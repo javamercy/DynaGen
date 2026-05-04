@@ -50,5 +50,3 @@ class ParsedCandidateResponse:
             thought=str(data["thought"]).strip(),
             code=str(data["code"]).strip(),
         )
-
-# DONE

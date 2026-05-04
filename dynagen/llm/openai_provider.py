@@ -45,5 +45,3 @@ class OpenAIProvider(LLMProvider):
             parsed_candidate_response=ParsedCandidateResponse.from_json(content),
             metadata=metadata,
         )
-
-# DONE

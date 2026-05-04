@@ -39,5 +39,3 @@ def tour_length(distance_matrix: np.ndarray, tour: Sequence[int] | np.ndarray) -
     nodes = validate_tour(tour, matrix.shape[0])
     next_nodes = np.roll(nodes, -1)
     return float(matrix[nodes, next_nodes].sum())
-
-# DONE

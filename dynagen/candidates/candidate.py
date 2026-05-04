@@ -66,5 +66,3 @@ class Candidate:
 
         candidate_dict.setdefault("code", "")
         return cls(**candidate_dict)
-
-# DONE

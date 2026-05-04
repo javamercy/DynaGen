@@ -135,5 +135,3 @@ def euclidean_distance_matrix(
 
     np.fill_diagonal(distances, 0.0)
     return distances.astype(float)
-
-# DONE

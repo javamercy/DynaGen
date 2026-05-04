@@ -66,5 +66,3 @@ def _sort_key(candidate: Candidate) -> tuple[int, float, str]:
     status_rank = _STATUS_ORDER.get(candidate.status, 99)
     fitness = candidate.fitness if candidate.fitness is not None else float("inf")
     return status_rank, fitness, candidate.id
-
-# DONE

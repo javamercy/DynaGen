@@ -24,5 +24,3 @@ class LLMProvider(ABC):
             temperature: float,
     ) -> LLMResponse:
         raise NotImplementedError
-
-# DONE

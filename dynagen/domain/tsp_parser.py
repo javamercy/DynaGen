@@ -124,5 +124,3 @@ def full_matrix(weights: list[float], dimension: int) -> np.ndarray:
         raise ValueError(f"FULL_MATRIX expected {expected} weights, got {len(weights)}")
 
     return np.asarray(weights, dtype=float).reshape((dimension, dimension))
-
-# DONE

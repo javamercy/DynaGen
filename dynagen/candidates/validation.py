@@ -127,5 +127,3 @@ def _validate_call(node: ast.Call) -> ValidationResult:
     if isinstance(func, ast.Attribute) and func.attr in UNSAFE_ATTRIBUTES:
         return ValidationResult(False, f"Unsafe attribute call not allowed: {func.attr}")
     return ValidationResult(True)
-
-# DONE
