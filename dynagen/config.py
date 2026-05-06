@@ -12,7 +12,7 @@ class LLMConfig:
     provider: str
     model: str
     temperature: float
-    api_key_env: str
+    api_key_env: str | None = None
 
     def __post_init__(self) -> None:
         if not self.provider:
@@ -21,7 +21,7 @@ class LLMConfig:
             raise ValueError("model must be specified")
         if self.temperature < 0 or self.temperature > 2:
             raise ValueError("temperature must be between 0 and 2")
-        if not self.api_key_env:
+        if not self.provider.startswith("ollama") and not self.api_key_env:
             raise ValueError("api_key_env must be specified")
 
 
