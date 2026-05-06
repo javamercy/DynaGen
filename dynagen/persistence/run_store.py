@@ -73,7 +73,7 @@ class RunStore:
     def save_test_result(self, candidate_id: str, result: EvaluationResult) -> None:
         dump_json(self.root / "test_result.json", {
             "candidate_id": candidate_id,
-            "status": result.status.value,
+            "status": result.status,
             "fitness": result.fitness,
             "metrics": result.metrics,
         })

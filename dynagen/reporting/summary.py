@@ -54,7 +54,7 @@ def build_final_report(
                 "",
                 "## Test Evaluation",
                 "",
-                f"- Status: {test_result.status.value}",
+                f"- Status: {test_result.status}",
                 f"- Test fitness (mean gap): {test_result.fitness}",
                 f"- Instances evaluated: {instances_evaluated}",
                 f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",

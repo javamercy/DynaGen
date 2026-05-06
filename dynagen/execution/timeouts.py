@@ -3,21 +3,17 @@ import queue
 import time
 import traceback
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
 
-class SolverExecutionStatus(StrEnum):
-    OK = "ok"
-    TIMEOUT = "timeout"
-    ERROR = "error"
+SolverExecutionStatus = Literal["ok", "timeout", "error"]
 
 
 @dataclass(frozen=True)
 class SolverExecutionResult:
-    status: str
+    status: SolverExecutionStatus
     value: Any = None
     runtime_seconds: float = 0.0
     error: str | None = None
@@ -45,14 +41,14 @@ def execute_solver_code(
         if process.is_alive():
             process.kill()
             process.join()
-        return SolverExecutionResult(SolverExecutionStatus.TIMEOUT, runtime_seconds=runtime, error="Solver timed out")
+        return SolverExecutionResult("timeout", runtime_seconds=runtime, error="Solver timed out")
     try:
         status, value, child_runtime, error = result_queue.get_nowait()
     except queue.Empty:
         if process.exitcode == 0:
-            return SolverExecutionResult(SolverExecutionStatus.ERROR, runtime_seconds=runtime,
+            return SolverExecutionResult("error", runtime_seconds=runtime,
                                          error="Solver exited without returning a result")
-        return SolverExecutionResult(SolverExecutionStatus.ERROR, runtime_seconds=runtime,
+        return SolverExecutionResult("error", runtime_seconds=runtime,
                                      error=f"Solver process exited with code {process.exitcode}")
     return SolverExecutionResult(status, value=value, runtime_seconds=child_runtime, error=error)
 

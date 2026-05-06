@@ -1,17 +1,13 @@
 from dataclasses import dataclass
 
 import traceback
-from enum import StrEnum
+from typing import Literal
 
 from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.execution.timeouts import execute_solver_code, SolverExecutionStatus
+from dynagen.execution.timeouts import execute_solver_code
 
 
-class SolverRunStatus(StrEnum):
-    VALID = "valid"
-    INVALID = "invalid"
-    TIMEOUT = "timeout"
-    ERROR = "error"
+SolverRunStatus = Literal["valid", "invalid", "timeout", "error"]
 
 
 @dataclass(frozen=True)
@@ -39,21 +35,21 @@ def run_solver(
         timeout_seconds=timeout_seconds,
     )
 
-    if execution.status == SolverExecutionStatus.TIMEOUT:
-        return SolverRunResult(SolverRunStatus.TIMEOUT, None, None, execution.runtime_seconds, execution.error)
+    if execution.status == "timeout":
+        return SolverRunResult("timeout", None, None, execution.runtime_seconds, execution.error)
 
     if execution.status != "ok":
-        return SolverRunResult(SolverRunStatus.ERROR, None, None, execution.runtime_seconds, execution.error)
+        return SolverRunResult("error", None, None, execution.runtime_seconds, execution.error)
 
     try:
         tour = instance.validate_tour(execution.value).astype(int).tolist()
         length = instance.tour_length(tour)
     except Exception:
         return SolverRunResult(
-            SolverRunStatus.INVALID,
+            "invalid",
             None,
             None,
             execution.runtime_seconds,
             error=traceback.format_exc()
         )
-    return SolverRunResult(SolverRunStatus.VALID, tour, length, execution.runtime_seconds)
+    return SolverRunResult("valid", tour, length, execution.runtime_seconds)

@@ -1,21 +1,16 @@
 import math
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
 from dynagen.candidates.validation import validate_generated_code
 from dynagen.domain.tsp_instance import TSPInstance
 from dynagen.evaluation.metrics import aggregate_records, compute_gap
-from dynagen.execution.runner import SolverRunStatus, run_solver
+from dynagen.execution.runner import run_solver
 
 
-class EvaluationStatus(StrEnum):
-    VALID = "valid"
-    INVALID = "invalid"
-    TIMEOUT = "timeout"
-    ERROR = "error"
+EvaluationStatus = Literal["valid", "invalid", "timeout", "error"]
 
 
 @dataclass(frozen=True)
@@ -53,7 +48,7 @@ class CandidateEvaluator:
 
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
         result = self.evaluate_code(candidate.code)
-        candidate.status = CandidateStatus(result.status.value)  # TODO: fix here
+        candidate.status = CandidateStatus(result.status)
         candidate.fitness = result.fitness
         candidate.metrics = result.metrics
         return result
@@ -62,7 +57,7 @@ class CandidateEvaluator:
         validation = validate_generated_code(code)
         if not validation.valid:
             metrics = self._with_context(aggregate_records([]))
-            return EvaluationResult(EvaluationStatus.INVALID, math.inf, metrics)
+            return EvaluationResult("invalid", math.inf, metrics)
 
         records: list[dict[str, Any]] = []
 
@@ -76,7 +71,7 @@ class CandidateEvaluator:
                     timeout_seconds=self.timeout_seconds,
                 )
 
-                is_valid = run.status == SolverRunStatus.VALID
+                is_valid = run.status == "valid"
                 gap = compute_gap(run.tour_length,
                                   instance.optimal_length) if is_valid and run.tour_length is not None else None
                 records.append({
@@ -85,7 +80,7 @@ class CandidateEvaluator:
                     "dimension": instance.dimension,
                     "source": instance.metadata.get("source", "unknown"),
                     "seed": seed,
-                    "status": run.status.value,
+                    "status": run.status,
                     "tour_length": run.tour_length,
                     "reference_length": instance.optimal_length,
                     "reference_kind": "optimal",
@@ -95,8 +90,8 @@ class CandidateEvaluator:
                 })
         metrics = self._with_context(aggregate_records(records))
         status = _candidate_status(metrics)
-        fitness = metrics["mean_gap"] if status == EvaluationStatus.VALID else math.inf
-        error_feedback = _error_feedback(records) if status != EvaluationStatus.VALID else None
+        fitness = metrics["mean_gap"] if status == "valid" else math.inf
+        error_feedback = _error_feedback(records) if status != "valid" else None
         return EvaluationResult(status, fitness, metrics, error_feedback)
 
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
@@ -109,14 +104,14 @@ class CandidateEvaluator:
 
 def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     if metrics["timeout_count"]:
-        return EvaluationStatus.TIMEOUT
+        return "timeout"
     if metrics["runtime_error_count"]:
-        return EvaluationStatus.ERROR
+        return "error"
     if metrics["invalid_tour_count"]:
-        return EvaluationStatus.INVALID
+        return "invalid"
     if metrics["runs"] and metrics["valid_count"] == metrics["runs"]:
-        return EvaluationStatus.VALID
-    return EvaluationStatus.INVALID
+        return "valid"
+    return "invalid"
 
 
 def _error_feedback(records: list[dict[str, Any]]) -> str | None:
