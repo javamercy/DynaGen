@@ -75,6 +75,7 @@ class RunStore:
             "candidate_id": candidate_id,
             "status": result.status,
             "fitness": result.fitness,
+            "error_details": result.error_feedback,
             "metrics": result.metrics,
         })
 

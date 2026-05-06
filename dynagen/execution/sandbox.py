@@ -62,12 +62,17 @@ SAFE_BUILTINS = {
 }
 
 
-def load_tsp_solver(code: str, *, validate_static: bool = True) -> Callable[..., object]:
+def load_tsp_solver(
+        code: str,
+        *,
+        validate_static: bool = True,
+        best_tour_reporter: Callable[[object], None] | None = None,
+) -> Callable[..., object]:
     if validate_static:
         result = validate_generated_code(code)
         if not result.valid:
             raise ValueError(result.error)
-    namespace = _sandbox_namespace()
+    namespace = _sandbox_namespace(best_tour_reporter=best_tour_reporter)
     exec(compile(code, "<generated_candidate>", "exec"), namespace, namespace)
     solver = namespace.get("solve_tsp")
     if not callable(solver):
@@ -75,7 +80,7 @@ def load_tsp_solver(code: str, *, validate_static: bool = True) -> Callable[...,
     return solver
 
 
-def _sandbox_namespace() -> dict[str, Any]:
+def _sandbox_namespace(*, best_tour_reporter: Callable[[object], None] | None = None) -> dict[str, Any]:
     safe_builtins = dict(SAFE_BUILTINS)
     safe_builtins["__import__"] = _safe_import
     namespace: dict[str, Any] = {
@@ -85,12 +90,17 @@ def _sandbox_namespace() -> dict[str, Any]:
         "numpy": np,
         "math": math,
         "random": random,
+        "report_best_tour": best_tour_reporter or _ignore_best_tour,
         "heapq": heapq,
         "itertools": itertools,
         "collections": collections,
         "time": time,
     }
     return namespace
+
+
+def _ignore_best_tour(tour: object) -> None:
+    return None
 
 
 def _safe_import(name: str, globals=None, locals=None, fromlist=(), level: int = 0):

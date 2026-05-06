@@ -32,18 +32,19 @@ def build_final_report(
         lines.append(f"| {rank} | `{candidate.id}` | {candidate.status} | {fitness} | {candidate.name} |")
     if ordered:
         best = search_best or ordered[0]
-        lines.extend(
-            [
-                "",
-                "## Search Best Candidate",
-                "",
-                f"- ID: `{best.id}`",
-                f"- Name: {best.name}",
-                f"- Status: {best.status}",
-                f"- Search fitness: {best.fitness}",
-                f"- Thought: {best.thought}",
-            ]
-        )
+        best_lines = [
+            "",
+            "## Search Best Candidate",
+            "",
+            f"- ID: `{best.id}`",
+            f"- Name: {best.name}",
+            f"- Status: {best.status}",
+            f"- Search fitness: {best.fitness}",
+            f"- Thought: {best.thought}",
+        ]
+        if best.error_details:
+            best_lines.append(f"- Error details: {best.error_details}")
+        lines.extend(best_lines)
     if test_result is not None:
         metrics = test_result.metrics
         runs = int(metrics.get("runs") or 0)
@@ -55,15 +56,21 @@ def build_final_report(
                 "## Test Evaluation",
                 "",
                 f"- Status: {test_result.status}",
-                f"- Test fitness (mean gap): {test_result.fitness}",
+                f"- Test fitness: {test_result.fitness}",
                 f"- Instances evaluated: {instances_evaluated}",
                 f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
                 f"- Mean gap: {metrics.get('mean_gap')}",
+                f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
+                f"- Timeout penalty: {metrics.get('timeout_penalty')}",
                 f"- Median gap: {metrics.get('median_gap')}",
                 f"- Worst gap: {metrics.get('worst_gap')}",
                 f"- Best gap: {metrics.get('best_gap')}",
             ]
         )
+        if test_result.error_feedback:
+            lines.append(f"- Error details: {test_result.error_feedback}")
     return "\n".join(lines) + "\n"
 
 

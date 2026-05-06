@@ -1,5 +1,6 @@
 import math
 import random
+import traceback
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
@@ -70,6 +71,7 @@ class EvolutionEngine:
             messages = build_initial_prompt(role)
             prompt = _format_messages(messages)
             candidate_id = self.store.next_candidate_id()
+            candidate: Candidate | None = None
             try:
                 response = self.provider.complete(
                     messages,
@@ -84,12 +86,17 @@ class EvolutionEngine:
                 )
                 self.search_evaluator.evaluate_candidate(candidate)
             except Exception:
-                candidate = _failed_candidate(
-                    candidate_id=candidate_id,
-                    generation=0,
-                    strategy=f"initial:{role.slot}",
-                    prompt=prompt,
-                )
+                error_details = _exception_details()
+                if candidate is None:
+                    candidate = _failed_candidate(
+                        candidate_id=candidate_id,
+                        generation=0,
+                        strategy=f"initial:{role.slot}",
+                        prompt=prompt,
+                        error_details=error_details,
+                    )
+                else:
+                    _mark_candidate_error(candidate, error_details)
             self.store.save_candidate(candidate)
             candidates.append(candidate)
         return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
@@ -101,6 +108,7 @@ class EvolutionEngine:
                 candidate_id = self.store.next_candidate_id()
                 parents: list[Candidate] = []
                 prompt = ""
+                candidate: Candidate | None = None
                 try:
                     parents = self._select_strategy_parents(strategy, population.candidates)
                     messages = build_evolution_prompt(strategy, parents)
@@ -118,14 +126,19 @@ class EvolutionEngine:
                         prompt=prompt,
                     )
                     self.search_evaluator.evaluate_candidate(candidate)
-                except Exception as exc:
-                    candidate = _failed_candidate(
-                        candidate_id=candidate_id,
-                        generation=generation,
-                        strategy=strategy,
-                        parents=[parent.id for parent in parents],
-                        prompt=prompt,
-                    )
+                except Exception:
+                    error_details = _exception_details()
+                    if candidate is None:
+                        candidate = _failed_candidate(
+                            candidate_id=candidate_id,
+                            generation=generation,
+                            strategy=strategy,
+                            parents=[parent.id for parent in parents],
+                            prompt=prompt,
+                            error_details=error_details,
+                        )
+                    else:
+                        _mark_candidate_error(candidate, error_details)
                 self.store.save_candidate(candidate)
                 offspring.append(candidate)
         return offspring
@@ -173,6 +186,7 @@ def _failed_candidate(
         strategy: str,
         prompt: str,
         parents: list[str] | None = None,
+        error_details: str | None = None,
 ) -> Candidate:
     return Candidate(
         id=candidate_id,
@@ -186,7 +200,20 @@ def _failed_candidate(
         metrics=aggregate_records([]),
         status=CandidateStatus.ERROR,
         prompt=prompt,
+        error_details=error_details,
     )
+
+
+def _exception_details() -> str:
+    return traceback.format_exc(limit=20).strip()
+
+
+def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
+    candidate.status = CandidateStatus.ERROR
+    candidate.fitness = math.inf
+    if not candidate.metrics:
+        candidate.metrics = aggregate_records([])
+    candidate.error_details = error_details
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:

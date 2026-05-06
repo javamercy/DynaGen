@@ -26,6 +26,7 @@ class Candidate:
     metrics: dict[str, Any] = field(default_factory=dict)
     prompt: str = ""
     raw_response: str = ""
+    error_details: str | None = None
     status: CandidateStatus = CandidateStatus.PENDING
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -46,6 +47,7 @@ class Candidate:
             "metrics": self.metrics,
             "prompt": self.prompt,
             "raw_response": self.raw_response,
+            "error_details": self.error_details,
             "status": self.status.value,
             "created_at": self.created_at,
         }
@@ -65,4 +67,5 @@ class Candidate:
             candidate_dict["code"] = code
 
         candidate_dict.setdefault("code", "")
+        candidate_dict.setdefault("error_details", None)
         return cls(**candidate_dict)

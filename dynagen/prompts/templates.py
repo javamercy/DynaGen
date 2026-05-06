@@ -8,6 +8,8 @@ Rules:
 - distance_matrix is a square NumPy array.
 - Return a 1D NumPy array or list containing each node id exactly once.
 - Do not repeat the starting node at the end; the evaluator closes the cycle.
+- A global helper report_best_tour(tour) is available. Call it whenever you improve your incumbent tour so the evaluator can score your best reported tour if the solver times out.
+- report_best_tour accepts the same tour format as the final return value and does not replace returning a final tour.
 - seed must control stochastic behavior! You don't have to use it if not needed.
 - budget is a hard iteration/evaluation cap only; use it to limit compute, not to shape the solver's core design.
 - Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
@@ -49,5 +51,8 @@ def _render_candidate(candidate: Candidate) -> str:
         candidate.code,
         "```",
     ]
+
+    if candidate.error_details:
+        parts.insert(4, f"Error details: {candidate.error_details}")
 
     return "\n".join(parts)

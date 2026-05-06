@@ -29,7 +29,8 @@ class CandidateEvaluator:
             seeds: tuple[int, ...] | list[int],
             budget: int,
             timeout_seconds: float,
-            pool_name: str
+            pool_name: str,
+            timeout_penalty: float = 10.0,
     ) -> None:
         if not instances:
             raise ValueError("At least one instance is required for evaluation")
@@ -37,6 +38,8 @@ class CandidateEvaluator:
             raise ValueError("Budget must be a positive integer")
         if timeout_seconds <= 0:
             raise ValueError("Timeout must be a positive number")
+        if timeout_penalty < 0:
+            raise ValueError("Timeout penalty must be non-negative")
         if not pool_name:
             raise ValueError("Pool name cannot be empty")
 
@@ -44,6 +47,7 @@ class CandidateEvaluator:
         self.seeds = tuple(int(seed) for seed in seeds)
         self.budget = int(budget)
         self.timeout_seconds = float(timeout_seconds)
+        self.timeout_penalty = float(timeout_penalty)
         self.pool_name = pool_name
 
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
@@ -51,13 +55,14 @@ class CandidateEvaluator:
         candidate.status = CandidateStatus(result.status)
         candidate.fitness = result.fitness
         candidate.metrics = result.metrics
+        candidate.error_details = result.error_feedback
         return result
 
     def evaluate_code(self, code: str) -> EvaluationResult:
         validation = validate_generated_code(code)
         if not validation.valid:
-            metrics = self._with_context(aggregate_records([]))
-            return EvaluationResult("invalid", math.inf, metrics)
+            metrics = self._with_context(aggregate_records([], timeout_penalty=self.timeout_penalty))
+            return EvaluationResult("invalid", math.inf, metrics, validation.error)
 
         records: list[dict[str, Any]] = []
 
@@ -71,9 +76,9 @@ class CandidateEvaluator:
                     timeout_seconds=self.timeout_seconds,
                 )
 
-                is_valid = run.status == "valid"
+                scored = run.status == "valid" or run.partial
                 gap = compute_gap(run.tour_length,
-                                  instance.optimal_length) if is_valid and run.tour_length is not None else None
+                                  instance.optimal_length) if scored and run.tour_length is not None else None
                 records.append({
                     "instance": instance.name,
                     "pool": self.pool_name,
@@ -82,15 +87,16 @@ class CandidateEvaluator:
                     "seed": seed,
                     "status": run.status,
                     "tour_length": run.tour_length,
+                    "partial": run.partial,
                     "reference_length": instance.optimal_length,
                     "reference_kind": "optimal",
                     "gap": gap,
                     "runtime_seconds": run.runtime_seconds,
                     "error": run.error,
                 })
-        metrics = self._with_context(aggregate_records(records))
+        metrics = self._with_context(aggregate_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        fitness = metrics["mean_gap"] if status == "valid" else math.inf
+        fitness = _candidate_fitness(status, metrics)
         error_feedback = _error_feedback(records) if status != "valid" else None
         return EvaluationResult(status, fitness, metrics, error_feedback)
 
@@ -99,6 +105,7 @@ class CandidateEvaluator:
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
+        metrics["timeout_penalty"] = self.timeout_penalty
         return metrics
 
 
@@ -112,6 +119,14 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     if metrics["runs"] and metrics["valid_count"] == metrics["runs"]:
         return "valid"
     return "invalid"
+
+
+def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
+    if status == "valid":
+        return metrics["mean_gap"] if metrics["mean_gap"] is not None else math.inf
+    if status == "timeout" and metrics.get("scored_count", 0):
+        return metrics["penalized_mean_gap"] if metrics["penalized_mean_gap"] is not None else math.inf
+    return math.inf
 
 
 def _error_feedback(records: list[dict[str, Any]]) -> str | None:

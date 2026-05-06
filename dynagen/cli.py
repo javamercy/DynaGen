@@ -49,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
+            timeout_penalty=config.evaluation.timeout_penalty,
             pool_name="search_instances",
         )
         test_instances = _load_instances(config.data.test_instances)
@@ -57,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
+            timeout_penalty=config.evaluation.timeout_penalty,
             pool_name="test_instances",
         )
 
@@ -80,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
+            timeout_penalty=config.evaluation.timeout_penalty,
             pool_name="search_instances",
         )
         result = search_evaluator.evaluate_code(code)

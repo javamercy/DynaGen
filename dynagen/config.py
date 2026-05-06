@@ -50,6 +50,7 @@ class EvaluationConfig:
     timeout_seconds: float
     seeds: list[int]
     metric: str
+    timeout_penalty: float = 10.0
 
     def __post_init__(self) -> None:
         if not self.seeds:
@@ -66,12 +67,16 @@ class EvaluationConfig:
 
         self.budget = int(self.budget)
         self.timeout_seconds = float(self.timeout_seconds)
+        self.timeout_penalty = float(self.timeout_penalty)
 
         if self.budget < 1:
             raise ValueError("budget must be at least 1")
 
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+
+        if self.timeout_penalty < 0:
+            raise ValueError("timeout_penalty must be non-negative")
 
 
 @dataclass
