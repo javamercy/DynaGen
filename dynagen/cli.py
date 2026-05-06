@@ -42,13 +42,21 @@ def main(argv: list[str] | None = None) -> int:
         except RuntimeError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        instances = _load_search_instances(config.data.search_instances)
+        search_instances = _load_instances(config.data.search_instances)
         search_evaluator = CandidateEvaluator(
-            instances,
+            search_instances,
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
             pool_name="search_instances",
+        )
+        test_instances = _load_instances(config.data.test_instances)
+        test_evaluator = CandidateEvaluator(
+            test_instances,
+            seeds=config.evaluation.seeds,
+            budget=config.evaluation.budget,
+            timeout_seconds=config.evaluation.timeout_seconds,
+            pool_name="test_instances",
         )
 
         store = RunStore.create(config.output_dir, config.name, config.to_dict())
@@ -56,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             config=config,
             provider=provider,
             search_evaluator=search_evaluator,
+            test_evaluator=test_evaluator,
             store=store,
         ).run()
         print(store.root)
@@ -64,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "evaluate-candidate":
         config = load_config(args.config)
         code = args.candidate.read_text(encoding="utf-8")
-        instances = _load_search_instances(config.data.search_instances)
+        instances = _load_instances(config.data.search_instances)
         search_evaluator = CandidateEvaluator(
             instances,
             seeds=config.evaluation.seeds,
@@ -87,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
-def _load_search_instances(path: str | Path):
+def _load_instances(path: str | Path):
     path = Path(path)
     if path.is_dir():
         files = sorted(item for item in path.iterdir() if item.suffix.lower() == ".tsp")

@@ -23,11 +23,13 @@ class EvolutionEngine:
             config: RunConfig,
             provider: LLMProvider,
             search_evaluator: CandidateEvaluator,
+            test_evaluator: CandidateEvaluator,
             store: RunStore,
     ) -> None:
         self.config = config
         self.provider = provider
         self.search_evaluator = search_evaluator
+        self.test_evaluator = test_evaluator
         self.store = store
         self.rng = random.Random(config.seed)
 
@@ -51,10 +53,13 @@ class EvolutionEngine:
                 summary=summary,
             )
         search_best = population.best
+        test_result = self.test_evaluator.evaluate_code(search_best.code)
+        self.store.save_test_result(search_best.id, test_result)
         self.store.write_final_report(
             build_final_report(
                 population.candidates,
                 search_best=search_best,
+                test_result=test_result,
             )
         )
         return population

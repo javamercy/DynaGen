@@ -77,10 +77,13 @@ class EvaluationConfig:
 @dataclass
 class DataConfig:
     search_instances: str
+    test_instances: str
 
     def __post_init__(self) -> None:
-        if self.search_instances is None:
+        if not self.search_instances:
             raise ValueError("search_instances must be specified")
+        if not self.test_instances:
+            raise ValueError("test_instances must be specified")
 
 
 @dataclass

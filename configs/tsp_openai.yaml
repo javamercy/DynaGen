@@ -1,24 +1,25 @@
 run:
   name: tsp_openai
   output_dir: runs
-  seed: 99
+  seed: 23
 
 llm:
   provider: openai
-  model: gpt-5.4-mini
+  model: gpt-5.4-nano
   temperature: 0.5
   api_key_env: OPENAI_API_KEY
 
 evolution:
-  population_size: 3
-  generations: 3
+  population_size: 1
+  generations: 1
   offspring_per_strategy: 1
 
 evaluation:
   budget: 1000
   timeout_seconds: 60
-  seeds: [ 31, 69 ]
+  seeds: [ 11, 22 ]
   metric: average_gap
 
 data:
   search_instances: data/tsp/search_instances
+  test_instances: data/tsp/test_instances

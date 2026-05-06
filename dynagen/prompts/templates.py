@@ -15,14 +15,6 @@ Rules:
 - The solver must work across different TSP sizes.
 """
 
-NON_CANONICAL_SEARCH_GUIDANCE = """
-Search-space guidance:
-- Do not submit a solver whose main idea is a standard TSP template: nearest neighbor, greedy insertion, cheapest/farthest/nearest insertion, 2-opt, 3-opt, Lin-Kernighan-style search, simulated annealing, tabu search, genetic algorithms, ant colony/pheromone logic, or simple multi-start variants of those.
-- Small repair or cleanup routines are acceptable only if they are not the core algorithmic idea.
-- The main solver should explore less-obvious mechanisms, such as learned scoring surrogates from the distance matrix, spectral/linear-algebraic structure, adaptive decomposition, graph signal processing, constraint propagation, ensemble voting over unusual embeddings, or other non-canonical search spaces.
-- The Thought must name the non-canonical mechanism and explain why it is not just a renamed known heuristic.
-"""
-
 RESPONSE_FORMAT = """
 Return exactly JSON object below!! ONLY JSON OBJECT, NO EXPLANATION, NO MARKDOWN, NO TEXT:
 {{
@@ -49,7 +41,7 @@ def _render_candidate(candidate: Candidate) -> str:
     metrics = candidate.metrics or {}
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; fitness: {fitness}",
+        f"Status: {candidate.status}; fitness: {fitness}%",
         f"Thought: {candidate.thought}",
         f"Mean runtime: {metrics.get('mean_runtime')}",
         "Code:",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dynagen.candidates.candidate import Candidate
-from dynagen.prompts.templates import NON_CANONICAL_SEARCH_GUIDANCE, RESPONSE_FORMAT, SOLVER_CONTRACT, render_candidates
+from dynagen.prompts.templates import RESPONSE_FORMAT, SOLVER_CONTRACT, render_candidates
 
 STRATEGY_INSTRUCTIONS = {
     "E1": """Divergent Exploration: generate a full TSP solver that differs substantially from the selected parents. Do not merely tune parameters; explore a different algorithmic family or hybrid while preserving the contract.""",

@@ -1,5 +1,6 @@
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
+from dynagen.evaluation.evaluator import EvaluationResult
 from dynagen.evolution.selection import select_survivors
 
 
@@ -21,6 +22,7 @@ def build_final_report(
         population: list[Candidate],
         *,
         search_best: Candidate | None = None,
+        test_result: EvaluationResult | None = None,
 ) -> str:
     ordered = select_survivors(population, len(population)) if population else []
     lines = ["# DynaGen Final Report", "", "## Final Population", "",
@@ -40,6 +42,26 @@ def build_final_report(
                 f"- Status: {best.status}",
                 f"- Search fitness: {best.fitness}",
                 f"- Thought: {best.thought}",
+            ]
+        )
+    if test_result is not None:
+        metrics = test_result.metrics
+        runs = int(metrics.get("runs") or 0)
+        seed_count = len(metrics.get("seeds") or [])
+        instances_evaluated = runs // seed_count if seed_count else runs
+        lines.extend(
+            [
+                "",
+                "## Test Evaluation",
+                "",
+                f"- Status: {test_result.status.value}",
+                f"- Test fitness (mean gap): {test_result.fitness}",
+                f"- Instances evaluated: {instances_evaluated}",
+                f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                f"- Mean gap: {metrics.get('mean_gap')}",
+                f"- Median gap: {metrics.get('median_gap')}",
+                f"- Worst gap: {metrics.get('worst_gap')}",
+                f"- Best gap: {metrics.get('best_gap')}",
             ]
         )
     return "\n".join(lines) + "\n"

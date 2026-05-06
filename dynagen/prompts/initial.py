@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dynagen.prompts.templates import NON_CANONICAL_SEARCH_GUIDANCE, RESPONSE_FORMAT, SOLVER_CONTRACT, \
-    base_system_prompt
+from dynagen.prompts.templates import RESPONSE_FORMAT, SOLVER_CONTRACT, base_system_prompt
 
 
 @dataclass(frozen=True)

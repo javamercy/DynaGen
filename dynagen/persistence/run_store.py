@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from dynagen.candidates.candidate import Candidate
+from dynagen.evaluation.evaluator import EvaluationResult
 from dynagen.persistence.serialization import dump_json, load_json
 
 
@@ -68,6 +69,14 @@ class RunStore:
 
     def save_split_manifest(self, manifest: dict[str, Any]) -> None:
         dump_json(self.root / "split_manifest.json", manifest)
+
+    def save_test_result(self, candidate_id: str, result: EvaluationResult) -> None:
+        dump_json(self.root / "test_result.json", {
+            "candidate_id": candidate_id,
+            "status": result.status.value,
+            "fitness": result.fitness,
+            "metrics": result.metrics,
+        })
 
     def write_final_report(self, text: str) -> None:
         (self.root / "final_report.md").write_text(text, encoding="utf-8")
