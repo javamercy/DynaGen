@@ -5,7 +5,8 @@ from pathlib import Path
 from dynagen.config import RunConfig, load_config
 from dynagen.domain import load_tsplib_file
 from dynagen.evaluation.evaluator import CandidateEvaluator
-from dynagen.evolution.engine import EvolutionEngine
+from dynagen.evolution.engine import EvolutionEngine, scheduled_llm_calls
+from dynagen.llm import CountingLLMProvider
 from dynagen.llm.ollama_provider import OllamaProvider
 from dynagen.llm.openai_provider import OpenAIProvider
 from dynagen.persistence.run_store import RunStore
@@ -112,9 +113,11 @@ def _load_instances(path: str | Path):
 
 def _provider_from_config(config: RunConfig):
     if config.llm.provider == "openai":
-        return OpenAIProvider(model=config.llm.model, api_key_env=config.llm.api_key_env)
+        provider = OpenAIProvider(model=config.llm.model, api_key_env=config.llm.api_key_env)
+        return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
     if config.llm.provider.startswith("ollama"):
-        return OllamaProvider(model=config.llm.model)
+        provider = OllamaProvider(model=config.llm.model)
+        return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
     raise ValueError(f"Unsupported provider: {config.llm.provider}")
 
 

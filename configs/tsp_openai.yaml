@@ -5,7 +5,7 @@ run:
 
 llm:
   provider: openai
-  model: gpt-5.4-nano
+  model: gpt-5.4-mini
   temperature: 0.5
   api_key_env: OPENAI_API_KEY
 
@@ -17,6 +17,7 @@ evolution:
 evaluation:
   budget: 1000
   timeout_seconds: 60
+  timeout_penalty: 0
   seeds: [ 11, 22 ]
   metric: average_gap
 

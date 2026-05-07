@@ -79,6 +79,9 @@ class RunStore:
             "metrics": result.metrics,
         })
 
+    def save_llm_calls(self, summary: dict[str, Any]) -> None:
+        dump_json(self.root / "llm_calls.json", summary)
+
     def write_final_report(self, text: str) -> None:
         (self.root / "final_report.md").write_text(text, encoding="utf-8")
 

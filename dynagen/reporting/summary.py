@@ -23,6 +23,7 @@ def build_final_report(
         *,
         search_best: Candidate | None = None,
         test_result: EvaluationResult | None = None,
+        llm_calls: dict | None = None,
 ) -> str:
     ordered = select_survivors(population, len(population)) if population else []
     lines = ["# DynaGen Final Report", "", "## Final Population", "",
@@ -71,6 +72,19 @@ def build_final_report(
         )
         if test_result.error_feedback:
             lines.append(f"- Error details: {test_result.error_feedback}")
+    if llm_calls is not None:
+        lines.extend(
+            [
+                "",
+                "## LLM Calls",
+                "",
+                f"- Candidate-generation calls: {llm_calls.get('candidate_generation_calls')}",
+                f"- Total API calls: {llm_calls.get('total_api_calls')}",
+                f"- Failed calls: {llm_calls.get('failed_calls')}",
+                f"- Configured candidate-generation budget: {llm_calls.get('configured_candidate_generation_budget')}",
+                f"- Budget match: {llm_calls.get('budget_match')}",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 

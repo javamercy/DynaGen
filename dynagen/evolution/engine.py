@@ -56,14 +56,29 @@ class EvolutionEngine:
         search_best = population.best
         test_result = self.test_evaluator.evaluate_code(search_best.code)
         self.store.save_test_result(search_best.id, test_result)
+        llm_calls = self._llm_call_summary()
+        self.store.save_llm_calls(llm_calls)
         self.store.write_final_report(
             build_final_report(
                 population.candidates,
                 search_best=search_best,
                 test_result=test_result,
+                llm_calls=llm_calls,
             )
         )
         return population
+
+    def _llm_call_summary(self) -> dict:
+        summary_getter = getattr(self.provider, "summary", None)
+        summary = dict(summary_getter()) if callable(summary_getter) else {}
+        configured_budget = scheduled_llm_calls(self.config)
+        summary.setdefault("candidate_generation_calls", None)
+        summary.setdefault("total_api_calls", None)
+        summary.setdefault("failed_calls", None)
+        summary["configured_candidate_generation_budget"] = configured_budget
+        calls = summary.get("candidate_generation_calls")
+        summary["budget_match"] = calls == configured_budget if calls is not None else None
+        return summary
 
     def _initial_population(self) -> Population:
         candidates: list[Candidate] = []
@@ -153,6 +168,15 @@ def _initial_roles(count: int) -> list[InitialRole]:
         role = INITIAL_ROLES[index % len(INITIAL_ROLES)]
         roles.append(InitialRole(index + 1, role.role, role.intended_bias))
     return roles
+
+
+def scheduled_llm_calls(config: RunConfig) -> int:
+    return (
+        config.evolution.population_size
+        + config.evolution.generations
+        * len(config.evolution.strategies)
+        * config.evolution.offspring_per_strategy
+    )
 
 
 def _build_candidate_from_response(
