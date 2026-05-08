@@ -1,6 +1,5 @@
 import math
 import random
-import traceback
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
@@ -100,8 +99,8 @@ class EvolutionEngine:
                     prompt=prompt,
                 )
                 self.search_evaluator.evaluate_candidate(candidate)
-            except Exception:
-                error_details = _exception_details()
+            except Exception as exc:
+                error_details = _exception_details(exc)
                 if candidate is None:
                     candidate = _failed_candidate(
                         candidate_id=candidate_id,
@@ -141,8 +140,8 @@ class EvolutionEngine:
                         prompt=prompt,
                     )
                     self.search_evaluator.evaluate_candidate(candidate)
-                except Exception:
-                    error_details = _exception_details()
+                except Exception as exc:
+                    error_details = _exception_details(exc)
                     if candidate is None:
                         candidate = _failed_candidate(
                             candidate_id=candidate_id,
@@ -228,8 +227,9 @@ def _failed_candidate(
     )
 
 
-def _exception_details() -> str:
-    return traceback.format_exc(limit=20).strip()
+def _exception_details(exc: Exception) -> str:
+    message = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
 
 
 def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:

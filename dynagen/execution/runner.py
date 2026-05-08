@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import traceback
 from typing import Literal
 
 from dynagen.domain.tsp_instance import TSPInstance
@@ -51,13 +50,13 @@ def run_solver(
 
     try:
         tour, length = _validated_tour(instance, execution.value)
-    except Exception:
+    except Exception as exc:
         return SolverRunResult(
             "invalid",
             None,
             None,
             execution.runtime_seconds,
-            error=traceback.format_exc()
+            error=_short_error_message(exc)
         )
     return SolverRunResult("valid", tour, length, execution.runtime_seconds)
 
@@ -65,3 +64,9 @@ def run_solver(
 def _validated_tour(instance: TSPInstance, value: object) -> tuple[list[int], float]:
     tour = instance.validate_tour(value).astype(int).tolist()
     return tour, instance.tour_length(tour)
+
+
+def _short_error_message(exc: Exception) -> str:
+    message = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+

@@ -2,19 +2,17 @@ from enum import StrEnum
 
 
 class Strategy(StrEnum):
-    E1 = "E1"
-    E2 = "E2"
-    E3 = "E3"
-    M1 = "M1"
-    M2 = "M2"
+    S1 = "S1"
+    S2 = "S2"
+    S3 = "S3"
+    S4 = "S4"
 
 
 _PARENT_COUNTS: dict[Strategy, int] = {
-    Strategy.E1: 3,
-    Strategy.E2: 3,
-    Strategy.E3: 2,
-    Strategy.M1: 1,
-    Strategy.M2: 1,
+    Strategy.S1: 1,
+    Strategy.S2: 1,
+    Strategy.S3: 2,
+    Strategy.S4: 1,
 }
 
 

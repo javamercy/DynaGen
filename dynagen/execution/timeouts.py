@@ -1,7 +1,6 @@
 import multiprocessing as mp
 import queue
 import time
-import traceback
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -90,9 +89,9 @@ def _worker(code: str, distance_matrix: np.ndarray, seed: int, budget: int, resu
         tour = tsp_solver(distance_matrix.copy(), int(seed), int(budget))
         runtime = time.perf_counter() - start
         result_queue.put(("ok", np.asarray(tour).tolist(), runtime, None))
-    except Exception:
+    except Exception as exc:
         runtime = time.perf_counter() - start
-        result_queue.put(("error", None, runtime, traceback.format_exc(limit=20)))
+        result_queue.put(("error", None, runtime, _short_error_message(exc)))
 
 
 def _reported_tour(best_tour_a, best_tour_b, active_tour_index) -> Any | None:
@@ -101,6 +100,11 @@ def _reported_tour(best_tour_a, best_tour_b, active_tour_index) -> Any | None:
     if active_tour_index.value == 1:
         return list(best_tour_b)
     return None
+
+
+def _short_error_message(exc: Exception) -> str:
+    message = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
 
 
 def _multiprocessing_context():
