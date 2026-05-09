@@ -6,19 +6,19 @@ run:
 problem:
   type: bbob
   function_ids: [ 1, 2 ]
-  dimension: 3
+  dimension: 5
   search_instances: [ 1 ]
-  test_instances: [ 2 ]
-  test_dimensions: [ 3 ]
+  test_instances: [ 1,2 ]
+  test_dimensions: [ 5,10,20 ]
   bounds: [ -5.0, 5.0 ]
   aocc_lower_bound: 0.00000001
   aocc_upper_bound: 100.0
-  comparison_baselines: [ random_search, differential_evolution ]
+  comparison_baselines: [ random_search ]
 
 llm:
   provider: openai
   model: gpt-5.4-nano
-  temperature: 0.6
+  temperature: 0.7
   api_key_env: OPENAI_API_KEY
 
 evolution:
@@ -27,8 +27,8 @@ evolution:
   offspring_per_strategy: 1
 
 evaluation:
-  budget: 200
-  timeout_seconds: 15
+  budget: 1000
+  timeout_seconds: 60
   timeout_penalty: 0
-  seeds: [ 11 ]
+  seeds: [ 11,22,33 ]
   metric: mean_aocc
