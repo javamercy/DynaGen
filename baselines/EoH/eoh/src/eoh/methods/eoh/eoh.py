@@ -207,6 +207,7 @@ class EOH:
         best = population[0]
         test_result = interface_prob.evaluate_test(best["code"], timeout_seconds=self.timeout)
         payload = {
+            "llm_model": self.llm_model,
             "candidate": {
                 "algorithm": best.get("algorithm"),
                 "search_objective": best.get("objective"),
