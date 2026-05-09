@@ -1,5 +1,6 @@
 import math
 import random
+from typing import Any
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
@@ -11,8 +12,7 @@ from dynagen.evolution.selection import select_parents, select_survivors
 from dynagen.evolution.strategies import parent_count, Strategy
 from dynagen.llm.base import LLMProvider
 from dynagen.persistence.run_store import RunStore
-from dynagen.prompts.evolution import build_evolution_prompt
-from dynagen.prompts.initial import INITIAL_ROLES, InitialRole, build_initial_prompt
+from dynagen.prompts.problem import build_problem_evolution_prompt, build_problem_initial_prompt, initial_roles_for_problem
 from dynagen.reporting.summary import build_final_report, generation_summary
 
 
@@ -81,8 +81,8 @@ class EvolutionEngine:
 
     def _initial_population(self) -> Population:
         candidates: list[Candidate] = []
-        for role in _initial_roles(self.config.evolution.population_size):
-            messages = build_initial_prompt(role)
+        for role in _initial_roles(self.config.evolution.population_size, self.config.problem.type):
+            messages = build_problem_initial_prompt(role, self.config.problem.type)
             prompt = _format_messages(messages)
             candidate_id = self.store.next_candidate_id()
             candidate: Candidate | None = None
@@ -97,6 +97,7 @@ class EvolutionEngine:
                     generation=0,
                     strategy=f"initial:{role.slot}",
                     prompt=prompt,
+                    metrics=self._empty_metrics(),
                 )
                 self.search_evaluator.evaluate_candidate(candidate)
             except Exception as exc:
@@ -108,6 +109,7 @@ class EvolutionEngine:
                         strategy=f"initial:{role.slot}",
                         prompt=prompt,
                         error_details=error_details,
+                        metrics=self._empty_metrics(),
                     )
                 else:
                     _mark_candidate_error(candidate, error_details)
@@ -125,7 +127,7 @@ class EvolutionEngine:
                 candidate: Candidate | None = None
                 try:
                     parents = self._select_strategy_parents(strategy, population.candidates)
-                    messages = build_evolution_prompt(strategy, parents)
+                    messages = build_problem_evolution_prompt(strategy, parents, self.config.problem.type)
                     prompt = _format_messages(messages)
                     response = self.provider.complete(
                         messages,
@@ -138,6 +140,7 @@ class EvolutionEngine:
                         strategy=strategy,
                         parents=[parent.id for parent in parents],
                         prompt=prompt,
+                        metrics=self._empty_metrics(),
                     )
                     self.search_evaluator.evaluate_candidate(candidate)
                 except Exception as exc:
@@ -150,6 +153,7 @@ class EvolutionEngine:
                             parents=[parent.id for parent in parents],
                             prompt=prompt,
                             error_details=error_details,
+                            metrics=self._empty_metrics(),
                         )
                     else:
                         _mark_candidate_error(candidate, error_details)
@@ -160,13 +164,13 @@ class EvolutionEngine:
     def _select_strategy_parents(self, strategy: Strategy, candidates: list[Candidate]) -> list[Candidate]:
         return select_parents(candidates, parent_count(strategy), self.rng)
 
+    def _empty_metrics(self) -> dict:
+        metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
+        return dict(metrics_getter()) if callable(metrics_getter) else aggregate_records([])
 
-def _initial_roles(count: int) -> list[InitialRole]:
-    roles: list[InitialRole] = []
-    for index in range(count):
-        role = INITIAL_ROLES[index % len(INITIAL_ROLES)]
-        roles.append(InitialRole(index + 1, role.role, role.intended_bias))
-    return roles
+
+def _initial_roles(count: int, problem_type: str) -> list[Any]:
+    return initial_roles_for_problem(count, problem_type)
 
 
 def scheduled_llm_calls(config: RunConfig) -> int:
@@ -186,6 +190,7 @@ def _build_candidate_from_response(
         strategy: str,
         parents: list[str] | None = None,
         prompt: str,
+        metrics: dict | None = None,
 ) -> Candidate:
     return Candidate(
         id=candidate_id,
@@ -196,7 +201,7 @@ def _build_candidate_from_response(
         code=response.code,
         parents=list(parents or []),
         fitness=None,
-        metrics=aggregate_records([]),
+        metrics=dict(metrics or aggregate_records([])),
         status=CandidateStatus.PENDING,
         prompt=prompt,
     )
@@ -210,6 +215,7 @@ def _failed_candidate(
         prompt: str,
         parents: list[str] | None = None,
         error_details: str | None = None,
+        metrics: dict | None = None,
 ) -> Candidate:
     return Candidate(
         id=candidate_id,
@@ -220,7 +226,7 @@ def _failed_candidate(
         code="",
         parents=list(parents or []),
         fitness=math.inf,
-        metrics=aggregate_records([]),
+        metrics=dict(metrics or aggregate_records([])),
         status=CandidateStatus.ERROR,
         prompt=prompt,
         error_details=error_details,

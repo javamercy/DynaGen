@@ -11,7 +11,7 @@ CANDIDATE_RESPONSE_SCHEMA = {
             "type": "string",
             "minLength": 5,
             "maxLength": 25,
-            "description": "A short descriptive name for the generated TSP solver.",
+            "description": "A short descriptive name for the generated solver or optimizer.",
         },
         "thought": {
             "type": "string",
@@ -22,7 +22,7 @@ CANDIDATE_RESPONSE_SCHEMA = {
         "code": {
             "type": "string",
             "minLength": 1,
-            "description": "Complete Python source code defining solve_tsp(distance_matrix, seed, budget).",
+            "description": "Complete Python source code following the prompt's required interface.",
         },
     },
 }

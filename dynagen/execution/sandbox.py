@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from dynagen.candidates.validation import ALLOWED_IMPORTS, validate_generated_code
+from dynagen.candidates.validation import ALLOWED_IMPORTS, validate_bbob_generated_code, validate_generated_code
 
 ALLOWED_MODULES = {
     "numpy": np,
@@ -58,6 +58,7 @@ SAFE_BUILTINS = {
     "TypeError": builtins.TypeError,
     "ValueError": builtins.ValueError,
     "zip": builtins.zip,
+    "__build_class__": builtins.__build_class__,
     "__import__": None,
 }
 
@@ -80,7 +81,29 @@ def load_tsp_solver(
     return solver
 
 
-def _sandbox_namespace(*, best_tour_reporter: Callable[[object], None] | None = None) -> dict[str, Any]:
+def load_bbob_optimizer(
+        code: str,
+        *,
+        validate_static: bool = True,
+        best_value_reporter: Callable[[object, object], None] | None = None,
+) -> type:
+    if validate_static:
+        result = validate_bbob_generated_code(code)
+        if not result.valid:
+            raise ValueError(result.error)
+    namespace = _sandbox_namespace(best_value_reporter=best_value_reporter)
+    exec(compile(code, "<generated_candidate>", "exec"), namespace, namespace)
+    optimizer = namespace.get("Optimizer")
+    if not isinstance(optimizer, type):
+        raise ValueError("Generated code did not define class Optimizer")
+    return optimizer
+
+
+def _sandbox_namespace(
+        *,
+        best_tour_reporter: Callable[[object], None] | None = None,
+        best_value_reporter: Callable[[object, object], None] | None = None,
+) -> dict[str, Any]:
     safe_builtins = dict(SAFE_BUILTINS)
     safe_builtins["__import__"] = _safe_import
     namespace: dict[str, Any] = {
@@ -91,6 +114,7 @@ def _sandbox_namespace(*, best_tour_reporter: Callable[[object], None] | None = 
         "math": math,
         "random": random,
         "report_best_tour": best_tour_reporter or _ignore_best_tour,
+        "report_best": best_value_reporter or _ignore_best_value,
         "heapq": heapq,
         "itertools": itertools,
         "collections": collections,
@@ -100,6 +124,10 @@ def _sandbox_namespace(*, best_tour_reporter: Callable[[object], None] | None = 
 
 
 def _ignore_best_tour(tour: object) -> None:
+    return None
+
+
+def _ignore_best_value(value: object, x: object) -> None:
     return None
 
 

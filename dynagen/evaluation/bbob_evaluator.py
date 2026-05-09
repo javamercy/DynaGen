@@ -1,39 +1,30 @@
 import math
-from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
-from dynagen.candidates.validation import validate_generated_code
-from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.evaluation.metrics import aggregate_records, compute_gap
-from dynagen.execution.runner import run_solver
+from dynagen.candidates.validation import validate_bbob_generated_code
+from dynagen.domain.bbob import BBOBInstance
+from dynagen.evaluation.bbob_metrics import aggregate_bbob_records, compute_aocc
+from dynagen.evaluation.evaluator import EvaluationResult, EvaluationStatus
+from dynagen.execution.bbob_runner import run_bbob_optimizer
 
 
-EvaluationStatus = Literal["valid", "invalid", "timeout", "error"]
-
-
-@dataclass(frozen=True)
-class EvaluationResult:
-    status: EvaluationStatus
-    fitness: float | None
-    metrics: dict[str, Any]
-    error_feedback: str | None = None
-
-
-class CandidateEvaluator:
+class BBOBCandidateEvaluator:
     def __init__(
             self,
-            instances: list[TSPInstance],
+            instances: list[BBOBInstance],
             *,
             seeds: tuple[int, ...] | list[int],
             budget: int,
             timeout_seconds: float,
             pool_name: str,
-            timeout_penalty: float = 10.0,
+            timeout_penalty: float = 0.0,
+            aocc_lower_bound: float = 1e-8,
+            aocc_upper_bound: float = 1e2,
     ) -> None:
         if not instances:
-            raise ValueError("At least one instance is required for evaluation")
+            raise ValueError("At least one BBOB instance is required for evaluation")
         if budget <= 0:
             raise ValueError("Budget must be a positive integer")
         if timeout_seconds <= 0:
@@ -49,9 +40,11 @@ class CandidateEvaluator:
         self.timeout_seconds = float(timeout_seconds)
         self.timeout_penalty = float(timeout_penalty)
         self.pool_name = pool_name
+        self.aocc_lower_bound = float(aocc_lower_bound)
+        self.aocc_upper_bound = float(aocc_upper_bound)
 
     def empty_metrics(self) -> dict[str, Any]:
-        return self._with_context(aggregate_records([], timeout_penalty=self.timeout_penalty))
+        return self._with_context(aggregate_bbob_records([], timeout_penalty=self.timeout_penalty))
 
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
         result = self.evaluate_code(candidate.code)
@@ -62,42 +55,51 @@ class CandidateEvaluator:
         return result
 
     def evaluate_code(self, code: str) -> EvaluationResult:
-        validation = validate_generated_code(code)
+        validation = validate_bbob_generated_code(code)
         if not validation.valid:
             metrics = self.empty_metrics()
             return EvaluationResult("invalid", math.inf, metrics, validation.error)
 
         records: list[dict[str, Any]] = []
-
         for instance in self.instances:
             for seed in self.seeds:
-                run = run_solver(
+                run = run_bbob_optimizer(
                     code,
                     instance,
                     seed=seed,
                     budget=self.budget,
                     timeout_seconds=self.timeout_seconds,
                 )
-
-                scored = run.status == "valid" or run.partial
-                gap = compute_gap(run.tour_length,
-                                  instance.optimal_length) if scored and run.tour_length is not None else None
+                history = run.history or ([run.best_value] if run.best_value is not None else [])
+                aocc = compute_aocc(
+                    history,
+                    optimum=instance.optimum_value,
+                    budget=self.budget,
+                    lower_bound=self.aocc_lower_bound,
+                    upper_bound=self.aocc_upper_bound,
+                ) if history else None
+                final_error = None
+                if run.best_value is not None and math.isfinite(run.best_value):
+                    final_error = max(0.0, float(run.best_value) - instance.optimum_value)
                 records.append({
                     "instance": instance.name,
                     "pool": self.pool_name,
+                    "function_id": instance.function_id,
+                    "function_name": instance.name.split("_i", 1)[0],
+                    "group": instance.group,
+                    "bbob_instance_id": instance.instance_id,
                     "dimension": instance.dimension,
-                    "source": instance.metadata.get("source", "unknown"),
                     "seed": seed,
                     "status": run.status,
-                    "tour_length": run.tour_length,
+                    "best_value": run.best_value,
+                    "final_error": final_error,
+                    "aocc": aocc,
+                    "evaluations": run.evaluations,
                     "partial": run.partial,
-                    "reference_length": instance.optimal_length,
-                    "reference_kind": "optimal",
-                    "gap": gap,
                     "runtime_seconds": run.runtime_seconds,
                     "error": run.error,
                 })
-        metrics = self._with_context(aggregate_records(records, timeout_penalty=self.timeout_penalty))
+        metrics = self._with_context(aggregate_bbob_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
         fitness = _candidate_fitness(status, metrics)
         error_feedback = _error_feedback(records) if status != "valid" else None
@@ -109,15 +111,17 @@ class CandidateEvaluator:
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
         metrics["timeout_penalty"] = self.timeout_penalty
+        metrics["aocc_lower_bound"] = self.aocc_lower_bound
+        metrics["aocc_upper_bound"] = self.aocc_upper_bound
         return metrics
 
 
 def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
-    if metrics["timeout_count"]:
-        return "timeout"
     if metrics["runtime_error_count"]:
         return "error"
-    if metrics["invalid_tour_count"]:
+    if metrics["timeout_count"]:
+        return "timeout"
+    if metrics["invalid_count"]:
         return "invalid"
     if metrics["runs"] and metrics["valid_count"] == metrics["runs"]:
         return "valid"
@@ -126,7 +130,8 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
 
 def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
     if status == "valid":
-        return metrics["mean_gap"] if metrics["mean_gap"] is not None else math.inf
+        mean_aocc = metrics.get("mean_aocc")
+        return 1.0 - float(mean_aocc) if mean_aocc is not None else math.inf
     if status == "timeout":
         timeout_fitness = metrics.get("timeout_fitness")
         return float(timeout_fitness) if timeout_fitness is not None else math.inf

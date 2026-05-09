@@ -36,6 +36,7 @@ class EvolutionConfig:
         self.population_size = int(self.population_size)
         self.generations = int(self.generations)
         self.offspring_per_strategy = int(self.offspring_per_strategy)
+        self.strategies = [Strategy(strategy) for strategy in self.strategies]
         if self.population_size < 1:
             raise ValueError("population_size must be at least 1")
         if self.generations < 0:
@@ -80,15 +81,54 @@ class EvaluationConfig:
 
 
 @dataclass
-class DataConfig:
-    search_instances: str
-    test_instances: str
+class ProblemConfig:
+    type: str = "tsp"
+    function_ids: list[int] = field(default_factory=lambda: list(range(1, 25)))
+    dimension: int = 5
+    search_instances: list[int] = field(default_factory=lambda: [1, 2, 3])
+    test_instances: list[int] = field(default_factory=lambda: [1, 2, 3])
+    test_dimensions: list[int] = field(default_factory=list)
+    bounds: list[float] = field(default_factory=lambda: [-5.0, 5.0])
+    aocc_lower_bound: float = 1e-8
+    aocc_upper_bound: float = 1e2
+    comparison_baselines: list[str] = field(default_factory=lambda: ["random_search", "differential_evolution"])
 
     def __post_init__(self) -> None:
-        if not self.search_instances:
-            raise ValueError("search_instances must be specified")
-        if not self.test_instances:
-            raise ValueError("test_instances must be specified")
+        self.type = str(self.type).lower()
+        if self.type not in {"tsp", "bbob"}:
+            raise ValueError("problem.type must be 'tsp' or 'bbob'")
+
+        self.function_ids = [int(function_id) for function_id in self.function_ids]
+        self.dimension = int(self.dimension)
+        self.search_instances = [int(instance_id) for instance_id in self.search_instances]
+        self.test_instances = [int(instance_id) for instance_id in self.test_instances]
+        self.test_dimensions = [int(dimension) for dimension in self.test_dimensions] or [self.dimension]
+        self.bounds = [float(bound) for bound in self.bounds]
+        self.aocc_lower_bound = float(self.aocc_lower_bound)
+        self.aocc_upper_bound = float(self.aocc_upper_bound)
+        self.comparison_baselines = [str(name) for name in self.comparison_baselines]
+
+        if self.dimension < 1:
+            raise ValueError("problem.dimension must be at least 1")
+        if not self.function_ids:
+            raise ValueError("problem.function_ids must not be empty")
+        if any(function_id < 1 or function_id > 24 for function_id in self.function_ids):
+            raise ValueError("BBOB function ids must be between 1 and 24")
+        if not self.search_instances or not self.test_instances:
+            raise ValueError("BBOB search_instances and test_instances must not be empty")
+        if len(self.bounds) != 2 or self.bounds[0] >= self.bounds[1]:
+            raise ValueError("problem.bounds must contain [lower, upper]")
+        if self.aocc_lower_bound <= 0 or self.aocc_upper_bound <= self.aocc_lower_bound:
+            raise ValueError("AOCC bounds must satisfy 0 < lower < upper")
+
+
+@dataclass
+class DataConfig:
+    search_instances: str | None = None
+    test_instances: str | None = None
+
+    def __post_init__(self) -> None:
+        return None
 
 
 @dataclass
@@ -99,6 +139,7 @@ class RunConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     evolution: EvolutionConfig = field(default_factory=EvolutionConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
+    problem: ProblemConfig = field(default_factory=ProblemConfig)
     data: DataConfig = field(default_factory=DataConfig)
 
     @classmethod
@@ -108,6 +149,7 @@ class RunConfig:
         llm = LLMConfig(**data.pop("llm", {}))
         evolution = EvolutionConfig(**data.pop("evolution", {}))
         evaluation = EvaluationConfig(**data.pop("evaluation", {}))
+        problem = ProblemConfig(**data.pop("problem", {}))
         data_cfg = DataConfig(**data.pop("data", {}))
         if data:
             raise ValueError(f"Unknown config keys: {sorted(data)}")
@@ -119,6 +161,7 @@ class RunConfig:
             llm=llm,
             evolution=evolution,
             evaluation=evaluation,
+            problem=problem,
             data=data_cfg,
         )
 

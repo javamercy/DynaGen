@@ -51,25 +51,49 @@ def build_final_report(
         runs = int(metrics.get("runs") or 0)
         seed_count = len(metrics.get("seeds") or [])
         instances_evaluated = runs // seed_count if seed_count else runs
-        lines.extend(
-            [
-                "",
-                "## Test Evaluation",
-                "",
-                f"- Status: {test_result.status}",
-                f"- Test fitness: {test_result.fitness}",
-                f"- Instances evaluated: {instances_evaluated}",
-                f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
-                f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
-                f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
-                f"- Mean gap: {metrics.get('mean_gap')}",
-                f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
-                f"- Timeout penalty: {metrics.get('timeout_penalty')}",
-                f"- Median gap: {metrics.get('median_gap')}",
-                f"- Worst gap: {metrics.get('worst_gap')}",
-                f"- Best gap: {metrics.get('best_gap')}",
-            ]
-        )
+        if metrics.get("problem") == "bbob":
+            lines.extend(
+                [
+                    "",
+                    "## Test Evaluation",
+                    "",
+                    f"- Problem: BBOB",
+                    f"- Status: {test_result.status}",
+                    f"- Test fitness: {test_result.fitness}",
+                    f"- Problem instances evaluated: {instances_evaluated}",
+                    f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                    f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                    f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
+                    f"- Mean AOCC: {metrics.get('mean_aocc')}",
+                    f"- Penalized mean AOCC: {metrics.get('penalized_mean_aocc')}",
+                    f"- Median AOCC: {metrics.get('median_aocc')}",
+                    f"- Best AOCC: {metrics.get('best_aocc')}",
+                    f"- Worst AOCC: {metrics.get('worst_aocc')}",
+                    f"- Mean final error: {metrics.get('mean_final_error')}",
+                    f"- Best final error: {metrics.get('best_final_error')}",
+                    f"- AOCC by group: {metrics.get('aocc_by_group')}",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    "## Test Evaluation",
+                    "",
+                    f"- Status: {test_result.status}",
+                    f"- Test fitness: {test_result.fitness}",
+                    f"- Instances evaluated: {instances_evaluated}",
+                    f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                    f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                    f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
+                    f"- Mean gap: {metrics.get('mean_gap')}",
+                    f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
+                    f"- Timeout penalty: {metrics.get('timeout_penalty')}",
+                    f"- Median gap: {metrics.get('median_gap')}",
+                    f"- Worst gap: {metrics.get('worst_gap')}",
+                    f"- Best gap: {metrics.get('best_gap')}",
+                ]
+            )
         if test_result.error_feedback:
             lines.append(f"- Error details: {test_result.error_feedback}")
     if llm_calls is not None:

@@ -42,12 +42,20 @@ class ValidationResult:
 
 
 def validate_generated_code(code: str) -> ValidationResult:
+    return _validate_generated_code(code, contract="tsp")
+
+
+def validate_bbob_generated_code(code: str) -> ValidationResult:
+    return _validate_generated_code(code, contract="bbob")
+
+
+def _validate_generated_code(code: str, *, contract: str) -> ValidationResult:
     try:
         tree = ast.parse(code)
     except SyntaxError as exception:
         return ValidationResult(False, f"SyntaxError: {exception}")
 
-    result = _validate_ast(tree)
+    result = _validate_ast(tree, contract=contract)
     if not result.valid:
         return result
     try:
@@ -73,10 +81,14 @@ def validate_solver_signature(func) -> ValidationResult:
     return ValidationResult(True)
 
 
-def _validate_ast(tree: ast.AST) -> ValidationResult:
+def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
     solver_node: ast.FunctionDef | None = None
+    optimizer_node: ast.ClassDef | None = None
+    top_level_allowed = (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign, ast.Expr)
+    if contract == "bbob":
+        top_level_allowed = top_level_allowed + (ast.ClassDef,)
     for node in getattr(tree, "body", []):
-        if not isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign, ast.Expr)):
+        if not isinstance(node, top_level_allowed):
             return ValidationResult(False, f"Top-level {type(node).__name__} statements are not allowed")
         if isinstance(node, ast.Expr) and not isinstance(node.value, ast.Constant):
             return ValidationResult(False, "Only docstrings/constants are allowed as top-level expressions")
@@ -87,10 +99,16 @@ def _validate_ast(tree: ast.AST) -> ValidationResult:
                 return result
         elif isinstance(node, ast.FunctionDef) and node.name == "solve_tsp":
             solver_node = node
+        elif isinstance(node, ast.ClassDef) and node.name == "Optimizer":
+            optimizer_node = node
         elif isinstance(node, ast.Call):
             result = _validate_call(node)
             if not result.valid:
                 return result
+    if contract == "bbob":
+        if optimizer_node is None:
+            return ValidationResult(False, "Missing required Optimizer class")
+        return _validate_bbob_optimizer_ast(optimizer_node)
     if solver_node is None:
         return ValidationResult(False, "Missing required solve_tsp function")
     return _validate_solver_signature_ast(solver_node)
@@ -103,6 +121,42 @@ def _validate_solver_signature_ast(node: ast.FunctionDef) -> ValidationResult:
         return ValidationResult(False, "solve_tsp must accept exactly three parameters")
     if [arg.arg for arg in positional] != ["distance_matrix", "seed", "budget"]:
         return ValidationResult(False, "solve_tsp parameters must be distance_matrix, seed, budget")
+    return ValidationResult(True)
+
+
+def _validate_bbob_optimizer_ast(node: ast.ClassDef) -> ValidationResult:
+    init_node: ast.FunctionDef | None = None
+    call_node: ast.FunctionDef | None = None
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+            init_node = item
+        elif isinstance(item, ast.FunctionDef) and item.name == "__call__":
+            call_node = item
+    if init_node is None:
+        return ValidationResult(False, "Optimizer must define __init__(self, budget, dim, seed)")
+    if call_node is None:
+        return ValidationResult(False, "Optimizer must define __call__(self, func)")
+    init_result = _validate_method_signature_ast(
+        init_node,
+        ["self", "budget", "dim", "seed"],
+        "Optimizer.__init__ must accept self, budget, dim, seed",
+    )
+    if not init_result.valid:
+        return init_result
+    return _validate_method_signature_ast(
+        call_node,
+        ["self", "func"],
+        "Optimizer.__call__ must accept self, func",
+    )
+
+
+def _validate_method_signature_ast(node: ast.FunctionDef, names: list[str], message: str) -> ValidationResult:
+    args = node.args
+    positional = list(args.posonlyargs) + list(args.args)
+    if len(positional) != len(names) or args.vararg or args.kwonlyargs or args.kwarg:
+        return ValidationResult(False, message)
+    if [arg.arg for arg in positional] != names:
+        return ValidationResult(False, message)
     return ValidationResult(True)
 
 
