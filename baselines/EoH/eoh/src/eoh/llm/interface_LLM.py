@@ -81,6 +81,9 @@ class InterfaceLLM:
 
     def get_call_summary(self):
         return {
+            "model": self.model_LLM,
+            "api_endpoint": self.api_endpoint,
+            "llm_use_local": self.llm_use_local,
             "candidate_generation_calls": self.candidate_generation_calls,
             "total_api_calls": self.total_api_calls,
             "health_check_calls": self.health_check_calls,
