@@ -10,7 +10,7 @@ CANDIDATE_RESPONSE_SCHEMA = {
         "name": {
             "type": "string",
             "minLength": 5,
-            "maxLength": 25,
+            "maxLength": 100,
             "description": "A short descriptive name for the generated solver or optimizer.",
         },
         "thought": {
