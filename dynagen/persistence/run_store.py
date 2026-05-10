@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from dynagen.candidates.candidate import Candidate
-from dynagen.evaluation.evaluator import EvaluationResult
+from dynagen.evaluation.base import EvaluationResult
 from dynagen.persistence.serialization import dump_json, load_json
 
 

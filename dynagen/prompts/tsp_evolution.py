@@ -1,8 +1,13 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.prompts.templates import RESPONSE_FORMAT, SOLVER_CONTRACT, render_candidates, INTERNAL_CHECKLIST
+from dynagen.prompts.tsp_templates import (
+    TSP_INTERNAL_CHECKLIST,
+    TSP_RESPONSE_FORMAT,
+    TSP_SOLVER_CONTRACT,
+    render_tsp_candidates,
+)
 
 # S1:explore, S2:improve, S3:combine, S4:stabilize.
-STRATEGY_INSTRUCTIONS = {
+TSP_STRATEGY_INSTRUCTIONS = {
     "S1": """Behavioral Innovation:
 Generate a complete TSP solver with a substantially different search behavior from the selected parent(s).
 
@@ -73,22 +78,22 @@ Prefer a smaller reliable solver over a large fragile one."""
 }
 
 
-def build_evolution_prompt(strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
-    if strategy not in STRATEGY_INSTRUCTIONS:
+def build_tsp_evolution_prompt(strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
+    if strategy not in TSP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
-    candidates_context = render_candidates(parents)
+    candidates_context = render_tsp_candidates(parents)
     user = f"""
     STRATEGY: {strategy}
-    {STRATEGY_INSTRUCTIONS[strategy]}
+    {TSP_STRATEGY_INSTRUCTIONS[strategy]}
     
     SELECTED PARENT(S) CONTEXT:
     {candidates_context}
     
-    {SOLVER_CONTRACT}
+    {TSP_SOLVER_CONTRACT}
     
-    {INTERNAL_CHECKLIST}
+    {TSP_INTERNAL_CHECKLIST}
     
-    {RESPONSE_FORMAT}"""
+    {TSP_RESPONSE_FORMAT}"""
     return [
         {"role": "system", "content": "You generate executable, reliable full TSP solvers for evolutionary search."},
         {"role": "user", "content": user},

@@ -5,8 +5,8 @@ from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
 from dynagen.candidates.validation import validate_bbob_generated_code
 from dynagen.domain.bbob import BBOBInstance
+from dynagen.evaluation.base import EvaluationResult, EvaluationStatus
 from dynagen.evaluation.bbob_metrics import aggregate_bbob_records, compute_aocc
-from dynagen.evaluation.evaluator import EvaluationResult, EvaluationStatus
 from dynagen.execution.bbob_runner import run_bbob_optimizer
 
 

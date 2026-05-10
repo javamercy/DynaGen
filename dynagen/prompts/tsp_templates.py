@@ -1,6 +1,6 @@
 from dynagen.candidates.candidate import Candidate
 
-SOLVER_CONTRACT = """
+TSP_SOLVER_CONTRACT = """
 Implement a complete TSP solver with exactly this interface:
 
 def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
@@ -35,7 +35,7 @@ Implementation rules:
 - Avoid O(n^3) operations inside large repeated loops unless guarded by n or budget.
 """
 
-INTERNAL_CHECKLIST = """
+TSP_INTERNAL_CHECKLIST = """
 Before producing the final response, internally verify the candidate:
 
 1. The code defines solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int).
@@ -50,7 +50,7 @@ Before producing the final response, internally verify the candidate:
 11. The implementation avoids obvious infinite loops and unguarded expensive repeated O(n^3) work.
 """
 
-RESPONSE_FORMAT = """
+TSP_RESPONSE_FORMAT = """
 Return exactly one JSON object and nothing else.
 
 Schema:
@@ -71,7 +71,7 @@ Strict formatting rules:
 """
 
 
-def base_system_prompt(role: str) -> str:
+def tsp_system_prompt(role: str) -> str:
     return f"""
 You are {role}. Generate robust, compact Python TSP solver code.
 Focus on full solvers, not small heuristic components.
@@ -79,16 +79,16 @@ Use classical TSP heuristics when useful, but combine them into a coherent compl
 Use budget as a hard effort cap. Follow the contract exactly."""
 
 
-def render_candidates(candidates: list[Candidate]) -> str:
-    return "\n\n".join(_render_candidate(candidate) for candidate in candidates)
+def render_tsp_candidates(candidates: list[Candidate]) -> str:
+    return "\n\n".join(_render_tsp_candidate(candidate) for candidate in candidates)
 
 
-def _render_candidate(candidate: Candidate) -> str:
+def _render_tsp_candidate(candidate: Candidate) -> str:
     fitness = "unknown" if candidate.fitness is None else f"{candidate.fitness:.6g}"
     metrics = candidate.metrics or {}
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; fitness: {fitness}%",
+        f"Status: {candidate.status}; fitness: {fitness}",
         f"Thought: {candidate.thought}",
         f"Mean runtime: {metrics.get('mean_runtime')}",
         "Code:",

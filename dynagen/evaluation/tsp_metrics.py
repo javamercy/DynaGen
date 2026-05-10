@@ -19,7 +19,7 @@ def compute_gap(tour_length: float, optimal_length: float | None) -> float | Non
     return 100.0 * (tour_length - optimal_length) / optimal_length
 
 
-def aggregate_records(records: list[dict[str, Any]], *, timeout_penalty: float = 0.0) -> dict[str, Any]:
+def aggregate_tsp_records(records: list[dict[str, Any]], *, timeout_penalty: float = 0.0) -> dict[str, Any]:
     valid = [record for record in records if record["status"] == "valid"]
     scored = [record for record in records if _has_finite_gap(record)]
     gaps = [float(record["gap"]) for record in scored]

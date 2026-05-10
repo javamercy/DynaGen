@@ -5,15 +5,11 @@ from pathlib import Path
 from dynagen.baselines.bbob import get_bbob_baseline_code
 from dynagen.comparison.bbob import build_bbob_comparison_report, compare_bbob_candidate
 from dynagen.config import RunConfig, load_config
-from dynagen.domain import load_tsplib_file
-from dynagen.domain.bbob import create_bbob_instances
-from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_spec
-from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
-from dynagen.evaluation.evaluator import CandidateEvaluator
 from dynagen.evolution.engine import EvolutionEngine, scheduled_llm_calls
 from dynagen.llm import CountingLLMProvider
 from dynagen.persistence.run_store import RunStore
 from dynagen.persistence.serialization import dump_json
+from dynagen.problems import problem_for_config
 from dynagen.reporting.summary import build_final_report
 
 
@@ -139,27 +135,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _build_evaluator(config: RunConfig, *, pool_name: str):
-    if config.problem.type == "bbob":
-        instances = _load_bbob_instances(config, pool_name=pool_name)
-        return BBOBCandidateEvaluator(
-            instances,
-            seeds=config.evaluation.seeds,
-            budget=config.evaluation.budget,
-            timeout_seconds=config.evaluation.timeout_seconds,
-            timeout_penalty=config.evaluation.timeout_penalty,
-            pool_name=pool_name,
-            aocc_lower_bound=config.problem.aocc_lower_bound,
-            aocc_upper_bound=config.problem.aocc_upper_bound,
-        )
-    instances = _load_instances(config.data.search_instances if pool_name == "search_instances" else config.data.test_instances)
-    return CandidateEvaluator(
-        instances,
-        seeds=config.evaluation.seeds,
-        budget=config.evaluation.budget,
-        timeout_seconds=config.evaluation.timeout_seconds,
-        timeout_penalty=config.evaluation.timeout_penalty,
-        pool_name=pool_name,
-    )
+    return problem_for_config(config).build_evaluator(config, pool_name=pool_name)
 
 
 def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = False) -> str | None:
@@ -177,37 +153,6 @@ def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = Fal
         return candidate_path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"Could not read candidate file {candidate_path}: {exc}") from exc
-
-
-def _load_instances(path: str | Path | None):
-    if not path:
-        raise ValueError("TSP data.search_instances and data.test_instances must be specified")
-    synthetic_spec = parse_llamea_tsp_spec(str(path))
-    if synthetic_spec is not None:
-        seed, size = synthetic_spec
-        return [generate_llamea_tsp_instance(seed=seed, size=size)]
-    path = Path(path)
-    if path.is_dir():
-        files = sorted(item for item in path.iterdir() if item.suffix.lower() == ".tsp")
-        if not files:
-            raise ValueError(f"No .tsp files found in {path}")
-        return [load_tsplib_file(file) for file in files]
-    return [load_tsplib_file(path)]
-
-
-def _load_bbob_instances(config: RunConfig, *, pool_name: str):
-    if pool_name == "search_instances":
-        instance_ids = config.problem.search_instances
-        dimensions = [config.problem.dimension]
-    else:
-        instance_ids = config.problem.test_instances
-        dimensions = config.problem.test_dimensions
-    return create_bbob_instances(
-        function_ids=config.problem.function_ids,
-        instance_ids=instance_ids,
-        dimensions=dimensions,
-        bounds=config.problem.bounds,
-    )
 
 
 def _provider_from_config(config: RunConfig):

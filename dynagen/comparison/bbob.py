@@ -3,8 +3,8 @@ from typing import Any
 
 from dynagen.baselines.bbob import get_bbob_baseline_code
 from dynagen.config import RunConfig
-from dynagen.domain.bbob import create_bbob_instances
-from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
+from dynagen.evaluation.base import CandidateEvaluator
+from dynagen.problems import problem_for_config
 
 
 def compare_bbob_candidate(
@@ -14,22 +14,9 @@ def compare_bbob_candidate(
         candidate_name: str = "candidate",
         candidate_kind: str = "candidate",
 ) -> dict[str, Any]:
-    instances = create_bbob_instances(
-        function_ids=config.problem.function_ids,
-        instance_ids=config.problem.test_instances,
-        dimensions=config.problem.test_dimensions,
-        bounds=config.problem.bounds,
-    )
-    evaluator = BBOBCandidateEvaluator(
-        instances,
-        seeds=config.evaluation.seeds,
-        budget=config.evaluation.budget,
-        timeout_seconds=config.evaluation.timeout_seconds,
-        timeout_penalty=config.evaluation.timeout_penalty,
-        pool_name="bbob_comparison",
-        aocc_lower_bound=config.problem.aocc_lower_bound,
-        aocc_upper_bound=config.problem.aocc_upper_bound,
-    )
+    if config.problem.type != "bbob":
+        raise ValueError("BBOB comparison requires problem.type: bbob")
+    evaluator = problem_for_config(config).build_evaluator(config, pool_name="bbob_comparison")
     algorithms = []
     evaluated_names: set[str] = set()
     if candidate_code is not None:
@@ -93,7 +80,7 @@ def write_bbob_comparison_report(path: str | Path, comparison: dict[str, Any]) -
     Path(path).write_text(build_bbob_comparison_report(comparison), encoding="utf-8")
 
 
-def _evaluate_algorithm(evaluator: BBOBCandidateEvaluator, name: str, kind: str, code: str) -> dict[str, Any]:
+def _evaluate_algorithm(evaluator: CandidateEvaluator, name: str, kind: str, code: str) -> dict[str, Any]:
     result = evaluator.evaluate_code(code)
     return {
         "name": name,

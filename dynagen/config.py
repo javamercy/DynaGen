@@ -108,18 +108,8 @@ class ProblemConfig:
         self.aocc_upper_bound = float(self.aocc_upper_bound)
         self.comparison_baselines = [str(name) for name in self.comparison_baselines]
 
-        if self.dimension < 1:
-            raise ValueError("problem.dimension must be at least 1")
-        if not self.function_ids:
-            raise ValueError("problem.function_ids must not be empty")
-        if any(function_id < 1 or function_id > 24 for function_id in self.function_ids):
-            raise ValueError("BBOB function ids must be between 1 and 24")
-        if not self.search_instances or not self.test_instances:
-            raise ValueError("BBOB search_instances and test_instances must not be empty")
-        if len(self.bounds) != 2 or self.bounds[0] >= self.bounds[1]:
-            raise ValueError("problem.bounds must contain [lower, upper]")
-        if self.aocc_lower_bound <= 0 or self.aocc_upper_bound <= self.aocc_lower_bound:
-            raise ValueError("AOCC bounds must satisfy 0 < lower < upper")
+        if self.type == "bbob":
+            _validate_bbob_problem_config(self)
 
 
 @dataclass
@@ -129,6 +119,21 @@ class DataConfig:
 
     def __post_init__(self) -> None:
         return None
+
+
+def _validate_bbob_problem_config(config: ProblemConfig) -> None:
+    if config.dimension < 1:
+        raise ValueError("problem.dimension must be at least 1")
+    if not config.function_ids:
+        raise ValueError("problem.function_ids must not be empty")
+    if any(function_id < 1 or function_id > 24 for function_id in config.function_ids):
+        raise ValueError("BBOB function ids must be between 1 and 24")
+    if not config.search_instances or not config.test_instances:
+        raise ValueError("BBOB search_instances and test_instances must not be empty")
+    if len(config.bounds) != 2 or config.bounds[0] >= config.bounds[1]:
+        raise ValueError("problem.bounds must contain [lower, upper]")
+    if config.aocc_lower_bound <= 0 or config.aocc_upper_bound <= config.aocc_lower_bound:
+        raise ValueError("AOCC bounds must satisfy 0 < lower < upper")
 
 
 @dataclass

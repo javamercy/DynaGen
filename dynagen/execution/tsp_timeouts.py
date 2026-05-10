@@ -7,26 +7,26 @@ from typing import Any, Literal
 import numpy as np
 
 
-SolverExecutionStatus = Literal["ok", "timeout", "error"]
+TSPSolverExecutionStatus = Literal["ok", "timeout", "error"]
 
 
 @dataclass(frozen=True)
-class SolverExecutionResult:
-    status: SolverExecutionStatus
+class TSPSolverExecutionResult:
+    status: TSPSolverExecutionStatus
     value: Any = None
     reported_value: Any = None
     runtime_seconds: float = 0.0
     error: str | None = None
 
 
-def execute_solver_code(
+def execute_tsp_solver_code(
         code: str,
         distance_matrix: np.ndarray,
         *,
         seed: int,
         budget: int,
         timeout_seconds: float,
-) -> SolverExecutionResult:
+) -> TSPSolverExecutionResult:
     context = _multiprocessing_context()
     distance_matrix_arr = np.asarray(distance_matrix, dtype=float)
     dimension = int(distance_matrix_arr.shape[0])
@@ -47,23 +47,23 @@ def execute_solver_code(
         if process.is_alive():
             process.kill()
             process.join()
-        return SolverExecutionResult("timeout", reported_value=_reported_tour(best_tour_a, best_tour_b,
-                                                                              active_tour_index),
-                                     runtime_seconds=runtime, error="Solver timed out")
+        return TSPSolverExecutionResult("timeout", reported_value=_reported_tour(best_tour_a, best_tour_b,
+                                                                                  active_tour_index),
+                                         runtime_seconds=runtime, error="Solver timed out")
     try:
         status, value, child_runtime, error = result_queue.get_nowait()
     except queue.Empty:
         if process.exitcode == 0:
-            return SolverExecutionResult("error", reported_value=_reported_tour(best_tour_a, best_tour_b,
-                                                                                active_tour_index),
-                                         runtime_seconds=runtime,
-                                         error="Solver exited without returning a result")
-        return SolverExecutionResult("error", runtime_seconds=runtime,
+            return TSPSolverExecutionResult("error", reported_value=_reported_tour(best_tour_a, best_tour_b,
+                                                                                   active_tour_index),
+                                            runtime_seconds=runtime,
+                                            error="Solver exited without returning a result")
+        return TSPSolverExecutionResult("error", runtime_seconds=runtime,
+                                         reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
+                                         error=f"Solver process exited with code {process.exitcode}")
+    return TSPSolverExecutionResult(status, value=value,
                                      reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
-                                     error=f"Solver process exited with code {process.exitcode}")
-    return SolverExecutionResult(status, value=value,
-                                 reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
-                                 runtime_seconds=child_runtime, error=error)
+                                     runtime_seconds=child_runtime, error=error)
 
 
 def _worker(code: str, distance_matrix: np.ndarray, seed: int, budget: int, result_queue, best_tour_a, best_tour_b,

@@ -1,27 +1,16 @@
 import math
-from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
 from dynagen.candidates.validation import validate_generated_code
 from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.evaluation.metrics import aggregate_records, compute_gap
-from dynagen.execution.runner import run_solver
+from dynagen.evaluation.base import EvaluationResult, EvaluationStatus
+from dynagen.evaluation.tsp_metrics import aggregate_tsp_records, compute_gap
+from dynagen.execution.tsp_runner import run_tsp_solver
 
 
-EvaluationStatus = Literal["valid", "invalid", "timeout", "error"]
-
-
-@dataclass(frozen=True)
-class EvaluationResult:
-    status: EvaluationStatus
-    fitness: float | None
-    metrics: dict[str, Any]
-    error_feedback: str | None = None
-
-
-class CandidateEvaluator:
+class TSPCandidateEvaluator:
     def __init__(
             self,
             instances: list[TSPInstance],
@@ -51,7 +40,7 @@ class CandidateEvaluator:
         self.pool_name = pool_name
 
     def empty_metrics(self) -> dict[str, Any]:
-        return self._with_context(aggregate_records([], timeout_penalty=self.timeout_penalty))
+        return self._with_context(aggregate_tsp_records([], timeout_penalty=self.timeout_penalty))
 
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
         result = self.evaluate_code(candidate.code)
@@ -71,7 +60,7 @@ class CandidateEvaluator:
 
         for instance in self.instances:
             for seed in self.seeds:
-                run = run_solver(
+                run = run_tsp_solver(
                     code,
                     instance,
                     seed=seed,
@@ -98,7 +87,7 @@ class CandidateEvaluator:
                     "runtime_seconds": run.runtime_seconds,
                     "error": run.error,
                 })
-        metrics = self._with_context(aggregate_records(records, timeout_penalty=self.timeout_penalty))
+        metrics = self._with_context(aggregate_tsp_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
         fitness = _candidate_fitness(status, metrics, pool_name=self.pool_name)
         error_feedback = _error_feedback(records) if status != "valid" else None

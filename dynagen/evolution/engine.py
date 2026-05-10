@@ -1,18 +1,17 @@
 import math
 import random
-from typing import Any
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
-from dynagen.evaluation.evaluator import CandidateEvaluator
-from dynagen.evaluation.metrics import aggregate_records
+from dynagen.evaluation.base import CandidateEvaluator
 from dynagen.evolution.population import Population
 from dynagen.evolution.selection import select_parents, select_survivors
 from dynagen.evolution.strategies import parent_count, Strategy
 from dynagen.llm.base import LLMProvider
 from dynagen.persistence.run_store import RunStore
-from dynagen.prompts.problem import build_problem_evolution_prompt, build_problem_initial_prompt, initial_roles_for_problem
+from dynagen.problems import problem_for_config
+from dynagen.problems.base import Problem
 from dynagen.reporting.summary import build_final_report, generation_summary
 
 
@@ -31,6 +30,7 @@ class EvolutionEngine:
         self.search_evaluator = search_evaluator
         self.test_evaluator = test_evaluator
         self.store = store
+        self.problem: Problem = problem_for_config(config)
         self.rng = random.Random(config.seed)
 
     def run(self) -> Population:
@@ -82,8 +82,8 @@ class EvolutionEngine:
 
     def _initial_population(self) -> Population:
         candidates: list[Candidate] = []
-        for role in _initial_roles(self.config.evolution.population_size, self.config.problem.type):
-            messages = build_problem_initial_prompt(role, self.config.problem.type)
+        for role in self.problem.initial_roles(self.config.evolution.population_size):
+            messages = self.problem.build_initial_prompt(role)
             prompt = _format_messages(messages)
             candidate_id = self.store.next_candidate_id()
             candidate: Candidate | None = None
@@ -128,7 +128,7 @@ class EvolutionEngine:
                 candidate: Candidate | None = None
                 try:
                     parents = self._select_strategy_parents(strategy, population.candidates)
-                    messages = build_problem_evolution_prompt(strategy, parents, self.config.problem.type)
+                    messages = self.problem.build_evolution_prompt(strategy, parents)
                     prompt = _format_messages(messages)
                     response = self.provider.complete(
                         messages,
@@ -167,11 +167,7 @@ class EvolutionEngine:
 
     def _empty_metrics(self) -> dict:
         metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
-        return dict(metrics_getter()) if callable(metrics_getter) else aggregate_records([])
-
-
-def _initial_roles(count: int, problem_type: str) -> list[Any]:
-    return initial_roles_for_problem(count, problem_type)
+        return dict(metrics_getter()) if callable(metrics_getter) else {}
 
 
 def scheduled_llm_calls(config: RunConfig) -> int:
@@ -202,7 +198,7 @@ def _build_candidate_from_response(
         code=response.code,
         parents=list(parents or []),
         fitness=None,
-        metrics=dict(metrics or aggregate_records([])),
+        metrics=dict(metrics) if metrics is not None else {},
         status=CandidateStatus.PENDING,
         prompt=prompt,
     )
@@ -227,7 +223,7 @@ def _failed_candidate(
         code="",
         parents=list(parents or []),
         fitness=math.inf,
-        metrics=dict(metrics or aggregate_records([])),
+        metrics=dict(metrics) if metrics is not None else {},
         status=CandidateStatus.ERROR,
         prompt=prompt,
         error_details=error_details,
@@ -243,7 +239,7 @@ def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
     candidate.status = CandidateStatus.ERROR
     candidate.fitness = math.inf
     if not candidate.metrics:
-        candidate.metrics = aggregate_records([])
+        candidate.metrics = {}
     candidate.error_details = error_details
 
 

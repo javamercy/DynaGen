@@ -1,12 +1,15 @@
-from dynagen.prompts.evolution import build_evolution_prompt
-from dynagen.prompts.initial import INITIAL_ROLES, build_initial_prompt
-from dynagen.prompts.problem import build_problem_evolution_prompt, build_problem_initial_prompt, initial_roles_for_problem
+from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
+from dynagen.prompts.bbob_initial import BBOB_INITIAL_ROLES, BBOBInitialRole, build_bbob_initial_prompt
+from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
+from dynagen.prompts.tsp_initial import TSP_INITIAL_ROLES, TSPInitialRole, build_tsp_initial_prompt
 
 __all__ = [
-    "INITIAL_ROLES",
-    "build_evolution_prompt",
-    "build_initial_prompt",
-    "build_problem_evolution_prompt",
-    "build_problem_initial_prompt",
-    "initial_roles_for_problem",
+    "BBOB_INITIAL_ROLES",
+    "BBOBInitialRole",
+    "TSP_INITIAL_ROLES",
+    "TSPInitialRole",
+    "build_bbob_evolution_prompt",
+    "build_bbob_initial_prompt",
+    "build_tsp_evolution_prompt",
+    "build_tsp_initial_prompt",
 ]

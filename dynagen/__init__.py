@@ -1,4 +1,4 @@
-"""DynaGen TSP metaheuristic generation framework."""
+"""DynaGen evolutionary algorithm generation framework."""
 
 from dynagen.config import RunConfig, load_config
 

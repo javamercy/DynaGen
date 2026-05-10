@@ -1,6 +1,6 @@
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
-from dynagen.evaluation.evaluator import EvaluationResult
+from dynagen.evaluation.base import EvaluationResult
 from dynagen.evolution.selection import select_survivors
 
 
