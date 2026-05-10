@@ -106,9 +106,9 @@ def require_header(headers: dict[str, str], key: str) -> str:
         raise ValueError(f"TSPLIB file is missing {key}") from None
 
 
-def parse_optional_number(value: str | None) -> float:
+def parse_optional_number(value: str | None) -> float | None:
     if value is None:
-        raise ValueError("Optimal length must be provided")
+        return None
     return float(value)
 
 

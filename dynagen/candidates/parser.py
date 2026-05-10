@@ -9,14 +9,11 @@ CANDIDATE_RESPONSE_SCHEMA = {
     "properties": {
         "name": {
             "type": "string",
-            "minLength": 5,
             "maxLength": 100,
             "description": "A short descriptive name for the generated solver or optimizer.",
         },
         "thought": {
             "type": "string",
-            "minLength": 10,
-            "maxLength": 500,
             "description": "A brief high-level explanation of the solver strategy.",
         },
         "code": {

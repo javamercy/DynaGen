@@ -82,6 +82,7 @@ class CandidateEvaluator:
                 scored = run.status == "valid" or run.partial
                 gap = compute_gap(run.tour_length,
                                   instance.optimal_length) if scored and run.tour_length is not None else None
+                reference_kind = "optimal" if instance.optimal_length is not None else None
                 records.append({
                     "instance": instance.name,
                     "pool": self.pool_name,
@@ -92,14 +93,14 @@ class CandidateEvaluator:
                     "tour_length": run.tour_length,
                     "partial": run.partial,
                     "reference_length": instance.optimal_length,
-                    "reference_kind": "optimal",
+                    "reference_kind": reference_kind,
                     "gap": gap,
                     "runtime_seconds": run.runtime_seconds,
                     "error": run.error,
                 })
         metrics = self._with_context(aggregate_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        fitness = _candidate_fitness(status, metrics)
+        fitness = _candidate_fitness(status, metrics, pool_name=self.pool_name)
         error_feedback = _error_feedback(records) if status != "valid" else None
         return EvaluationResult(status, fitness, metrics, error_feedback)
 
@@ -124,9 +125,13 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     return "invalid"
 
 
-def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
+def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any], *, pool_name: str) -> float:
     if status == "valid":
-        return metrics["mean_gap"] if metrics["mean_gap"] is not None else math.inf
+        if pool_name == "search_instances":
+            return metrics["mean_tour_length"] if metrics["mean_tour_length"] is not None else math.inf
+        if metrics["mean_gap"] is not None:
+            return metrics["mean_gap"]
+        return metrics["mean_tour_length"] if metrics["mean_tour_length"] is not None else math.inf
     if status == "timeout":
         timeout_fitness = metrics.get("timeout_fitness")
         return float(timeout_fitness) if timeout_fitness is not None else math.inf

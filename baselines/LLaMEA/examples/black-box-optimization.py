@@ -7,20 +7,62 @@
 import os
 import pickle
 import textwrap
+from pathlib import Path
 
 import numpy as np
 from ioh import get_problem, logger
 
-from llamea import Gemini_LLM, LLaMEA
+from llamea import Gemini_LLM, LLaMEA, Ollama_LLM, OpenAI_LLM
 from llamea.utils import prepare_namespace, clean_local_namespace
 from misc import OverBudgetException, aoc_logger, correct_aoc
 
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _env_int(name, default):
+    value = os.getenv(name)
+    return default if value is None or value == "" else int(value)
+
+
+def _env_int_list(name, default):
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return list(default)
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def _prepare_output_dir():
+    output_dir = Path(os.getenv("LLAMEA_OUTPUT_DIR", str(PROJECT_ROOT / "runs" / "bbob")))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(output_dir)
+    print(f"LLaMEA output directory: {output_dir}")
+
+
+def _build_llm(model: str):
+    provider = os.getenv("LLAMEA_LLM_PROVIDER", "gemini").lower()
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        return OpenAI_LLM(api_key, model)
+    if provider == "ollama":
+        return Ollama_LLM(model)
+    api_key = os.getenv("GOOGLE_API_KEY")
+    return Gemini_LLM(api_key, model)
+
 if __name__ == "__main__":
     # Execution code starts here
-    api_key = os.getenv("GOOGLE_API_KEY")
-    ai_model = "gemini-2.5-flash"
-    experiment_name = "pop1-5"
-    llm = Gemini_LLM(api_key, ai_model)
+    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gemini-2.5-flash"))
+    experiment_name = os.getenv("LLAMEA_EXPERIMENT_NAME", "pop1-5")
+    bbob_dimensions = _env_int_list("LLAMEA_BBOB_DIMENSIONS", [5])
+    bbob_function_ids = _env_int_list("LLAMEA_BBOB_FUNCTION_IDS", range(1, 25))
+    bbob_instance_ids = _env_int_list("LLAMEA_BBOB_INSTANCE_IDS", [1, 2, 3])
+    bbob_repetitions = _env_int("LLAMEA_BBOB_REPETITIONS", 3)
+    bbob_budget_factor = _env_int("LLAMEA_BBOB_BUDGET_FACTOR", 2000)
+    llm_call_budget = _env_int("LLAMEA_LLM_CALLS", 100)
+    n_parents = _env_int("LLAMEA_N_PARENTS", 1)
+    n_offspring = _env_int("LLAMEA_N_OFFSPRING", 1)
+    _prepare_output_dir()
+    llm = _build_llm(ai_model)
 
     # We define the evaluation function that executes the generated algorithm (solution.code) on the BBOB test suite.
     # It should set the scores and feedback of the solution based on the performance metric, in this case we use mean AOCC.
@@ -47,15 +89,15 @@ if __name__ == "__main__":
         aucs = []
 
         algorithm = None
-        for dim in [5]:
-            budget = 2000 * dim
+        for dim in bbob_dimensions:
+            budget = bbob_budget_factor * dim
             l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
-            for fid in np.arange(1, 25):
-                for iid in [1, 2, 3]:  # , 4, 5]
+            for fid in bbob_function_ids:
+                for iid in bbob_instance_ids:
                     problem = get_problem(fid, iid, dim)
                     problem.attach_logger(l2)
 
-                    for rep in range(3):
+                    for rep in range(bbob_repetitions):
                         np.random.seed(rep)
                         try:
                             algorithm = local_ns[algorithm_name](
@@ -91,13 +133,16 @@ if __name__ == "__main__":
         # A 1+1 strategy
         es = LLaMEA(
             evaluateBBOB,
-            n_parents=1,
-            n_offspring=1,
+            n_parents=n_parents,
+            n_offspring=n_offspring,
             llm=llm,
             task_prompt=task_prompt,
             experiment_name=experiment_name,
             elitism=True,
             HPO=False,
-            budget=100
+            budget=llm_call_budget
         )
-        print(es.run())
+        result = es.run()
+        if getattr(es, "logger", None) is not None:
+            result.add_metadata("llm_model", es.model)
+        print(result)

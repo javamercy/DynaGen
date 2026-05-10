@@ -1,4 +1,5 @@
 import math
+import random
 import signal
 import sys
 import time
@@ -33,10 +34,10 @@ class TSPCONST():
         search_instances = getattr(paras, "tsp_search_instances", None)
         test_instances = getattr(paras, "tsp_test_instances", None)
         if search_instances:
-            self.instance_data = load_tsplib_pool(search_instances)
+            self.instance_data = load_tsp_pool(search_instances)
             self.n_instance = len(self.instance_data)
             if test_instances:
-                self.test_instance_data = load_tsplib_pool(test_instances)
+                self.test_instance_data = load_tsp_pool(test_instances)
         else:
             getData = GetData(self.n_instance, self.problem_size)
             self.instance_data = getData.generate_instances()
@@ -375,6 +376,41 @@ def load_tsplib_pool(path):
     if not files:
         raise ValueError(f"No .tsp files found in {path}")
     return [load_tsplib_file(file) for file in files]
+
+
+def load_tsp_pool(path):
+    synthetic_spec = parse_llamea_tsp_spec(str(path))
+    if synthetic_spec is not None:
+        seed, size = synthetic_spec
+        return [generate_llamea_tsp_record(seed=seed, size=size)]
+    return load_tsplib_pool(path)
+
+
+def parse_llamea_tsp_spec(spec):
+    parts = spec.split(":")
+    if len(parts) != 4 or parts[:2] != ["synthetic", "llamea"]:
+        return None
+    return int(parts[2]), int(parts[3])
+
+
+def generate_llamea_tsp_record(seed=69, size=32):
+    rng = random.Random(seed)
+    coordinates = [(50.0, 50.0)]
+    for _ in range(size):
+        coordinates.append((float(rng.randint(0, 100)), float(rng.randint(0, 100))))
+        rng.randint(10, 35)
+
+    coordinates_arr = np.asarray(coordinates, dtype=float)
+    diff = coordinates_arr[:, np.newaxis, :] - coordinates_arr[np.newaxis, :, :]
+    distance_matrix = np.sqrt(np.sum(diff * diff, axis=-1))
+    np.fill_diagonal(distance_matrix, 0.0)
+    return {
+        "name": f"llamea_seed{seed}_size{size}",
+        "coordinates": coordinates_arr,
+        "distance_matrix": distance_matrix,
+        "optimal_length": None,
+        "source": f"synthetic:llamea:{seed}:{size}",
+    }
 
 
 def load_tsplib_file(path):

@@ -1,175 +1,390 @@
 """Multi-objective LLaMEA example on a synthetic TSP variant.
 
-This script shows how to:
-1. Evaluate generated code against two objectives (Distance and Fuel).
-2. Return objective values using ``Fitness``.
-3. Run LLaMEA with ``multi_objective=True`` and objective keys.
-4. Read final non-dominated solutions from ``ParetoArchive``.
+Search uses the same synthetic instance as the original LLaMEA example:
+``generate_tsp_test(seed=69, size=32)`` by default. The final selected
+solution is then evaluated on the shared TSPLIB test pool under
+``data/tsp/test_instances``.
 """
 
+import json
+import math
 import os
 import random
-from typing import Optional
+import sys
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
-from llamea import LLaMEA
-from llamea import Solution
-from llamea.llm import Ollama_LLM, Gemini_LLM
-from llamea.pareto_archive import ParetoArchive
+import numpy as np
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dynagen.domain import load_tsplib_file
+from llamea import LLaMEA, Solution
+from llamea.llm import Gemini_LLM, Ollama_LLM, OpenAI_LLM
 from llamea.loggers import ExperimentLogger
-from llamea.utils import prepare_namespace
 from llamea.multi_objective_fitness import Fitness
+from llamea.pareto_archive import ParetoArchive
+from llamea.utils import prepare_namespace
+
 
 @dataclass
 class Location:
     id: int
-    x: int
-    y: int
-    weight: int
+    x: float
+    y: float
+    weight: float
 
     def vectorise(self):
         return [self.id, self.x, self.y, self.weight]
-    
+
     def __repr__(self):
-        return f"Location(id: {self.id}, coordinates: ({self.x}, {self.y}), weight: {self.weight})"
+        return (
+            f"Location(id: {self.id}, coordinates: ({self.x}, {self.y}), "
+            f"weight: {self.weight})"
+        )
+
+
+@dataclass
+class TSPCase:
+    name: str
+    depot: Location
+    customers: list[Location]
+    distance_matrix: np.ndarray | None = None
+    optimal_length: float | None = None
+    source: str | None = None
+
+
+SEARCH_CASE: TSPCase | None = None
+
+
+def _int_env(name: str, default: int) -> int:
+    value = os.getenv(name)
+    return default if value is None or value == "" else int(value)
+
+
+def _prepare_output_dir() -> Path:
+    output_dir = Path(os.getenv("LLAMEA_OUTPUT_DIR", str(PROJECT_ROOT / "runs" / "tsp")))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(output_dir)
+    print(f"LLaMEA TSP output directory: {output_dir}")
+    return output_dir
+
+
+def _build_llm(model: str):
+    provider = os.getenv("LLAMEA_LLM_PROVIDER", "gemini").lower()
+    if provider == "ollama":
+        return Ollama_LLM(model)
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        return OpenAI_LLM(api_key, model)
+    api_key = os.getenv("GOOGLE_API_KEY")
+    return Gemini_LLM(api_key, model)
 
 
 def generate_tsp_test(seed: Optional[int] = None, size: int = 10):
     """Generate a depot and customer set for the synthetic TSP task."""
-    if seed is not None:
-        random.seed(seed)
+    rng = random.Random(seed) if seed is not None else random
     depot = Location(0, 50, 50, 0)
-    customers : list[Location] = []         # x, y, wight
+    customers: list[Location] = []
     for id in range(size):
-        x = random.randint(0, 100)
-        y = random.randint(0, 100)
-        weight = random.randint(10, 35)
+        x = rng.randint(0, 100)
+        y = rng.randint(0, 100)
+        weight = rng.randint(10, 35)
         customers.append(Location(id + 1, x, y, weight))
     return depot, customers
 
-depot, customers = generate_tsp_test(seed=69, size=32)
 
-referable_dict = {}
-referable_dict[0] = depot
+def build_generated_case(seed: int, size: int) -> TSPCase:
+    depot, customers = generate_tsp_test(seed=seed, size=size)
+    return TSPCase(
+        name=f"llamea_seed{seed}_size{size}",
+        depot=depot,
+        customers=customers,
+        source=f"synthetic:llamea:{seed}:{size}",
+    )
 
-for customer in customers:
-    referable_dict[customer.id] = customer
+
+def load_test_cases(path: str | Path) -> list[TSPCase]:
+    path = Path(path)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    files = sorted(path.iterdir()) if path.is_dir() else [path]
+    tsp_files = [item for item in files if item.suffix.lower() == ".tsp"]
+    if not tsp_files:
+        raise ValueError(f"No .tsp files found in {path}")
+
+    cases = []
+    for file in tsp_files:
+        instance = load_tsplib_file(file)
+        if instance.coordinates is None:
+            raise ValueError(f"TSP instance {file} does not include coordinates")
+        depot = Location(0, instance.coordinates[0, 0], instance.coordinates[0, 1], 0)
+        customers = [
+            Location(index, instance.coordinates[index, 0], instance.coordinates[index, 1], 1)
+            for index in range(1, instance.dimension)
+        ]
+        cases.append(
+            TSPCase(
+                name=instance.name,
+                depot=depot,
+                customers=customers,
+                distance_matrix=instance.distance_matrix,
+                optimal_length=instance.optimal_length,
+                source=instance.metadata.get("source"),
+            )
+        )
+    return cases
+
 
 def evaluate(solution: Solution, explogger: Optional[ExperimentLogger] = None):
-    """Evaluate generated solver code on a two-objective TSP benchmark.
-
-    The generated class must return a permutation of customer ids. The evaluator
-    validates the route, computes total travel distance and load-dependent fuel
-    usage, then stores a ``Fitness`` object with both objectives.
-    """
-    code = solution.code
+    """Evaluate generated solver code on the synthetic search TSP case."""
+    if SEARCH_CASE is None:
+        raise RuntimeError("SEARCH_CASE was not initialized")
 
     global_ns, issues = prepare_namespace(
-        code,
-        ['numpy', 'pymoo', 'typing', 'scipy'],
-        explogger
+        solution.code,
+        ["numpy", "pymoo", "typing", "scipy"],
+        explogger,
     )
+    global_ns["Location"] = Location
     local_ns = {}
-
-    global_ns['Location'] = Location
-
     feedback = ""
     if issues:
         feedback += f"Import issues: {issues}. "
         print(f"Potential Issues {issues}.")
 
-    compiled = compile(code, "<llm_code>", "exec")
-    exec(compiled, global_ns, local_ns)
-
-    cls = local_ns[solution.name]
     try:
-        path_index = cls(
-            depot.vectorise(),
-            [customer.vectorise() for customer in customers]
-        )()
-
-    except Exception as e:
+        compiled = compile(solution.code, "<llm_code>", "exec")
+        exec(compiled, global_ns, local_ns)
+        path_index = _run_solution(local_ns[solution.name], SEARCH_CASE)
+        record = score_route(SEARCH_CASE, path_index, pool_name="search_instances")
+    except Exception as exc:
         solution.set_scores(
-            Fitness({"Distance": float('inf'), "Fuel": float('inf')}),
-            feedback=f"Runtime error: {e}",
-            error=e
+            Fitness({"Distance": float("inf"), "Fuel": float("inf")}),
+            feedback=f"Runtime error: {exc}",
+            error=exc,
         )
         return solution
 
-    # ---- Validate output ----
-    if not isinstance(path_index, (list, tuple)):
+    if record["status"] != "valid":
         solution.set_scores(
-            Fitness({"Distance": float('inf'), "Fuel": float('inf')}),
-            feedback="Solver did not return a list of indices"
+            Fitness({"Distance": float("inf"), "Fuel": float("inf")}),
+            feedback=record.get("error", "Invalid route"),
         )
         return solution
 
-    if len(path_index) != len(customers):
-        solution.set_scores(
-            Fitness({"Distance": float('inf'), "Fuel": float('inf')}),
-            feedback="Path length does not match number of customers"
-        )
-        return solution
-
-    if len(set(path_index)) != len(path_index):
-        solution.set_scores(
-            Fitness({"Distance": float('inf'), "Fuel": float('inf')}),
-            feedback="Path contains duplicate customer indices"
-        )
-        return solution
-
-    if not all(idx in referable_dict for idx in path_index):
-        solution.set_scores(
-            Fitness({"Distance": float('inf'), "Fuel": float('inf')}),
-            feedback="Path contains invalid customer indices"
-        )
-        return solution
-
-    print(f"Path Index returned by LLM program: {path_index}")
-
-    path: list[Location] = [referable_dict[idx] for idx in path_index]
-
-    distance = 0.0
-    previous = depot
-
-    for current in path + [depot]:
-        dx = current.x - previous.x
-        dy = current.y - previous.y
-        distance += (dx * dx + dy * dy) ** 0.5
-        previous = current
-
-    remaining = sum(c.weight for c in path)
-    capacity = 1.1 * remaining
-
-    fuel = 0.0
-    previous = depot
-
-    for current in path + [depot]:
-        dx = current.x - previous.x
-        dy = current.y - previous.y
-        dist = (dx * dx + dy * dy) ** 0.5
-
-        consumption_rate = 1.0 + (remaining / capacity)
-        fuel += dist * consumption_rate
-
-        remaining -= current.weight
-        previous = current
-
-    fitness = Fitness({
-        "Distance": distance,
-        "Fuel": fuel
-    })
-
-    solution.set_scores(
-        fitness,
-        feedback=f"Fitness {fitness} for path {path_index}"
-    )
+    fitness = Fitness({"Distance": record["tour_length"], "Fuel": record["fuel"]})
+    solution.add_metadata("search_record", record)
+    solution.set_scores(fitness, feedback=f"Fitness {fitness} for path {record['route']}")
     return solution
 
+
+def evaluate_test_solution(solution: Solution, test_cases: list[TSPCase]) -> dict:
+    global_ns, issues = prepare_namespace(
+        solution.code,
+        ["numpy", "pymoo", "typing", "scipy"],
+        None,
+    )
+    global_ns["Location"] = Location
+    local_ns = {}
+
+    try:
+        compiled = compile(solution.code, "<llm_code>", "exec")
+        exec(compiled, global_ns, local_ns)
+        cls = local_ns[solution.name]
+    except Exception as exc:
+        records = [error_record(case, "test_instances", "error", str(exc)) for case in test_cases]
+        return summarize_records(records, import_issues=issues)
+
+    records = []
+    for case in test_cases:
+        try:
+            path_index = _run_solution(cls, case)
+            records.append(score_route(case, path_index, pool_name="test_instances"))
+        except Exception as exc:
+            records.append(error_record(case, "test_instances", "error", str(exc)))
+    return summarize_records(records, import_issues=issues)
+
+
+def _run_solution(cls, case: TSPCase):
+    return cls(
+        case.depot.vectorise(),
+        [customer.vectorise() for customer in case.customers],
+    )()
+
+
+def score_route(case: TSPCase, path_index, *, pool_name: str) -> dict:
+    route = normalize_route(path_index)
+    valid_ids = {customer.id for customer in case.customers}
+    if len(route) != len(case.customers):
+        return error_record(case, pool_name, "invalid", "Path length does not match number of customers")
+    if len(set(route)) != len(route):
+        return error_record(case, pool_name, "invalid", "Path contains duplicate customer indices")
+    if not all(idx in valid_ids for idx in route):
+        return error_record(case, pool_name, "invalid", "Path contains invalid customer indices")
+
+    tour_length = route_distance(case, route)
+    gap = compute_gap(tour_length, case.optimal_length)
+    record = {
+        "instance": case.name,
+        "pool": pool_name,
+        "dimension": len(case.customers) + 1,
+        "source": case.source,
+        "status": "valid",
+        "tour_length": tour_length,
+        "reference_length": case.optimal_length,
+        "reference_kind": "optimal" if case.optimal_length is not None else None,
+        "gap": gap,
+        "route": route,
+    }
+    if pool_name == "search_instances":
+        record["fuel"] = route_fuel(case, route)
+    return record
+
+
+def normalize_route(path_index) -> list[int]:
+    if isinstance(path_index, np.ndarray):
+        path_index = path_index.tolist()
+    if not isinstance(path_index, (list, tuple)):
+        raise ValueError("Solver did not return a list of indices")
+    return [int(item) for item in path_index]
+
+
+def route_distance(case: TSPCase, route: list[int]) -> float:
+    node_ids = [case.depot.id] + route + [case.depot.id]
+    if case.distance_matrix is not None:
+        return float(
+            sum(case.distance_matrix[current, nxt] for current, nxt in zip(node_ids, node_ids[1:]))
+        )
+
+    locations = {case.depot.id: case.depot, **{customer.id: customer for customer in case.customers}}
+    distance = 0.0
+    for current, nxt in zip(node_ids, node_ids[1:]):
+        current_location = locations[current]
+        next_location = locations[nxt]
+        dx = next_location.x - current_location.x
+        dy = next_location.y - current_location.y
+        distance += math.sqrt(dx * dx + dy * dy)
+    return float(distance)
+
+
+def route_fuel(case: TSPCase, route: list[int]) -> float:
+    locations = {case.depot.id: case.depot, **{customer.id: customer for customer in case.customers}}
+    path = [locations[idx] for idx in route]
+    remaining = sum(customer.weight for customer in path)
+    capacity = 1.1 * remaining if remaining > 0 else 1.0
+    fuel = 0.0
+    previous = case.depot
+    for current in path + [case.depot]:
+        dx = current.x - previous.x
+        dy = current.y - previous.y
+        dist = math.sqrt(dx * dx + dy * dy)
+        fuel += dist * (1.0 + (remaining / capacity))
+        remaining -= current.weight
+        previous = current
+    return float(fuel)
+
+
+def compute_gap(tour_length: float, optimal_length: float | None) -> float | None:
+    if optimal_length is None or optimal_length <= 0 or not math.isfinite(optimal_length):
+        return None
+    return 100.0 * (tour_length - optimal_length) / optimal_length
+
+
+def error_record(case: TSPCase, pool_name: str, status: str, error: str) -> dict:
+    return {
+        "instance": case.name,
+        "pool": pool_name,
+        "dimension": len(case.customers) + 1,
+        "source": case.source,
+        "status": status,
+        "tour_length": None,
+        "reference_length": case.optimal_length,
+        "reference_kind": "optimal" if case.optimal_length is not None else None,
+        "gap": None,
+        "error": error,
+    }
+
+
+def summarize_records(records: list[dict], import_issues=None) -> dict:
+    gaps = [record["gap"] for record in records if record.get("gap") is not None and math.isfinite(record["gap"])]
+    lengths = [record["tour_length"] for record in records if record.get("tour_length") is not None]
+    valid_count = sum(1 for record in records if record["status"] == "valid")
+    status = "valid" if valid_count == len(records) else first_nonvalid_status(records)
+    fitness = float(np.mean(gaps)) if gaps and status == "valid" else None
+    return {
+        "status": status,
+        "fitness": fitness,
+        "error_details": first_error(records),
+        "metrics": {
+            "pool": "test_instances",
+            "runs": len(records),
+            "valid_count": valid_count,
+            "mean_gap": float(np.mean(gaps)) if gaps else None,
+            "mean_tour_length": float(np.mean(lengths)) if lengths else None,
+            "import_issues": import_issues or [],
+            "records": records,
+        },
+    }
+
+
+def first_nonvalid_status(records: list[dict]) -> str:
+    for record in records:
+        if record["status"] != "valid":
+            return record["status"]
+    return "valid"
+
+
+def first_error(records: list[dict]) -> str | None:
+    for record in records:
+        if record["status"] != "valid":
+            return f"{record['status']} on {record['instance']}: {record.get('error')}"
+    return None
+
+
+def select_candidate(solutions):
+    if isinstance(solutions, ParetoArchive):
+        solutions = solutions.get_best()
+    if isinstance(solutions, Solution):
+        return solutions
+    return min(solutions, key=lambda solution: float(solution.fitness["Distance"]))
+
+
+def json_safe(value):
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Fitness):
+        return value.to_dict()
+    return value
+
+
 if __name__ == "__main__":
-    # key = os.getenv("GOOGLE_API__KEY")
-    llm = Ollama_LLM("gemma3:12b")
-    # llm = Gemini_LLM(key)
+    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gemini-2.5-flash"))
+    search_seed = _int_env("LLAMEA_TSP_SEARCH_SEED", 69)
+    search_size = _int_env("LLAMEA_TSP_SEARCH_SIZE", 32)
+    llm_call_budget = _int_env("LLAMEA_LLM_CALLS", 27)
+    n_parents = _int_env("LLAMEA_N_PARENTS", 3)
+    n_offspring = _int_env("LLAMEA_N_OFFSPRING", 3)
+    max_workers = _int_env("LLAMEA_MAX_WORKERS", 3)
+    experiment_name = os.getenv("LLAMEA_EXPERIMENT_NAME", "MOO-TSP")
+    test_instances = os.getenv(
+        "LLAMEA_TSP_TEST_INSTANCES",
+        str(PROJECT_ROOT / "data" / "tsp" / "test_instances"),
+    )
+
+    _prepare_output_dir()
+    SEARCH_CASE = build_generated_case(search_seed, search_size)
+    test_cases = load_test_cases(test_instances)
+    llm = _build_llm(ai_model)
 
     role_prompt = "You are an excellent Scientific Programmer, who can write novel solution to solve optimisation problem."
 
@@ -186,42 +401,55 @@ Write a class with __init__ method that excepts a two parameters.
 An example program of this solution will be:
 import random
 class Multi_Objective_TSP:
-    def __init__(depot, customer):
+    def __init__(self, depot, customers):
         self.depot = depot
-        self.cusotmers = customers
+        self.customers = customers
 
-    def __call__():
-        customer_ids = [customer[0] for customer in customers]
+    def __call__(self):
+        customer_ids = [customer[0] for customer in self.customers]
         random.shuffle(customer_ids)
         return customer_ids
 """
 
-    # Multi-objective mode returns a Pareto archive instead of a single winner.
-    llamea_inst = LLaMEA(f=evaluate,
-           llm=llm,
-           multi_objective=True,
-           max_workers=3,
-           n_offspring=3,
-           n_parents=3,
-           multi_objective_keys=['Distance', 'Fuel'],
-           role_prompt=role_prompt,
-           task_prompt=task_prompt,
-           example_prompt=example_prompt,
-            experiment_name="MOO-TSP",
-            minimization=True,
-           budget=27
-           )
+    llamea_inst = LLaMEA(
+        f=evaluate,
+        llm=llm,
+        multi_objective=True,
+        max_workers=max_workers,
+        n_offspring=n_offspring,
+        n_parents=n_parents,
+        multi_objective_keys=["Distance", "Fuel"],
+        role_prompt=role_prompt,
+        task_prompt=task_prompt,
+        example_prompt=example_prompt,
+        experiment_name=experiment_name,
+        minimization=True,
+        budget=llm_call_budget,
+    )
 
     solutions = llamea_inst.run()
-    # Keep only the final non-dominated set for reporting/inspection.
-    if isinstance(solutions, ParetoArchive):
-        solutions = solutions.get_best()
+    candidate = select_candidate(solutions)
+    candidate.add_metadata("llm_model", llamea_inst.model)
+    test_result = evaluate_test_solution(candidate, test_cases)
+    payload = {
+        "llm_model": llamea_inst.model,
+        "search_instances": SEARCH_CASE.source,
+        "test_instances": str(test_instances),
+        "candidate": {
+            "id": candidate.id,
+            "name": candidate.name,
+            "description": candidate.description,
+            "search_fitness": candidate.fitness,
+        },
+        **test_result,
+    }
 
-    import matplotlib.pyplot as plt
-    for index, solution in enumerate(solutions):
-        print(index + 1)
-        print(solutions.name)
-        print(solutions.description)
-        print(solutions.code)
-        print(solutions.fitness)
-        print("------------------------------------------------------------------------------------------------------------------------")
+    if getattr(llamea_inst, "logger", None) is not None:
+        result_path = Path(llamea_inst.logger.dirname) / "test_result.json"
+        result_path.write_text(json.dumps(json_safe(payload), indent=2), encoding="utf-8")
+        print(f"Wrote TSP test result: {result_path}")
+
+    print(candidate.name)
+    print(candidate.description)
+    print(candidate.fitness)
+    print(test_result)

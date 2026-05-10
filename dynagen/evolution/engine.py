@@ -74,6 +74,7 @@ class EvolutionEngine:
         summary.setdefault("candidate_generation_calls", None)
         summary.setdefault("total_api_calls", None)
         summary.setdefault("failed_calls", None)
+        summary["llm_model"] = getattr(self.provider, "model", None)
         summary["configured_candidate_generation_budget"] = configured_budget
         calls = summary.get("candidate_generation_calls")
         summary["budget_match"] = calls == configured_budget if calls is not None else None

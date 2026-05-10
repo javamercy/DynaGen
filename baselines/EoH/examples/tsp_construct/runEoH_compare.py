@@ -28,17 +28,30 @@ def _csv_env(name: str, default: list[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _project_path_or_spec(value: str) -> str:
+    if value.startswith("synthetic:"):
+        return value
+    path = Path(value)
+    return str(path if path.is_absolute() else PROJECT_ROOT / path)
+
+
 def main():
     use_local = os.environ.get("EOH_LLM_USE_LOCAL", "0") == "1"
     api_endpoint = os.environ.get("EOH_LLM_API_ENDPOINT", "api.openai.com")
     api_key = os.environ.get("OPENAI_API_KEY")
     local_url = os.environ.get("EOH_LLM_LOCAL_URL")
-    model = os.environ.get("EOH_LLM_MODEL", "gpt-5.4-nano")
+    model = os.environ.get("LLM_MODEL", os.environ.get("EOH_LLM_MODEL", "gpt-5.4-nano"))
     eva_timeout = _float_env("EOH_EVA_TIMEOUT", 60.0)
     ec_pop_size = _int_env("EOH_EC_POP_SIZE", 1)
     ec_n_pop = _int_env("EOH_EC_N_POP", 3)
     ec_operators = _csv_env("EOH_EC_OPERATORS", ["e1", "e2", "m1", "m2"])
     ec_operator_weights = [float(item) for item in _csv_env("EOH_EC_OPERATOR_WEIGHTS", ["1", "1", "1", "1"])]
+    tsp_search_instances = _project_path_or_spec(
+        os.environ.get("EOH_TSP_SEARCH_INSTANCES", "synthetic:llamea:69:32")
+    )
+    tsp_test_instances = _project_path_or_spec(
+        os.environ.get("EOH_TSP_TEST_INSTANCES", "data/tsp/test_instances")
+    )
     run_name = os.environ.get(
         "EOH_RUN_NAME",
         datetime.now().strftime(
@@ -73,8 +86,8 @@ def main():
         llm_enable_health_check=False,
         llm_api_max_attempts=1,
         llm_parse_retries=0,
-        tsp_search_instances=str(PROJECT_ROOT / "data" / "tsp" / "search_instances"),
-        tsp_test_instances=str(PROJECT_ROOT / "data" / "tsp" / "test_instances"),
+        tsp_search_instances=tsp_search_instances,
+        tsp_test_instances=tsp_test_instances,
     )
 
     expected_calls = 2 * ec_pop_size + ec_n_pop * len(ec_operators) * ec_pop_size

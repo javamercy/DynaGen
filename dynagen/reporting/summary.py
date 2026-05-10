@@ -75,6 +75,8 @@ def build_final_report(
                 ]
             )
         else:
+            search_metric_label = "Mean tour length" if metrics.get("pool") == "search_instances" else "Mean gap"
+            penalized_metric_label = "Penalized mean tour length" if metrics.get("pool") == "search_instances" else "Penalized mean gap"
             lines.extend(
                 [
                     "",
@@ -86,8 +88,8 @@ def build_final_report(
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
                     f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
-                    f"- Mean gap: {metrics.get('mean_gap')}",
-                    f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
+                    f"- {search_metric_label}: {metrics.get('mean_tour_length') if metrics.get('pool') == 'search_instances' else metrics.get('mean_gap')}",
+                    f"- {penalized_metric_label}: {metrics.get('penalized_mean_gap') if metrics.get('pool') != 'search_instances' else metrics.get('mean_tour_length')}",
                     f"- Timeout penalty: {metrics.get('timeout_penalty')}",
                     f"- Median gap: {metrics.get('median_gap')}",
                     f"- Worst gap: {metrics.get('worst_gap')}",
@@ -105,6 +107,7 @@ def build_final_report(
                 f"- Candidate-generation calls: {llm_calls.get('candidate_generation_calls')}",
                 f"- Total API calls: {llm_calls.get('total_api_calls')}",
                 f"- Failed calls: {llm_calls.get('failed_calls')}",
+                f"- LLM model: {llm_calls.get('llm_model') or llm_calls.get('model')}",
                 f"- Configured candidate-generation budget: {llm_calls.get('configured_candidate_generation_budget')}",
                 f"- Budget match: {llm_calls.get('budget_match')}",
             ]

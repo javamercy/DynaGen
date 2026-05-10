@@ -7,6 +7,7 @@ from dynagen.comparison.bbob import build_bbob_comparison_report, compare_bbob_c
 from dynagen.config import RunConfig, load_config
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.bbob import create_bbob_instances
+from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_spec
 from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
 from dynagen.evaluation.evaluator import CandidateEvaluator
 from dynagen.evolution.engine import EvolutionEngine, scheduled_llm_calls
@@ -181,6 +182,10 @@ def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = Fal
 def _load_instances(path: str | Path | None):
     if not path:
         raise ValueError("TSP data.search_instances and data.test_instances must be specified")
+    synthetic_spec = parse_llamea_tsp_spec(str(path))
+    if synthetic_spec is not None:
+        seed, size = synthetic_spec
+        return [generate_llamea_tsp_instance(seed=seed, size=size)]
     path = Path(path)
     if path.is_dir():
         files = sorted(item for item in path.iterdir() if item.suffix.lower() == ".tsp")

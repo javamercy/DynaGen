@@ -12,7 +12,7 @@ class TSPInstance:
     name: str
     dimension: int
     distance_matrix: np.ndarray
-    optimal_length: float
+    optimal_length: float | None
     coordinates: np.ndarray | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -38,7 +38,8 @@ class TSPInstance:
             self.coordinates = coordinates_arr[:, :2]
 
         if self.optimal_length is None:
-            raise ValueError("Optimal length must be provided")
+            return
+        self.optimal_length = float(self.optimal_length)
         if not np.isfinite(self.optimal_length) or self.optimal_length < 0:
             raise ValueError("Optimal length must be a non-negative finite value")
 
@@ -49,7 +50,7 @@ class TSPInstance:
             coordinates: Sequence[Sequence[float]] | np.ndarray,
             *,
             edge_weight_type: Literal["EUC_2D", "CEIL_2D"],
-            optimal_length: float,
+            optimal_length: float | None,
             metadata: dict[str, Any] | None = None,
     ) -> "TSPInstance":
         coordinates_arr = np.asarray(coordinates, dtype=float)
@@ -71,7 +72,7 @@ class TSPInstance:
             name: str,
             distance_matrix: Sequence[Sequence[float]] | np.ndarray,
             *,
-            optimal_length: float,
+            optimal_length: float | None,
             metadata: dict[str, Any] | None = None,
     ) -> "TSPInstance":
         matrix = np.asarray(distance_matrix, dtype=float)
@@ -90,7 +91,7 @@ class TSPInstance:
             dimension=data["dimension"],
             coordinates=data.get("coordinates"),
             distance_matrix=data["distance_matrix"],
-            optimal_length=data.get("optimal_length", float("inf")),
+            optimal_length=data.get("optimal_length"),
             metadata=dict(data.get("metadata", {})),
         )
 

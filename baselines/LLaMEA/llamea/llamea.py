@@ -416,6 +416,7 @@ class LLaMEA:
             if hasattr(self.f, "log_individual"):
                 self.f.log_individual(new_individual)
         print("Releasing individual", new_individual)
+        new_individual.add_metadata("llm_model", self.model)
         return new_individual
 
     def initialize(self):
@@ -967,6 +968,7 @@ Feedback:
             )
             evolved_individual.generation = self.generation
             evolved_individual.task_prompt = individual_copy.task_prompt
+            evolved_individual.add_metadata("llm_model", self.model)
 
             # enhance the individual with AST features and feature guidance metadata (before logging).
             if self.feature_guided_mutation:
@@ -987,6 +989,7 @@ Feedback:
                 evolved_individual = self.evaluate_fitness(evolved_individual)
         except Exception as e:
             evolved_individual.generation = self.generation
+            evolved_individual.add_metadata("llm_model", self.model)
             evolved_individual.set_scores(
                 self.worst_value, f"An exception occurred: {e.__repr__()}.", e
             )

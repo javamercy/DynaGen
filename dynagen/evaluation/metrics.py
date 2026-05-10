@@ -6,12 +6,15 @@ from typing import Any
 UNSCORED_TIMEOUT_GAP = 1_000_000.0
 
 
-def compute_gap(tour_length: float, optimal_length: float) -> float:
+def compute_gap(tour_length: float, optimal_length: float | None) -> float | None:
     if not math.isfinite(tour_length) or tour_length <= 0:
         raise ValueError("Tour length must be a positive finite value")
 
+    if optimal_length is None:
+        return None
+
     if not math.isfinite(optimal_length) or optimal_length <= 0:
-        raise ValueError("Reference length must be a positive finite value")
+        return None
 
     return 100.0 * (tour_length - optimal_length) / optimal_length
 
@@ -20,7 +23,11 @@ def aggregate_records(records: list[dict[str, Any]], *, timeout_penalty: float =
     valid = [record for record in records if record["status"] == "valid"]
     scored = [record for record in records if _has_finite_gap(record)]
     gaps = [float(record["gap"]) for record in scored]
-    lengths = [float(record["tour_length"]) for record in scored if record.get("tour_length") is not None]
+    lengths = [
+        float(record["tour_length"])
+        for record in records
+        if record.get("tour_length") is not None and math.isfinite(float(record["tour_length"]))
+    ]
     runtimes = [float(record.get("runtime_seconds", 0.0)) for record in records]
     timeout_count = sum(1 for record in records if record["status"] == "timeout")
     timeout_fraction = timeout_count / len(records) if records else 0.0

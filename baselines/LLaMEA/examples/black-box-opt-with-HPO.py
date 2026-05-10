@@ -11,21 +11,74 @@ import re
 import textwrap
 import time
 from itertools import product
+from pathlib import Path
 
 import numpy as np
 from ConfigSpace import Configuration, ConfigurationSpace
 from ioh import get_problem, logger
 from smac import AlgorithmConfigurationFacade, Scenario
 
-from llamea import Gemini_LLM, LLaMEA
+from llamea import Gemini_LLM, LLaMEA, Ollama_LLM, OpenAI_LLM
 from misc import OverBudgetException, aoc_logger, correct_aoc
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _env_int(name, default):
+    value = os.getenv(name)
+    return default if value is None or value == "" else int(value)
+
+
+def _env_int_list(name, default):
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return list(default)
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def _prepare_output_dir():
+    output_dir = Path(os.getenv("LLAMEA_OUTPUT_DIR", str(PROJECT_ROOT / "runs" / "bbob")))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(output_dir)
+    print(f"LLaMEA-HPO output directory: {output_dir}")
+
+
+def _build_llm(model: str):
+    provider = os.getenv("LLAMEA_LLM_PROVIDER", "gemini").lower()
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        return OpenAI_LLM(api_key, model)
+    if provider == "ollama":
+        return Ollama_LLM(model)
+    api_key = os.getenv("GOOGLE_API_KEY")
+    return Gemini_LLM(api_key, model)
+
+
+def _parse_instance(instance):
+    if isinstance(instance, tuple):
+        return int(instance[0]), int(instance[1])
+    fid, iid = str(instance).strip().strip("()").split(",", 1)
+    return int(fid.strip()), int(iid.strip())
 
 if __name__ == "__main__":
     # Execution code starts here
-    api_key = os.getenv("GEMINI_API_KEY")
-    ai_model = "gemini-1.5-flash"
-    experiment_name = "pop1-5-HPO"
-    llm = Gemini_LLM(api_key, ai_model)
+    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gemini-1.5-flash"))
+    experiment_name = os.getenv("LLAMEA_EXPERIMENT_NAME", "pop1-5-HPO")
+    bbob_dimensions = _env_int_list("LLAMEA_BBOB_DIMENSIONS", [5])
+    bbob_function_ids = _env_int_list("LLAMEA_BBOB_FUNCTION_IDS", range(1, 25))
+    bbob_instance_ids = _env_int_list("LLAMEA_BBOB_INSTANCE_IDS", [1, 2, 3])
+    bbob_repetitions = _env_int("LLAMEA_BBOB_REPETITIONS", 3)
+    bbob_budget_factor = _env_int("LLAMEA_BBOB_BUDGET_FACTOR", 2000)
+    llm_call_budget = _env_int("LLAMEA_LLM_CALLS", 100)
+    n_parents = _env_int("LLAMEA_N_PARENTS", 5)
+    n_offspring = _env_int("LLAMEA_N_OFFSPRING", 5)
+    eval_timeout = _env_int("LLAMEA_EVAL_TIMEOUT", 3600)
+    hpo_trials = _env_int("LLAMEA_HPO_TRIALS", 2000)
+    hpo_min_budget = _env_int("LLAMEA_HPO_MIN_BUDGET", 12)
+    hpo_max_budget = _env_int("LLAMEA_HPO_MAX_BUDGET", 200)
+    _prepare_output_dir()
+    llm = _build_llm(ai_model)
 
     def evaluateBBOBWithHPO(solution, explogger=None):
         """
@@ -69,8 +122,8 @@ if __name__ == "__main__":
         code = solution.code
         algorithm_name = solution.name
         exec(code, globals())
-        dim = 5
-        budget = 2000 * dim
+        dim = bbob_dimensions[0]
+        budget = bbob_budget_factor * dim
         error = ""
         algorithm = None
 
@@ -87,9 +140,7 @@ if __name__ == "__main__":
         # now optimize the hyper-parameters
         def get_bbob_performance(config: Configuration, instance: str, seed: int = 0):
             np.random.seed(seed)
-            fid, iid = instance.split(",")
-            fid = int(fid[1:])
-            iid = int(iid[:-1])
+            fid, iid = _parse_instance(instance)
             problem = get_problem(fid, iid, dim)
             l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
             problem.attach_logger(l2)
@@ -105,13 +156,13 @@ if __name__ == "__main__":
             auc = correct_aoc(problem, l2, budget)
             return 1 - auc
 
-        args = list(product(range(1, 25), range(1, 4)))
+        args = list(product(bbob_function_ids, bbob_instance_ids))
         np.random.shuffle(args)
         inst_feats = {str(arg): [arg[0]] for idx, arg in enumerate(args)}
         # inst_feats = {str(arg): [idx] for idx, arg in enumerate(args)}
         error = ""
 
-        if "_configspace" not in solution.keys():
+        if solution.configspace is None:
             # No HPO possible, evaluate only the default
             incumbent = {}
             error = "The configuration space was not properly formatted or not present in your answer. The evaluation was done on the default configuration."
@@ -121,9 +172,9 @@ if __name__ == "__main__":
                 configuration_space,
                 name=str(int(time.time())) + "-" + algorithm_name,
                 deterministic=False,
-                min_budget=12,
-                max_budget=200,
-                n_trials=2000,
+                min_budget=hpo_min_budget,
+                max_budget=hpo_max_budget,
+                n_trials=hpo_trials,
                 instances=args,
                 instance_features=inst_feats,
                 output_directory="smac3_output"
@@ -138,25 +189,27 @@ if __name__ == "__main__":
 
         # last but not least, perform the final validation
 
-        l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
         aucs = []
-        for fid in np.arange(1, 25):
-            for iid in [1, 2, 3]:  # , 4, 5]
-                problem = get_problem(fid, iid, dim)
-                problem.attach_logger(l2)
-                for rep in range(3):
-                    np.random.seed(rep)
-                    try:
-                        algorithm = globals()[algorithm_name](
-                            budget=budget, dim=dim, **dict(incumbent)
-                        )
-                        algorithm(problem)
-                    except OverBudgetException:
-                        pass
-                    auc = correct_aoc(problem, l2, budget)
-                    aucs.append(auc)
-                    l2.reset(problem)
-                    problem.reset()
+        for validation_dim in bbob_dimensions:
+            validation_budget = bbob_budget_factor * validation_dim
+            l2 = aoc_logger(validation_budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
+            for fid in bbob_function_ids:
+                for iid in bbob_instance_ids:
+                    problem = get_problem(fid, iid, validation_dim)
+                    problem.attach_logger(l2)
+                    for rep in range(bbob_repetitions):
+                        np.random.seed(rep)
+                        try:
+                            algorithm = globals()[algorithm_name](
+                                budget=validation_budget, dim=validation_dim, **dict(incumbent)
+                            )
+                            algorithm(problem)
+                        except OverBudgetException:
+                            pass
+                        auc = correct_aoc(problem, l2, validation_budget)
+                        aucs.append(auc)
+                        l2.reset(problem)
+                        problem.reset()
 
         auc_mean = np.mean(aucs)
         auc_std = np.std(aucs)
@@ -229,6 +282,8 @@ if __name__ == "__main__":
         es = LLaMEA(
             evaluateBBOBWithHPO,
             llm=llm,
+            n_parents=n_parents,
+            n_offspring=n_offspring,
             role_prompt=role_prompt,
             task_prompt=task_prompt,
             example_prompt=example_prompt,
@@ -237,5 +292,10 @@ if __name__ == "__main__":
             experiment_name=experiment_name,
             elitism=True,
             HPO=True,
+            budget=llm_call_budget,
+            eval_timeout=eval_timeout,
         )
-        print(es.run())
+        result = es.run()
+        if getattr(es, "logger", None) is not None:
+            result.add_metadata("llm_model", es.model)
+        print(result)
