@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ class RunStore:
         self.candidates_dir = self.root / "candidates"
         self.prompts_dir = self.root / "prompts"
         self._counter = self._scan_counter()
+        self._counter_lock = threading.Lock()
         for directory in (self.generations_dir, self.candidates_dir, self.prompts_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -34,8 +36,9 @@ class RunStore:
         return store
 
     def next_candidate_id(self) -> str:
-        self._counter += 1
-        return f"cand_{self._counter:06d}"
+        with self._counter_lock:
+            self._counter += 1
+            return f"cand_{self._counter:06d}"
 
     def save_candidate(self, candidate: Candidate) -> None:
         dump_json(self.candidates_dir / f"{candidate.id}.json", candidate.to_dict(include_code=False))

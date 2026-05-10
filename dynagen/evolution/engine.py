@@ -1,5 +1,7 @@
 import math
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
@@ -13,6 +15,17 @@ from dynagen.persistence.run_store import RunStore
 from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
 from dynagen.reporting.summary import build_final_report, generation_summary
+
+
+@dataclass(frozen=True)
+class _CandidateTask:
+    """Immutable descriptor for a single candidate generation task."""
+    candidate_id: str
+    generation: int
+    strategy: str
+    parents: list[Candidate]
+    messages: list[dict[str, str]]
+    prompt: str
 
 
 class EvolutionEngine:
@@ -80,87 +93,115 @@ class EvolutionEngine:
         summary["budget_match"] = calls == configured_budget if calls is not None else None
         return summary
 
+    # ------------------------------------------------------------------
+    # Initial population: parallel LLM calls + parallel evaluations
+    # ------------------------------------------------------------------
+
     def _initial_population(self) -> Population:
-        candidates: list[Candidate] = []
-        for role in self.problem.initial_roles(self.config.evolution.population_size):
+        roles = self.problem.initial_roles(self.config.evolution.population_size)
+        tasks = self._build_initial_tasks(roles)
+        candidates = self._execute_tasks_parallel(tasks)
+        return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
+
+    def _build_initial_tasks(self, roles: list) -> list[_CandidateTask]:
+        tasks: list[_CandidateTask] = []
+        for role in roles:
             messages = self.problem.build_initial_prompt(role)
             prompt = _format_messages(messages)
             candidate_id = self.store.next_candidate_id()
-            candidate: Candidate | None = None
-            try:
-                response = self.provider.complete(
-                    messages,
-                    temperature=self.config.llm.temperature,
-                )
-                candidate = _build_candidate_from_response(
-                    response,
-                    candidate_id=candidate_id,
-                    generation=0,
-                    strategy=f"initial:{role.slot}",
-                    prompt=prompt,
-                    metrics=self._empty_metrics(),
-                )
-                self.search_evaluator.evaluate_candidate(candidate)
-            except Exception as exc:
-                error_details = _exception_details(exc)
-                if candidate is None:
-                    candidate = _failed_candidate(
-                        candidate_id=candidate_id,
-                        generation=0,
-                        strategy=f"initial:{role.slot}",
-                        prompt=prompt,
-                        error_details=error_details,
-                        metrics=self._empty_metrics(),
-                    )
-                else:
-                    _mark_candidate_error(candidate, error_details)
-            self.store.save_candidate(candidate)
-            candidates.append(candidate)
-        return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
+            tasks.append(_CandidateTask(
+                candidate_id=candidate_id,
+                generation=0,
+                strategy=f"initial:{role.slot}",
+                parents=[],
+                messages=messages,
+                prompt=prompt,
+            ))
+        return tasks
+
+    # ------------------------------------------------------------------
+    # Offspring generation: parallel LLM calls + parallel evaluations
+    # ------------------------------------------------------------------
 
     def _generate_offspring(self, generation: int, population: Population) -> list[Candidate]:
-        offspring: list[Candidate] = []
+        tasks = self._build_offspring_tasks(generation, population)
+        return self._execute_tasks_parallel(tasks)
+
+    def _build_offspring_tasks(self, generation: int, population: Population) -> list[_CandidateTask]:
+        tasks: list[_CandidateTask] = []
         for strategy in self.config.evolution.strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
-                parents: list[Candidate] = []
-                prompt = ""
-                candidate: Candidate | None = None
-                try:
-                    parents = self._select_strategy_parents(strategy, population.candidates)
-                    messages = self.problem.build_evolution_prompt(strategy, parents)
-                    prompt = _format_messages(messages)
-                    response = self.provider.complete(
-                        messages,
-                        temperature=self.config.llm.temperature,
-                    )
-                    candidate = _build_candidate_from_response(
-                        response,
-                        candidate_id=candidate_id,
-                        generation=generation,
-                        strategy=strategy,
-                        parents=[parent.id for parent in parents],
-                        prompt=prompt,
-                        metrics=self._empty_metrics(),
-                    )
-                    self.search_evaluator.evaluate_candidate(candidate)
-                except Exception as exc:
-                    error_details = _exception_details(exc)
-                    if candidate is None:
-                        candidate = _failed_candidate(
-                            candidate_id=candidate_id,
-                            generation=generation,
-                            strategy=strategy,
-                            parents=[parent.id for parent in parents],
-                            prompt=prompt,
-                            error_details=error_details,
-                            metrics=self._empty_metrics(),
-                        )
-                    else:
-                        _mark_candidate_error(candidate, error_details)
-                self.store.save_candidate(candidate)
-                offspring.append(candidate)
-        return offspring
+                parents = self._select_strategy_parents(strategy, population.candidates)
+                messages = self.problem.build_evolution_prompt(strategy, parents)
+                prompt = _format_messages(messages)
+                tasks.append(_CandidateTask(
+                    candidate_id=candidate_id,
+                    generation=generation,
+                    strategy=strategy,
+                    parents=parents,
+                    messages=messages,
+                    prompt=prompt,
+                ))
+        return tasks
+
+    # ------------------------------------------------------------------
+    # Parallel task execution: LLM call → evaluation → persist
+    # ------------------------------------------------------------------
+
+    def _execute_tasks_parallel(self, tasks: list[_CandidateTask]) -> list[Candidate]:
+        """Execute LLM calls and evaluations concurrently, preserving task order."""
+        if not tasks:
+            return []
+
+        max_workers = min(len(tasks), 8)
+        results: list[Candidate] = [None] * len(tasks)  # type: ignore[list-item]
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(self._process_single_task, task): index
+                for index, task in enumerate(tasks)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                results[index] = future.result()
+
+        return results
+
+    def _process_single_task(self, task: _CandidateTask) -> Candidate:
+        """Run LLM call + evaluation for a single candidate. Always returns a Candidate."""
+        candidate: Candidate | None = None
+        try:
+            response = self.provider.complete(
+                task.messages,
+                temperature=self.config.llm.temperature,
+            )
+            candidate = _build_candidate_from_response(
+                response,
+                candidate_id=task.candidate_id,
+                generation=task.generation,
+                strategy=task.strategy,
+                parents=[parent.id for parent in task.parents],
+                prompt=task.prompt,
+                metrics=self._empty_metrics(),
+            )
+            self.search_evaluator.evaluate_candidate(candidate)
+        except Exception as exc:
+            error_details = _exception_details(exc)
+            if candidate is None:
+                candidate = _failed_candidate(
+                    candidate_id=task.candidate_id,
+                    generation=task.generation,
+                    strategy=task.strategy,
+                    parents=[parent.id for parent in task.parents],
+                    prompt=task.prompt,
+                    error_details=error_details,
+                    metrics=self._empty_metrics(),
+                )
+            else:
+                _mark_candidate_error(candidate, error_details)
+        self.store.save_candidate(candidate)
+        return candidate
 
     def _select_strategy_parents(self, strategy: Strategy, candidates: list[Candidate]) -> list[Candidate]:
         return select_parents(candidates, parent_count(strategy), self.rng)

@@ -1,3 +1,4 @@
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -30,16 +31,32 @@ class CountingLLMProvider(LLMProvider):
     def __init__(self, provider: LLMProvider, *, configured_budget: int | None = None) -> None:
         self.provider = provider
         self.configured_budget = configured_budget
-        self.candidate_generation_calls = 0
-        self.total_api_calls = 0
-        self.failed_calls = 0
+        self._candidate_generation_calls = 0
+        self._total_api_calls = 0
+        self._failed_calls = 0
+        self._lock = threading.Lock()
+
+    @property
+    def candidate_generation_calls(self) -> int:
+        with self._lock:
+            return self._candidate_generation_calls
+
+    @property
+    def total_api_calls(self) -> int:
+        with self._lock:
+            return self._total_api_calls
+
+    @property
+    def failed_calls(self) -> int:
+        with self._lock:
+            return self._failed_calls
 
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         self._record_call()
         try:
             return self.provider.complete(messages, temperature=temperature)
         except Exception:
-            self.failed_calls += 1
+            self._record_failure()
             raise
 
     def complete_with_metadata(
@@ -52,21 +69,30 @@ class CountingLLMProvider(LLMProvider):
         try:
             return self.provider.complete_with_metadata(messages, temperature=temperature)
         except Exception:
-            self.failed_calls += 1
+            self._record_failure()
             raise
 
     def summary(self) -> dict[str, Any]:
+        with self._lock:
+            calls = self._candidate_generation_calls
+            total = self._total_api_calls
+            failed = self._failed_calls
         budget_match = None
         if self.configured_budget is not None:
-            budget_match = self.candidate_generation_calls == self.configured_budget
+            budget_match = calls == self.configured_budget
         return {
-            "candidate_generation_calls": self.candidate_generation_calls,
-            "total_api_calls": self.total_api_calls,
-            "failed_calls": self.failed_calls,
+            "candidate_generation_calls": calls,
+            "total_api_calls": total,
+            "failed_calls": failed,
             "configured_candidate_generation_budget": self.configured_budget,
             "budget_match": budget_match,
         }
 
     def _record_call(self) -> None:
-        self.candidate_generation_calls += 1
-        self.total_api_calls += 1
+        with self._lock:
+            self._candidate_generation_calls += 1
+            self._total_api_calls += 1
+
+    def _record_failure(self) -> None:
+        with self._lock:
+            self._failed_calls += 1

@@ -1,4 +1,5 @@
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from dynagen.candidates import CandidateStatus
@@ -56,42 +57,59 @@ class TSPCandidateEvaluator:
             metrics = self.empty_metrics()
             return EvaluationResult("invalid", math.inf, metrics, validation.error)
 
-        records: list[dict[str, Any]] = []
-
-        for instance in self.instances:
-            for seed in self.seeds:
-                run = run_tsp_solver(
-                    code,
-                    instance,
-                    seed=seed,
-                    budget=self.budget,
-                    timeout_seconds=self.timeout_seconds,
-                )
-
-                scored = run.status == "valid" or run.partial
-                gap = compute_gap(run.tour_length,
-                                  instance.optimal_length) if scored and run.tour_length is not None else None
-                reference_kind = "optimal" if instance.optimal_length is not None else None
-                records.append({
-                    "instance": instance.name,
-                    "pool": self.pool_name,
-                    "dimension": instance.dimension,
-                    "source": instance.metadata.get("source", "unknown"),
-                    "seed": seed,
-                    "status": run.status,
-                    "tour_length": run.tour_length,
-                    "partial": run.partial,
-                    "reference_length": instance.optimal_length,
-                    "reference_kind": reference_kind,
-                    "gap": gap,
-                    "runtime_seconds": run.runtime_seconds,
-                    "error": run.error,
-                })
+        records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_tsp_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
         fitness = _candidate_fitness(status, metrics, pool_name=self.pool_name)
         error_feedback = _error_feedback(records) if status != "valid" else None
         return EvaluationResult(status, fitness, metrics, error_feedback)
+
+    def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
+        tasks = [
+            (instance, seed)
+            for instance in self.instances
+            for seed in self.seeds
+        ]
+        records: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
+
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as executor:
+            future_to_index = {
+                executor.submit(self._run_single_instance, code, instance, seed): index
+                for index, (instance, seed) in enumerate(tasks)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                records[index] = future.result()
+
+        return records
+
+    def _run_single_instance(self, code: str, instance: TSPInstance, seed: int) -> dict[str, Any]:
+        run = run_tsp_solver(
+            code,
+            instance,
+            seed=seed,
+            budget=self.budget,
+            timeout_seconds=self.timeout_seconds,
+        )
+        scored = run.status == "valid" or run.partial
+        gap = compute_gap(run.tour_length,
+                          instance.optimal_length) if scored and run.tour_length is not None else None
+        reference_kind = "optimal" if instance.optimal_length is not None else None
+        return {
+            "instance": instance.name,
+            "pool": self.pool_name,
+            "dimension": instance.dimension,
+            "source": instance.metadata.get("source", "unknown"),
+            "seed": seed,
+            "status": run.status,
+            "tour_length": run.tour_length,
+            "partial": run.partial,
+            "reference_length": instance.optimal_length,
+            "reference_kind": reference_kind,
+            "gap": gap,
+            "runtime_seconds": run.runtime_seconds,
+            "error": run.error,
+        }
 
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
         metrics = dict(metrics)

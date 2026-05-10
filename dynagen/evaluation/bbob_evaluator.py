@@ -1,4 +1,5 @@
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from dynagen.candidates import CandidateStatus
@@ -60,50 +61,69 @@ class BBOBCandidateEvaluator:
             metrics = self.empty_metrics()
             return EvaluationResult("invalid", math.inf, metrics, validation.error)
 
-        records: list[dict[str, Any]] = []
-        for instance in self.instances:
-            for seed in self.seeds:
-                run = run_bbob_optimizer(
-                    code,
-                    instance,
-                    seed=seed,
-                    budget=self.budget,
-                    timeout_seconds=self.timeout_seconds,
-                )
-                history = run.history or ([run.best_value] if run.best_value is not None else [])
-                aocc = compute_aocc(
-                    history,
-                    optimum=instance.optimum_value,
-                    budget=self.budget,
-                    lower_bound=self.aocc_lower_bound,
-                    upper_bound=self.aocc_upper_bound,
-                ) if history else None
-                final_error = None
-                if run.best_value is not None and math.isfinite(run.best_value):
-                    final_error = max(0.0, float(run.best_value) - instance.optimum_value)
-                records.append({
-                    "instance": instance.name,
-                    "pool": self.pool_name,
-                    "function_id": instance.function_id,
-                    "function_name": instance.name.split("_i", 1)[0],
-                    "group": instance.group,
-                    "bbob_instance_id": instance.instance_id,
-                    "dimension": instance.dimension,
-                    "seed": seed,
-                    "status": run.status,
-                    "best_value": run.best_value,
-                    "final_error": final_error,
-                    "aocc": aocc,
-                    "evaluations": run.evaluations,
-                    "partial": run.partial,
-                    "runtime_seconds": run.runtime_seconds,
-                    "error": run.error,
-                })
+        records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_bbob_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
         fitness = _candidate_fitness(status, metrics)
         error_feedback = _error_feedback(records) if status != "valid" else None
         return EvaluationResult(status, fitness, metrics, error_feedback)
+
+    def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
+        tasks = [
+            (instance, seed)
+            for instance in self.instances
+            for seed in self.seeds
+        ]
+        records: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
+
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as executor:
+            future_to_index = {
+                executor.submit(self._run_single_instance, code, instance, seed): index
+                for index, (instance, seed) in enumerate(tasks)
+            }
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                records[index] = future.result()
+
+        return records
+
+    def _run_single_instance(self, code: str, instance: BBOBInstance, seed: int) -> dict[str, Any]:
+        run = run_bbob_optimizer(
+            code,
+            instance,
+            seed=seed,
+            budget=self.budget,
+            timeout_seconds=self.timeout_seconds,
+        )
+        history = run.history or ([run.best_value] if run.best_value is not None else [])
+        aocc = compute_aocc(
+            history,
+            optimum=instance.optimum_value,
+            budget=self.budget,
+            lower_bound=self.aocc_lower_bound,
+            upper_bound=self.aocc_upper_bound,
+        ) if history else None
+        final_error = None
+        if run.best_value is not None and math.isfinite(run.best_value):
+            final_error = max(0.0, float(run.best_value) - instance.optimum_value)
+        return {
+            "instance": instance.name,
+            "pool": self.pool_name,
+            "function_id": instance.function_id,
+            "function_name": instance.name.split("_i", 1)[0],
+            "group": instance.group,
+            "bbob_instance_id": instance.instance_id,
+            "dimension": instance.dimension,
+            "seed": seed,
+            "status": run.status,
+            "best_value": run.best_value,
+            "final_error": final_error,
+            "aocc": aocc,
+            "evaluations": run.evaluations,
+            "partial": run.partial,
+            "runtime_seconds": run.runtime_seconds,
+            "error": run.error,
+        }
 
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
         metrics = dict(metrics)

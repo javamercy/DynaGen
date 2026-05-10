@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -17,18 +18,20 @@ def compare_bbob_candidate(
     if config.problem.type != "bbob":
         raise ValueError("BBOB comparison requires problem.type: bbob")
     evaluator = problem_for_config(config).build_evaluator(config, pool_name="bbob_comparison")
-    algorithms = []
+
+    tasks: list[tuple[str, str, str]] = []
     evaluated_names: set[str] = set()
     if candidate_code is not None:
-        algorithms.append(_evaluate_algorithm(evaluator, candidate_name, candidate_kind, candidate_code))
+        tasks.append((candidate_name, candidate_kind, candidate_code))
         evaluated_names.add(candidate_name)
     for baseline_name in config.problem.comparison_baselines:
         if baseline_name in evaluated_names:
             continue
         baseline_code = get_bbob_baseline_code(baseline_name)
-        algorithms.append(_evaluate_algorithm(evaluator, baseline_name, "baseline", baseline_code))
+        tasks.append((baseline_name, "baseline", baseline_code))
         evaluated_names.add(baseline_name)
 
+    algorithms = _evaluate_algorithms_parallel(evaluator, tasks)
     algorithms.sort(key=lambda item: (item["fitness"] is None, float("inf") if item["fitness"] is None else item["fitness"]))
     return {
         "problem": "bbob",
@@ -45,6 +48,29 @@ def compare_bbob_candidate(
         "algorithms": algorithms,
         "best_algorithm": algorithms[0]["name"] if algorithms else None,
     }
+
+
+def _evaluate_algorithms_parallel(
+        evaluator: CandidateEvaluator,
+        tasks: list[tuple[str, str, str]],
+) -> list[dict[str, Any]]:
+    """Evaluate multiple algorithms concurrently."""
+    if not tasks:
+        return []
+
+    max_workers = min(len(tasks), 4)
+    results: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(_evaluate_algorithm, evaluator, name, kind, code): index
+            for index, (name, kind, code) in enumerate(tasks)
+        }
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            results[index] = future.result()
+
+    return results
 
 
 def build_bbob_comparison_report(comparison: dict[str, Any]) -> str:
