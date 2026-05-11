@@ -26,12 +26,17 @@ class LLMProvider(ABC):
     ) -> LLMResponse:
         raise NotImplementedError
 
+    @abstractmethod
+    def complete_text(self, messages: list[dict[str, str]], *, temperature: float) -> str:
+        raise NotImplementedError
+
 
 class CountingLLMProvider(LLMProvider):
     def __init__(self, provider: LLMProvider, *, configured_budget: int | None = None) -> None:
         self.provider = provider
         self.configured_budget = configured_budget
         self._candidate_generation_calls = 0
+        self._reflection_calls = 0
         self._total_api_calls = 0
         self._failed_calls = 0
         self._lock = threading.Lock()
@@ -50,6 +55,11 @@ class CountingLLMProvider(LLMProvider):
     def failed_calls(self) -> int:
         with self._lock:
             return self._failed_calls
+
+    @property
+    def reflection_calls(self) -> int:
+        with self._lock:
+            return self._reflection_calls
 
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         self._record_call()
@@ -72,9 +82,18 @@ class CountingLLMProvider(LLMProvider):
             self._record_failure()
             raise
 
+    def complete_text(self, messages: list[dict[str, str]], *, temperature: float) -> str:
+        self._record_reflection_call()
+        try:
+            return self.provider.complete_text(messages, temperature=temperature)
+        except Exception:
+            self._record_failure()
+            raise
+
     def summary(self) -> dict[str, Any]:
         with self._lock:
             calls = self._candidate_generation_calls
+            reflections = self._reflection_calls
             total = self._total_api_calls
             failed = self._failed_calls
         budget_match = None
@@ -82,6 +101,7 @@ class CountingLLMProvider(LLMProvider):
             budget_match = calls == self.configured_budget
         return {
             "candidate_generation_calls": calls,
+            "reflection_calls": reflections,
             "total_api_calls": total,
             "failed_calls": failed,
             "configured_candidate_generation_budget": self.configured_budget,
@@ -91,6 +111,11 @@ class CountingLLMProvider(LLMProvider):
     def _record_call(self) -> None:
         with self._lock:
             self._candidate_generation_calls += 1
+            self._total_api_calls += 1
+
+    def _record_reflection_call(self) -> None:
+        with self._lock:
+            self._reflection_calls += 1
             self._total_api_calls += 1
 
     def _record_failure(self) -> None:

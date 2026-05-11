@@ -10,9 +10,14 @@ EvaluationStatus = Literal["valid", "invalid", "timeout", "error"]
 @dataclass(frozen=True)
 class EvaluationResult:
     status: EvaluationStatus
-    fitness: float | None
+    score: float | None
     metrics: dict[str, Any]
     error_feedback: str | None = None
+    score_name: str = "fitness"
+
+    @property
+    def fitness(self) -> float | None:
+        return self.score
 
 
 class CandidateEvaluator(Protocol):

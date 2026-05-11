@@ -29,7 +29,13 @@ class BBOBProblem:
     def build_initial_prompt(self, role: Any) -> list[dict[str, str]]:
         return build_bbob_initial_prompt(role)
 
-    def build_evolution_prompt(self, strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
+    def build_evolution_prompt(
+            self,
+            strategy: str,
+            parents: list[Candidate],
+            *,
+            generation_reflection: str = "",
+    ) -> list[dict[str, str]]:
         return build_bbob_evolution_prompt(strategy, parents)
 
 

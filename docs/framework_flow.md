@@ -1,54 +1,87 @@
 # Framework Flow
 
+This is the current DynaGen TSP run path. For the full step-by-step description, see
+[`docs/tsp_flow.md`](tsp_flow.md).
+
 ```mermaid
 flowchart TD
-    A[Run configuration<br/>configs/*.yaml] --> B[Initialize run store<br/>config.json]
+    A[CLI run command<br/>python3 -m dynagen.cli run --config configs/tsp/*.yaml] --> B[Load RunConfig<br/>run, llm, evolution, evaluation, data<br/>problem.type defaults to tsp]
 
-    B --> C[Load search instances]
-    B --> C2[Load test instances]
-    B --> D[Configure LLM, evolution, and evaluation settings<br/>seeds, budget, timeout, timeout_penalty]
+    B --> C[Create CountingLLMProvider<br/>OpenAI or Ollama<br/>configured calls = population_size + generations * strategies * offspring_per_strategy]
+    B --> D[TSPProblem from problem_for_config]
 
-    C --> E[Evaluation set<br/>search_instances x seeds]
-    D --> F[Generate initial population<br/>population_size candidates]
+    D --> E[Build search evaluator<br/>pool_name = search_instances]
+    D --> F[Build test evaluator<br/>pool_name = test_instances]
+    E --> G[Load search TSP instances<br/>synthetic:llamea:seed:size or TSPLIB file/dir]
+    F --> H[Load test TSP instances<br/>TSPLIB .tsp files]
+    G --> I[Search evaluation tasks<br/>search_instances x seeds]
+    H --> J[Test evaluation tasks<br/>test_instances x seeds]
 
-    F --> R[Call LLM provider<br/>per candidate]
-    R --> S{Response parsed?}
-    S -- No --> S2[Save error candidate<br/>error_details + prompt]
-    S -- Yes --> G[Evaluate initial candidates]
-    E --> G
-    G --> G2[Run solver/optimizer in sandbox<br/>TSP: report_best_tour / BBOB: report_best]
-    G2 --> G3{Timed out?}
-    G3 -- No --> G4[Score completed run]
-    G3 -- Yes --> G5[Check reported best value/tour]
-    G5 -- Valid reported best --> G6[Score partial run<br/>penalized_mean_gap]
-    G5 -- No reported best --> G7[Timeout fitness is inf]
-    G4 --> H[Rank population by fitness]
-    G6 --> H
-    G7 --> H
-    S2 --> H
+    B --> K[Create RunStore<br/>runs/tsp/timestamp_name<br/>config.json, candidates, prompts, generations]
+    C --> L[EvolutionEngine.run]
+    I --> L
+    J --> L
+    K --> L
 
-    H --> I{More generations?}
+    L --> M[Generation 0 initial population<br/>create TSP roles and prompts]
+    M --> N[Parallel candidate tasks<br/>max 8 workers]
+    N --> O[LLM complete<br/>JSON schema response: name, thought, code]
+    O --> P{Response parsed?}
+    P -- No --> Q[Create error candidate<br/>distance = inf<br/>empty metrics]
+    P -- Yes --> R[Create Candidate<br/>status = pending]
 
-    I -- Yes --> J[Select parents from current population<br/>Rank-based probabilities]
-    J --> K[Apply each Strategy<br/>S1-S4 with varying parent counts]
-    K --> L[Generate offspring<br/>offspring_per_strategy per Strategy]
-    L --> R2[Call LLM provider<br/>per offspring]
-    R2 --> S3{Response parsed?}
-    S3 -- No --> S4[Save error offspring<br/>error_details + prompt]
-    S3 -- Yes --> M[Evaluate offspring]
-    E --> M
-    M --> M2[Run solver/optimizer in sandbox<br/>TSP: report_best_tour / BBOB: report_best]
-    M2 --> M3[Score completed or partial-timeout runs]
-    M3 --> N[Combine population and offspring]
-    S4 --> N
-    N --> O[Select survivors<br/>population_size candidates<br/>Status > Fitness > ID]
-    O --> H
+    R --> S[TSPCandidateEvaluator.evaluate_candidate]
+    S --> T[Static code validation<br/>AST, allowed imports, solve_tsp signature]
+    T --> U{Valid code?}
+    U -- No --> V[Return invalid evaluation<br/>distance = inf<br/>empty metrics]
+    U -- Yes --> W[Run every instance x seed<br/>ThreadPool max 8]
 
-    I -- No --> P[Choose best search candidate]
+    W --> X[run_tsp_solver]
+    X --> Y[execute_tsp_solver_code<br/>separate process, timeout_seconds]
+    Y --> Z[Sandbox generated code<br/>solve_tsp(distance_matrix.copy(), seed, budget)<br/>report_best_tour captures incumbent]
 
-    P --> T[Offline test evaluation<br/>best candidate x test_instances x seeds<br/>no LLM, no mutation]
-    C2 --> T
-    T --> T2[Save test_result.json]
+    Z --> AA{Solver result}
+    AA -- ok --> AB[Validate returned tour<br/>permutation of node ids]
+    AA -- timeout with reported tour --> AC[Validate reported best tour<br/>partial = true]
+    AA -- timeout without report --> AD[Timeout without scoreable tour]
+    AA -- process error --> AE[Runtime error]
 
-    T2 --> Q[Write run artifacts<br/>candidates, prompts, generation summaries, test_result.json, final_report.md]
+    AB --> AF[Compute tour length<br/>cycle is closed by evaluator]
+    AC --> AF
+    AF --> AG[Compute gap if optimal_length exists<br/>100 * (tour_length - optimal) / optimal]
+    AD --> AH[Record timeout]
+    AE --> AI[Record error]
+    V --> AJ[No solver runs are launched]
+
+    AG --> AK[Aggregate TSP metrics<br/>mean_tour_length, mean_gap, timeout counts, score groups, records]
+    AH --> AK
+    AI --> AK
+    AJ --> AK
+    AK --> AL[Set candidate status and distance<br/>search: mean_tour_length when valid<br/>test: mean_gap when available<br/>timeout: timeout_distance<br/>invalid/error: inf]
+    Q --> AM[Persist candidate artifacts]
+    AL --> AM[Persist candidate artifacts<br/>candidates/*.json, candidates/*.py, prompts/*.txt]
+    AM --> AM2{Task batch source?}
+
+    AM2 -- initial --> AN[Select generation 0 survivors<br/>status rank, distance, id]
+    AN --> AO[Save generation_000<br/>population.json, offspring.json, summary.json]
+    AO --> AP{More generations?}
+
+    AP -- Yes --> AQ0{Generation multiple of 2?}
+    AQ0 -- Yes --> AQ1[Call LLM reflection once<br/>selected previous child plus parent code and metrics<br/>store metrics.reflection.llm_reflection]
+    AQ0 -- No --> AQ[Build offspring tasks<br/>for each strategy S1, S2, S3 and offspring_per_strategy]
+    AQ1 --> AQ[Build offspring tasks<br/>inject reflection into every TSP evolution prompt]
+    AQ --> AR[Select parents<br/>S1/S2: 1 parent, S3: 2 parents<br/>rank-biased probabilities]
+    AR --> AT[Build TSP evolution prompt<br/>strategy instructions, parent context with any existing LLM reflection, solver contract]
+    AT --> N
+
+    AM2 -- offspring --> AU[Combine current population and offspring]
+    AU --> AV[Select survivors<br/>population_size by status, distance, id]
+    AV --> AW[Save generation_N artifacts]
+    AW --> AP
+
+    AP -- No --> AX[Choose best search candidate]
+    AX --> AY[Offline test evaluation<br/>best code x test_instances x seeds<br/>no LLM, no mutation]
+    AY --> AZ[Save test_result.json]
+    AZ --> BA[Save llm_calls.json]
+    BA --> BB[Write final_report.md]
 ```

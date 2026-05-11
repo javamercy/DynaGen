@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
             store=store,
         ).run()
         print(store.root)
-        print(f"best={population.best.id} fitness={population.best.fitness}")
+        print(f"best={population.best.id} {population.best.score_name}={population.best.score_value}")
         return 0
     if args.command == "evaluate-candidate":
         config = load_config(args.config)
@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         result = search_evaluator.evaluate_code(code)
         print(build_final_report([]).splitlines()[0])
-        print(f"status={result.status} fitness={result.fitness}")
+        print(f"status={result.status} {result.score_name}={result.score}")
         return 0
     if args.command == "compare-bbob":
         config = load_config(args.config)

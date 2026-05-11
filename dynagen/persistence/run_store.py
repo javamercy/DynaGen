@@ -74,13 +74,14 @@ class RunStore:
         dump_json(self.root / "split_manifest.json", manifest)
 
     def save_test_result(self, candidate_id: str, result: EvaluationResult) -> None:
-        dump_json(self.root / "test_result.json", {
+        data = {
             "candidate_id": candidate_id,
             "status": result.status,
-            "fitness": result.fitness,
+            result.score_name: result.score,
             "error_details": result.error_feedback,
             "metrics": result.metrics,
-        })
+        }
+        dump_json(self.root / "test_result.json", data)
 
     def save_llm_calls(self, summary: dict[str, Any]) -> None:
         dump_json(self.root / "llm_calls.json", summary)

@@ -26,7 +26,13 @@ def select_parents(
     if rng is None:
         rng = random.Random()
 
-    pool = list(candidates)
+    pool = [
+        c for c in candidates
+        if c.status in (CandidateStatus.VALID, CandidateStatus.EVALUATED, CandidateStatus.TIMEOUT)
+    ]
+    if not pool:
+        pool = list(candidates)
+
     selected: list[Candidate] = []
     for _ in range(min(count, len(pool))):
         probabilities = _rank_biased_probabilities(pool)
@@ -64,5 +70,5 @@ def _rank_biased_probabilities(candidates: list[Candidate]) -> list[float]:
 
 def _sort_key(candidate: Candidate) -> tuple[int, float, str]:
     status_rank = _STATUS_ORDER.get(candidate.status, 99)
-    fitness = candidate.fitness if candidate.fitness is not None else float("inf")
-    return status_rank, fitness, candidate.id
+    score = candidate.score_value if candidate.score_value is not None else float("inf")
+    return status_rank, score, candidate.id

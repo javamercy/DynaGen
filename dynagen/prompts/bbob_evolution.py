@@ -6,76 +6,75 @@ from dynagen.prompts.bbob_templates import (
     render_bbob_candidates,
 )
 
-
 BBOB_STRATEGY_INSTRUCTIONS = {
-    "S1": """Behavioral Innovation:
-Generate a complete black-box optimizer with substantially different search behavior from the selected parent(s).
+    "S1": """Explorative Innovation:
+Generate a complete black-box optimizer that takes a meaningfully different algorithmic approach from the selected parent.
 
-Do not merely tune constants, rename variables, or rearrange the same algorithm.
-The new optimizer should differ from the parent(s) in at least two of these dimensions:
-- how it initializes or samples early points
-- how it proposes candidate points
-- how it adapts step sizes, population statistics, or coordinate scales
-- how it handles stagnation and restarts
-- how it allocates the function-evaluation budget over time
-- how it balances exploration and exploitation
-- how it uses seed-controlled randomness
+Do not make superficial changes. The offspring must differ in at least one core mechanism:
+- the search distribution (e.g., Gaussian, Cauchy, uniform, correlated, coordinate-wise)
+- step-size or covariance adaptation strategy (e.g., CSA, path-length control, self-adaptive σ)
+- population structure or recombination scheme
+- restart or diversification logic (e.g., IPOP/BIPOP-style restarts, random restarts with warm memory)
+- hybrid structure (e.g., combining DE with local ES, or pattern search with population-based sampling)
 
-Prioritize budget correctness and robustness, but make the search behavior meaningfully novel.""",
+Strong algorithmic families for BBOB include:
+- CMA-ES variants with cumulative step-size adaptation and covariance learning
+- Separable CMA-ES or per-coordinate step-size adaptation for separable functions
+- Differential evolution with adaptive CR/F and optional local refinement
+- Multi-restart strategies with increasing population size
+- Hybrid optimizers that switch between global exploration and local exploitation based on progress
 
-    "S2": """Evidence-Guided Performance Upgrade:
-Improve the selected parent into a stronger complete optimizer while preserving its useful backbone.
+Use proven ideas, not novelty for its own sake.
+Prioritize strict budget correctness, feasible incumbents, and strong anytime convergence.""",
 
-Use the parent context as evidence. Keep what appears reliable or effective, and change what appears weak, wasteful, brittle, or under-explored.
-The offspring should improve at least one of:
-- anytime progress measured by best-so-far values
-- final objective value under the budget
-- robustness to conditioned or multimodal landscapes
-- ability to escape stagnation
-- effective use of seed-controlled randomness
-- safe handling of budget and bounds
+    "S2": """Evidence-Guided Refinement:
+Improve the selected parent into a stronger optimizer by diagnosing and fixing its weakest aspects.
 
-Prefer one or two coherent mechanism changes over many shallow tweaks.""",
+Analyze the parent's AOCC scores by function group to identify specific weaknesses:
+- Low separable AOCC → the optimizer may lack coordinate-wise adaptation or efficient axis-aligned search.
+- Low high-conditioning AOCC → step-size control or covariance adaptation is likely too slow or missing.
+- Low multimodal (strong structure) AOCC → restart logic may be absent, too infrequent, or too aggressive.
+- Low multimodal (weak structure) AOCC → the optimizer may converge prematurely without sufficient global sampling.
+- Low overall AOCC with high final error → the optimizer may waste evaluations on exploration without exploitation.
 
-    "S3": """Complementary Mechanism Recombination:
-Combine useful traits from selected parents into one coherent complete optimizer.
+Make one or two coherent, targeted changes to address the diagnosed weakness.
+Preserve mechanisms that contribute to the parent's strengths.
+Do not make cosmetic changes. Every modification should have a clear performance rationale.
 
-Do not concatenate multiple optimizers without integration.
-Choose one clear backbone, then integrate one or two complementary mechanisms from the other parent(s).
-Useful complementary mechanisms may involve:
-- population initialization
-- mutation or recombination behavior
-- local refinement behavior
-- restart or diversification behavior
-- memory or adaptive parameter control
-- budget allocation
+Also ensure robustness:
+- feasible incumbent evaluated early, report_best called on every improvement
+- budget never exceeded, all points clipped to bounds
+- no infinite loops or unguarded expensive operations""",
 
-The offspring should be simpler than the sum of its parents.""",
+    "S3": """Complementary Recombination:
+Combine the strongest mechanisms from the selected parents into one coherent optimizer.
 
-    "S4": """Robust Anytime Simplification:
-Generate a complete optimizer focused on reliability, feasible incumbents, and steady improvement under strict budget.
+Do not concatenate or run parents sequentially. Choose one parent as the structural backbone,
+then integrate one or two complementary mechanisms from the other parent.
 
-Use this strategy when parents are brittle, timeout-prone, overly complex, invalid, or inconsistent.
-The offspring must:
-- evaluate a feasible incumbent early
-- report the initial incumbent and every improvement
-- never exceed the function-evaluation budget
-- keep all points inside bounds
-- avoid unguarded expensive loops
-- preserve only mechanisms that clearly contribute to search progress
+Effective recombination targets:
+- Take the better parent's core search loop, add the other's restart or diversification logic
+- Combine one parent's step-size adaptation with the other's initialization or sampling strategy
+- Merge a strong local refinement mechanism with a better global exploration strategy
+- Integrate coordinate-wise adaptation from one parent with covariance learning from another
 
-This is not merely a repair strategy. After making the optimizer robust, improve quality-per-budget with compact search logic.""",
+The offspring must be simpler than the sum of its parents.
+Resolve design conflicts — do not include redundant or contradictory mechanisms.
+The result should outperform both parents, not merely contain pieces of both.
+Keep the implementation compact and budget-correct."""
 }
 
 
-def build_bbob_evolution_prompt(strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
+def build_bbob_evolution_prompt(
+        strategy: str,
+        parents: list[Candidate],
+) -> list[dict[str, str]]:
     if strategy not in BBOB_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
     candidates_context = render_bbob_candidates(parents)
     user = f"""
     STRATEGY: {strategy}
     {BBOB_STRATEGY_INSTRUCTIONS[strategy]}
-
     SELECTED PARENT(S) CONTEXT:
     {candidates_context}
 
@@ -85,6 +84,7 @@ def build_bbob_evolution_prompt(strategy: str, parents: list[Candidate]) -> list
 
     {BBOB_RESPONSE_FORMAT}"""
     return [
-        {"role": "system", "content": "You generate executable, reliable continuous black-box optimizers for evolutionary search."},
+        {"role": "system",
+         "content": "You generate executable, reliable continuous black-box optimizers for evolutionary search."},
         {"role": "user", "content": user},
     ]

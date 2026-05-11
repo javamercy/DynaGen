@@ -10,7 +10,9 @@ import json
 import math
 import os
 import random
+import signal
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -58,11 +60,21 @@ class TSPCase:
 
 
 SEARCH_CASE: TSPCase | None = None
+DEFAULT_TEST_TIMEOUT_SECONDS = 60.0
+
+
+class TestEvaluationTimeoutError(TimeoutError):
+    pass
 
 
 def _int_env(name: str, default: int) -> int:
     value = os.getenv(name)
     return default if value is None or value == "" else int(value)
+
+
+def _float_env(name: str, default: float) -> float:
+    value = os.getenv(name)
+    return default if value is None or value == "" else float(value)
 
 
 def _prepare_output_dir() -> Path:
@@ -74,7 +86,7 @@ def _prepare_output_dir() -> Path:
 
 
 def _build_llm(model: str):
-    provider = os.getenv("LLAMEA_LLM_PROVIDER", "gemini").lower()
+    provider = "openai"
     if provider == "ollama":
         return Ollama_LLM(model)
     if provider == "openai":
@@ -182,7 +194,11 @@ def evaluate(solution: Solution, explogger: Optional[ExperimentLogger] = None):
     return solution
 
 
-def evaluate_test_solution(solution: Solution, test_cases: list[TSPCase]) -> dict:
+def evaluate_test_solution(
+        solution: Solution,
+        test_cases: list[TSPCase],
+        timeout_seconds: float | None = None,
+) -> dict:
     global_ns, issues = prepare_namespace(
         solution.code,
         ["numpy", "pymoo", "typing", "scipy"],
@@ -192,21 +208,47 @@ def evaluate_test_solution(solution: Solution, test_cases: list[TSPCase]) -> dic
     local_ns = {}
 
     try:
-        compiled = compile(solution.code, "<llm_code>", "exec")
-        exec(compiled, global_ns, local_ns)
-        cls = local_ns[solution.name]
+        with evaluation_timeout(timeout_seconds):
+            compiled = compile(solution.code, "<llm_code>", "exec")
+            exec(compiled, global_ns, local_ns)
+            cls = local_ns[solution.name]
+    except TestEvaluationTimeoutError as exc:
+        records = [error_record(case, "test_instances", "timeout", str(exc)) for case in test_cases]
+        return summarize_records(records, import_issues=issues, timeout_seconds=timeout_seconds)
     except Exception as exc:
         records = [error_record(case, "test_instances", "error", str(exc)) for case in test_cases]
-        return summarize_records(records, import_issues=issues)
+        return summarize_records(records, import_issues=issues, timeout_seconds=timeout_seconds)
 
     records = []
     for case in test_cases:
+        start = time.monotonic()
         try:
-            path_index = _run_solution(cls, case)
-            records.append(score_route(case, path_index, pool_name="test_instances"))
+            with evaluation_timeout(timeout_seconds):
+                path_index = _run_solution(cls, case)
+            record = score_route(case, path_index, pool_name="test_instances")
+            record["runtime_seconds"] = time.monotonic() - start
+            records.append(record)
+        except TestEvaluationTimeoutError as exc:
+            records.append(
+                error_record(
+                    case,
+                    "test_instances",
+                    "timeout",
+                    str(exc),
+                    runtime_seconds=time.monotonic() - start,
+                )
+            )
         except Exception as exc:
-            records.append(error_record(case, "test_instances", "error", str(exc)))
-    return summarize_records(records, import_issues=issues)
+            records.append(
+                error_record(
+                    case,
+                    "test_instances",
+                    "error",
+                    str(exc),
+                    runtime_seconds=time.monotonic() - start,
+                )
+            )
+    return summarize_records(records, import_issues=issues, timeout_seconds=timeout_seconds)
 
 
 def _run_solution(cls, case: TSPCase):
@@ -294,8 +336,14 @@ def compute_gap(tour_length: float, optimal_length: float | None) -> float | Non
     return 100.0 * (tour_length - optimal_length) / optimal_length
 
 
-def error_record(case: TSPCase, pool_name: str, status: str, error: str) -> dict:
-    return {
+def error_record(
+        case: TSPCase,
+        pool_name: str,
+        status: str,
+        error: str,
+        runtime_seconds: float | None = None,
+) -> dict:
+    record = {
         "instance": case.name,
         "pool": pool_name,
         "dimension": len(case.customers) + 1,
@@ -307,13 +355,19 @@ def error_record(case: TSPCase, pool_name: str, status: str, error: str) -> dict
         "gap": None,
         "error": error,
     }
+    if runtime_seconds is not None:
+        record["runtime_seconds"] = runtime_seconds
+    return record
 
 
-def summarize_records(records: list[dict], import_issues=None) -> dict:
+def summarize_records(records: list[dict], import_issues=None, timeout_seconds=None) -> dict:
     gaps = [record["gap"] for record in records if record.get("gap") is not None and math.isfinite(record["gap"])]
     lengths = [record["tour_length"] for record in records if record.get("tour_length") is not None]
     valid_count = sum(1 for record in records if record["status"] == "valid")
-    status = "valid" if valid_count == len(records) else first_nonvalid_status(records)
+    timeout_count = sum(1 for record in records if record["status"] == "timeout")
+    runtime_error_count = sum(1 for record in records if record["status"] == "error")
+    invalid_count = sum(1 for record in records if record["status"] == "invalid")
+    status = test_status(records)
     fitness = float(np.mean(gaps)) if gaps and status == "valid" else None
     return {
         "status": status,
@@ -323,12 +377,28 @@ def summarize_records(records: list[dict], import_issues=None) -> dict:
             "pool": "test_instances",
             "runs": len(records),
             "valid_count": valid_count,
+            "timeout_count": timeout_count,
+            "runtime_error_count": runtime_error_count,
+            "invalid_count": invalid_count,
+            "timeout_seconds": timeout_seconds,
             "mean_gap": float(np.mean(gaps)) if gaps else None,
             "mean_tour_length": float(np.mean(lengths)) if lengths else None,
             "import_issues": import_issues or [],
             "records": records,
         },
     }
+
+
+def test_status(records: list[dict]) -> str:
+    if not records:
+        return "invalid"
+    if any(record["status"] == "timeout" for record in records):
+        return "timeout"
+    if any(record["status"] == "error" for record in records):
+        return "error"
+    if any(record["status"] == "invalid" for record in records):
+        return "invalid"
+    return "valid"
 
 
 def first_nonvalid_status(records: list[dict]) -> str:
@@ -343,6 +413,30 @@ def first_error(records: list[dict]) -> str | None:
         if record["status"] != "valid":
             return f"{record['status']} on {record['instance']}: {record.get('error')}"
     return None
+
+
+class evaluation_timeout:
+    def __init__(self, timeout_seconds: float | None):
+        self.timeout_seconds = timeout_seconds
+        self.previous_handler = None
+
+    def __enter__(self):
+        if self.timeout_seconds is None or self.timeout_seconds <= 0:
+            return self
+        self.previous_handler = signal.getsignal(signal.SIGALRM)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.setitimer(signal.ITIMER_REAL, float(self.timeout_seconds))
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self.timeout_seconds is not None and self.timeout_seconds > 0:
+            signal.setitimer(signal.ITIMER_REAL, 0.0)
+            signal.signal(signal.SIGALRM, self.previous_handler)
+        return False
+
+
+def timeout_handler(signum, frame):
+    raise TestEvaluationTimeoutError("evaluation timed out")
 
 
 def select_candidate(solutions):
@@ -368,13 +462,14 @@ def json_safe(value):
 
 
 if __name__ == "__main__":
-    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gemini-2.5-flash"))
+    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gpt-5.4-nano"))
     search_seed = _int_env("LLAMEA_TSP_SEARCH_SEED", 69)
     search_size = _int_env("LLAMEA_TSP_SEARCH_SIZE", 32)
     llm_call_budget = _int_env("LLAMEA_LLM_CALLS", 27)
     n_parents = _int_env("LLAMEA_N_PARENTS", 3)
     n_offspring = _int_env("LLAMEA_N_OFFSPRING", 3)
     max_workers = _int_env("LLAMEA_MAX_WORKERS", 3)
+    test_timeout = _float_env("LLAMEA_TSP_TEST_TIMEOUT", DEFAULT_TEST_TIMEOUT_SECONDS)
     experiment_name = os.getenv("LLAMEA_EXPERIMENT_NAME", "MOO-TSP")
     test_instances = os.getenv(
         "LLAMEA_TSP_TEST_INSTANCES",
@@ -430,7 +525,7 @@ class Multi_Objective_TSP:
     solutions = llamea_inst.run()
     candidate = select_candidate(solutions)
     candidate.add_metadata("llm_model", llamea_inst.model)
-    test_result = evaluate_test_solution(candidate, test_cases)
+    test_result = evaluate_test_solution(candidate, test_cases, timeout_seconds=test_timeout)
     payload = {
         "llm_model": llamea_inst.model,
         "search_instances": SEARCH_CASE.source,

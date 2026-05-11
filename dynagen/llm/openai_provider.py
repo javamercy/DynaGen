@@ -21,6 +21,14 @@ class OpenAIProvider(LLMProvider):
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         return self.complete_with_metadata(messages, temperature=temperature).parsed_candidate_response
 
+    def complete_text(self, messages: list[dict[str, str]], *, temperature: float) -> str:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+        )
+        return response.choices[0].message.content or ""
+
     def complete_with_metadata(self, messages: list[dict[str, str]], *, temperature: float) -> LLMResponse:
         response = self.client.chat.completions.create(
             model=self.model,

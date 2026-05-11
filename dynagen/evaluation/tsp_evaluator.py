@@ -46,8 +46,9 @@ class TSPCandidateEvaluator:
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
         result = self.evaluate_code(candidate.code)
         candidate.status = CandidateStatus(result.status)
-        candidate.fitness = result.fitness
-        candidate.metrics = result.metrics
+        candidate.distance = result.score
+        candidate.metrics = dict(result.metrics)
+        candidate.metrics["distance"] = result.score
         candidate.error_details = result.error_feedback
         return result
 
@@ -55,14 +56,16 @@ class TSPCandidateEvaluator:
         validation = validate_generated_code(code)
         if not validation.valid:
             metrics = self.empty_metrics()
-            return EvaluationResult("invalid", math.inf, metrics, validation.error)
+            metrics["distance"] = math.inf
+            return EvaluationResult("invalid", math.inf, metrics, validation.error, score_name="distance")
 
         records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_tsp_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        fitness = _candidate_fitness(status, metrics, pool_name=self.pool_name)
+        distance = _candidate_distance(status, metrics, pool_name=self.pool_name)
+        metrics["distance"] = distance
         error_feedback = _error_feedback(records) if status != "valid" else None
-        return EvaluationResult(status, fitness, metrics, error_feedback)
+        return EvaluationResult(status, distance, metrics, error_feedback, score_name="distance")
 
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
         tasks = [
@@ -113,6 +116,9 @@ class TSPCandidateEvaluator:
 
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
         metrics = dict(metrics)
+        metrics["problem"] = "tsp"
+        metrics["score_name"] = "distance"
+        metrics.setdefault("distance", math.inf)
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
@@ -132,7 +138,7 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     return "invalid"
 
 
-def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any], *, pool_name: str) -> float:
+def _candidate_distance(status: EvaluationStatus, metrics: dict[str, Any], *, pool_name: str) -> float:
     if status == "valid":
         if pool_name == "search_instances":
             return metrics["mean_tour_length"] if metrics["mean_tour_length"] is not None else math.inf
@@ -140,8 +146,8 @@ def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any], *, poo
             return metrics["mean_gap"]
         return metrics["mean_tour_length"] if metrics["mean_tour_length"] is not None else math.inf
     if status == "timeout":
-        timeout_fitness = metrics.get("timeout_fitness")
-        return float(timeout_fitness) if timeout_fitness is not None else math.inf
+        timeout_distance = metrics.get("timeout_distance")
+        return float(timeout_distance) if timeout_distance is not None else math.inf
     return math.inf
 
 

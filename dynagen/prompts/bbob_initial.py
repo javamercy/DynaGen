@@ -18,28 +18,28 @@ class BBOBInitialRole:
 BBOB_INITIAL_ROLES = (
     BBOBInitialRole(
         1,
-        "a landscape-probing optimizer designer",
-        "Design an optimizer that samples enough early points to infer rough scale, conditioning, separability, and multimodality signals before committing budget to improvement.",
+        "a scale-adaptive evolution strategy designer",
+        "Design an optimizer inspired by strong evolution-strategy principles: adaptive sampling radius, elite selection, success-based updates, restart behavior, and dimension-aware scaling.",
     ),
     BBOBInitialRole(
         2,
-        "an adaptive population search engineer",
-        "Design a compact population-based optimizer with budget-aware mutation, recombination, and replacement. Emphasize reliable progress across separable, conditioned, and multimodal functions.",
+        "a population recombination optimizer engineer",
+        "Design a compact population-based optimizer using mutation, recombination, replacement, and diversity control to make reliable progress across separable, conditioned, and multimodal functions.",
     ),
     BBOBInitialRole(
         3,
-        "a restart and diversification strategist",
-        "Design an optimizer that balances local exploitation with restarts, radius changes, or distribution resets when progress stagnates.",
+        "a restart-based global-local search strategist",
+        "Design an optimizer that combines broad exploration, local improvement, stagnation detection, and restarts or radius resets to escape poor basins while preserving the best incumbent.",
     ),
     BBOBInitialRole(
         4,
-        "a covariance-free local adaptation researcher",
-        "Design an optimizer that adapts coordinate scales, step sizes, and directional biases without relying on external libraries or heavy matrix operations.",
+        "a coordinate and pattern search specialist",
+        "Design an optimizer that exploits coordinate-wise, directional, or pattern-based local moves with adaptive step sizes and bounded evaluation discipline.",
     ),
     BBOBInitialRole(
         5,
-        "a memory-guided continuous search architect",
-        "Design an optimizer that remembers successful moves, directions, coordinates, or population statistics and uses them to bias later proposals under the evaluation budget.",
+        "a hybrid adaptive optimizer architect",
+        "Design a compact hybrid optimizer that combines complementary mechanisms such as population sampling, local refinement, success memory, adaptive step control, and restart logic.",
     ),
 )
 

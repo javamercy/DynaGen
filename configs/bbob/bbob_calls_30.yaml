@@ -5,11 +5,11 @@ run:
 
 problem:
   type: bbob
-  function_ids: [ 1, 2 ]
-  dimension: 3
-  search_instances: [ 1 ]
-  test_instances: [ 2 ]
-  test_dimensions: [ 3 ]
+  function_ids: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 ]
+  dimension: 5
+  search_instances: [ 1, 2, 3 ]
+  test_instances: [ 1, 2, 3 ]
+  test_dimensions: [ 5 ]
   bounds: [ -5.0, 5.0 ]
   aocc_lower_bound: 0.00000001
   aocc_upper_bound: 100.0
@@ -18,13 +18,14 @@ problem:
 llm:
   provider: openai
   model: gpt-5.4-nano
-  temperature: 0.6
+  temperature: 0.8
   api_key_env: OPENAI_API_KEY
 
 evolution:
   population_size: 2
   generations: 7
   offspring_per_strategy: 1
+  strategies: [ S1, S2, S3 ]
 
 evaluation:
   budget: 200

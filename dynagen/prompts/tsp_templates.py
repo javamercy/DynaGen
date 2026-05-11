@@ -1,116 +1,78 @@
 from dynagen.candidates.candidate import Candidate
 
 TSP_SOLVER_CONTRACT = """
-Implement a complete TSP solver with exactly this interface:
+Implement exactly this interface:
 
 def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
 
-Functional rules:
-- distance_matrix is a square NumPy array of edge costs.
-- Return a 1D NumPy array or list containing each node id exactly once.
-- Do not repeat the starting node at the end; the evaluator closes the cycle.
-- The solver must work across different TSP sizes.
-- For n <= 2, return the trivial valid tour.
-- Always create a valid incumbent tour early, before expensive search.
-- Always return a valid tour, even when budget is very small.
-- seed must control stochastic behavior when randomness is used.
-- budget is a hard effort cap. Use it to limit loop counts, restarts, local-search passes, perturbations, and candidate evaluations.
-- Do not hard-code behavior for specific benchmark instances, matrix sizes, seeds, or evaluator artifacts.
-- Use the distance matrix directly. Do not assume coordinates are available.
-- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+Rules:
+- Distance is the search objective for TSP; lower distance is better.
+- Return a 1D tour with each node exactly once; do not repeat the start node.
+- Handle all n; for n <= 2 return the trivial valid tour.
+- Always return a valid tour, even with tiny budget.
+- Use only distance_matrix; do not assume coordinates or hard-code instances.
+- Use seed for randomness and budget as a hard cap on search effort.
+- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
 - Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
-
-Timeout and reporting rules:
-- A global helper report_best_tour(tour) is available.
-- Call report_best_tour(tour) whenever you improve the incumbent tour.
-- report_best_tour accepts the same tour format as the final return value.
-- report_best_tour does not replace returning a final tour.
-- The code should report an initial valid incumbent before entering expensive loops.
-
-Implementation rules:
-- The submitted code may include helper functions.
-- Keep the implementation compact and robust.
-- Prefer deterministic repair over raising exceptions.
-- Avoid recursion-heavy or memory-heavy designs.
-- Avoid O(n^3) operations inside large repeated loops unless guarded by n or budget.
+- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.
 """
 
 TSP_INTERNAL_CHECKLIST = """
-Before producing the final response, internally verify the candidate:
-
-1. The code defines solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int).
-2. Every return path returns a valid tour containing each node exactly once.
-4. A valid incumbent tour is created before expensive search.
-5. report_best_tour(tour) is called for the initial incumbent and every improved incumbent.
-6. seed controls stochastic behavior if randomness is used.
-7. budget bounds the main search effort.
-8. Only allowed imports are used.
-9. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
-10. The solver is complete, not just a helper function.
-11. The implementation avoids obvious infinite loops and unguarded expensive repeated O(n^3) work.
+Internal check before final JSON: correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
 """
 
 TSP_RESPONSE_FORMAT = """
-Return exactly one JSON object and nothing else.
+Return one JSON object and nothing else:
 
-Schema:
 {
   "name": "short snake_case_or_title name",
-  "thought": "brief public summary of the algorithmic idea, including construction, improvement, diversification, seed use, and budget use",
+  "thought": "brief public summary of the idea, seed use, and budget use",
   "code": "complete Python code as a JSON string"
 }
 
-Strict formatting rules:
-- Do not use Markdown.
-- Do not include ``` fences.
-- Do not include comments outside the JSON.
-- The code field must be a valid JSON string.
-- Escape newlines in code as \\n.
-- Escape inner double quotes as needed.
-- The code must define solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int).
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.
 """
 
 
 def tsp_system_prompt(role: str) -> str:
-    return f"""
-You are {role}. Generate robust, compact Python TSP solver code.
-Focus on full solvers, not small heuristic components.
-Use classical TSP heuristics when useful, but combine them into a coherent complete solver rather than a generic template.
-Use budget as a hard effort cap. Follow the contract exactly."""
+    return f"You are {role}. Generate compact TSP solver code that follows the contract."
 
 
 def render_tsp_candidates(candidates: list[Candidate]) -> str:
-    return "\n\n".join(_render_tsp_candidate(candidate) for candidate in candidates)
+    return "\n\n".join(
+        _render_tsp_candidate(candidate)
+        for candidate in candidates
+    )
 
 
 def _render_tsp_candidate(candidate: Candidate) -> str:
-    fitness = "unknown" if candidate.fitness is None else f"{candidate.fitness:.6g}"
-    metrics = candidate.metrics or {}
+    distance = candidate.score_value
+    distance_str = "unknown" if distance is None else f"{float(distance):.6g}"
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; fitness: {fitness}",
+        f"Status: {candidate.status}; distance: {distance_str}",
         f"Thought: {candidate.thought}",
-        f"Mean runtime: {metrics.get('mean_runtime')}",
+    ]
+
+    if candidate.error_details:
+        parts.append(f"Error details: {candidate.error_details}")
+
+    reflection = (candidate.metrics or {}).get("reflection")
+    if isinstance(reflection, dict):
+        llm_reflection = reflection.get("llm_reflection")
+        if isinstance(llm_reflection, dict):
+            parts.extend([
+                "",
+                f"LLM reflection (generation {llm_reflection.get('generation')}):",
+                str(llm_reflection.get("text", "")).strip(),
+            ])
+
+    parts.extend([
         "Code:",
         "```python",
         candidate.code,
         "```",
-    ]
-
-    if candidate.error_details:
-        parts.insert(4, f"Error details: {candidate.error_details}")
-
+    ])
     return "\n".join(parts)
-
-# TODO: Update candidate feedback info, add more metrics such as reflection feedback
-# metrics = {
-#   "mean_runtime": ...,
-#   "timeout_rate": ...,
-#   "invalid_rate": ...,
-#   "reported_best_rate": ...,
-#   "mean_gap_by_size": ...,
-#   "best_gap": ...,
-#   "worst_gap": ...,
-#   "observed_strengths": ...,
-#   "observed_weaknesses": ...,
-# }

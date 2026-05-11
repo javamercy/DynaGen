@@ -48,7 +48,7 @@ def aggregate_tsp_records(records: list[dict[str, Any]], *, timeout_penalty: flo
         "timeout_fraction": timeout_fraction,
         "timeout_penalty": float(timeout_penalty),
         "penalized_mean_gap": penalized_mean_gap,
-        "timeout_fitness": penalized_mean_gap if penalized_mean_gap is not None else (
+        "timeout_distance": penalized_mean_gap if penalized_mean_gap is not None else (
             UNSCORED_TIMEOUT_GAP if timeout_count else None
         ),
         "median_gap": _median(gaps),

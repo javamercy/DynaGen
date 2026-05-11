@@ -16,7 +16,6 @@ from llamea import Gemini_LLM, LLaMEA, Ollama_LLM, OpenAI_LLM
 from llamea.utils import prepare_namespace, clean_local_namespace
 from misc import OverBudgetException, aoc_logger, correct_aoc
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -40,7 +39,7 @@ def _prepare_output_dir():
 
 
 def _build_llm(model: str):
-    provider = os.getenv("LLAMEA_LLM_PROVIDER", "gemini").lower()
+    provider = "openai"
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         return OpenAI_LLM(api_key, model)
@@ -49,9 +48,10 @@ def _build_llm(model: str):
     api_key = os.getenv("GOOGLE_API_KEY")
     return Gemini_LLM(api_key, model)
 
+
 if __name__ == "__main__":
     # Execution code starts here
-    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gemini-2.5-flash"))
+    ai_model = os.getenv("LLM_MODEL", os.getenv("LLAMEA_LLM_MODEL", "gpt-5.4-nano"))
     experiment_name = os.getenv("LLAMEA_EXPERIMENT_NAME", "pop1-5")
     bbob_dimensions = _env_int_list("LLAMEA_BBOB_DIMENSIONS", [5])
     bbob_function_ids = _env_int_list("LLAMEA_BBOB_FUNCTION_IDS", range(1, 25))
@@ -64,6 +64,7 @@ if __name__ == "__main__":
     _prepare_output_dir()
     llm = _build_llm(ai_model)
 
+
     # We define the evaluation function that executes the generated algorithm (solution.code) on the BBOB test suite.
     # It should set the scores and feedback of the solution based on the performance metric, in this case we use mean AOCC.
     def evaluateBBOB(solution, explogger=None):
@@ -72,7 +73,7 @@ if __name__ == "__main__":
 
         code = solution.code
         algorithm_name = solution.name
-        feedback=""
+        feedback = ""
         possible_issue = None
         local_ns = {}
         try:
@@ -121,6 +122,7 @@ if __name__ == "__main__":
         solution.set_scores(auc_mean, feedback)
 
         return solution
+
 
     # The task prompt describes the problem to be solved by the LLaMEA algorithm.
     task_prompt = textwrap.dedent("""

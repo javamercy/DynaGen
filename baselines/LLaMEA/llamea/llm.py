@@ -47,15 +47,15 @@ from .diffmodemanager import DiffModeManager
 
 class LLM(ABC):
     def __init__(
-        self,
-        api_key,
-        model="",
-        base_url="",
-        code_pattern=None,
-        name_pattern=None,
-        desc_pattern=None,
-        cs_pattern=None,
-        logger=None,
+            self,
+            api_key,
+            model="",
+            base_url="",
+            code_pattern=None,
+            name_pattern=None,
+            desc_pattern=None,
+            cs_pattern=None,
+            logger=None,
     ):
         """
         Initializes the LLM manager with an API key, model name and base_url.
@@ -119,12 +119,12 @@ class LLM(ABC):
         self.log = True
 
     def sample_solution(
-        self,
-        session_messages: list,
-        parent_ids: list | None = None,
-        HPO: bool = False,
-        base_code: str | None = None,
-        diff_mode: bool = False,
+            self,
+            session_messages: list,
+            parent_ids: list | None = None,
+            HPO: bool = False,
+            base_code: str | None = None,
+            diff_mode: bool = False,
     ):
         """Generate or mutate a solution using the language model.
 
@@ -254,7 +254,7 @@ class OpenAI_LLM(LLM):
     A manager class for handling requests to OpenAI's GPT models.
     """
 
-    def __init__(self, api_key, model="gpt-4-turbo", temperature=0.8, **kwargs):
+    def __init__(self, api_key, model="gpt-5.4-nano", temperature=0.8, **kwargs):
         """
         Initializes the LLM manager with an API key and model name.
 
@@ -309,9 +309,9 @@ class OpenAI_LLM(LLM):
                 time.sleep(wait)
 
             except (
-                openai.APITimeoutError,
-                openai.APIConnectionError,
-                openai.APIError,
+                    openai.APITimeoutError,
+                    openai.APIConnectionError,
+                    openai.APIError,
             ) as err:
                 attempt += 1
                 if attempt > max_retries:
@@ -405,11 +405,11 @@ class Gemini_LLM(LLM):
         return new
 
     def query(
-        self,
-        session_messages: list[dict[str, str]],
-        max_retries: int = 5,
-        default_delay: int = 10,
-        **kwargs,
+            self,
+            session_messages: list[dict[str, str]],
+            max_retries: int = 5,
+            default_delay: int = 10,
+            **kwargs,
     ):
         """
         Sends the conversation history to Gemini, retrying on 429 ResourceExhausted exceptions.
@@ -571,7 +571,7 @@ class LMStudio_LLM(LLM):
         self.config = config
 
     def query(
-        self, session: list[dict[str, str]], default_delay: int = 5, max_tries: int = 5
+            self, session: list[dict[str, str]], default_delay: int = 5, max_tries: int = 5
     ) -> str:
         """
         Query stub for LMStudio class.
@@ -622,12 +622,12 @@ class MLX_LM_LLM(LLM):
     """An mlx_lm implementation for running large LLMs locally."""
 
     def __init__(
-        self,
-        model,
-        config=None,
-        max_tokens: int = 12000,
-        chat_template_style=None,
-        **kwargs,
+            self,
+            model,
+            config=None,
+            max_tokens: int = 12000,
+            chat_template_style=None,
+            **kwargs,
     ):
         """
         Initialises the LMStudio LLM inteface.
@@ -679,11 +679,11 @@ class MLX_LM_LLM(LLM):
         return new
 
     def query(
-        self,
-        session: list,
-        max_tries: int = 5,
-        default_delay: int = 5,
-        add_generation_prompt: bool = False,
+            self,
+            session: list,
+            max_tries: int = 5,
+            default_delay: int = 5,
+            add_generation_prompt: bool = False,
     ):
         """
         Query stub for LMStudio class.

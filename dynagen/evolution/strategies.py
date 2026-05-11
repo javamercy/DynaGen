@@ -5,14 +5,12 @@ class Strategy(StrEnum):
     S1 = "S1"
     S2 = "S2"
     S3 = "S3"
-    S4 = "S4"
 
 
 _PARENT_COUNTS: dict[Strategy, int] = {
     Strategy.S1: 1,
     Strategy.S2: 1,
-    Strategy.S3: 2,
-    Strategy.S4: 1,
+    Strategy.S3: 3,
 }
 
 

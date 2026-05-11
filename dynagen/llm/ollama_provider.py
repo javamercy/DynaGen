@@ -25,6 +25,9 @@ class OllamaProvider(LLMProvider):
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         return self.complete_with_metadata(messages, temperature=temperature).parsed_candidate_response
 
+    def complete_text(self, messages: list[dict[str, str]], *, temperature: float) -> str:
+        return self._message_content(self._chat(messages, temperature=temperature, format_schema=None))
+
     def complete_with_metadata(self, messages: list[dict[str, str]], *, temperature: float) -> LLMResponse:
         response_data = self._chat(messages, temperature=temperature)
         content = self._message_content(response_data)
@@ -34,16 +37,23 @@ class OllamaProvider(LLMProvider):
             metadata=self._metadata(response_data),
         )
 
-    def _chat(self, messages: list[dict[str, str]], *, temperature: float) -> dict[str, Any]:
+    def _chat(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            temperature: float,
+            format_schema: dict[str, Any] | None = CANDIDATE_RESPONSE_SCHEMA,
+    ) -> dict[str, Any]:
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "format": CANDIDATE_RESPONSE_SCHEMA,
             "options": {
                 "temperature": temperature,
             },
         }
+        if format_schema is not None:
+            payload["format"] = format_schema
         request = Request(
             OLLAMA_CHAT_URL,
             data=json.dumps(payload).encode("utf-8"),

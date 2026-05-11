@@ -19,5 +19,20 @@ class Problem(Protocol):
     def build_initial_prompt(self, role: Any) -> list[dict[str, str]]:
         ...
 
-    def build_evolution_prompt(self, strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
+    def build_evolution_prompt(
+            self,
+            strategy: str,
+            parents: list[Candidate],
+            *,
+            generation_reflection: str = "",
+    ) -> list[dict[str, str]]:
+        ...
+
+    def build_llm_reflection_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+    ) -> list[dict[str, str]]:
         ...

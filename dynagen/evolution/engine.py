@@ -16,6 +16,8 @@ from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
 from dynagen.reporting.summary import build_final_report, generation_summary
 
+LLM_REFLECTION_PERIOD = 2
+
 
 @dataclass(frozen=True)
 class _CandidateTask:
@@ -45,6 +47,7 @@ class EvolutionEngine:
         self.store = store
         self.problem: Problem = problem_for_config(config)
         self.rng = random.Random(config.seed)
+        self._candidate_index: dict[str, Candidate] = {}
 
     def run(self) -> Population:
         population = self._initial_population()
@@ -85,6 +88,7 @@ class EvolutionEngine:
         summary = dict(summary_getter()) if callable(summary_getter) else {}
         configured_budget = scheduled_llm_calls(self.config)
         summary.setdefault("candidate_generation_calls", None)
+        summary.setdefault("reflection_calls", None)
         summary.setdefault("total_api_calls", None)
         summary.setdefault("failed_calls", None)
         summary["llm_model"] = getattr(self.provider, "model", None)
@@ -101,6 +105,7 @@ class EvolutionEngine:
         roles = self.problem.initial_roles(self.config.evolution.population_size)
         tasks = self._build_initial_tasks(roles)
         candidates = self._execute_tasks_parallel(tasks)
+        self._register_candidates(candidates)
         return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
 
     def _build_initial_tasks(self, roles: list) -> list[_CandidateTask]:
@@ -124,16 +129,31 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def _generate_offspring(self, generation: int, population: Population) -> list[Candidate]:
-        tasks = self._build_offspring_tasks(generation, population)
-        return self._execute_tasks_parallel(tasks)
+        generation_reflection = ""
+        if self._include_llm_reflection(generation):
+            generation_reflection = self._generate_llm_reflection(generation, population.candidates)
+        tasks = self._build_offspring_tasks(generation, population, generation_reflection=generation_reflection)
+        offspring = self._execute_tasks_parallel(tasks)
+        self._register_candidates(offspring)
+        return offspring
 
-    def _build_offspring_tasks(self, generation: int, population: Population) -> list[_CandidateTask]:
+    def _build_offspring_tasks(
+            self,
+            generation: int,
+            population: Population,
+            *,
+            generation_reflection: str = "",
+    ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
         for strategy in self.config.evolution.strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
                 parents = self._select_strategy_parents(strategy, population.candidates)
-                messages = self.problem.build_evolution_prompt(strategy, parents)
+                messages = self.problem.build_evolution_prompt(
+                    strategy,
+                    parents,
+                    generation_reflection=generation_reflection,
+                )
                 prompt = _format_messages(messages)
                 tasks.append(_CandidateTask(
                     candidate_id=candidate_id,
@@ -210,13 +230,65 @@ class EvolutionEngine:
         metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
+    def _include_llm_reflection(self, generation: int) -> bool:
+        return self.config.problem.type == "tsp" and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
+
+    def _generate_llm_reflection(self, generation: int, candidates: list[Candidate]) -> str:
+        prompt_builder = getattr(self.problem, "build_llm_reflection_prompt", None)
+        text_completion = getattr(self.provider, "complete_text", None)
+        if not callable(prompt_builder) or not callable(text_completion):
+            return ""
+        candidate = self._select_reflection_candidate(candidates)
+        candidate.metrics = candidate.metrics or {}
+        reflection = candidate.metrics.setdefault("reflection", {})
+        if not isinstance(reflection, dict):
+            reflection = {}
+            candidate.metrics["reflection"] = reflection
+        resolved_parents = self._resolve_parents(candidate)
+        try:
+            text = text_completion(
+                prompt_builder(candidate, parents=resolved_parents, generation=generation),
+                temperature=min(self.config.llm.temperature, 0.7),
+            )
+            normalized_text = " ".join(text.split())[:1200]
+            reflection["llm_reflection"] = {
+                "generation": generation,
+                "cadence": LLM_REFLECTION_PERIOD,
+                "candidate_id": candidate.id,
+                "text": normalized_text,
+            }
+            self.store.save_candidate(candidate)
+            return normalized_text
+        except Exception as exc:
+            reflection["llm_reflection_error"] = _exception_details(exc)
+            self.store.save_candidate(candidate)
+            return ""
+
+    def _select_reflection_candidate(self, candidates: list[Candidate]) -> Candidate:
+        ordered = select_survivors(candidates, len(candidates))
+        for candidate in ordered:
+            if self._resolve_parents(candidate):
+                return candidate
+        return ordered[0]
+
+    def _resolve_parents(self, candidate: Candidate) -> list[Candidate]:
+        return [
+            self._candidate_index[parent_id]
+            for parent_id in candidate.parents
+            if parent_id in self._candidate_index
+        ]
+
+    def _register_candidates(self, candidates: list[Candidate]) -> None:
+        for candidate in candidates:
+            self._candidate_index[candidate.id] = candidate
+
 
 def scheduled_llm_calls(config: RunConfig) -> int:
     return (
-        config.evolution.population_size
-        + config.evolution.generations
-        * len(config.evolution.strategies)
-        * config.evolution.offspring_per_strategy
+            config.evolution.population_size
+            + config.evolution.generations
+            * len(config.evolution.strategies)
+            * config.evolution.offspring_per_strategy
     )
 
 
@@ -229,7 +301,12 @@ def _build_candidate_from_response(
         parents: list[str] | None = None,
         prompt: str,
         metrics: dict | None = None,
-) -> Candidate:
+    ) -> Candidate:
+    candidate_metrics = dict(metrics) if metrics is not None else {}
+    uses_distance = _uses_distance_metrics(candidate_metrics)
+    if uses_distance:
+        candidate_metrics.setdefault("score_name", "distance")
+        candidate_metrics["distance"] = math.inf
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -238,8 +315,9 @@ def _build_candidate_from_response(
         thought=response.thought,
         code=response.code,
         parents=list(parents or []),
-        fitness=None,
-        metrics=dict(metrics) if metrics is not None else {},
+        fitness=None if uses_distance else None,
+        distance=math.inf if uses_distance else None,
+        metrics=candidate_metrics,
         status=CandidateStatus.PENDING,
         prompt=prompt,
     )
@@ -255,6 +333,11 @@ def _failed_candidate(
         error_details: str | None = None,
         metrics: dict | None = None,
 ) -> Candidate:
+    candidate_metrics = dict(metrics) if metrics is not None else {}
+    uses_distance = _uses_distance_metrics(candidate_metrics)
+    if uses_distance:
+        candidate_metrics.setdefault("score_name", "distance")
+        candidate_metrics["distance"] = math.inf
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -263,8 +346,9 @@ def _failed_candidate(
         thought="",
         code="",
         parents=list(parents or []),
-        fitness=math.inf,
-        metrics=dict(metrics) if metrics is not None else {},
+        fitness=None if uses_distance else math.inf,
+        distance=math.inf if uses_distance else None,
+        metrics=candidate_metrics,
         status=CandidateStatus.ERROR,
         prompt=prompt,
         error_details=error_details,
@@ -278,10 +362,24 @@ def _exception_details(exc: Exception) -> str:
 
 def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
     candidate.status = CandidateStatus.ERROR
-    candidate.fitness = math.inf
     if not candidate.metrics:
         candidate.metrics = {}
+    if candidate.score_name == "distance":
+        candidate.distance = math.inf
+        candidate.fitness = None
+        candidate.metrics.setdefault("score_name", "distance")
+        candidate.metrics["distance"] = math.inf
+    else:
+        candidate.fitness = math.inf
     candidate.error_details = error_details
+
+
+def _uses_distance_metrics(metrics: dict) -> bool:
+    return (
+        metrics.get("problem") == "tsp"
+        or metrics.get("score_name") == "distance"
+        or "distance" in metrics
+    )
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:

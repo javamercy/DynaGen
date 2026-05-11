@@ -7,6 +7,7 @@ from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
 from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_spec
 from dynagen.evaluation.tsp_evaluator import TSPCandidateEvaluator
+from dynagen.evaluation.tsp_reflection import build_tsp_llm_reflection_prompt
 from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
 from dynagen.prompts.tsp_initial import TSP_INITIAL_ROLES, TSPInitialRole, build_tsp_initial_prompt
 
@@ -31,8 +32,27 @@ class TSPProblem:
     def build_initial_prompt(self, role: Any) -> list[dict[str, str]]:
         return build_tsp_initial_prompt(role)
 
-    def build_evolution_prompt(self, strategy: str, parents: list[Candidate]) -> list[dict[str, str]]:
-        return build_tsp_evolution_prompt(strategy, parents)
+    def build_evolution_prompt(
+            self,
+            strategy: str,
+            parents: list[Candidate],
+            *,
+            generation_reflection: str = "",
+    ) -> list[dict[str, str]]:
+        return build_tsp_evolution_prompt(
+            strategy,
+            parents,
+            generation_reflection=generation_reflection,
+        )
+
+    def build_llm_reflection_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+    ) -> list[dict[str, str]]:
+        return build_tsp_llm_reflection_prompt(candidate, parents=parents, generation=generation)
 
 
 def create_tsp_initial_roles(count: int) -> list[TSPInitialRole]:

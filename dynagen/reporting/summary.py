@@ -7,15 +7,17 @@ from dynagen.evolution.selection import select_survivors
 def generation_summary(generation: int, population: list[Candidate], offspring: list[Candidate]) -> dict:
     best = select_survivors(population, 1)[0] if population else None
     valid_offspring = sum(1 for candidate in offspring if candidate.status == CandidateStatus.VALID)
-    return {
+    summary = {
         "generation": generation,
         "population_ids": [candidate.id for candidate in population],
         "offspring_count": len(offspring),
         "valid_offspring_count": valid_offspring,
         "best_candidate_id": None if best is None else best.id,
-        "best_fitness": None if best is None else best.fitness,
         "status_counts": _status_counts(population + offspring),
     }
+    if best is not None:
+        summary[f"best_{best.score_name}"] = best.score_value
+    return summary
 
 
 def build_final_report(
@@ -26,11 +28,13 @@ def build_final_report(
         llm_calls: dict | None = None,
 ) -> str:
     ordered = select_survivors(population, len(population)) if population else []
+    search_score_name = _population_score_name(ordered)
+    search_score_title = _score_title(search_score_name)
     lines = ["# DynaGen Final Report", "", "## Final Population", "",
-             "| Rank | Candidate | Status | Search Fitness | Name |", "|---:|---|---|---:|---|"]
+             f"| Rank | Candidate | Status | Search {search_score_title} | Name |", "|---:|---|---|---:|---|"]
     for rank, candidate in enumerate(ordered, start=1):
-        fitness = "" if candidate.fitness is None else f"{candidate.fitness:.6g}"
-        lines.append(f"| {rank} | `{candidate.id}` | {candidate.status} | {fitness} | {candidate.name} |")
+        score = "" if candidate.score_value is None else f"{candidate.score_value:.6g}"
+        lines.append(f"| {rank} | `{candidate.id}` | {candidate.status} | {score} | {candidate.name} |")
     if ordered:
         best = search_best or ordered[0]
         best_lines = [
@@ -40,7 +44,7 @@ def build_final_report(
             f"- ID: `{best.id}`",
             f"- Name: {best.name}",
             f"- Status: {best.status}",
-            f"- Search fitness: {best.fitness}",
+            f"- Search {best.score_name}: {best.score_value}",
             f"- Thought: {best.thought}",
         ]
         if best.error_details:
@@ -59,7 +63,7 @@ def build_final_report(
                     "",
                     f"- Problem: BBOB",
                     f"- Status: {test_result.status}",
-                    f"- Test fitness: {test_result.fitness}",
+                    f"- Test fitness: {test_result.score}",
                     f"- Problem instances evaluated: {instances_evaluated}",
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
@@ -75,15 +79,15 @@ def build_final_report(
                 ]
             )
         else:
-            search_metric_label = "Mean tour length" if metrics.get("pool") == "search_instances" else "Mean gap"
-            penalized_metric_label = "Penalized mean tour length" if metrics.get("pool") == "search_instances" else "Penalized mean gap"
+            search_metric_label = "Mean tour distance" if metrics.get("pool") == "search_instances" else "Mean gap"
+            penalized_metric_label = "Penalized mean tour distance" if metrics.get("pool") == "search_instances" else "Penalized mean gap"
             lines.extend(
                 [
                     "",
                     "## Test Evaluation",
                     "",
                     f"- Status: {test_result.status}",
-                    f"- Test fitness: {test_result.fitness}",
+                    f"- Test distance: {test_result.score}",
                     f"- Instances evaluated: {instances_evaluated}",
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
@@ -105,6 +109,7 @@ def build_final_report(
                 "## LLM Calls",
                 "",
                 f"- Candidate-generation calls: {llm_calls.get('candidate_generation_calls')}",
+                f"- Reflection calls: {llm_calls.get('reflection_calls')}",
                 f"- Total API calls: {llm_calls.get('total_api_calls')}",
                 f"- Failed calls: {llm_calls.get('failed_calls')}",
                 f"- LLM model: {llm_calls.get('llm_model') or llm_calls.get('model')}",
@@ -120,3 +125,14 @@ def _status_counts(candidates: list[Candidate]) -> dict[str, int]:
     for candidate in candidates:
         counts[candidate.status] = counts.get(candidate.status, 0) + 1
     return counts
+
+
+def _population_score_name(candidates: list[Candidate]) -> str:
+    for candidate in candidates:
+        if candidate.score_name == "distance":
+            return "distance"
+    return "fitness"
+
+
+def _score_title(score_name: str) -> str:
+    return "Distance" if score_name == "distance" else "Fitness"

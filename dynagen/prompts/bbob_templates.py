@@ -1,6 +1,5 @@
 from dynagen.candidates.candidate import Candidate
 
-
 BBOB_SOLVER_CONTRACT = """
 Implement a complete continuous black-box optimizer with exactly this interface:
 
@@ -37,7 +36,6 @@ Implementation rules:
 - Avoid recursion-heavy or memory-heavy designs.
 """
 
-
 BBOB_INTERNAL_CHECKLIST = """
 Before producing the final response, internally verify the candidate:
 
@@ -51,7 +49,6 @@ Before producing the final response, internally verify the candidate:
 8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
 9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
 """
-
 
 BBOB_RESPONSE_FORMAT = """
 Return exactly one JSON object and nothing else.
@@ -77,9 +74,25 @@ Strict formatting rules:
 def bbob_system_prompt(role: str) -> str:
     return f"""
 You are {role}. Generate robust, compact Python optimizers for continuous black-box minimization.
-Focus on full optimizers, not small heuristic components.
-Use classical continuous optimization ideas when useful, but combine them into a coherent complete optimizer.
-Use budget as a hard function-evaluation cap. Follow the contract exactly."""
+
+The optimizer must work without gradients across diverse landscapes: separable, nonseparable, ill-conditioned, multimodal, weakly structured, and noisy-looking objective surfaces.
+
+Focus on complete optimizers, not isolated heuristic components.
+
+You may use, simplify, hybridize, or adapt strong known optimization ideas such as evolution strategies, differential evolution, coordinate search, pattern search, restart methods, population search, distribution adaptation, and local stochastic search.
+
+Prefer mechanisms that are likely to improve objective value under a strict function-evaluation budget.
+
+Important priorities:
+1. never exceed the function-evaluation budget
+2. always maintain and report a feasible incumbent
+3. adapt search scale to bounds, dimension, and observed progress
+4. balance global exploration with local improvement
+5. keep the implementation compact and reliable
+6. improve performance over the selected parent when parent context is provided
+
+Follow the contract exactly.
+"""
 
 
 def render_bbob_candidates(candidates: list[Candidate]) -> str:

@@ -23,6 +23,7 @@ class Candidate:
     code: str = ""
     parents: list[str] = field(default_factory=list)
     fitness: float | None = None
+    distance: float | None = None
     metrics: dict[str, Any] = field(default_factory=dict)
     prompt: str = ""
     raw_response: str = ""
@@ -34,6 +35,20 @@ class Candidate:
         self.generation = int(self.generation)
         self.parents = list(self.parents)
         self.status = CandidateStatus(self.status)
+        if self._uses_distance():
+            if self.distance is None:
+                self.distance = _float_or_none(self.metrics.get("distance", self.fitness))
+            self.fitness = None
+
+    @property
+    def score_name(self) -> str:
+        return "distance" if self._uses_distance() else "fitness"
+
+    @property
+    def score_value(self) -> float | None:
+        if self._uses_distance():
+            return _float_or_none(self.distance if self.distance is not None else self.metrics.get("distance"))
+        return _float_or_none(self.fitness)
 
     def to_dict(self, *, include_code: bool = True) -> dict[str, Any]:
         data = {
@@ -43,7 +58,6 @@ class Candidate:
             "name": self.name,
             "thought": self.thought,
             "parents": self.parents,
-            "fitness": self.fitness,
             "metrics": self.metrics,
             "prompt": self.prompt,
             "raw_response": self.raw_response,
@@ -52,9 +66,25 @@ class Candidate:
             "created_at": self.created_at,
         }
 
+        if self._uses_distance():
+            data["distance"] = self.score_value
+        else:
+            data["fitness"] = self.fitness
+
         if include_code:
             data["code"] = self.code
         return data
+
+    def _uses_distance(self) -> bool:
+        if self.distance is not None:
+            return True
+        if not isinstance(self.metrics, dict):
+            return False
+        return (
+            self.metrics.get("problem") == "tsp"
+            or self.metrics.get("score_name") == "distance"
+            or "distance" in self.metrics
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], *, code: str | None = None) -> "Candidate":
@@ -69,3 +99,12 @@ class Candidate:
         candidate_dict.setdefault("code", "")
         candidate_dict.setdefault("error_details", None)
         return cls(**candidate_dict)
+
+
+def _float_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None

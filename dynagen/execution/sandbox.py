@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import builtins
 import collections
 import heapq
@@ -7,7 +5,6 @@ import itertools
 import math
 import random
 import time
-from types import FunctionType
 from typing import Any, Callable
 
 import numpy as np
