@@ -4,6 +4,7 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain.bbob import BBOBInstance, create_bbob_instances
 from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
+from dynagen.evaluation.bbob_reflection import build_bbob_llm_reflection_prompt
 from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
 from dynagen.prompts.bbob_initial import BBOB_INITIAL_ROLES, BBOBInitialRole, build_bbob_initial_prompt
 
@@ -36,7 +37,20 @@ class BBOBProblem:
             *,
             generation_reflection: str = "",
     ) -> list[dict[str, str]]:
-        return build_bbob_evolution_prompt(strategy, parents)
+        return build_bbob_evolution_prompt(
+            strategy,
+            parents,
+            generation_reflection=generation_reflection,
+        )
+
+    def build_llm_reflection_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+    ) -> list[dict[str, str]]:
+        return build_bbob_llm_reflection_prompt(candidate, parents=parents, generation=generation)
 
 
 def create_bbob_initial_roles(count: int) -> list[BBOBInitialRole]:

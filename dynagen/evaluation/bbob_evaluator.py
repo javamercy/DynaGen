@@ -18,7 +18,7 @@ class BBOBCandidateEvaluator:
             *,
             seeds: tuple[int, ...] | list[int],
             budget: int,
-            timeout_seconds: float,
+            timeout_seconds: float = 600,
             pool_name: str,
             timeout_penalty: float = 0.0,
             aocc_lower_bound: float = 1e-8,

@@ -231,7 +231,7 @@ class EvolutionEngine:
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
     def _include_llm_reflection(self, generation: int) -> bool:
-        return self.config.problem.type in {"tsp", "dvrp"} and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
+        return self.config.problem.type in {"tsp", "bbob", "dvrp"} and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
 
     def _generate_llm_reflection(self, generation: int, candidates: list[Candidate]) -> str:
         prompt_builder = getattr(self.problem, "build_llm_reflection_prompt", None)
