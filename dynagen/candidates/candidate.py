@@ -82,6 +82,7 @@ class Candidate:
             return False
         return (
             self.metrics.get("problem") == "tsp"
+            or self.metrics.get("problem") == "dvrp"
             or self.metrics.get("score_name") == "distance"
             or "distance" in self.metrics
         )

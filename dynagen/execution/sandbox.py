@@ -9,7 +9,12 @@ from typing import Any, Callable
 
 import numpy as np
 
-from dynagen.candidates.validation import ALLOWED_IMPORTS, validate_bbob_generated_code, validate_generated_code
+from dynagen.candidates.validation import (
+    ALLOWED_IMPORTS,
+    validate_bbob_generated_code,
+    validate_dvrp_generated_code,
+    validate_generated_code,
+)
 
 ALLOWED_MODULES = {
     "numpy": np,
@@ -94,6 +99,23 @@ def load_bbob_optimizer(
     if not isinstance(optimizer, type):
         raise ValueError("Generated code did not define class Optimizer")
     return optimizer
+
+
+def load_dvrp_policy(
+        code: str,
+        *,
+        validate_static: bool = True,
+) -> Callable[..., object]:
+    if validate_static:
+        result = validate_dvrp_generated_code(code)
+        if not result.valid:
+            raise ValueError(result.error)
+    namespace = _sandbox_namespace()
+    exec(compile(code, "<generated_candidate>", "exec"), namespace, namespace)
+    policy = namespace.get("choose_next_customer")
+    if not callable(policy):
+        raise ValueError("Generated code did not define callable choose_next_customer")
+    return policy
 
 
 def _sandbox_namespace(

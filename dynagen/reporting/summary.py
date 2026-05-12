@@ -78,6 +78,28 @@ def build_final_report(
                     f"- AOCC by group: {metrics.get('aocc_by_group')}",
                 ]
             )
+        elif metrics.get("problem") == "dvrp":
+            lines.extend(
+                [
+                    "",
+                    "## Test Evaluation",
+                    "",
+                    f"- Problem: DVRP",
+                    f"- Status: {test_result.status}",
+                    f"- Test distance: {test_result.score}",
+                    f"- Instances evaluated: {instances_evaluated}",
+                    f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                    f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                    f"- Mean gap: {metrics.get('mean_gap')}",
+                    f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
+                    f"- Mean makespan: {metrics.get('mean_makespan')}",
+                    f"- Timeout penalty: {metrics.get('timeout_penalty')}",
+                    f"- Median gap: {metrics.get('median_gap')}",
+                    f"- Worst gap: {metrics.get('worst_gap')}",
+                    f"- Best gap: {metrics.get('best_gap')}",
+                    f"- Gap by instance size: {metrics.get('score_by_instance_size')}",
+                ]
+            )
         else:
             search_metric_label = "Mean tour distance" if metrics.get("pool") == "search_instances" else "Mean gap"
             penalized_metric_label = "Penalized mean tour distance" if metrics.get("pool") == "search_instances" else "Penalized mean gap"

@@ -8,6 +8,10 @@ def get_problem(problem_type: str) -> Problem:
         from dynagen.problems.bbob import BBOBProblem
 
         return BBOBProblem()
+    if normalized == "dvrp":
+        from dynagen.problems.dvrp import DVRPProblem
+
+        return DVRPProblem()
     if normalized == "tsp":
         from dynagen.problems.tsp import TSPProblem
 

@@ -1,0 +1,77 @@
+from typing import Any
+
+from dynagen.candidates.candidate import Candidate
+from dynagen.config import RunConfig
+from dynagen.domain.dvrp import DVRPInstance, load_dvrp_instances
+from dynagen.evaluation.dvrp_evaluator import DVRPCandidateEvaluator
+from dynagen.evaluation.dvrp_reflection import build_dvrp_llm_reflection_prompt
+from dynagen.prompts.dvrp_evolution import build_dvrp_evolution_prompt
+from dynagen.prompts.dvrp_initial import DVRP_INITIAL_ROLES, DVRPInitialRole, build_dvrp_initial_prompt
+
+
+class DVRPProblem:
+    type = "dvrp"
+
+    def build_evaluator(self, config: RunConfig, *, pool_name: str) -> DVRPCandidateEvaluator:
+        path = config.data.search_instances if pool_name == "search_instances" else config.data.test_instances
+        return DVRPCandidateEvaluator(
+            load_dvrp_instances(
+                path,
+                pool_name=pool_name,
+                search_limit=config.problem.dvrp_search_limit,
+                test_sizes=config.problem.dvrp_test_sizes,
+                test_limit_per_size=config.problem.dvrp_test_limit_per_size,
+            ),
+            seeds=config.evaluation.seeds,
+            budget=config.evaluation.budget,
+            timeout_seconds=config.evaluation.timeout_seconds,
+            timeout_penalty=config.evaluation.timeout_penalty,
+            pool_name=pool_name,
+        )
+
+    def initial_roles(self, count: int) -> list[DVRPInitialRole]:
+        return create_dvrp_initial_roles(count)
+
+    def build_initial_prompt(self, role: Any) -> list[dict[str, str]]:
+        return build_dvrp_initial_prompt(role)
+
+    def build_evolution_prompt(
+            self,
+            strategy: str,
+            parents: list[Candidate],
+            *,
+            generation_reflection: str = "",
+    ) -> list[dict[str, str]]:
+        return build_dvrp_evolution_prompt(
+            strategy,
+            parents,
+            generation_reflection=generation_reflection,
+        )
+
+    def build_llm_reflection_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+    ) -> list[dict[str, str]]:
+        return build_dvrp_llm_reflection_prompt(candidate, parents=parents, generation=generation)
+
+
+def create_dvrp_initial_roles(count: int) -> list[DVRPInitialRole]:
+    roles: list[DVRPInitialRole] = []
+    for index in range(count):
+        role = DVRP_INITIAL_ROLES[index % len(DVRP_INITIAL_ROLES)]
+        roles.append(DVRPInitialRole(index + 1, role.role, role.intended_bias))
+    return roles
+
+
+def load_paper_dvrp_instances(config: RunConfig, *, pool_name: str) -> list[DVRPInstance]:
+    path = config.data.search_instances if pool_name == "search_instances" else config.data.test_instances
+    return load_dvrp_instances(
+        path,
+        pool_name=pool_name,
+        search_limit=config.problem.dvrp_search_limit,
+        test_sizes=config.problem.dvrp_test_sizes,
+        test_limit_per_size=config.problem.dvrp_test_limit_per_size,
+    )

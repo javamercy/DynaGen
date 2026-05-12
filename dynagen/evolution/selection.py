@@ -71,4 +71,19 @@ def _rank_biased_probabilities(candidates: list[Candidate]) -> list[float]:
 def _sort_key(candidate: Candidate) -> tuple[int, float, str]:
     status_rank = _STATUS_ORDER.get(candidate.status, 99)
     score = candidate.score_value if candidate.score_value is not None else float("inf")
-    return status_rank, score, candidate.id
+    runtime = _metric_float(candidate, "mean_runtime")
+    # Prefer newer candidates when the score is tied, then keep ordering stable by ID.
+    return status_rank, score, runtime, -int(candidate.generation), candidate.id
+
+
+def _metric_float(candidate: Candidate, key: str) -> float:
+    if not isinstance(candidate.metrics, dict):
+        return float("inf")
+    value = candidate.metrics.get(key)
+    if value is None:
+        return float("inf")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float("inf")
+    return number if number == number else float("inf")

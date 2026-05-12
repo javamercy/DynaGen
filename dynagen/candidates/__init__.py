@@ -1,6 +1,11 @@
 from dynagen.candidates.candidate import Candidate, CandidateStatus
 from dynagen.candidates.parser import ParsedCandidateResponse
-from dynagen.candidates.validation import ValidationResult, validate_bbob_generated_code, validate_generated_code
+from dynagen.candidates.validation import (
+    ValidationResult,
+    validate_bbob_generated_code,
+    validate_dvrp_generated_code,
+    validate_generated_code,
+)
 
 __all__ = [
     "CandidateStatus",
@@ -8,5 +13,6 @@ __all__ = [
     "ParsedCandidateResponse",
     "ValidationResult",
     "validate_bbob_generated_code",
+    "validate_dvrp_generated_code",
     "validate_generated_code",
 ]

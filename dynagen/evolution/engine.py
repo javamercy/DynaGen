@@ -231,7 +231,7 @@ class EvolutionEngine:
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
     def _include_llm_reflection(self, generation: int) -> bool:
-        return self.config.problem.type == "tsp" and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
+        return self.config.problem.type in {"tsp", "dvrp"} and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
 
     def _generate_llm_reflection(self, generation: int, candidates: list[Candidate]) -> str:
         prompt_builder = getattr(self.problem, "build_llm_reflection_prompt", None)
@@ -245,11 +245,18 @@ class EvolutionEngine:
             reflection = {}
             candidate.metrics["reflection"] = reflection
         resolved_parents = self._resolve_parents(candidate)
+        prompt = prompt_builder(candidate, parents=resolved_parents, generation=generation)
+        reflection_record = {
+            "generation": generation,
+            "candidate_id": candidate.id,
+            "cadence": LLM_REFLECTION_PERIOD,
+            "problem": self.config.problem.type,
+            "prompt": prompt,
+            "model": getattr(self.provider, "model", None),
+            "status": "ok",
+        }
         try:
-            text = text_completion(
-                prompt_builder(candidate, parents=resolved_parents, generation=generation),
-                temperature=min(self.config.llm.temperature, 0.7),
-            )
+            text = text_completion(prompt, temperature=min(self.config.llm.temperature, 0.7))
             normalized_text = " ".join(text.split())[:1200]
             reflection["llm_reflection"] = {
                 "generation": generation,
@@ -257,10 +264,15 @@ class EvolutionEngine:
                 "candidate_id": candidate.id,
                 "text": normalized_text,
             }
+            reflection_record["response"] = normalized_text
             self.store.save_candidate(candidate)
+            self.store.save_reflection(reflection_record)
             return normalized_text
         except Exception as exc:
             reflection["llm_reflection_error"] = _exception_details(exc)
+            reflection_record["status"] = "error"
+            reflection_record["error_details"] = _exception_details(exc)
+            self.store.save_reflection(reflection_record)
             self.store.save_candidate(candidate)
             return ""
 
@@ -377,6 +389,7 @@ def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
 def _uses_distance_metrics(metrics: dict) -> bool:
     return (
         metrics.get("problem") == "tsp"
+        or metrics.get("problem") == "dvrp"
         or metrics.get("score_name") == "distance"
         or "distance" in metrics
     )

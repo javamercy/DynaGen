@@ -92,11 +92,14 @@ class ProblemConfig:
     aocc_lower_bound: float = 1e-8
     aocc_upper_bound: float = 1e2
     comparison_baselines: list[str] = field(default_factory=lambda: ["random_search", "differential_evolution"])
+    dvrp_search_limit: int = 8
+    dvrp_test_sizes: list[int] = field(default_factory=lambda: [10, 20, 50, 100, 200])
+    dvrp_test_limit_per_size: int = 64
 
     def __post_init__(self) -> None:
         self.type = str(self.type).lower()
-        if self.type not in {"tsp", "bbob"}:
-            raise ValueError("problem.type must be 'tsp' or 'bbob'")
+        if self.type not in {"tsp", "bbob", "dvrp"}:
+            raise ValueError("problem.type must be 'tsp', 'bbob', or 'dvrp'")
 
         self.function_ids = [int(function_id) for function_id in self.function_ids]
         self.dimension = int(self.dimension)
@@ -107,9 +110,14 @@ class ProblemConfig:
         self.aocc_lower_bound = float(self.aocc_lower_bound)
         self.aocc_upper_bound = float(self.aocc_upper_bound)
         self.comparison_baselines = [str(name) for name in self.comparison_baselines]
+        self.dvrp_search_limit = int(self.dvrp_search_limit)
+        self.dvrp_test_sizes = [int(size) for size in self.dvrp_test_sizes]
+        self.dvrp_test_limit_per_size = int(self.dvrp_test_limit_per_size)
 
         if self.type == "bbob":
             _validate_bbob_problem_config(self)
+        if self.type == "dvrp":
+            _validate_dvrp_problem_config(self)
 
 
 @dataclass
@@ -134,6 +142,17 @@ def _validate_bbob_problem_config(config: ProblemConfig) -> None:
         raise ValueError("problem.bounds must contain [lower, upper]")
     if config.aocc_lower_bound <= 0 or config.aocc_upper_bound <= config.aocc_lower_bound:
         raise ValueError("AOCC bounds must satisfy 0 < lower < upper")
+
+
+def _validate_dvrp_problem_config(config: ProblemConfig) -> None:
+    if config.dvrp_search_limit < 1:
+        raise ValueError("problem.dvrp_search_limit must be at least 1")
+    if not config.dvrp_test_sizes:
+        raise ValueError("problem.dvrp_test_sizes must not be empty")
+    if any(size < 2 for size in config.dvrp_test_sizes):
+        raise ValueError("DVRP test sizes must be at least 2")
+    if config.dvrp_test_limit_per_size < 1:
+        raise ValueError("problem.dvrp_test_limit_per_size must be at least 1")
 
 
 @dataclass
