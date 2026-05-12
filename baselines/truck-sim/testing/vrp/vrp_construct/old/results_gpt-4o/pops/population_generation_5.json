@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The algorithm selects the next node by evaluating a custom heuristic combining the proximity to the destination node and the inverse of the proximity to the current node among unvisited nodes, ensuring a balance between short-term cost and long-term goals.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the distance to the destination node from each unvisited node\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    # Calculate the distance from the current node to each unvisited node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    # Calculate the custom heuristic: (current_distance + 1) / (destination_distance + 1)\n    heuristic_scores = (current_distances + 1) / (destination_distances + 1)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 29.61721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm is designed to select the next node by combining the shortest path with an attraction score based on closeness to an ultimate destination, modifying the typical nearest neighbor approach.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the attraction score\n    attraction_scores = -distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculate the distance from the current node to all unvisited nodes\n    distance_scores = distance_matrix[current_node, unvisited_nodes]\n    \n    # Combine distance and attraction scores by taking a weighted sum. Tune weight for balance.\n    alpha = 0.5  # Weighting factor for attraction importance\n    combined_scores = distance_scores + alpha * attraction_scores\n    \n    # Select node with minimum combined score\n    next_node_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 31.54531,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by combining a heuristic based on the square distance to the destination node and a logarithmic distance from the current node, aiming to provide a more non-linear balance between immediate and future costs.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the squared distance to the destination node from each unvisited node\n    destination_distances_squared = np.square(distance_matrix[unvisited_nodes, destination_node])\n    # Calculate the logarithmic distance from the current node to each unvisited node\n    current_distances_log = np.log1p(distance_matrix[current_node, unvisited_nodes])\n    # Calculate the custom heuristic: current_distance_log / (destination_distance_squared + 1)\n    heuristic_scores = current_distances_log / (destination_distances_squared + 1)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 35.7303,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by computing a custom heuristic that combines proximity to a randomly chosen intermediate node among unvisited nodes and the proximity to the current node, promoting diversification while maintaining efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Choose a random intermediate node from unvisited nodes\n    intermediate_node = np.random.choice(unvisited_nodes)\n    # Calculate the distance from the current node to each unvisited node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    # Calculate the distance to the intermediate node from each unvisited node\n    intermediate_distances = distance_matrix[unvisited_nodes, intermediate_node]\n    # Calculate the custom heuristic: current_distance * (1 + intermediate_distance)\n    heuristic_scores = current_distances * (1 + intermediate_distances)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 37.38708,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by calculating a heuristic score that combines the square of the proximity to the destination node and the square root of the proximity to the current node for all unvisited nodes, promoting a strategic balance between immediate gains and future benefits.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the distance to the destination node from each unvisited node\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    # Calculate the distance from the current node to each unvisited node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    # Calculate the custom heuristic: (current_distance ** 0.5) / (destination_distance ** 2 + 1)\n    heuristic_scores = (current_distances ** 0.5) / (destination_distances ** 2 + 1)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 37.40041,
+          "other_inf": null
+     }
+]

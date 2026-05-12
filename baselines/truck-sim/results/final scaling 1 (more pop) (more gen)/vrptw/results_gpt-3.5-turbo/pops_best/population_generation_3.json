@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm aims to select the next customer for the current truck based on a combination of factors including the distance between the current truck position and the customer, the remaining time window urgency, and the potential waiting time at the customer with modified parameter settings in the score function.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_score = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        remaining_time = time_windows[i][1] - current_time\n        wait_time = max(0, time_windows[i][0] - current_time)\n\n        score = distance + wait_time * 0.5 + remaining_time * 0.5\n\n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+     "objective": 110.84746,
+     "other_inf": null
+}

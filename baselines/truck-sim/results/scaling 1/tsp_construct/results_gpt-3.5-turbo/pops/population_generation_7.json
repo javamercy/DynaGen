@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "New algorithm: Select the next node based on the node that minimizes the ratio of the sum of the squared Euclidean distance between the current node and a prospective node and the minimum distance from that prospective node to all other unvisited nodes to the direct distance to the destination node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])**2\n        min_distance = np.min(distance_matrix[node, unvisited_nodes])\n        direct_distance = np.linalg.norm(distance_matrix[node] - distance_matrix[destination_node])\n        \n        ratio = (euclidean_distance + min_distance) / direct_distance\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 15.19086,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Select the next node based on the node that maximizes the sum of the minimum distance to all other unvisited nodes and the direct distance to the destination node minus the Euclidean distance between the current node and the prospective node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_sum_distance = float('-inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        min_distance = np.min(distance_matrix[node, unvisited_nodes])\n        direct_distance = np.linalg.norm(distance_matrix[node] - distance_matrix[destination_node])\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        \n        sum_distance = min_distance + direct_distance - euclidean_distance\n        \n        if sum_distance > max_sum_distance:\n            max_sum_distance = sum_distance\n            next_node = node\n            \n    return next_node",
+          "objective": 15.58301,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: In each step, calculate the average distance from the current node to all unvisited nodes and select the node with the minimum average distance as the next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    avg_distances = np.mean(distance_matrix[current_node, unvisited_nodes], axis=0)\n    next_node = unvisited_nodes[np.argmin(avg_distances)]\n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Select the next node based on the node that minimizes the ratio of the sum of the Euclidean distance between the current node and a prospective node and the average distance from that prospective node to all other unvisited nodes to the direct distance to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])**2\n        avg_distance = np.mean(distance_matrix[node, unvisited_nodes])\n        direct_distance = np.linalg.norm(distance_matrix[node] - distance_matrix[destination_node])\n        \n        ratio = (euclidean_distance + avg_distance) / direct_distance\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 16.76449,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node based on the node that minimizes the product of the squared Euclidean distance between the current node and a prospective node and the average distance from that prospective node to all other unvisited nodes, relative to the direct distance to the destination node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])**2\n        avg_distance = np.mean(distance_matrix[node, unvisited_nodes])\n        direct_distance = np.linalg.norm(distance_matrix[node] - distance_matrix[destination_node])\n        \n        product = (euclidean_distance * avg_distance) / direct_distance\n        \n        if product < min_product:\n            min_product = product\n            next_node = node\n            \n    return next_node",
+          "objective": 18.80746,
+          "other_inf": null
+     }
+]

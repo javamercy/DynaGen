@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nDescription: Our new algorithm selects the next node by taking into account the difference in distances to unvisited nodes and the waiting time at each node, with a priority given to minimizing the total distance traveled by the fleet of trucks.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance_difference = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            distance_to_node = distance_matrix[current_node][node]\n            total_distance = distance_to_node + distance_matrix[node][depot_node]\n            truck_distances = [distance_matrix[truck_node][node] for truck_node in truck_nodes if truck_node != current_node]\n            avg_truck_distance = sum(truck_distances) / len(truck_distances) if truck_distances else 0\n            distance_difference = total_distance - avg_truck_distance\n            \n            if distance_difference < min_distance_difference:\n                min_distance_difference = distance_difference\n                next_node = node\n    \n    return next_node",
+     "objective": 36.56833,
+     "other_inf": null
+}

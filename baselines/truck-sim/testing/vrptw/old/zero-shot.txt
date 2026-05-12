@@ -1,0 +1,34 @@
+The Vehicle Routing Problem with Time Windows (VRPTW) deals with the distribution of goods between depots and customers using vehicles. The vehicles have a limited capacity. Each customer has to be supplied within the time window associated with the customer and our objective is to minimize the time taken to visit all customers and return to the depot.
+
+Here is a starter code:
+```Python
+def vrptw(Customers: list[int],
+          Demand: list[int],
+          LowerTimeWindow: list[int],
+          UpperTimeWindow: list[int],
+          Distance: list[list[int]],
+          ServiceTime: list[int],
+          Capacity: int,
+          num_vehicles: int,
+          M: int):
+    """
+    Args:
+        Customers: Set of customers
+        Demand: Demand of customer `i`
+        LowerTimeWindow: Lower Bound of the Time Window of customer `i`
+        UpperTimeWindow: Upper Bound of the Time Window of customer `i`
+        Distance: Distance or cost between pair of customer `i` and customer `j`
+        ServiceTime: Service _time at customer `i`
+        Capacity: Capacity of the vehicles
+        num_vehicles: Number of vehicles available
+        M: A large constant
+
+    Returns:
+        FinishTime: The time when the last truck arrives back at the depot
+    """
+    # To be implemented
+    FinishTime = M
+
+    return FinishTime
+```
+Provide an LP or MIP model for this problem with explanations for each parameter then implement the model following the format of the given code example strictly. No code is required outside the function except for the import package (no test code).

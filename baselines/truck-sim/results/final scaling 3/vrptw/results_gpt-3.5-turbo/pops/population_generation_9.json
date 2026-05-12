@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "New algorithm: The algorithm calculates the weighted average of distances from the current truck position to all unvisited customers, factoring in both distance and time to the expected time window end, then selects the customer with the smallest weighted average distance as the next node for the current truck to visit.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_weighted_avg = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.sum(np.linalg.norm(cur_truck_pos - np.array(all_truck_pos), axis=1))\n        time_window = time_windows[i]\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_to_node = distance_to_node / truck_speed\n        weight_factor = ((time_window[1] - current_time) / (time_window[1] - time_window[0] + 0.1)) + time_to_node\n        weighted_avg = total_distance * weight_factor\n        \n        if weighted_avg < min_weighted_avg:\n            min_weighted_avg = weighted_avg\n            best_node = i\n            \n    return best_node",
+          "objective": 82.86634,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm prioritizes selecting the customer with the smallest total distance to the node, taking into account both the current distance to the customer and the time to reach the customer relative to the time window, while adding a penalty term based on the square of the time to node term.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_weighted_avg = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.sum(np.linalg.norm(cur_truck_pos - np.array(all_truck_pos), axis=1))\n        time_window = time_windows[i]\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_to_node = distance_to_node / truck_speed\n        penalty_factor = (time_to_node ** 2)\n        weighted_avg = total_distance + (time_window[1] - current_time) / (time_window[1] - time_window[0] + 0.1) + penalty_factor\n        \n        if weighted_avg < min_weighted_avg:\n            min_weighted_avg = weighted_avg\n            best_node = i\n            \n    return best_node",
+          "objective": 84.23211,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to select the customer with the smallest weighted average distance based on a combination of distance to the node, time to reach the node, and a penalty factor that is the exponential of the time to node term.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_weighted_avg = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.sum(np.linalg.norm(cur_truck_pos - np.array(all_truck_pos), axis=1))\n        time_window = time_windows[i]\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_to_node = distance_to_node / truck_speed\n        weight_factor = ((time_window[1] - current_time) / (time_window[1] - time_window[0] + 0.1)) + np.exp(time_to_node)\n        weighted_avg = total_distance * weight_factor\n        \n        if weighted_avg < min_weighted_avg:\n            min_weighted_avg = weighted_avg\n            best_node = i\n            \n    return best_node",
+          "objective": 90.59087,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the customer with the smallest weighted average distance based on a combination of distance to the node, time to reach the node, and a penalty factor that is the square root of the time to node term.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_weighted_avg = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.sum(np.linalg.norm(cur_truck_pos - np.array(all_truck_pos), axis=1))\n        time_window = time_windows[i]\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_to_node = distance_to_node / truck_speed\n        weight_factor = ((time_window[1] - current_time) / (time_window[1] - time_window[0] + 0.1)) + np.sqrt(time_to_node)\n        weighted_avg = total_distance * weight_factor\n        \n        if weighted_avg < min_weighted_avg:\n            min_weighted_avg = weighted_avg\n            best_node = i\n            \n    return best_node",
+          "objective": 92.34314,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm prioritizes selecting the customer with the smallest weighted average distance based on a combination of distance to the node, time to reach the node, and a penalty factor that is the cube of the time to node term.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_weighted_avg = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.sum(np.linalg.norm(cur_truck_pos - np.array(all_truck_pos), axis=1))\n        time_window = time_windows[i]\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_to_node = distance_to_node / truck_speed\n        weight_factor = ((time_window[1] - current_time) / (time_window[1] - time_window[0] + 0.1)) + (time_to_node ** 3)\n        weighted_avg = total_distance * weight_factor\n        \n        if weighted_avg < min_weighted_avg:\n            min_weighted_avg = weighted_avg\n            best_node = i\n            \n    return best_node",
+          "objective": 92.65382,
+          "other_inf": null
+     }
+]

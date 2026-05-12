@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node based on the minimum product of distances from the current node to the destination node and the unvisited nodes, taking into account the reciprocal of the number of connections of the unvisited nodes to other unvisited nodes.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = np.inf\n    next_node = None\n\n    for node in unvisited_nodes:\n        dist_curr_dest = distance_matrix[current_node][destination_node]\n        dist_curr_next = distance_matrix[current_node][node]\n        dist_next_dest = distance_matrix[node][destination_node]\n\n        total_connections = np.sum([1 for u_node in unvisited_nodes if u_node != node and distance_matrix[node][u_node] < np.inf])\n\n        product_distances = (dist_curr_dest * dist_curr_next) / (dist_next_dest + 1 / total_connections)\n\n        if product_distances < min_product:\n            min_product = product_distances\n            next_node = node\n\n    return next_node",
+     "objective": 12.31333,
+     "other_inf": null
+}

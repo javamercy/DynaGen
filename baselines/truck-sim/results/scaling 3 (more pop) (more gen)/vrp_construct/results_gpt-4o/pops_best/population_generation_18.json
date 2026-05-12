@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm selects the next node by favoring nodes with the shortest normalized distance from the current node and applying a penalty based on the average distance to nodes currently targeted by other trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node if current_node != depot_node else None\n\n    scores = []\n\n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node, node]\n        avg_distance_to_other_trucks = np.mean([distance_matrix[node, truck] for truck in truck_nodes])\n        \n        shortest_normalized_distance = distance_to_current / np.max(distance_matrix)\n        avg_distance_normalized_value = avg_distance_to_other_trucks / np.max(distance_matrix)\n        \n        score = shortest_normalized_distance - 0.75 * avg_distance_normalized_value\n        scores.append((score, node))\n\n    scores.sort()\n    best_score, next_node = scores[0]\n    \n    return next_node",
+     "objective": 22.40251,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "My algorithm is: selective nearest neighbor method where each truck's decision is influenced by the current destinations of other trucks to promote distribution and avoid clumping.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Check if there are any unvisited nodes left\n    if unvisited_nodes.size == 0:\n        return depot_node\n    \n    # Filter out destinations that are currently being aimed towards by other trucks\n    unique_targets = np.setdiff1d(unvisited_nodes, truck_nodes, assume_unique=True)\n\n    # If all unvisited nodes are being targeted by other trucks, allow revisiting of nodes\n    if unique_targets.size == 0:\n        unique_targets = unvisited_nodes \n\n    # Calculate distances from the current node to the unique targets\n    current_distances = distance_matrix[current_node, unique_targets]\n\n    # Select the index of the minimum distance in the filtered unique targets\n    min_distance_index = np.argmin(current_distances)\n\n    # Return the node corresponding to the minimum distance\n    next_node = unique_targets[min_distance_index]\n    \n    return next_node",
+     "objective": 40.31261,
+     "other_inf": null
+}

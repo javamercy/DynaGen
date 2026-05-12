@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm: Compute next node by combining direct distance with an attraction factor that rewards nearby unvisited nodes and the avoidance of recently visited nodes using dynamic weighing.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node  # All nodes visited, return to depot\n\n    last_visited = truck_nodes[-1] if len(truck_nodes) > 0 else None\n    costs = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        if last_visited is not None:\n            recent_visit_penalty = np.exp(-distance_matrix[last_visited, node])\n        else:\n            recent_visit_penalty = 0\n        \n        attraction_to_unvisited = 1 / (1 + direct_distance)  # Inversion to reward closeness\n        weighted_cost = 0.5 * direct_distance + 0.3 * recent_visit_penalty + 0.2 * attraction_to_unvisited\n        costs[i] = weighted_cost\n    \n    next_node = unvisited_nodes[np.argmin(costs)]\n    return next_node",
+     "objective": 29.26401,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm involves selecting the next node based on the closest distance to the current truck position, the total demand estimate from nearby trucks, and an additional variable related to the angle between the current truck position and the depot position, weighted by the distance to the depot.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    distances = []\n    for idx, node in enumerate(unvisited_customers):\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        total_demand = 0\n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                total_demand += 1\n\n        angle_factor = np.dot((node - cur_truck_pos), (depot_pos - cur_truck_pos)) / (np.linalg.norm(node - cur_truck_pos) * np.linalg.norm(depot_pos - cur_truck_pos))\n        \n        dist_to_depot = np.linalg.norm(node - depot_pos)\n        \n        distances.append(dist + total_demand + angle_factor * dist_to_depot)\n    \n    best_node = np.argmin(distances)\n    \n    return best_node",
+     "objective": 32.91899,
+     "other_inf": null
+}

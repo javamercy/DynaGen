@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy algorithm selects the next node based on the node that has the shortest distance to the destination among the unvisited nodes, breaking ties randomly.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < shortest_distance:\n            shortest_distance = distance_matrix[current_node][node]\n            next_node = node\n        elif distance_matrix[current_node][node] == shortest_distance:\n            if np.random.randint(2) == 0:\n                next_node = node\n                \n    return next_node",
+     "objective": 3.25721,
+     "other_inf": null
+}

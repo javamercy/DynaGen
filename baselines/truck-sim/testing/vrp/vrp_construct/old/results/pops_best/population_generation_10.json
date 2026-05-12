@@ -1,0 +1,6 @@
+{
+     "algorithm": "\"Capacity Utilization Algorithm (CUA)\": This algorithm prioritizes selecting the next node based primarily on minimizing distance but significantly penalizes shorter distances that would result in a return to previously high-traffic nodes, aiming to distribute the travel more evenly among all nodes.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    \n    distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Penalty for visiting nodes that would lead to high future traffic or redundancy\n    future_traffic_potential = np.sum(distance_matrix[unvisited_nodes, :], axis=1)\n    traffic_penalty = np.exp(-future_traffic_potential / np.mean(future_traffic_potential))\n    \n    # Capacity utilisation score prioritizes distance minimization and low future traffic nodes\n    capacity_utilisation_scores = distances + (traffic_penalty * max(distances))\n    \n    # Select node with lowest capacity utilisation score\n    best_index = np.argmin(capacity_utilisation_scores)\n    next_node = unvisited_nodes[best_index]\n    \n    return next_node",
+     "objective": 30.54887,
+     "other_inf": null
+}

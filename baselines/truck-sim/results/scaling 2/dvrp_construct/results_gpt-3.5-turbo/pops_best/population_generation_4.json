@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm involves finding the closest unvisited customer for the current truck by calculating the Euclidean distance between the current truck position and each unvisited customer's location Subtracting a term that penalizes already assigned customers based on the other truck locations, then selecting the customer with the lowest modified distance as the next node for the truck to visit.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    distances = []\n    for customer in unvisited_customers:\n        distance = np.linalg.norm(np.array(cur_truck_pos) - np.array(customer))\n        for pos in all_truck_pos:\n            if np.all(pos == cur_truck_pos):\n                continue\n            penalty = 1/ (np.linalg.norm(np.array(pos) - np.array(customer)) + 1)\n            distance += penalty\n        distances.append(distance)\n    \n    min_distance_idx = np.argmin(distances)\n    best_node = min_distance_idx\n    \n    return best_node",
+     "objective": 36.96736,
+     "other_inf": null
+}

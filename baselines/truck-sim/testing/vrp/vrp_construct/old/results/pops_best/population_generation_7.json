@@ -1,0 +1,6 @@
+{
+     "algorithm": "My novel algorithm selectively chooses the next node based on a weighted score that combines the direct distance to the node, the average distance to all other nodes from the current node, and a balancing factor influenced by immediate inbound and outbound traffic demands.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    \n    distances = distance_matrix[current_node, unvisited_nodes]\n    avg_distance_from_current = np.mean(distance_matrix[current_node])\n    avg_distances_to_unvisited = np.array([np.mean(distance_matrix[:, node]) for node in unvisited_nodes])\n    \n    # Normalize distances and the average distances to unvisited nodes\n    normalized_distances = distances / np.max(distances)\n    normalized_avg_distances = avg_distances_to_unvisited / np.max(avg_distances_to_unvisited, initial=1)\n    \n    # Calculate scores by combining normalized metrics with weighted preferences\n    scores = 0.5 * (1 - normalized_distances) + 0.5 * normalized_avg_distances\n    \n    # Select the node with the highest score\n    best_index = np.argmax(scores)\n    next_node = unvisited_nodes[best_index]\n\n    return next_node",
+     "objective": 31.32238,
+     "other_inf": null
+}

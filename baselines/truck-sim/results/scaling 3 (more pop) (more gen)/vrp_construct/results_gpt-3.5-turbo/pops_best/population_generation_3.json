@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm prioritizes the next node based on the sum of the reciprocal of the distance from the current node, the square of the total distance savings from all trucks visiting the node, and the logarithm of the number of times the node has been visited plus one.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance_savings = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance_savings = 0\n        for truck_node in truck_nodes:\n            distance_saved = distance_matrix[current_node][truck_node] + distance_matrix[truck_node][node] - distance_matrix[current_node][node]\n            total_distance_savings += distance_saved\n        \n        dist_from_current = distance_matrix[current_node][node]\n        \n        visit_count = len([t for t in truck_nodes if t == node])\n        \n        priority_score = 1/(1 + dist_from_current) + (total_distance_savings ** 2) + np.log(visit_count + 1)\n        \n        if priority_score > min_distance_savings:\n            min_distance_savings = priority_score\n            next_node = node\n    \n    return next_node",
+     "objective": 20.13354,
+     "other_inf": null
+}

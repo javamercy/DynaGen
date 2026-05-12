@@ -1,0 +1,6 @@
+{
+     "algorithm": "My novel algorithm leverages a weighted score system based on minimizing route overlap among trucks, by considering both the geometric center of all trucks' current positions and the furthest node from this center as potential guides for route diversification.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    best_score = float('inf')\n    best_node = None\n    \n    # Calculate the geometric center of all truck positions\n    center_of_trucks = np.mean(all_truck_pos, axis=0)\n    \n    for i, customer in enumerate(unvisited_customers):\n        # Calculate distance to current truck position\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        \n        # Calculate distance from the geometric center\n        distance_from_center = np.linalg.norm(center_of_trucks - customer)\n        \n        # Calculate route diversification score\n        score = distance - 0.5 * distance_from_center\n        \n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+     "objective": 38.92454,
+     "other_inf": null
+}

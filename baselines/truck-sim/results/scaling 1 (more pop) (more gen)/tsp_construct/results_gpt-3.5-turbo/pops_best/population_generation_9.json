@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node based on the sum of distances from the current node to the destination node, weighing the distances differently for each unvisited node, and selects the node with the lowest sum as the next node to visit.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_sum = float('inf')\n    next_node = None\n\n    for node in unvisited_nodes:\n        dist_curr_dest = distance_matrix[current_node][destination_node]\n        dist_curr_next = distance_matrix[current_node][node]\n        dist_next_dest = distance_matrix[node][destination_node]\n        \n        sum_distances = dist_curr_dest + (dist_curr_next * 1.2) - (dist_next_dest * 0.8)\n\n        if sum_distances < min_sum:\n            min_sum = sum_distances\n            next_node = node\n\n    return next_node",
+     "objective": 11.31882,
+     "other_inf": null
+}

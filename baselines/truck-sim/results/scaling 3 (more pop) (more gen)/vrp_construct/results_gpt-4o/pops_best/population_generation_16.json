@@ -1,0 +1,6 @@
+{
+     "algorithm": "Creating an algorithm that selects the next node to visit based on the minimum normalized ratio between the distance to the current node and the sum of distances to other trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node if current_node != depot_node else None\n\n    scores = []\n\n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node, node]\n        sum_distance_to_other_trucks = np.sum([distance_matrix[node, truck] for truck in truck_nodes])\n        \n        normalized_distance_to_current = distance_to_current / np.max(distance_matrix)\n        normalized_sum_distance = sum_distance_to_other_trucks / np.max(distance_matrix)\n        \n        score = normalized_distance_to_current / normalized_sum_distance\n        scores.append((score, node))\n\n    scores.sort()\n    best_score, next_node = scores[0]\n    \n    return next_node",
+     "objective": 24.90196,
+     "other_inf": null
+}

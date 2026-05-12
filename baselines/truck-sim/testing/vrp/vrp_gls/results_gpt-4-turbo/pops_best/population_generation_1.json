@@ -1,0 +1,6 @@
+{
+     "algorithm": "My algorithm increases the distance for edges that appear frequently in the local optimal routes in an attempt to discourage their use and promote exploration of alternative routes.",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    # Initialize updated distance matrix from current edge distances\n    updated_edge_distance = np.copy(edge_distance)\n    \n    # Increase penalties for each edge used in the local optimal tours\n    scaling_factor = 0.1  # This determines how strong the penalty should be\n    max_tour_usage = np.max(edge_n_used) if np.max(edge_n_used) > 0 else 1\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour) - 1):\n            start, end = tour[i], tour[i + 1]\n            usage_scaled = edge_n_used[start][end] / max_tour_usage\n            increment = scaling_factor * usage_scaled * edge_distance[start][end]\n            updated_edge_distance[start][end] += increment\n            updated_edge_distance[end][start] += increment  # if undirected graph\n\n    return updated_edge_distance",
+     "objective": 22.80304,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm selects the next node based on a weighted score that subtracts the distance from the current node to the unvisited node from a fraction of the distance from each unvisited node to the destination, prioritizing closer unvisited nodes that are also closer to the destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances from current node to all unvisited nodes\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distances from unvisited nodes to the destination node\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Create a weighted score considering both distances, emphasizing proximity to the current node\n    score = (0.5 * unvisited_to_destination) - current_to_unvisited\n    \n    # Choose the node with the maximal score value\n    idx_max = np.argmax(score)\n    \n    # Return the next node to visit\n    next_node = unvisited_nodes[idx_max]\n    \n    return next_node",
+     "objective": 6.07672,
+     "other_inf": null
+}

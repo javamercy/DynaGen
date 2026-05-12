@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm will prioritize nodes based on their geometric centrality and direct distance, capturing nodes that strategically balance immediate travel reduction and overall path centrality without direct reference to the final destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances to the unvisited nodes from the current node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate the geometric mean of distances from each unvisited node to all other unvisited nodes\n    geometric_meandist = np.exp(np.mean(np.log(distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]+1e-9), axis=1))  # Adding a small epsilon to avoid log(0)\n\n    # Combine the direct distance with the inverse of geometric centrality\n    scores = direct_distances * (1 / geometric_meandist)\n\n    # Choose the node which minimizes this combined metric\n    next_node_index = np.argmin(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+     "objective": 8.69228,
+     "other_inf": null
+}

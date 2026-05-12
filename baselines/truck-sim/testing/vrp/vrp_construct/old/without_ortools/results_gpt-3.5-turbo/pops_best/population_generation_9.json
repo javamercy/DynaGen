@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm: At each step, select the next node by calculating the cosine similarity between the current node and each unvisited node, and choose the node with the maximum cosine similarity.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_cosine_sim = -1\n    next_node = None\n    \n    for node in unvisited_nodes:\n        vec_current = distance_matrix[current_node]\n        vec_next = distance_matrix[node]\n        \n        cosine_sim = np.dot(vec_current, vec_next) / (np.linalg.norm(vec_current) * np.linalg.norm(vec_next))\n        \n        if cosine_sim > max_cosine_sim:\n            max_cosine_sim = cosine_sim\n            next_node = node\n    \n    return next_node",
+     "objective": 3.19638,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "In this novel algorithm, the next node for a truck is chosen based on a ranked priority of unvisited nodes, calculated by combining the distance from the current node and the count of trucks already aiming for each unvisited node, preferring nodes with minimum distance and minimum truck congestion.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    scores = []\n    truck_count = np.bincount(truck_nodes, minlength=distance_matrix.shape[0])\n    \n    for node in unvisited_nodes:\n        distance_score = distance_matrix[current_node, node]\n        truck_score = truck_count[node] + 1  # Add 1 to avoid division by zero\n        score = distance_score * truck_score\n        scores.append((score, node))\n    \n    scores.sort()\n    best_score, next_node = scores[0]\n    return next_node",
+     "objective": 42.14403,
+     "other_inf": null
+}

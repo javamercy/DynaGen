@@ -1,0 +1,6 @@
+{
+     "algorithm": "Dynamic Adaptive Nearest-Neighbor Selection (DANNS): Each truck dynamically selects the nearest customer not targeted by other trucks, considering real-time distance and remaining customer urgency.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    def distance(a, b):\n        return np.linalg.norm(a - b)\n    \n    if len(unvisited_customers) == 0:\n        return None  # No more customers to visit\n    \n    distances = np.array([distance(cur_truck_pos, customer) for customer in unvisited_customers])\n    target_indices = []\n    \n    for other_truck in all_truck_pos:\n        if not np.array_equal(other_truck, cur_truck_pos):\n            other_distances = np.array([distance(other_truck, customer) for customer in unvisited_customers])\n            target_indices.append(np.argmin(other_distances))\n    \n    unique_targets = [idx for idx in range(len(unvisited_customers)) if idx not in target_indices]\n    \n    if unique_targets:\n        best_node = unique_targets[np.argmin(distances[unique_targets])]\n    else:\n        best_node = np.argmin(distances)  # Default to nearest if all targets are claimed\n    \n    return best_node",
+     "objective": 41.94442,
+     "other_inf": null
+}

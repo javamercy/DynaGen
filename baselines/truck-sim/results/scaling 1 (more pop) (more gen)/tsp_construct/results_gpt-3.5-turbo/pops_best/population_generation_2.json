@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nUsing a novel algorithm that considers both the distance to the destination node and the distance to unvisited nodes, choose the next node as the one that minimizes the sum of these distances.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = float('inf')\n    next_node = None\n\n    for node in unvisited_nodes:\n        dist_to_dest = distance_matrix[current_node][destination_node]\n        dist_to_node = distance_matrix[current_node][node]\n        total_distance = dist_to_dest + dist_to_node\n        \n        if total_distance < min_distance:\n            min_distance = total_distance\n            next_node = node\n\n    return next_node",
+     "objective": 15.81281,
+     "other_inf": null
+}

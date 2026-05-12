@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next coordinate based on the closest unvisited coordinate to the current truck position, while also considering the positions of the other trucks to avoid overlap, and occasionally choosing to stay at the current location to wait if necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    closest_dist = float('inf')\n    next_destination = None\n    \n    for i in range(len(unvisited)):\n        dist = np.linalg.norm(current - unvisited[i])\n        \n        if dist < closest_dist:\n            if all(np.linalg.norm(truck - unvisited[i]) > 0 for truck in trucks):\n                closest_dist = dist\n                next_destination = i\n    \n    return next_destination",
+          "objective": 44.21354,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: At each step, calculate the Euclidean distance between the current location of the truck and all unvisited coordinates, then select the unvisited coordinate that minimizes the sum of distances to that coordinate from all other trucks, including itself.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    min_total_distance = float('inf')\n    next_destination = None\n    \n    for i, coord in enumerate(unvisited):\n        total_distance = 0\n        for truck in trucks:\n            total_distance += np.linalg.norm(truck - coord)\n        \n        if total_distance < min_total_distance:\n            min_total_distance = total_distance\n            next_destination = i\n    \n    return next_destination",
+          "objective": 92.44722,
+          "other_inf": null
+     }
+]

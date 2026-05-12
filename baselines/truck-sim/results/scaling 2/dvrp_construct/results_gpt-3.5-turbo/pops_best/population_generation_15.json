@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm involves selecting the next unvisited customer for the current truck by calculating a modified Manhattan distance incorporating penalties for assigned customers and the distance to the depot with different penalty weights, and selecting the customer with the lowest modified distance as the next node for the truck to visit.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    distances = []\n    for customer in unvisited_customers:\n        distance = np.sum(np.abs(np.array(cur_truck_pos) - np.array(customer))**2)\n        for pos in all_truck_pos:\n            if np.all(pos == cur_truck_pos):\n                continue\n            penalty_assigned = 1/ (np.linalg.norm(np.array(pos) - np.array(customer)) + 1)\n            penalty_depot = 1/ (np.linalg.norm(np.array(depot_pos) - np.array(customer)) + 1)\n            distance += 0.6 * penalty_assigned + 0.4 * penalty_depot # Modified penalty weights\n        distances.append(distance)\n    \n    min_distance_idx = np.argmin(distances)\n    best_node = min_distance_idx\n    \n    return best_node",
+     "objective": 31.93143,
+     "other_inf": null
+}

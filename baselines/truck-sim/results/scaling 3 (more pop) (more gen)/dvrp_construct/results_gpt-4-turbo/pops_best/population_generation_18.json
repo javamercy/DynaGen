@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    def distance(p1, p2):\n        return np.linalg.norm(p1 - p2)\n    \n    if not unvisited_customers:\n        return None\n\n    # Initialize lists to store calculated scores\n    combined_scores = []\n    \n    # Calculate scores based on weights combination of distance and inverse square root congestion\n    for idx, customer_pos in enumerate(unvisited_customers):\n        dist_score = distance(cur_truck_pos, customer_pos)\n        \n        # Congestion score based on inverse square function of distances to trucks\n        congestion_score = sum(1 / np.sqrt(distance(truck_pos, customer_pos) + 0.1) for truck_pos in all_truck_pos)\n        \n        # Combine scores with a fixed ratio to adjust influence\n        combined_score = dist_score + 0.2 * congestion_score\n        \n        combined_scores.append((combined_score, idx))\n    \n    # Choose the node with the minimum combined score\n    _, best_node = min(combined_scores, key=lambda x: x[0])\n\n    return best_node",
+     "objective": 32.00377,
+     "other_inf": null
+}

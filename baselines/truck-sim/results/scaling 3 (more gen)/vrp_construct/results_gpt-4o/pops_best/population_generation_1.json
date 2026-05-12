@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the next node by balancing the potential for reducing overall travel distance with the potential for reaching clusters of unvisited nodes, using a weighted score based on the distances from the current node, the depot, and the average distance to nearby unvisited nodes.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    available_nodes = set(unvisited_nodes) - set(truck_nodes)\n    if not available_nodes:\n        return None\n    \n    best_score = float('-inf')\n    next_node = None\n\n    for node in available_nodes:\n        distance_to_current = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        nearby_nodes = [distance_matrix[node][other_node] for other_node in available_nodes if other_node != node]\n        if nearby_nodes:\n            avg_distance_to_nearby = np.mean(nearby_nodes)\n        else:\n            avg_distance_to_nearby = 0\n        \n        score = -distance_to_current + distance_to_depot - avg_distance_to_nearby\n        \n        if score > best_score:\n            best_score = score\n            next_node = node\n    \n    return next_node",
+     "objective": 38.9748,
+     "other_inf": null
+}

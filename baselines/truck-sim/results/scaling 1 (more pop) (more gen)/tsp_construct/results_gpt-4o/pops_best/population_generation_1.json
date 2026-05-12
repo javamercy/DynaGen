@@ -1,0 +1,6 @@
+{
+     "algorithm": "Selects the next node by evaluating based on the ratio of the distance from the current node and the direct distance to the destination, favoring nodes where this ratio is minimized to ensure a progressive yet efficient route.",
+     "code": "import numpy as np\n\n# Backbone idea: Both algorithms consider a node's distance from the current node and its relationship to the destination node.\n\n# {Selects the next node by evaluating based on the ratio of the distance from the current node and the direct distance to the destination, favoring nodes where this ratio is minimized to ensure a progressive yet efficient route.}\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        direct_distance = distance_matrix[current_node, node]\n        to_destination = distance_matrix[node, destination_node]\n        \n        # Calculate the ratio; avoid division by zero\n        ratio = direct_distance / (to_destination + 1e-5)\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n    \n    return next_node",
+     "objective": 9.9253,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "A novel algorithm that selects the next node for a fleet of trucks based on the node that minimizes the ratio between the total distance from itself to the depot and the unvisited nodes, and the average distance between nodes, while also considering the square root of the product of the distance to the depot and the distance to the potential next node.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \n    min_ratio = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        total_distance = current_to_depot + current_to_node\n        if len(truck_nodes) > 0:\n            average_distance = np.mean([distance_matrix[node][next_node] for next_node in truck_nodes])   \n            ratio = total_distance / average_distance\n        else:\n            ratio = total_distance\n        \n        product_sqrt = np.sqrt(current_to_depot * current_to_node)\n        score = ratio * product_sqrt\n        \n        if score < min_ratio:\n            min_ratio = score\n            next_node = node\n    \n    return next_node",
+     "objective": 23.43891,
+     "other_inf": null
+}

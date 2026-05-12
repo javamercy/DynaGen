@@ -1,0 +1,20 @@
+[
+     {
+          "algorithm": "\nDynamic Adaptive Routing (DAR): An algorithm that selects the next node based on current truck position, proximity to nearest customers, anticipated customer additions, and time-delayed decision-making, integrating real-time optimizations and flexibility.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None  # If no customers to visit, return None to indicate wait or potential return to depot.\n    \n    # Calculate distances from current position to all unvisited customers\n    distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    \n    # Determine the nearest customer\n    min_distance_index = np.argmin(distances)\n    \n    # Retrieve the index corresponding to the nearest customer\n    best_node = min_distance_index\n    \n    return best_node",
+          "objective": 44.92087,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm dynamically chooses the next node based on a weighted priority system that factors in proximity, clustering of remaining customers, and current distribution of all trucks; it balances direct efficiency and global efficiency to optimize the complete route.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None  # No customers left to visit\n\n    distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    cluster_values = np.zeros(len(unvisited_customers))\n\n    # Compute a simple 'clustering' heuristic by looking at distances from each unvisited to other unvisits\n    for i in range(len(unvisited_customers)):\n        cluster_distances = np.linalg.norm(unvisited_customers - unvisited_customers[i], axis=1)\n        cluster_values[i] = np.sum(cluster_distances)\n\n    # Normalize values\n    max_dist = np.max(distances) if np.max(distances) > 0 else 1\n    max_cluster_value = np.max(cluster_values) if np.max(cluster_values) > 0 else 1\n\n    distances /= max_dist\n    cluster_values /= max_cluster_value\n\n    # Weighted priority (minimizing) system\n    priority = distances - 0.5 * cluster_values  # Weights can be adjusted\n\n    # Select the index with the lowest priority value\n    best_node = np.argmin(priority)\n\n    return best_node",
+          "objective": 45.66119,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm prioritizes the nearest, unvisited customer from the current position reducing the travel time, and allows waiting based on the density of nearby customers to optimize the utility of trucks' movement.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None  # If no customers are left to visit, possibly end the route or wait for new customers.\n    \n    distances = np.sqrt(((unvisited_customers - cur_truck_pos)**2).sum(axis=1))\n    nearest_index = np.argmin(distances)\n    \n    # Decision to wait at the current position if traffic density (other trucks) is high around this truck\n    truck_distances = np.sqrt(((all_truck_pos - cur_truck_pos)**2).sum(axis=1))\n    if (truck_distances < np.mean(truck_distances)).sum() > len(all_truck_pos) / 2 and len(unvisited_customers) > 10:\n        return None  # Choose to wait\n\n    best_node = nearest_index\n    return best_node",
+          "objective": 89.48829,
+          "other_inf": null
+     }
+]

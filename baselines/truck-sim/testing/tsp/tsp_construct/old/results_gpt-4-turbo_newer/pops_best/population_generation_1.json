@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm will select the next node based on maximizing the ratio between the shortest distance to the destination node and the distance to the next possible node, thus prioritizing nodes that are on or closer to the direct route towards the destination node but are still nearby the current node.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances from current node to all unvisited nodes\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distances from unvisited nodes to the destination node\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculate the ratio of distance to destination over distance to next node from current\n    ratio = unvisited_to_destination / current_to_unvisited\n    \n    # Choose the node with the maximal value of this ratio\n    idx_max = np.argmax(ratio)\n    \n    # Return the next node to visit\n    next_node = unvisited_nodes[idx_max]\n    \n    return next_node",
+     "objective": 6.30341,
+     "other_inf": null
+}

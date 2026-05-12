@@ -1,0 +1,61 @@
+The Vehicle Routing Problem with Time Windows (VRPTW) deals with the distribution of goods between depots and customers using vehicles. The vehicles have a limited capacity. Each customer has to be supplied within the time window associated with the customer and our objective is to minimize the time taken to visit all customers and return to the depot.
+
+Here is a starter code:
+```
+def vrptw(Customers: list[int],
+          Demand: list[int],
+          LowerTimeWindow: list[int],
+          UpperTimeWindow: list[int],
+          Distance: list[list[int]],
+          ServiceTime: list[int],
+          Capacity: int,
+          num_vehicles: int,
+          M: int):
+    """
+    Args:
+        Customers: Set of customers
+        Demand: Demand of customer `i`
+        LowerTimeWindow: Lower Bound of the Time Window of customer `i`
+        UpperTimeWindow: Upper Bound of the Time Window of customer `i`
+        Distance: Distance or cost between pair of customer `i` and customer `j`
+        ServiceTime: Service _time at customer `i`
+        Capacity: Capacity of the vehicles
+        num_vehicles: Number of vehicles available
+        M: A large constant
+
+    Returns:
+        FinishTime: The time when the last truck arrives back at the depot
+    """
+    # To be implemented
+    FinishTime = M
+
+    return FinishTime
+```
+Provide an LP or MIP model for this problem with explanations for each parameter then implement the model following the format of the given code example strictly. No code is required outside the function except for the import package (no test code).
+
+The following is an example input and output for the code:
+```json
+{
+    "input": {
+        "Customers": [ 0, 1, 2, 3, 4, 5, 6, 7, 8 ],
+        "Demand": [ 0, 15, 25, 18, 22, 12, 28, 20, 16 ],
+        "LowerTimeWindow": [ 0, 85, 120, 160, 95, 55, 190, 140, 75 ],
+        "UpperTimeWindow": [ 480, 175, 210, 255, 185, 145, 290, 235, 165 ],
+        "ServiceTime": [ 0, 15, 12, 18, 14, 16, 13, 17, 15 ],
+        "Distance": [
+            [ 0, 45, 62, 38, 55, 28, 70, 42, 33 ],
+            [ 45, 0, 35, 28, 48, 32, 25, 55, 40 ],
+            [ 62, 35, 0, 42, 30, 45, 38, 28, 52 ],
+            [ 38, 28, 42, 0, 35, 22, 45, 32, 28 ],
+            [ 55, 48, 30, 35, 0, 38, 42, 25, 45 ],
+            [ 28, 32, 45, 22, 38, 0, 35, 42, 30 ],
+            [ 70, 25, 38, 45, 42, 35, 0, 38, 45 ],
+            [ 42, 55, 28, 32, 25, 42, 38, 0, 35 ],
+            [ 33, 40, 52, 28, 45, 30, 45, 35, 0 ] ],
+        "Capacity": 100,
+        "num_vehicles": 3,
+        "M": 1000000
+    },
+    "output": 273
+}
+```

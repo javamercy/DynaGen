@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node based on the node with the highest demand and proximity to the current node, incorporating a penalty for nodes that are frequently visited by other trucks to optimize route planning efficiency.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n\n            if proximity_penalty < min_penalty:\n                min_penalty = proximity_penalty\n                next_node = node\n    \n    return next_node",
+     "objective": 27.33842,
+     "other_inf": null
+}

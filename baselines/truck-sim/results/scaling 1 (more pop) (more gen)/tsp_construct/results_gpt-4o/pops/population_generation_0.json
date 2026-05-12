@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "Design an algorithm that selects the next node based on minimizing the ratio of the distance to the unvisited destination node to the remaining distance to the final destination, thus balancing the immediate travel cost and the ultimate goal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        remaining_distance_to_dest = distance_matrix[node, destination_node]\n        ratio = distance_to_node / (1 + remaining_distance_to_dest)\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 13.96932,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next unvisited node with the shortest distance from the current node, considering the destination node to form a potentially optimal path.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        # Calculate the direct distance and the detour distance through the destination node\n        direct_distance = distance_matrix[current_node, node]\n        detour_distance = (distance_matrix[current_node, destination_node] + \n                           distance_matrix[destination_node, node])\n        \n        # Choose the smaller distance to consider for the next step\n        effective_distance = min(direct_distance, detour_distance)\n        \n        if effective_distance < min_distance:\n            min_distance = effective_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by choosing the one that minimizes the combined distance from the current node and a potential direct distance to the destination node, adjusted with a factor that promotes overall shorter detours, aiming to balance between immediate proximity and strategic progress towards the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    balance_factor = 0.5  # A factor to balance local proximity and overall progress\n    min_cost = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        direct_distance = distance_matrix[current_node, node]\n        potential_to_destination = distance_matrix[node, destination_node]\n        \n        cost = direct_distance + balance_factor * potential_to_destination\n        \n        if cost < min_cost:\n            min_cost = cost\n            next_node = node\n            \n    return next_node",
+          "objective": 23.75222,
+          "other_inf": null
+     },
+     {
+          "algorithm": "To select the next node, the algorithm prioritizes nodes that minimize the weighted sum of immediate distance and distance difference to a given destination node, considering unexplored nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    alpha = 0.5  # weighting factor between immediate distance and distance difference\n    min_weighted_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        immediate_distance = distance_matrix[current_node, node]\n        distance_to_destination_from_current = distance_matrix[current_node, destination_node]\n        distance_to_destination_from_node = distance_matrix[node, destination_node]\n        \n        weighted_distance = (alpha * immediate_distance +\n                             (1 - alpha) * abs(distance_to_destination_from_node - distance_to_destination_from_current))\n        \n        if weighted_distance < min_weighted_distance:\n            min_weighted_distance = weighted_distance\n            next_node = node\n            \n    return next_node",
+          "objective": 24.84359,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The novel algorithm \"Destination-Aware Weighted Choice\" selects the next node by considering both proximity to the current node and the remaining distance to the destination node, applying a weighted scoring system to balance local and global proximity.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Weights for the scoring system, these can be adjusted for different behavior\n    weight_current = 0.7\n    weight_destination = 0.3\n    \n    scores = []\n    \n    for node in unvisited_nodes:\n        # Calculate the score for this node based on distance to current and destination\n        dist_to_current = distance_matrix[current_node, node]\n        dist_to_destination = distance_matrix[node, destination_node]\n        \n        score = (weight_current * dist_to_current) + (weight_destination * dist_to_destination)\n        scores.append((score, node))\n    \n    # Select the node with the lowest score as the next node\n    next_node = min(scores, key=lambda x: x[0])[1]\n    \n    return next_node",
+          "objective": 26.35373,
+          "other_inf": null
+     },
+     {
+          "algorithm": "A novel algorithm named \"Curiosity Navigation\" selects the next node by balancing the curiosity to explore lesser-visited nodes with the need to ultimately head towards the predetermined endpoint, essentially blending a greedy approach with spatial curiosity.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Define weights for curiosity vs heading towards destination\n    curiosity_weight = 0.7\n    destination_weight = 0.3\n    \n    # Calculate distances from the current node to all unvisited nodes\n    distances_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distances from unvisited nodes to the destination\n    distances_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Normalize distances to avoid bias by absolute distances\n    max_distance_to_unvisited = np.max(distances_to_unvisited) if distances_to_unvisited.size > 0 else 1\n    max_distance_to_destination = np.max(distances_to_destination) if distances_to_destination.size > 0 else 1\n    \n    normalized_distances_to_unvisited = distances_to_unvisited / max_distance_to_unvisited\n    normalized_distances_to_destination = distances_to_destination / max_distance_to_destination\n    \n    # Calculate scores with curiosity and destination considerations\n    scores = curiosity_weight * (1 - normalized_distances_to_unvisited) + destination_weight * (1 - normalized_distances_to_destination)\n    \n    # Select the unvisited node with the highest score\n    highest_score_index = np.argmax(scores)\n    next_node = unvisited_nodes[highest_score_index]\n    \n    return next_node",
+          "objective": 27.00909,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My novel algorithm selects the next node by calculating a weighted score that combines the inverse distance to the destination and inverse distance from the current node, prioritizing nodes that move us towards the destination while maintaining a balanced traversal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    weights = []\n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n        \n        # Avoid division by zero and prevent node from being too close to current or destination\n        if distance_to_current == 0 or distance_to_destination == 0:\n            continue\n        \n        score = 1 / distance_to_current + 1 / distance_to_destination\n        weights.append((node, score))\n    \n    # Select the node with the highest weighted score\n    next_node = max(weights, key=lambda x: x[1])[0]\n    \n    return next_node",
+          "objective": 27.46492,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by minimizing the product of the distance from the current node and the distance to the destination node, thereby forming an optimal step considering both immediate proximity and overall tour completion.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = float('inf')\n    next_node = None\n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node, node]\n        dist_from_node_to_dest = distance_matrix[node, destination_node]\n        product = dist_to_node * dist_from_node_to_dest\n        if product < min_product:\n            min_product = product\n            next_node = node\n    return next_node",
+          "objective": 28.02198,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The novel algorithm, named \"Gravity-Pull Selection\", combines the gravitational pull analogy with a weighted preference towards the destination node by calculating a pseudo-gravitational pull for each unvisited node based on its distance to the current node and prioritizes nodes that create a more direct path to the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    gravitational_pulls = []\n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n        \n        # Calculate gravitational pull as a function of closeness and alignment to the destination\n        gravitational_pull = (1 / (distance_to_current ** 2)) + (1 / (distance_to_destination ** 2))\n        gravitational_pulls.append(gravitational_pull)\n    \n    # Choose the node with the maximum gravitational pull\n    best_index = np.argmax(gravitational_pulls)\n    next_node = unvisited_nodes[best_index]\n    \n    return next_node",
+          "objective": 28.4093,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node based on a weighted combination of the distance to the destination node and the distance from the current node, balancing between immediate travel cost and future benefit towards the end goal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    alpha = 0.5  # Weight parameter to balance between minimizing current distance and future benefit\n    min_cost = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_node = distance_matrix[current_node, node]\n        node_to_destination = distance_matrix[node, destination_node]\n        cost = alpha * current_to_node + (1 - alpha) * node_to_destination\n        \n        if cost < min_cost:\n            min_cost = cost\n            next_node = node\n            \n    return next_node",
+          "objective": 40.85044,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n\n    # Environmental Awareness Algorithm using inverse distance attractiveness and an attraction to the center of mass of all unvisited nodes\n    center_of_mass = np.mean(unvisited_nodes)\n    \n    # Calculate distances to unvisited nodes\n    distances = distance_matrix[current_node, unvisited_nodes]\n    inverse_distances = 1 / distances\n\n    # Calculate attractiveness based on how close nodes are to the center of mass\n    center_attraction = np.abs(unvisited_nodes - center_of_mass)\n    \n    # Normalize scores\n    normalized_inverse_distances = inverse_distances / np.max(inverse_distances)\n    normalized_center_attraction = center_attraction / np.max(center_attraction)\n\n    # Combine scores with a bias towards inverse distance\n    scores = 0.7 * normalized_inverse_distances + 0.3 * (1 - normalized_center_attraction)\n\n    # Select node with highest score\n    next_node_index = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+     "objective": 33.26971,
+     "other_inf": null
+}

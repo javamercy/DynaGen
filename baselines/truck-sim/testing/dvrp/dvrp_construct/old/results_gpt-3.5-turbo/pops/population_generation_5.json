@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next coordinate based on the closest unvisited coordinate to the current truck position, while also considering the positions of the other trucks to avoid overlap, and occasionally choosing to stay at the current location to wait if necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    closest_dist = float('inf')\n    next_destination = None\n    \n    for i in range(len(unvisited)):\n        dist = np.linalg.norm(current - unvisited[i])\n        \n        if dist < closest_dist:\n            if all(np.linalg.norm(truck - unvisited[i]) > 0 for truck in trucks):\n                closest_dist = dist\n                next_destination = i\n    \n    return next_destination",
+          "objective": 44.21354,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis new algorithm prioritizes visiting coordinates that are closest to the current position while also considering the distances from the other trucks, but it introduces a different parameter setting in the score function by taking into account the Euclidean distance instead of the Manhattan distance and multiplying it by the inverse of the sum of the distances from the other trucks to the coordinate.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current, destination, trucks, unvisited):\n    max_dist = float('inf')\n    next_destination = None\n    \n    # Determine exploration factor\n    explore = random.random()\n    \n    if explore < 0.1:  # 10% chance to explore randomly\n        next_destination = random.randint(0, len(unvisited) - 1)\n    else:\n        for i, coord in enumerate(unvisited):\n            euclidean_dist = np.linalg.norm(current - coord)\n            dist_from_trucks_sum = sum([np.linalg.norm(truck - coord) for truck in trucks])\n            score = euclidean_dist * (1 / (dist_from_trucks_sum + 1))  # New scoring function\n            \n            if score < max_dist:\n                max_dist = score\n                next_destination = i\n    \n    return next_destination",
+          "objective": 45.66611,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to select the next coordinate to visit by calculating the minimum Manhattan distance from the current location to the potential destinations, with a consideration of the distance from other trucks taken into account using a weighted sum of Euclidean and Manhattan distances.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    min_dist = float('inf')\n    next_destination = None\n    \n    for i, coord in enumerate(unvisited):\n        manhattan_dist = abs(current[0] - coord[0]) + abs(current[1] - coord[1])\n        euclidean_dist = np.linalg.norm(current - coord) + np.linalg.norm(destination - coord)\n        dist_from_trucks = sum([np.linalg.norm(truck - coord) for truck in trucks])\n        \n        total_dist = 0.6*euclidean_dist + 0.4*manhattan_dist + dist_from_trucks\n        \n        if total_dist < min_dist:\n            min_dist = total_dist\n            next_destination = i\n    \n    return next_destination",
+          "objective": 60.62946,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My algorithm selects the next coordinate based on the minimum Manhattan distance between the current location and all unvisited coordinates, while also considering the distances from the other trucks and occasionally choosing to skip to the next coordinate without visiting if necessary.",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    min_dist = float('inf')\n    next_destination = None\n    \n    for i, coord in enumerate(unvisited):\n        manhattan_dist = np.abs(current[0] - coord[0]) + np.abs(current[1] - coord[1])\n        dist_from_trucks = sum([np.linalg.norm(truck - coord) for truck in trucks])\n        \n        if manhattan_dist + dist_from_trucks < min_dist:\n            min_dist = manhattan_dist + dist_from_trucks\n            next_destination = i\n    \n    return next_destination",
+          "objective": 62.52125,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis new algorithm prioritizes visiting coordinates that are closest to the current position while also considering the distances from the other trucks, but it introduces a random exploration factor by occasionally selecting a random unvisited coordinate.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current, destination, trucks, unvisited):\n    min_dist = float('inf')\n    next_destination = None\n    \n    # Determine exploration factor\n    explore = random.random()\n    \n    if explore < 0.1:  # 10% chance to explore randomly\n        next_destination = random.randint(0, len(unvisited) - 1)\n    else:\n        for i, coord in enumerate(unvisited):\n            manhattan_dist = np.abs(current[0] - coord[0]) + np.abs(current[1] - coord[1])\n            dist_from_trucks = sum([np.linalg.norm(truck - coord) for truck in trucks])\n            \n            if manhattan_dist + dist_from_trucks < min_dist:\n                min_dist = manhattan_dist + dist_from_trucks\n                next_destination = i\n    \n    return next_destination",
+          "objective": 65.36831,
+          "other_inf": null
+     }
+]

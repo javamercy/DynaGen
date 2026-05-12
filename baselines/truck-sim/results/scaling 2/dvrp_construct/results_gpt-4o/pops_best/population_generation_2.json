@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    # Calculate distances from current truck position to each unvisited customer\n    distances = [np.linalg.norm(cur_truck_pos - customer) for customer in unvisited_customers]\n\n    # Calculate influence of other truck positions on each unvisited customer\n    influence = [sum(np.exp(-np.linalg.norm(customer - other_truck)**2) for other_truck in all_truck_pos) for customer in unvisited_customers]\n    \n    # Updated score function using influence and distance\n    influence_factor = 0.3 + 0.5 / len(unvisited_customers)\n    distance_factor = 1.0 - influence_factor\n    \n    weighted_score = [distance_factor * dist + influence_factor * inf for dist, inf in zip(distances, influence)]\n    best_node = np.argmin(weighted_score)\n    \n    return best_node",
+     "objective": 36.22633,
+     "other_inf": null
+}

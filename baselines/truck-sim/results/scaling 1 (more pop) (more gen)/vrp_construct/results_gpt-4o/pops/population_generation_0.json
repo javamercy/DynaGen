@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "The algorithm iteratively assigns the nearest unvisited node to the current node that no other truck is targeting,\n     or makes the truck wait if no such node is available.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \"\"\"\n    {The algorithm iteratively assigns the nearest unvisited node to the current node that no other truck is targeting,\n     or makes the truck wait if no such node is available.}\n    \"\"\"\n    # Calculate distances from the current node to all unvisited nodes\n    distances_to_unvisited = [(node, distance_matrix[current_node, node]) for node in unvisited_nodes]\n\n    # Sort the unvisited nodes by distance\n    distances_to_unvisited.sort(key=lambda x: x[1])\n\n    for node, distance in distances_to_unvisited:\n        # Check if no other truck is targeting this node\n        if node not in truck_nodes:\n            return node\n    \n    # If no suitable node is found, return None to indicate the truck should wait\n    return next_node",
+          "objective": 36.29146,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node for a truck by considering unvisited nodes weighted by their distances from the current node and the depot node, preferring closer nodes to balance coverage and path length, or waits if no beneficial move is available.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    min_distance = float('inf')\n    next_node = None\n\n    for node in unvisited_nodes:\n        if node in truck_nodes:\n            continue\n\n        distance_to_node = distance_matrix[current_node, node]\n        distance_from_node_to_depot = distance_matrix[node, depot_node]\n\n        weighted_distance = distance_to_node + distance_from_node_to_depot\n\n        if weighted_distance < min_distance:\n            min_distance = weighted_distance\n            next_node = node\n\n    return next_node",
+          "objective": 53.34352,
+          "other_inf": null
+     }
+]

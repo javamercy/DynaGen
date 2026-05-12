@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm modifies the decision-making process by weighing both the direct distance to customers and a dynamically scaled factor of the minimum distance from any other truck to the customer, aiming to balance between efficient routing and effective distribution.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None  # If there are no unvisited customers, return None to indicate waiting\n\n    priority_scores = []\n\n    for customer in unvisited_customers:\n        distance_to_customer = np.linalg.norm(customer - cur_truck_pos)\n        distances_to_other_trucks = np.array([np.linalg.norm(customer - truck_pos) for truck_pos in all_truck_pos if not np.array_equal(truck_pos, cur_truck_pos)])\n        closest_distance_to_other_truck = np.min(distances_to_other_trucks) if distances_to_other_trucks.size > 0 else float('inf')\n        \n        # Newly added dynamic scaling factor\n        dynamic_factor = np.log1p(closest_distance_to_other_truck)\n        score = distance_to_customer - dynamic_factor\n        priority_scores.append(score)\n\n    best_node = np.argmin(priority_scores)\n    \n    return best_node",
+     "objective": 31.12298,
+     "other_inf": null
+}

@@ -1,0 +1,26 @@
+[
+     {
+          "algorithm": "\nPropose an algorithm that selects the next node based on the following steps: \n1. Calculate the distance between the current node and all unvisited nodes.\n2. Exclude the destination node from the list of unvisited nodes.\n3. Select the next node as the one with the shortest distance from the current node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    distances = np.delete(distances, np.where(unvisited_nodes == destination_node)) if destination_node in unvisited_nodes else distances\n    next_node = unvisited_nodes[np.argmin(distances)]\n    return next_node",
+          "objective": 6.60788,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node by considering the Euclidean distance between the current node and the unvisited nodes, prioritizing nodes that are closer to the current node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = np.linalg.norm(distance_matrix[current_node] - distance_matrix[unvisited_nodes], axis=1)\n    next_node = unvisited_nodes[np.argmin(distances)]\n    return next_node",
+          "objective": 6.73716,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nSelect the next node by calculating the product of the Euclidean distance between the current node and unvisited nodes and the distance between the unvisited nodes and the destination node, biasing towards nodes with a higher combined distance.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_current = np.linalg.norm(distance_matrix[current_node] - distance_matrix[unvisited_nodes], axis=1)\n    distances_to_destination = np.linalg.norm(distance_matrix[destination_node] - distance_matrix[unvisited_nodes], axis=1)\n    scores = distances_to_current * distances_to_destination\n    next_node = unvisited_nodes[np.argmin(scores)]\n    return next_node",
+          "objective": 7.53382,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nSelect the next node by calculating a weighted combination of the Euclidean distance between the current node and unvisited nodes and the distance between the unvisited nodes and the destination node, biasing towards nodes that are closer to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_current = np.linalg.norm(distance_matrix[current_node] - distance_matrix[unvisited_nodes], axis=1)\n    distances_to_destination = np.linalg.norm(distance_matrix[destination_node] - distance_matrix[unvisited_nodes], axis=1)\n    weights = distances_to_current + distances_to_destination\n    next_node = unvisited_nodes[np.argmin(weights)]\n    return next_node",
+          "objective": 7.54407,
+          "other_inf": null
+     }
+]

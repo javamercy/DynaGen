@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm will prioritize visiting customers with approaching time windows while penalizing missing time windows and incorporating a penalty for the distance traveled by the truck, aiming to minimize the overall time it takes for all trucks to finish. The new parameter settings for the score function will assign a higher weight to the distance traveled by the truck compared to the original algorithm.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_score = float('inf')\n    \n    for i, customer in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer)\n        travel_time = dist / truck_speed\n        distance_penalty = dist * 0.5  # New parameter setting\n        deadline = (time_windows[i][1] - current_time) if current_time < time_windows[i][1] else 0\n        wait_time = max(time_windows[i][0] - (current_time + travel_time), 0)\n        \n        score = dist + travel_time + wait_time + deadline + distance_penalty\n        if score < best_score:\n            best_node = i\n            best_score = score\n    \n    return best_node",
+     "objective": 112.27319,
+     "other_inf": null
+}

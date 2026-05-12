@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nCreate a new algorithm that penalizes edges differently based on the product of their length and the number of times they have been used, with a higher penalty factor to encourage exploration of shorter routes and avoid local optima.\n",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    penalty_factor = 0.2\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            edge_length = edge_distance[edge_id[0], edge_id[1]]\n            edge_penalty = penalty_factor * edge_length * edge_n_used[edge_id[0], edge_id[1]]\n            updated_edge_distance[edge_id[0], edge_id[1]] += edge_penalty\n            updated_edge_distance[edge_id[1], edge_id[0]] += edge_penalty\n    \n    return updated_edge_distance",
+     "objective": 16.9938,
+     "other_inf": null
+}

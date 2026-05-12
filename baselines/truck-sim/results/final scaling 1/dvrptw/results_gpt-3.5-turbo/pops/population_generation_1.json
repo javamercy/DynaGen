@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "My new algorithm selects the next node for a truck to visit by prioritizing nodes that are closer in distance, within their time windows, and have not been visited by other trucks, while also introducing a dynamic factor that adjusts the weight of each criterion based on the current state of the route.",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer_pos)\n        dist_weight = 0.6\n        time_weight = 0.3\n        unique_weight = 0.1\n        \n        arrival_time = current_time + dist / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        cost = dist * dist_weight + (arrival_time + wait_time + service_time) * time_weight + len(all_truck_pos) / len(unvisited_customers) * unique_weight\n        \n        if cost < min_time:\n            min_time = cost\n            best_node = i\n    \n    return best_node",
+          "objective": 105.28516,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm selects the next node for a truck to visit by prioritizing nodes based on a combination of distance, time windows, and the inverse proportion of the number of visited nodes to the total number of unvisited nodes, with a weight of 0.5 for distance, 0.4 for time windows, and 0.1 for the unique factor.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_score = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer_pos)\n        dist_weight = 0.5\n        time_weight = 0.4\n        unique_weight = 0.1\n        \n        arrival_time = current_time + dist / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        score = dist * dist_weight + (wait_time + service_time) * time_weight + (len(unvisited_customers) - len(all_truck_pos)) / len(unvisited_customers) * unique_weight\n        \n        if score < min_score:\n            min_score = score\n            best_node = i\n    \n    return best_node",
+          "objective": 105.64281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm aims to prioritize nodes that are within their time windows, have not been visited by other trucks, and are closer in distance, with a modified scoring function that includes a higher weight for the time factor and a lower weight for the distance factor, as well as a unique weight factor for the number of unvisited customers.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer_pos)\n        dist_weight = 0.3\n        time_weight = 0.6\n        unique_weight = 0.1\n        \n        arrival_time = current_time + dist / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        cost = dist * dist_weight + (arrival_time + wait_time + service_time) * time_weight + len(all_truck_pos) / len(unvisited_customers) * unique_weight\n        \n        if cost < min_time:\n            min_time = cost\n            best_node = i\n    \n    return best_node",
+          "objective": 110.60923,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm is based on a combination of nearest neighbor and time window constraints, where the truck selects the next node to visit by considering the time window, distance, and waiting time at each node before making a decision.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        arrival_time = current_time + np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        if arrival_time + wait_time + service_time < min_time:\n            min_time = arrival_time + wait_time + service_time\n            best_node = i\n    \n    return best_node",
+          "objective": 116.94814,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm prioritizes nodes that are within their time windows, have not been visited by other trucks, and dynamically adjusts the weight of each criterion based on the current state of the route, while also incorporating a random factor to introduce exploration in the decision-making process.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer_pos)\n        dist_weight = 0.6\n        time_weight = 0.3\n        unique_weight = 0.1\n        \n        arrival_time = current_time + dist / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        cost = dist * dist_weight + (arrival_time + wait_time + service_time) * time_weight + len(all_truck_pos) / len(unvisited_customers) * unique_weight + random.uniform(-0.1, 0.1)\n        \n        if cost < min_time:\n            min_time = cost\n            best_node = i\n    \n    return best_node",
+          "objective": 120.71524,
+          "other_inf": null
+     }
+]

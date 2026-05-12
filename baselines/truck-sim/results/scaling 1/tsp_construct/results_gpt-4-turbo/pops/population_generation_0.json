@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "Select the next_node by combining a weighted average of distances to the destination node and distances to the unvisited nodes, placing higher priority on proximity to the destination when close, but initially favoring shorter paths to unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n\n    weights_to_destination = np.array([\n        np.exp(-distance_matrix[current_node][node]) for node in unvisited_nodes\n    ])\n    weights_to_unvisited = np.array([\n        1 / (distance_matrix[current_node][node] + 1e-5) for node in unvisited_nodes\n    ])\n    \n    total_weights = weights_to_destination + weights_to_unvisited\n    \n    next_node_idx = np.argmax(total_weights)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Novel algorithm: In each step, prioritize nodes based on a weighted combination of their distance from the current node and an exponentially decreasing weight of their direct distance to the destination node, aiming to balance exploration and destination-directedness.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_current = distance_matrix[current_node, unvisited_nodes]\n    distances_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Exponential decay factor for destination influence\n    alpha = 0.5\n    weighted_distances = distances_to_current + alpha * distances_to_destination\n\n    next_node_index = np.argmin(weighted_distances)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 23.75222,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My novel algorithm selects the next node as the one that minimizes the weighted sum of the distances to both the next immediate unvisited node and the final destination node, adjusting priorities dynamically during traversal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n    \n    # Weights for distance to the next possible nodes and to the final destination\n    weight_to_next = 0.7\n    weight_to_destination = 0.3\n    \n    # Calculate weighted distances for each unvisited node\n    weighted_distances = weight_to_next * distance_matrix[current_node, unvisited_nodes] + weight_to_destination * distance_matrix[unvisited_nodes, destination_node]\n    \n    # Get node with minimum weighted distance\n    min_index = np.argmin(weighted_distances)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 26.35373,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node weighted inversely by the distance from the current node and directly by the potential progress towards the destination node, preferring closer nodes while ensuring advancement toward the final destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    destination_distances = distance_matrix[destination_node, unvisited_nodes]\n\n    # Weight distances inversely and destination attraction directly\n    weights = 1 / (current_distances + 1e-5) * (1 / (destination_distances + 1e-5))\n\n    # Normalize the weights for probability distribution\n    weights /= np.sum(weights)\n    \n    # Choose the next node based on maximum weight\n    max_index = np.argmax(weights)\n    next_node = unvisited_nodes[max_index]\n\n    return next_node",
+          "objective": 28.02198,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm chooses the next node based on a weighted scoring system that prioritizes proximity to the current node and the destination node, integrating both considerations into a decision-making framework to optimize route planning.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    \n    # Priority is given to the distances to current_node and destination_node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Compute scores as weighted averages\n    weights_current = 0.6\n    weights_destination = 0.4\n    scores = weights_current * current_distances + weights_destination * destination_distances\n    \n    # Select node with the minimum score\n    min_index = np.argmin(scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 33.09454,
+          "other_inf": null
+     }
+]

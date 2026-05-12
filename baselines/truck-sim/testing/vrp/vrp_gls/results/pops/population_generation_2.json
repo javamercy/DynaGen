@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "\nCreate a new edge distance matrix by penalizing edges based on the inverse of the frequency they appear in the local optimal tours, adjusting the penalties dynamically to encourage exploration and discourage being trapped in local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)):\n            node1 = tour[i]\n            node2 = tour[(i+1) % len(tour)]\n            penalty = 1 / (edge_n_used[node1, node2] + edge_n_used[node2, node1])\n            updated_edge_distance[node1, node2] += penalty\n            updated_edge_distance[node2, node1] += penalty\n    \n    return updated_edge_distance",
+          "objective": 156.15525,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nCreate a new edge distance matrix by penalizing edges based on the frequency they appear in the local optimal tours, adjusting the penalties dynamically to encourage exploration and discourage being trapped in local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)):\n            node1 = tour[i]\n            node2 = tour[(i+1) % len(tour)]\n            penalty = edge_n_used[node1, node2] + edge_n_used[node2, node1]\n            updated_edge_distance[node1, node2] += penalty\n            updated_edge_distance[node2, node1] += penalty\n    \n    return updated_edge_distance",
+          "objective": 156.50545,
+          "other_inf": null
+     }
+]

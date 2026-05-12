@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy algorithm selects the next node based on the shortest distance to any unvisited node, favoring nodes that are closer to the depot, with a bias towards nodes that have been unvisited for a longer duration.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        node_age = np.where(truck_nodes == node)[0] if node in truck_nodes else 0\n        \n        distance_score = dist_to_node + 0.1*dist_to_depot + 0.01*node_age\n        \n        if distance_score < min_distance:\n            min_distance = distance_score\n            next_node = node\n    \n    return next_node",
+     "objective": 31.73079,
+     "other_inf": null
+}

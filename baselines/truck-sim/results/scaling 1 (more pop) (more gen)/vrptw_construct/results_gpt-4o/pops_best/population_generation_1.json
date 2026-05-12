@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm prioritizes visiting customers with the earliest ending time windows while balancing travel distance to minimize wait times and penalties.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_cost = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        arrival_time = current_time + travel_time\n        window_start, window_end = time_windows[i]\n\n        if arrival_time > window_end:\n            continue\n\n        wait_time = max(0, window_start - arrival_time)\n        cost = travel_time + wait_time\n\n        if cost < min_cost:\n            min_cost = cost\n            best_node = i\n\n    return best_node",
+     "objective": 153.06951,
+     "other_inf": null
+}

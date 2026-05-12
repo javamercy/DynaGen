@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the next unvisited node by considering a combined score of direct distance, estimated benefit of visiting neighboring nodes, and a bonus for moving toward the destination node.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_score = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        # Calculate the direct distance\n        direct_distance = distance_matrix[current_node, node]\n        \n        # Estimate benefit by averaging distances to other unvisited nodes\n        neighbors_benefit = np.mean([distance_matrix[node, neighbor] for neighbor in unvisited_nodes if neighbor != node])\n        \n        # Calculate a bonus for moving toward the destination node\n        toward_destination_bonus = -distance_matrix[node, destination_node]\n        \n        # Calculate score considering direct distance, neighboring benefit, and destination bonus\n        score = direct_distance - 0.5 * neighbors_benefit + 0.3 * toward_destination_bonus\n        \n        if score < min_score:\n            min_score = score\n            next_node = node\n    \n    return next_node",
+     "objective": 9.47563,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm selects the next node by blending the direct shortest path distance to unvisited nodes with a heuristic based on how many nodes are closer to the destination from each candidate node, weighted by each candidate node's proximity to the destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Count of nodes closer to the destination for each unvisited node\n    closer_counts = np.sum(distance_matrix[unvisited_nodes][:, unvisited_nodes] < unvisited_to_destination[:, None], axis=1)\n    \n    # Calculate selection score: contribution of distance to efficiency, adjusted by the count of nodes closer to the destination\n    selection_scores = current_to_unvisited * (1 / (unvisited_to_destination + 1e-10)) * (1 + 0.1 * closer_counts)\n    \n    # Select the node with the minimal selection score\n    min_index = np.argmin(selection_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+     "objective": 6.13203,
+     "other_inf": null
+}

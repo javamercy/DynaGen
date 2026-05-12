@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "\nOur algorithm, named 'SmartNextNode', selects the next node based on the node that is closest to the current node while taking into account the unvisited nodes, destination nodes, and also considers the potential waiting time at certain nodes to optimize truck routes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < min_distance:\n            if node not in truck_nodes or node == destination_node:\n                next_node = node\n                min_distance = distance_matrix[current_node][node]\n    \n    if next_node is None:\n        for node in unvisited_nodes:\n            if distance_matrix[current_node][node] + distance_matrix[node][destination_node] < min_distance:\n                if node not in truck_nodes:\n                    next_node = node\n                    min_distance = distance_matrix[current_node][node] + distance_matrix[node][destination_node]\n    \n    return next_node",
+          "objective": 37.64581,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nDescription: This algorithm selects the next node by finding the unvisited node with the shortest total distance (distance to current node + distance to destination node) and checks if it is reachable by any of the trucks.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    min_total_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance = distance_matrix[current_node][node] + distance_matrix[node][destination_node]\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if total_distance < min_total_distance and is_reachable:\n            min_total_distance = total_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 54.51195,
+          "other_inf": null
+     }
+]

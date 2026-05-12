@@ -1,0 +1,8 @@
+[
+     {
+          "algorithm": "The algorithm selects the next node based on the minimum angle change needed for the truck from its current direction, aiming to maintain a smooth routing path while prioritizing unvisited nodes closer to the current position.",
+          "code": "import numpy as np\n\ndef calculate_angle(current, destination, node):\n    vec_1 = np.array(destination) - np.array(current)\n    vec_2 = np.array(node) - np.array(current)\n    unit_vec_1 = vec_1 / np.linalg.norm(vec_1) if np.linalg.norm(vec_1) != 0 else vec_1\n    unit_vec_2 = vec_2 / np.linalg.norm(vec_2) if np.linalg.norm(vec_2) != 0 else vec_2\n    dot_product = np.dot(unit_vec_1, unit_vec_2)\n    dot_product = np.clip(dot_product, -1.0, 1.0)\n    angle = np.arccos(dot_product)\n    return np.degrees(angle)\n\ndef select_next_node(current, destination, trucks, unvisited):\n    if not unvisited:\n        return None\n\n    min_score = float('inf')\n    next_destination = None\n\n    for idx, node in enumerate(unvisited):\n        angle_change = calculate_angle(current, destination, node)\n        distance = np.linalg.norm(np.array(node) - np.array(current))\n        score = angle_change + distance\n\n        if score < min_score:\n            min_score = score\n            next_destination = idx\n\n    return next_destination",
+          "objective": 202.13117,
+          "other_inf": null
+     }
+]

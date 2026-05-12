@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the difference between the distance to the current node and the destination node, with a penalty that increases as the distance to the current node decreases.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    penalty_factor = 0.5\n    avail_nodes = np.copy(unvisited_nodes)\n    avail_nodes = avail_nodes[avail_nodes != current_node]\n    \n    if len(avail_nodes) == 1:\n        return avail_nodes.item()\n    \n    curr_dist = distance_matrix[current_node, avail_nodes]\n    dest_dist = distance_matrix[destination_node, avail_nodes]\n    \n    scores = curr_dist - dest_dist + penalty_factor/(1/np.abs(curr_dist))\n\n    next_node = avail_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 29.62765,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the closest distance to the current node, the destination node, and the unvisited nodes with a lower weight given to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    available_nodes = np.copy(unvisited_nodes)\n    available_nodes = available_nodes[available_nodes != current_node]\n    \n    if len(available_nodes) == 1:\n        return available_nodes.item()\n    \n    current_dist = distance_matrix[current_node, available_nodes]\n    dest_dist = distance_matrix[destination_node, available_nodes]\n    \n    scores = current_dist - dest_dist * 0.5\n    \n    next_node = available_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 31.54531,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by considering the distance to the current node, the destination node, and the unvisited nodes, with a weighted penalty based on the difference between the distances from the current and destination nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    available_nodes = np.copy(unvisited_nodes)\n    available_nodes = available_nodes[available_nodes != current_node]\n    \n    if len(available_nodes) == 1:\n        return available_nodes.item()\n    \n    current_dist = distance_matrix[current_node, available_nodes]\n    dest_dist = distance_matrix[destination_node, available_nodes]\n    \n    scores = current_dist - dest_dist * 0.8\n    \n    next_node = available_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 32.35029,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the ratio of the distance to the current node and the distance to the destination node for each neighbor, in addition to the number of unvisited neighbors each node has.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    available_nodes = np.copy(unvisited_nodes)\n    available_nodes = available_nodes[available_nodes != current_node]\n    \n    if len(available_nodes) == 1:\n        return available_nodes.item()\n    \n    current_dist = distance_matrix[current_node, available_nodes]\n    dest_dist = distance_matrix[destination_node, available_nodes]\n    \n    num_unvisited_neighbors = np.zeros(len(available_nodes))\n    for i, node in enumerate(available_nodes):\n        num_unvisited_neighbors[i] = np.count_nonzero(unvisited_nodes == node)\n    \n    ratios = np.divide(current_dist, dest_dist)\n    \n    scores = ratios + num_unvisited_neighbors\n    \n    next_node = available_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 32.62298,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm prioritizes visiting nodes that are closer to the current node with a bias towards unvisited nodes close to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    available_nodes = np.copy(unvisited_nodes)\n    available_nodes = available_nodes[available_nodes != current_node]\n    \n    if len(available_nodes) == 1:\n        return available_nodes.item()\n    \n    current_dist = distance_matrix[current_node, available_nodes]\n    dest_dist = distance_matrix[destination_node, available_nodes]\n    \n    scores = current_dist + 1/(np.exp(dest_dist))\n    \n    next_node = available_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 34.27741,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nCreate a new algorithm that adjusts the penalty factor dynamically based on the number of times an edge has been used, increasing the penalty for more frequently used edges to promote exploration of alternative routes and also reducing the penalty if there are no alternative routes found, aiming to balance exploration and exploitation.\n",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            edge_length = edge_distance[edge_id[0], edge_id[1]]\n            penalty_factor = 0.1 + 0.1 * edge_n_used[edge_id[0], edge_id[1]]\n            \n            if np.sum(edge_n_used) == 0 or np.max(edge_n_used) == 1:\n                penalty_factor *= 0.5\n            \n            edge_penalty = penalty_factor * edge_length\n            updated_edge_distance[edge_id[0], edge_id[1]] += edge_penalty\n            updated_edge_distance[edge_id[1], edge_id[0]] += edge_penalty\n    \n    return updated_edge_distance",
+     "objective": 16.08146,
+     "other_inf": null
+}

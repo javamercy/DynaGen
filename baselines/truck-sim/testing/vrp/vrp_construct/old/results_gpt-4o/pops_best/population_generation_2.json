@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the next node by evaluating a custom heuristic combining the proximity to the destination node and the inverse of the proximity to the current node among unvisited nodes, ensuring a balance between short-term cost and long-term goals.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the distance to the destination node from each unvisited node\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    # Calculate the distance from the current node to each unvisited node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    # Calculate the custom heuristic: (current_distance + 1) / (destination_distance + 1)\n    heuristic_scores = (current_distances + 1) / (destination_distances + 1)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+     "objective": 29.61721,
+     "other_inf": null
+}

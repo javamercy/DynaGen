@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nPropose an algorithm that selects the next node based on the following steps: \n1. Calculate the distance between the current node and all unvisited nodes.\n2. Exclude the destination node from the list of unvisited nodes.\n3. Select the next node as the one with the shortest distance from the current node.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    distances = np.delete(distances, np.where(unvisited_nodes == destination_node)) if destination_node in unvisited_nodes else distances\n    next_node = unvisited_nodes[np.argmin(distances)]\n    return next_node",
+     "objective": 6.60788,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nCreate a new algorithm that calculates the minimum cost to visit each unvisited customer taking into account the square of the distance to the node, penalty for missing the time window squared, and waiting time squared at the node if necessary, and prioritize the customers accordingly.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_cost = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_node = np.linalg.norm(cur_truck_pos - customer_pos) ** 2\n        time_to_node = dist_to_node / truck_speed\n        penalty = 0\n\n        if time_windows[i][0] > current_time + time_to_node:\n            penalty += (time_windows[i][0] - (current_time + time_to_node)) ** 2\n        elif time_windows[i][1] < current_time + time_to_node:\n            penalty += (current_time + time_to_node - time_windows[i][1]) ** 2\n        \n        waiting_time = max(0, time_windows[i][0] - (current_time + time_to_node)) ** 2\n\n        total_cost = dist_to_node + penalty + waiting_time\n\n        if total_cost < min_cost:\n            min_cost = total_cost\n            best_node = i\n    \n    return best_node",
+     "objective": 69.52904,
+     "other_inf": null
+}

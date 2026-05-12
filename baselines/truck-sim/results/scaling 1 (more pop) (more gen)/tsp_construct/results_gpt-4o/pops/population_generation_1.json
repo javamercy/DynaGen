@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "Selects the next node by evaluating based on the ratio of the distance from the current node and the direct distance to the destination, favoring nodes where this ratio is minimized to ensure a progressive yet efficient route.",
+          "code": "import numpy as np\n\n# Backbone idea: Both algorithms consider a node's distance from the current node and its relationship to the destination node.\n\n# {Selects the next node by evaluating based on the ratio of the distance from the current node and the direct distance to the destination, favoring nodes where this ratio is minimized to ensure a progressive yet efficient route.}\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        direct_distance = distance_matrix[current_node, node]\n        to_destination = distance_matrix[node, destination_node]\n        \n        # Calculate the ratio; avoid division by zero\n        ratio = direct_distance / (to_destination + 1e-5)\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n    \n    return next_node",
+          "objective": 9.9253,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by minimizing the weighted sum of the distance to the unvisited node and the squared difference between the distance from this node to the destination and the current location to the destination, encouraging a balance between the immediate path length and deviation from the desired overall route.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_weighted_sum = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        deviation = (distance_matrix[node, destination_node] - distance_matrix[current_node, destination_node]) ** 2\n        weighted_sum = distance_to_node + deviation\n        \n        if weighted_sum < min_weighted_sum:\n            min_weighted_sum = weighted_sum\n            next_node = node\n            \n    return next_node",
+          "objective": 12.16231,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Design an algorithm that selects the next node based on minimizing the ratio of the distance to the unvisited destination node to the remaining distance to the final destination, thus balancing the immediate travel cost and the ultimate goal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        remaining_distance_to_dest = distance_matrix[node, destination_node]\n        ratio = distance_to_node / (1 + remaining_distance_to_dest)\n        \n        if ratio < min_ratio:\n            min_ratio = ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 13.96932,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node by minimizing a weighted sum of immediate travel cost and a factor capturing the variance of distances to the remaining unvisited nodes from the candidate node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # {Select the next node by minimizing a weighted sum of immediate travel cost and a factor capturing the variance of distances to the remaining unvisited nodes from the candidate node.}\n    \n    min_combined_metric = float('inf')\n    next_node = None\n\n    for node in unvisited_nodes:\n        immediate_distance = distance_matrix[current_node, node]\n        variance_distances = np.var([distance_matrix[node, other_node] for other_node in unvisited_nodes if other_node != node])\n        \n        combined_metric = immediate_distance + variance_distances\n        \n        if combined_metric < min_combined_metric:\n            min_combined_metric = combined_metric\n            next_node = node\n            \n    return next_node",
+          "objective": 15.24515,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next unvisited node with the shortest distance from the current node, considering the destination node to form a potentially optimal path.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        # Calculate the direct distance and the detour distance through the destination node\n        direct_distance = distance_matrix[current_node, node]\n        detour_distance = (distance_matrix[current_node, destination_node] + \n                           distance_matrix[destination_node, node])\n        \n        # Choose the smaller distance to consider for the next step\n        effective_distance = min(direct_distance, detour_distance)\n        \n        if effective_distance < min_distance:\n            min_distance = effective_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next unvisited node by considering a weighted score that combines the direct distance and the average distance to all remaining unvisited nodes, with an aim to balance between immediate proximity and overall path efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_score = float('inf')\n    next_node = None\n    \n    total_unvisited_nodes = len(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        # Calculate the direct distance from the current node to the potential next node\n        direct_distance = distance_matrix[current_node, node]\n        \n        # Calculate the average distance from the potential next node to all unvisited nodes\n        remaining_distances = [\n            distance_matrix[node, other_node] for other_node in unvisited_nodes if other_node != node\n        ]\n        average_remaining_distance = np.mean(remaining_distances) if remaining_distances else 0\n        \n        # Calculate a weighted score combining direct distance and average remaining distance\n        weighted_score = direct_distance + (average_remaining_distance / total_unvisited_nodes)\n        \n        if weighted_score < min_score:\n            min_score = weighted_score\n            next_node = node\n    \n    return next_node",
+          "objective": 16.02571,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next unvisited node based on a weighted combination of direct distance and detour distance through the destination, with the weight dynamically adjusted according to the remaining number of unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_weighted_distance = float('inf')\n    next_node = None\n    num_unvisited = len(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        direct_distance = distance_matrix[current_node, node]\n        detour_distance = (distance_matrix[current_node, destination_node] + \n                           distance_matrix[destination_node, node])\n        \n        # Calculate a weighted effective distance based on remaining unvisited nodes\n        weight_factor = num_unvisited / (num_unvisited + 1)\n        weighted_distance = (weight_factor * direct_distance + \n                             (1 - weight_factor) * detour_distance)\n        \n        if weighted_distance < min_weighted_distance:\n            min_weighted_distance = weighted_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 16.21952,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node by averaging immediate travel cost and a heuristic difference factor involving relative changes in distances to other unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Common backbone idea: Balancing immediate travel cost with the goal of minimizing overall distance to the destination.\n    \n    # {Select the next node by averaging immediate travel cost and a heuristic difference factor involving relative changes in distances to other unvisited nodes.}\n    \n    min_combined_metric = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        immediate_distance = distance_matrix[current_node, node]\n        average_diff_distances = np.mean([abs(distance_matrix[current_node, other_node] - distance_matrix[node, other_node]) for other_node in unvisited_nodes if other_node != node])\n        \n        combined_metric = immediate_distance + average_diff_distances\n        \n        if combined_metric < min_combined_metric:\n            min_combined_metric = combined_metric\n            next_node = node\n            \n    return next_node",
+          "objective": 20.03962,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node by prioritizing nodes with the lowest ratio of immediate travel cost to a heuristic factor involving the maximum variance in distances to all unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # {Select the next node by prioritizing nodes with the lowest ratio of immediate travel cost to a heuristic factor involving the maximum variance in distances to all unvisited nodes.}\n    \n    min_combined_metric = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        immediate_distance = distance_matrix[current_node, node]\n        variance_distances = np.var([distance_matrix[node, other_node] for other_node in unvisited_nodes if other_node != node])\n        \n        if variance_distances != 0:\n            combined_metric = immediate_distance / variance_distances\n        else:\n            combined_metric = immediate_distance\n        \n        if combined_metric < min_combined_metric:\n            min_combined_metric = combined_metric\n            next_node = node\n            \n    return next_node",
+          "objective": 21.0518,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by choosing the one that minimizes the combined distance from the current node and a potential direct distance to the destination node, adjusted with a factor that promotes overall shorter detours, aiming to balance between immediate proximity and strategic progress towards the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    balance_factor = 0.5  # A factor to balance local proximity and overall progress\n    min_cost = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        direct_distance = distance_matrix[current_node, node]\n        potential_to_destination = distance_matrix[node, destination_node]\n        \n        cost = direct_distance + balance_factor * potential_to_destination\n        \n        if cost < min_cost:\n            min_cost = cost\n            next_node = node\n            \n    return next_node",
+          "objective": 23.75222,
+          "other_inf": null
+     }
+]

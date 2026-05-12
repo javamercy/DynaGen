@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "\nNovel algorithm: The algorithm selects the next node based on the node with the highest priority value calculated as the sum of the inverse distance to the current node and a random weight factor.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    random_weights = np.random.rand(len(unvisited_nodes))  # generate random weights for each unvisited node\n    priority_values = 1 / distances + random_weights\n    next_node = unvisited_nodes[np.argmax(priority_values)]\n    \n    return next_node",
+          "objective": 35.0856,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: The algorithm selects the next node based on the node with the highest score value calculated as the product of the reciprocal of the distance to the current node and the square root of a random weight factor.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    random_weights = np.random.rand(len(unvisited_nodes))  # generate random weights for each unvisited node\n    score_values = (1 / distances) * np.sqrt(random_weights)\n    next_node = unvisited_nodes[np.argmax(score_values)]\n    \n    return next_node",
+          "objective": 40.87681,
+          "other_inf": null
+     }
+]

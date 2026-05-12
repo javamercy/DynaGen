@@ -1,0 +1,8 @@
+[
+     {
+          "algorithm": "The algorithm iteratively selects the next node by choosing the closest unvisited node that no other truck is heading towards, or returns None if all suitable nodes are unavailable.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    available_nodes = set(unvisited_nodes) - set(truck_nodes)\n    if not available_nodes:\n        return None\n    \n    min_distance = float('inf')\n    next_node = None\n\n    for node in available_nodes:\n        if distance_matrix[current_node][node] < min_distance:\n            min_distance = distance_matrix[current_node][node]\n            next_node = node\n    \n    return next_node",
+          "objective": 42.14403,
+          "other_inf": null
+     }
+]

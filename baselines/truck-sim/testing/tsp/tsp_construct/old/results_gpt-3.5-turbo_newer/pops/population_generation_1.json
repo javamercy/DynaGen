@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nThe algorithm selects the next node by calculating the Euclidean distance between the current node and each unvisited node, then chooses the node with the shortest distance as the next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < min_distance:\n            min_distance = distance_matrix[current_node][node]\n            next_node = node\n    \n    return next_node",
+          "objective": 6.60788,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by calculating the Euclidean distance between the current node and each unvisited node, and then choosing the node with the minimum distance.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = np.zeros_like(unvisited_nodes, dtype=float)\n    for i, node in enumerate(unvisited_nodes):\n        distances[i] = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n    \n    next_node = unvisited_nodes[np.argmin(distances)]\n    \n    return next_node",
+          "objective": 6.73716,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm selects the next node based on the average distance to all unvisited nodes from the current node, with a preference towards nodes closer to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    unvisited_distances = np.array([distance_matrix[current_node][node] for node in unvisited_nodes])\n    destination_distances = np.array([distance_matrix[node][destination_node] for node in unvisited_nodes])\n    avg_distances = (unvisited_distances + destination_distances) / 2\n    next_node = unvisited_nodes[np.argmin(avg_distances)]\n    \n    return next_node",
+          "objective": 7.6436,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur new algorithm selects the next node based on the maximum difference between the distances from the current node to the destination node and from the current node to each unvisited node, divided by the sum of the distance from the current node to the destination node and the distance from the current node to the unvisited node, thus emphasizing nodes that have the largest contrast in distances while considering the total distance to reach each node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_difference = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_cd = distance_matrix[current_node, destination_node]\n        dist_cn = distance_matrix[current_node, node]\n        \n        difference = np.abs(dist_cd - dist_cn) / (dist_cd + dist_cn)\n        \n        if difference > max_difference:\n            max_difference = difference\n            next_node = node\n    \n    return next_node",
+          "objective": 9.22293,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur algorithm selects the next node based on the minimum product of the distances from the current node to the destination node and from the current node to each unvisited node, divided by the distance from the current node to the unvisited node, thus emphasizing nodes that are closer to both the current and destination nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_cd = distance_matrix[current_node, destination_node]\n        dist_cn = distance_matrix[current_node, node]\n        \n        product = (dist_cd * dist_cn) / dist_cn\n        \n        if product < min_product:\n            min_product = product\n            next_node = node\n    \n    return next_node",
+          "objective": 14.69382,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nCreate a new algorithm that updates the edge distance matrix by adjusting the distances of edges used in the local optimal route based on the reciprocal of edge usage frequency, the cube root of the distance itself, and a random factor, with different coefficients and a wider random factor range to introduce more exploration diversity and escape local optima.\n",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n\n    for i in range(len(local_opt_tour)-1):\n        edge_idx = (local_opt_tour[i], local_opt_tour[i+1])\n        random_factor = np.random.uniform(0.5, 1.5)\n        updated_edge_distance[edge_idx] += 1 / (edge_n_used[edge_idx] + 1)\n        updated_edge_distance[edge_idx] += np.cbrt(updated_edge_distance[edge_idx] + 1)\n        updated_edge_distance[edge_idx] *= random_factor\n\n    return updated_edge_distance",
+     "objective": 0.03317,
+     "other_inf": null
+}

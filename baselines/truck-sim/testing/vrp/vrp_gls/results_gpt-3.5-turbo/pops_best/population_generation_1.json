@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nCreate a new edge distance matrix by adding a penalty to edges used in local optimal tours based on the number of times they were used, with the goal of discouraging the algorithm from revisiting the same edges too often and encouraging exploration of new routes.\n",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    penalty_factor = 0.1\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            updated_edge_distance[edge_id[0], edge_id[1]] += penalty_factor * edge_n_used[edge_id[0], edge_id[1]]\n            updated_edge_distance[edge_id[1], edge_id[0]] += penalty_factor * edge_n_used[edge_id[1], edge_id[0]]\n    \n    return updated_edge_distance",
+     "objective": 20.05385,
+     "other_inf": null
+}

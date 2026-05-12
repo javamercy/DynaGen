@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "My novel algorithm leverages a weighted score system based on minimizing route overlap among trucks, by considering both the geometric center of all trucks' current positions and the furthest node from this center as potential guides for route diversification.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    best_score = float('inf')\n    best_node = None\n    \n    # Calculate the geometric center of all truck positions\n    center_of_trucks = np.mean(all_truck_pos, axis=0)\n    \n    for i, customer in enumerate(unvisited_customers):\n        # Calculate distance to current truck position\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        \n        # Calculate distance from the geometric center\n        distance_from_center = np.linalg.norm(center_of_trucks - customer)\n        \n        # Calculate route diversification score\n        score = distance - 0.5 * distance_from_center\n        \n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+          "objective": 38.92454,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Design a new algorithm called \"Dynamic Proximity and Density Balancer,\" which adjusts truck routes by balancing the proximity of unvisited nodes with their local density to minimize idle times and adapt to newly added nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    # Calculate distances to each unvisited customer\n    distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    \n    # Calculate density around each unvisited customer by counting neighbors within a certain radius\n    radius = 10  # Radius for counting nearby nodes\n    densities = np.array([\n        np.sum(np.linalg.norm(unvisited_customers - customer_pos, axis=1) < radius) \n        for customer_pos in unvisited_customers\n    ])\n    \n    # Prioritize nodes based on a combination of proximity and density\n    scores = distances - 0.5 * densities\n    \n    # Select the best node to visit next based on scores\n    best_node = np.argmin(scores)\n    \n    return best_node",
+          "objective": 42.56626,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Design a spatial-temporal adaptive algorithm that determines the next node by weighing the travel distance from the current truck position more heavily than the proximity of all trucks, dynamically adjusting for newly added nodes to optimize total completion time.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    alpha = 0.7  # Weight factor emphasizing the importance of the current truck's distance\n    min_score = float('inf')\n    best_node = None\n\n    for i, customer in enumerate(unvisited_customers):\n        current_distance = np.linalg.norm(cur_truck_pos - customer)\n        all_distances = np.linalg.norm(np.array(all_truck_pos) - customer, axis=1)\n        projected_time = alpha * current_distance + (1 - alpha) * np.min(all_distances)\n        \n        if projected_time < min_score:\n            min_score = projected_time\n            best_node = i\n    \n    return best_node",
+          "objective": 43.98471,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Design an adaptive dynamic programming algorithm that selects the next node for a truck by evaluating the projected completion time for visiting each unvisited customer, incorporating real-time updates for new nodes and waiting strategies to minimize the total mission time.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    min_time = float('inf')\n    best_node = None\n\n    for i, customer in enumerate(unvisited_customers):\n        distances = np.linalg.norm(np.array(all_truck_pos) - customer, axis=1)\n        current_distance = np.linalg.norm(cur_truck_pos - customer)\n        projected_time = current_distance + np.min(distances)\n        \n        if projected_time < min_time:\n            min_time = projected_time\n            best_node = i\n    \n    return best_node",
+          "objective": 45.44511,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My new algorithm prioritizes selecting nodes based on a balance between distance from the truck's current position and proximity to the line connecting the truck's current position and the farthest unvisited node, to enhance route dispersion and minimize convergence among trucks.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    best_score = float('inf')\n    best_node = None\n    \n    # Find the farthest unvisited node from the current truck position\n    farthest_customer = max(unvisited_customers, key=lambda customer: np.linalg.norm(customer - cur_truck_pos))\n    \n    for i, customer in enumerate(unvisited_customers):\n        # Calculate distance to current truck position\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        \n        # Calculate projection of the customer onto the line connecting the truck position and the farthest node\n        line_vector = farthest_customer - cur_truck_pos\n        proj_length = np.dot(customer - cur_truck_pos, line_vector) / np.linalg.norm(line_vector)\n        projection = cur_truck_pos + proj_length * (line_vector / np.linalg.norm(line_vector))\n        \n        # Calculate distance from the projection\n        distance_from_line = np.linalg.norm(customer - projection)\n        \n        # Calculate a new score balancing distance and route dispersion\n        score = distance + 0.5 * distance_from_line\n        \n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+          "objective": 48.23099,
+          "other_inf": null
+     }
+]

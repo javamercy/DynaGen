@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nThe new algorithm prioritizes visiting nodes with the highest demand and proximity to the current node, while penalizing depot distance and nodes frequently visited by other trucks, with updated penalty weights.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 2*proximity_penalty - 0.25*depot_distance + 3*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 18.43813,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node based on a combination of demand, distance, and frequency of visit by other trucks with unique penalty weights.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 2.5*proximity_penalty - 0.3*depot_distance + 3.5*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 18.6637,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by prioritizing nodes with high demand, low distance to the depot, and minimal penalties for frequently visited nodes, with adjusted penalty weights to optimize route planning efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 1.8*proximity_penalty - 0.6*depot_distance + 3.5*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 20.36626,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on a combination of demand, distance to the depot, and penalties for visiting frequently visited nodes by adjusting the penalty weights for each factor to optimize route planning efficiency.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 2*proximity_penalty - 0.8*depot_distance + 4*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 21.0406,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on a combination of demand, distance to the depot, and penalties for frequently visited nodes with adjusted penalty weights to optimize route planning efficiency.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 1.8*proximity_penalty - 0.5*depot_distance + 2.5*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 21.85484,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node based on a combination of demand, proximity to the depot, and penalties for visiting frequently visited nodes, with dynamically adjusted penalty weights for each factor to optimize route planning efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 2.5*proximity_penalty - 0.7*depot_distance + 3.5*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 21.9461,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm prioritizes visiting nodes with the highest demand and closest proximity to the current node, while penalizing the distance to the depot and nodes frequently visited by other trucks, with adjusted penalty weights to optimize route planning efficiency.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 3*proximity_penalty - 0.5*depot_distance + 4*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 22.26367,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by considering a combination of demand satisfaction, proximity to the current node, and penalizing nodes frequently visited by other trucks, in order to optimize route planning efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_metric = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            proximity_metric = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n            demand_satisfaction = 1 / np.sum(demand_matrix)\n\n            total_metric = 0.6 * proximity_metric - 0.4*visited_penalty + 0.5 * demand_satisfaction\n\n            if total_metric < min_metric:\n                min_metric = total_metric\n                next_node = node\n    \n    return next_node",
+          "objective": 22.435,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to select the next node based on a combination of demand, distance to the depot, and penalties for visiting frequently visited nodes by adjusting the penalty weights for each factor to optimize route planning efficiency with adjusted scoring parameters.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 1.5*proximity_penalty - 0.7*depot_distance + 3*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 22.55625,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by balancing demand, distance to the depot, and penalties for frequently visited nodes with dynamically adjusted weights to optimize route planning efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_penalty = np.inf\n\n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            demand_matrix = np.random.randint(1, 10, (len(unvisited_nodes),))\n            max_demand_node = unvisited_nodes[np.argmax(demand_matrix)]\n            proximity_penalty = distance_matrix[current_node][node] - np.mean(distance_matrix[node][truck_nodes])\n            depot_distance = distance_matrix[node][depot_node]\n            visited_penalty = np.sum([1 for tn in truck_nodes if tn == node])\n\n            total_penalty = 1.5*proximity_penalty - 0.35*depot_distance + 2.8*visited_penalty\n\n            if total_penalty < min_penalty:\n                min_penalty = total_penalty\n                next_node = node\n    \n    return next_node",
+          "objective": 22.74036,
+          "other_inf": null
+     }
+]

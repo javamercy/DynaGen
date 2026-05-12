@@ -1,0 +1,6 @@
+{
+     "algorithm": "Choose the next node by integrating the minimum distance to the nearest unvisited node with a reward for proximity to the starting node, balancing immediate gains with potential cumulative savings.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    reward_factor = 0.5\n    heuristic_values = []\n\n    for node in unvisited_nodes:\n        distance_to_next = distance_matrix[current_node, node]\n        distance_from_start = distance_matrix[node, destination_node]\n        \n        heuristic_value = distance_to_next - reward_factor * distance_from_start\n        heuristic_values.append((node, heuristic_value))\n\n    next_node = min(heuristic_values, key=lambda x: x[1])[0]\n    return next_node",
+     "objective": 12.57356,
+     "other_inf": null
+}

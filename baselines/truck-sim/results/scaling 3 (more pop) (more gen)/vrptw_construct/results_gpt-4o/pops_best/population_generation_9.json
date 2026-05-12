@@ -1,0 +1,6 @@
+{
+     "algorithm": "My algorithm selects the next customer by minimizing a cost function that balances travel distance, waiting time, and penalties for missed time windows.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_cost = float('inf')\n\n    for index, customer in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer) / truck_speed\n        arrival_time = current_time + travel_time\n        \n        # Cost components\n        distance_cost = travel_time\n        waiting_time = max(0, time_windows[index][0] - arrival_time)\n        penalty = max(0, arrival_time - time_windows[index][1])\n        \n        total_cost = distance_cost + 0.5 * waiting_time + 10 * penalty\n\n        if total_cost < min_cost:\n            min_cost = total_cost\n            best_node = index\n\n    return best_node",
+     "objective": 54.54263,
+     "other_inf": null
+}

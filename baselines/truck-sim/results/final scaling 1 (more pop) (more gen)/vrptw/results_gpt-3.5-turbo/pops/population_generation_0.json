@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nDesign a novel algorithm that selects the next node for a truck to visit based on minimizing the time it takes for the last truck to finish by considering both customer time windows and truck waiting times.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(cur_truck_pos - customer)\n        arrival_time = current_time + dist_to_customer / truck_speed\n        start_time = max(arrival_time, time_windows[i][0])\n        end_time = time_windows[i][1]\n\n        if start_time <= end_time:\n            if start_time > current_time:\n                waiting_time = start_time - current_time\n            else:\n                waiting_time = 0\n\n            total_time = dist_to_customer / truck_speed + waiting_time + end_time - current_time\n\n            if total_time < min_time:\n                min_time = total_time\n                best_node = i\n    \n    return best_node",
+          "objective": 114.30011,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm will prioritize visiting customers with the earliest time windows that can be reached within a certain time limit, considering the current position of all trucks, their speeds, and the time spent at each customer site in order to minimize the total completion time.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time_to_node = float('inf')\n    \n    for i in range(len(unvisited_customers)):\n        customer_pos = unvisited_customers[i]\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        wait_time = max(0, time_windows[i][0] - current_time - travel_time)\n        \n        if current_time + travel_time + wait_time + time_windows[i][1] <= min_time_to_node:\n            best_node = i\n            min_time_to_node = current_time + travel_time + wait_time + time_windows[i][1]\n    \n    return best_node",
+          "objective": 125.3028,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm aims to select the next customer for the current truck based on a combination of factors including the proximity to the current truck position, the urgency of the customer's time window, and the potential waiting time at the customer.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_score = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        wait_time = max(0, time_windows[i][0] - current_time)\n        urgency = time_windows[i][1] - current_time - travel_time\n\n        score = travel_time + wait_time * 0.5 + urgency * 0.5\n\n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+          "objective": 124.10125,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm calculates the distance between the current truck position and all unvisited customers, taking into account the time it would take to reach them within their time windows, wait times, and penalties for missing the time window, then selects the customer with the minimum total time as the next node for the truck to visit.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(customer_pos - cur_truck_pos)\n        time_to_customer = dist_to_customer / truck_speed\n        total_time = max(time_to_customer, time_windows[i][0] - current_time) + time_windows[i][1]\n        \n        if total_time < min_time:\n            min_time = total_time\n            best_node = i\n    \n    return best_node",
+          "objective": 125.3028,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nCreate a new algorithm that takes into account the remaining time of the other trucks to estimate the best customer to visit next, ensuring the overall completion time is minimized.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_completion_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(cur_truck_pos - customer_pos)\n        arrival_time = current_time + dist_to_customer / truck_speed\n        \n        for other_truck_pos in all_truck_pos:\n            dist_between_trucks = np.linalg.norm(other_truck_pos - customer_pos)\n            time_to_other_truck = dist_between_trucks / truck_speed\n            total_wait_time = max(0, arrival_time - current_time - time_to_other_truck)\n            if total_wait_time > time_windows[i][1]:\n                continue\n                \n        completion_time = max(arrival_time, time_windows[i][0]) + time_windows[i][1]\n        \n        if completion_time < min_completion_time:\n            min_completion_time = completion_time\n            best_node = i\n            \n    return best_node",
+          "objective": 125.3028,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe algorithm works by calculating the time it would take for each truck to reach each unvisited customer, taking into account the time window constraints and penalties, and then selecting the customer that minimizes the time it takes for the last truck to finish.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    min_finish_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        for j, truck_pos in enumerate(all_truck_pos):\n            travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n            arrival_time = current_time + travel_time\n            wait_time = max(0, time_windows[i][0] - arrival_time)\n            finish_time = arrival_time + wait_time + time_windows[i][1] + np.linalg.norm(customer_pos - depot_pos) / truck_speed\n            if finish_time < min_finish_time:\n                min_finish_time = finish_time\n                best_node = i\n    \n    return best_node",
+          "objective": 145.07069,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm will consider the distance to each unvisited customer, the time window constraints, and the potential waiting time at each customer to select the next node that minimizes the time for the last truck to finish.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = 0\n    min_time = float('inf')\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(customer_pos - cur_truck_pos)\n        travel_time = dist_to_customer / truck_speed\n        arrival_time = current_time + travel_time\n        wait_time = max(0, time_windows[idx][0] - arrival_time)\n        potential_time = arrival_time + wait_time + (time_windows[idx][1] - current_time)\n        \n        if potential_time < min_time:\n            min_time = potential_time\n            best_node = idx\n            \n    return best_node",
+          "objective": 125.3028,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur novel algorithm involves calculating the time required for each unvisited customer based on the current truck position, truck speeds, and time windows, then selecting the customer with the minimum total time to reach, wait if necessary, and return to the starting point.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_total_time = float('inf')\n    best_node = None\n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        start_time = max(current_time + travel_time, time_windows[i][0])\n        end_time = start_time + time_windows[i][1]\n\n        for truck_pos in all_truck_pos:\n            return_time = np.linalg.norm(customer_pos - depot_pos) / truck_speed\n            total_time = end_time + return_time\n            if total_time < min_total_time:\n                min_total_time = total_time\n                best_node = i\n\n    return best_node",
+          "objective": 145.07069,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nUse a greedy algorithm to select the next customer for the current truck based on minimizing travel time and penalties if a time window is missed, allowing the option for the truck to wait at a customer if needed.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_cost = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        start_time = max(current_time + travel_time, time_windows[i][0])\n        end_time = start_time + time_windows[i][1]\n\n        if end_time <= time_windows[i][1]:  # Customer can be visited within time window\n            cost = end_time\n        else:  # Wait at the customer before visiting\n            cost = end_time + (end_time - time_windows[i][1])\n\n        if cost < best_cost:\n            best_cost = cost\n            best_node = i\n\n    return best_node",
+          "objective": 113.04683,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm involves calculating the potential travel time to each unvisited customer considering their time windows and prioritizing the customer that minimizes the overall completion time for all trucks, factoring in any waiting time if necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_completion_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        arrival_time = current_time + travel_time\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        \n        new_time = arrival_time + wait_time + time_windows[i][1]\n        \n        if new_time < min_completion_time:\n            min_completion_time = new_time\n            best_node = i\n    \n    return best_node",
+          "objective": 125.3028,
+          "other_inf": null
+     }
+]

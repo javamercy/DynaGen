@@ -1,0 +1,6 @@
+{
+     "algorithm": "My new algorithm selects the next node for a truck to visit by prioritizing nodes that are closer in distance, within their time windows, and have not been visited by other trucks, while also introducing a dynamic factor that adjusts the weight of each criterion based on the current state of the route.",
+     "code": "import numpy as np\nimport random\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist = np.linalg.norm(cur_truck_pos - customer_pos)\n        dist_weight = 0.6\n        time_weight = 0.3\n        unique_weight = 0.1\n        \n        arrival_time = current_time + dist / truck_speed\n        wait_time = max(0, time_windows[i][0] - arrival_time)\n        service_time = time_windows[i][1] - wait_time\n        \n        cost = dist * dist_weight + (arrival_time + wait_time + service_time) * time_weight + len(all_truck_pos) / len(unvisited_customers) * unique_weight\n        \n        if cost < min_time:\n            min_time = cost\n            best_node = i\n    \n    return best_node",
+     "objective": 105.28516,
+     "other_inf": null
+}

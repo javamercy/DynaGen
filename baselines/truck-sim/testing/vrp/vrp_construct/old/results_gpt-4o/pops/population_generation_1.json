@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The algorithm selects the next node by evaluating a custom heuristic combining the proximity to the destination node and the inverse of the proximity to the current node among unvisited nodes, ensuring a balance between short-term cost and long-term goals.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the distance to the destination node from each unvisited node\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    # Calculate the distance from the current node to each unvisited node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    # Calculate the custom heuristic: (current_distance + 1) / (destination_distance + 1)\n    heuristic_scores = (current_distances + 1) / (destination_distances + 1)\n    # Select the unvisited node with the minimal heuristic score\n    min_index = np.argmin(heuristic_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 29.61721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm is designed to select the next node by combining the shortest path with an attraction score based on closeness to an ultimate destination, modifying the typical nearest neighbor approach.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the attraction score\n    attraction_scores = -distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculate the distance from the current node to all unvisited nodes\n    distance_scores = distance_matrix[current_node, unvisited_nodes]\n    \n    # Combine distance and attraction scores by taking a weighted sum. Tune weight for balance.\n    alpha = 0.5  # Weighting factor for attraction importance\n    combined_scores = distance_scores + alpha * attraction_scores\n    \n    # Select node with minimum combined score\n    next_node_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 31.54531,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by considering both the immediate distance to neighboring unvisited nodes and introducing a temporal learning factor that slightly adjusts scores based on the frequency of previous selections, promoting exploration over mere distance optimization.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Simple memory to track selection frequency\n    selection_count = {node: 0 for node in unvisited_nodes",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Simple memory to track selection frequency\n    selection_count = {node: 0 for node in unvisited_nodes}\n\n    def score_with_learning(node):\n        # Calculate the immediate distance\n        distance_to_node = distance_matrix[current_node, node]\n        # Introduce a learning factor based on selection frequency\n        learning_factor = 1 + 0.1 * selection_count[node]\n        # Combine both to get a score\n        score = distance_to_node * learning_factor\n        return score\n\n    # Compute scores and select the next node\n    scores = [(node, score_with_learning(node)) for node in unvisited_nodes]\n    next_node = min(scores, key=lambda x: x[1])[0]\n\n    # Update memory\n    selection_count[next_node] += 1\n\n    return next_node",
+          "objective": 40.1896,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm introduces a randomness factor to the score function to encourage exploration by combining distance with a random perturbation, making the next node selection partly stochastic.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    def score_with_randomness(node):\n        # Calculate the immediate distance\n        distance_to_node = distance_matrix[current_node, node]\n        # Introduce a randomness factor\n        randomness_factor = np.random.uniform(0.9, 1.1)\n        # Combine both to get a score\n        score = distance_to_node * randomness_factor\n        return score\n\n    # Compute scores and select the next node\n    scores = [(node, score_with_randomness(node)) for node in unvisited_nodes]\n    next_node = min(scores, key=lambda x: x[1])[0]\n\n    return next_node",
+          "objective": 41.08616,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by calculating a score that incorporates the inverse of current distance for rewarding proximity, a tension factor for urgency towards the destination, and a dynamically adjusted entropy to balance exploration and exploitation.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate the inverse of the distance from the current node to each unvisited node\n    current_inverse_dist = 1 / (distance_matrix[current_node, unvisited_nodes] + 1e-6)\n    \n    # Calculate a tension factor for the urgency towards the destination\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n    tension_factor = np.exp(-destination_distances)\n    \n    # Dynamic entropy for exploration/exploitation balance\n    dynamic_entropy = np.random.normal(0, 1, len(unvisited_nodes))\n    \n    # Combine scores: inverse current distance, tension factor, and dynamic entropy\n    alpha = 0.3  # Weighting factor for proximity importance\n    delta = 0.1  # Weighting factor for dynamic entropy\n    combined_scores = alpha * current_inverse_dist + tension_factor + delta * dynamic_entropy\n    \n    # Select the unvisited node with the maximal combined score\n    next_node_index = np.argmax(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 42.67151,
+          "other_inf": null
+     }
+]

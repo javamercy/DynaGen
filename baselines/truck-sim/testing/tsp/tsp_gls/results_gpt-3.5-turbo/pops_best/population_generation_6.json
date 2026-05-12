@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nAlgorithm: The algorithm updates the edge distance matrix by increasing the distances of the edges used in the local optimal tour based on their frequency of use to enhance exploring new paths and avoid local optima in search for a minimized distance tour.\n",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for i in range(len(local_opt_tour)-1):\n        edge_index = edge_n_used[local_opt_tour[i], local_opt_tour[i+1]]\n        frequency = edge_n_used[edge_n_used == edge_index].shape[0]\n        updated_edge_distance[local_opt_tour[i], local_opt_tour[i+1]] += frequency\n        updated_edge_distance[local_opt_tour[i+1], local_opt_tour[i]] += frequency\n    \n    return updated_edge_distance",
+     "objective": -2.39419,
+     "other_inf": null
+}

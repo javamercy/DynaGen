@@ -1,0 +1,6 @@
+{
+     "algorithm": "My new algorithm adjusts the priority scoring by incorporating a decay factor that reduces the weight of the distance to far-off nodes, favoring closer nodes within a certain range.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n\n    decay_factor = 0.5\n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        mean_distance_to_trucks = np.mean(distance_matrix[node, truck_nodes])\n        priority_scores[i] = -(direct_distance ** decay_factor) + mean_distance_to_trucks\n\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+     "objective": 22.23341,
+     "other_inf": null
+}

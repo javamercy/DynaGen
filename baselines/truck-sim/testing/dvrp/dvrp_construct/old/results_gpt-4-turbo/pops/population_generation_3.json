@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # New algorithm: \"Adaptive Proximity Balancing Route Selection (APBRS)\", selects next node by balancing proximity, remaining load, and optimizing routing efficiency dynamically.\n    \n    # Distance to unvisited nodes from current position\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Encourage distribution by considering distances to and from the destination\n    final_distances = np.linalg.norm(unvisited - destination, axis=1)\n\n    # Balancing score calculation for each unvisited node:\n    scores = distances + final_distances * 0.5  # balance between path optimization and final goal proximity\n\n    for idx, unvisited_node in enumerate(unvisited):\n        proximity_score = 0\n        for truck in trucks:\n            if np.array_equal(truck, current):\n                continue\n            truck_distance = np.linalg.norm(unvisited_node - truck)\n            proximity_score += 1 / (truck_distance + 0.1)  # adding a small constant to prevent division by zero\n\n        # Final score adjustment\n        scores[idx] += proximity_score * 0.2  # weighted less to not overpower distance considerations\n\n    # Find the index of the unvisited node with the best (lowest) score\n    next_destination = np.argmin(scores)\n    return next_destination",
+          "objective": 33.58928,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Dynamically weight distances and truck separation, with additional randomness to avoid routing conflicts\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    min_distance = np.min(distances)\n    scores = distances / min_distance  # Normalize distances\n\n    for idx, unvisited_node in enumerate(unvisited):\n        # Enhance truck separation\n        separation_scores = np.linalg.norm(trucks - unvisited_node, axis=1)\n        min_separation = np.min(separation_scores)\n        if min_separation != 0:\n            scores[idx] *= (1 + 10 / min_separation)  # Encourage better spread but reduce impact\n\n    # Add randomness to avoid trucks getting stuck in similar paths\n    random_effect = np.random.rand(len(unvisited)) * 0.1\n    scores += random_effect\n\n    next_destination = np.argmin(scores)\n    return next_destination",
+          "objective": 35.74325,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\n\"Use a Dynamic Exploration Strategy (DES) where each unvisited node is scored combining inversely weighted distances, exponential decay of distance influence, and a high randomness factor to prioritize distant, rarely chosen places for exploration purposes.\"\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Inversely weight distances\n    with np.errstate(divide='ignore', invalid='ignore'):\n        inv_distances = 1 / distances\n        inv_distances[distances == 0] = float('inf')  # handle division by zero\n\n    # Exponential decay of distance influence\n    decay_distances = np.exp(-distances)\n    \n    # Combine weights: Reduced distance emphasis, increased randomness\n    weights = 0.3 * inv_distances + 0.2 * decay_distances + 0.5 * np.random.random(size=distances.shape)\n    \n    # Choose the node with the highest score (because of inverse distance high implies closer)\n    next_destination = np.argmax(weights)\n    \n    return next_destination",
+          "objective": 36.44674,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\"Use a Weighted Importance Strategy (WIS) where each unvisited node is scored based on a trade-off between a normalized distance from the current location and a random factor to allow exploration, emphasizing closer nodes but unpredictably exploring further ones.\"",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Normalize distances\n    max_distance = np.max(distances)\n    if max_distance > 0:\n        normalized_distances = distances / max_distance\n    else:\n        normalized_distances = distances\n    \n    # Weight factors: Distance has a larger weight than randomness\n    weights = 0.8 * normalized_distances + 0.2 * np.random.random(size=normalized_distances.shape)\n    \n    # Choose the node with the lowest weighted score\n    next_destination = np.argmin(weights)\n    \n    return next_destination",
+          "objective": 37.54923,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My new algorithm, \"Dynamic Re-evaluation Algorithm with Proximity Consideration (DRAPC)\", adapts at every step by calculating the shortest distance from the current position to the nearest unvisited node, considering the distances and dynamic additions to the 'unvisited' list, and helps balance the workload among trucks by factoring in their current distance from predicted next nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Find the index of the nearest unvisited node\n    next_destination = np.argmin(distances)\n    \n    # Check if any truck is closer to this node than the current truck\n    for truck in trucks:\n        if truck is not current:  # ensuring not to compare the truck with itself\n            truck_distance = np.linalg.norm(unvisited[next_destination] - truck)\n            current_distance = distances[next_destination]\n            if truck_distance < current_distance:\n                return None  # Suggest 'None' to wait and possibly rebalance the workload \n\n    # Return index of the next closest node if no truck is competitively closer\n    return next_destination",
+          "objective": 40.51431,
+          "other_inf": null
+     }
+]

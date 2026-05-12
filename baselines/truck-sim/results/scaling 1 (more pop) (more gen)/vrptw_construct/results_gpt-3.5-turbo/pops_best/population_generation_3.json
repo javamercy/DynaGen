@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm: The new algorithm selects the next customer based on a combination of the distance to be traveled, the time window availability, and the urgency of visiting customers close to their time windows' midpoint while adjusting the urgency coefficient based on the truck speed and the current time.\n\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    min_difference = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = dist_to_customer / truck_speed\n        \n        midpoint_time = (time_windows[i][0] + time_windows[i][1]) / 2\n        time_difference = abs(current_time - midpoint_time)\n        \n        urgency_factor = 0.7 if time_difference < 50 else 0.5\n        \n        criteria = urgency_factor * time_difference + dist_to_customer + travel_time\n        \n        if criteria < min_difference:\n            best_node = i\n            min_difference = criteria\n        \n    return best_node",
+     "objective": 118.22591,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nDesign a novel algorithm that considers the distance to each unvisited customer, the time window constraints, and the potential for waiting time, selecting the next customer for the current truck to visit in order to minimize the time it takes for the last truck to finish.\n",
+     "code": "import numpy as np\n\ndef distance(pos1, pos2):\n    return np.linalg.norm(pos1 - pos2)\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_score = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        distance_to_customer = distance(cur_truck_pos, customer_pos)\n        time_to_customer = distance_to_customer / truck_speed\n\n        if current_time + time_to_customer > time_windows[i][1]:\n            continue\n\n        if current_time + time_to_customer < time_windows[i][0]:\n            wait_time = time_windows[i][0] - current_time - time_to_customer\n        else:\n            wait_time = 0\n\n        score = distance_to_customer + wait_time\n\n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+     "objective": 94.77464,
+     "other_inf": null
+}

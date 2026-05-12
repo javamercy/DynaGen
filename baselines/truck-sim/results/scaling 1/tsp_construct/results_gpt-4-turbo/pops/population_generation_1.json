@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "This algorithm selects the next node based on the ratio of distances to the current node over the aggregate remaining distances to all unvisited nodes, aiming to balance exploration with efficient route coverage by preferentially visiting nodes that are closer to the current position but still considerable for the remaining traversal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n\n    # Calculate the distance to each unvisited node from the current node\n    distances_to_current = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate the sum of distances from each unvisited node to all other unvisited nodes\n    aggregate_distances = np.array([np.sum(distance_matrix[node, unvisited_nodes]) for node in unvisited_nodes])\n\n    # Avoid division by zero\n    aggregate_distances = np.where(aggregate_distances == 0, 1e-5, aggregate_distances)\n\n    # Calculate the ratio of distance to current node over aggregate distances\n    ratio_scores = distances_to_current / aggregate_distances\n\n    # Find the index of the minimum ratio, implying closer to current yet fewer remaining distances\n    next_node_idx = np.argmin(ratio_scores)\n    next_node = unvisited_nodes[next_node_idx]\n\n    return next_node",
+          "objective": 9.50204,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: Select the next node based on the ratio of the distance from the current node to the unvisited node and the distance from the unvisited node to the destination, favoring those with a smaller ratio which indicates a direct path towards the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n    \n    distances_from_current = distance_matrix[current_node, unvisited_nodes]\n    distances_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculating the ratio of distances from current to unvisited and unvisited to the destination\n    ratio = distances_from_current / (distances_to_destination + 1e-9)  # Adding a small value to avoid division by zero\n\n    # Selecting node with the minimal ratio\n    min_index = np.argmin(ratio)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 9.9253,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Novel algorithm: Prioritize nodes based on a combination of distance to the current node and a dynamic exploration factor which reduces the likelihood of closure to the start point too early.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_current = distance_matrix[current_node, unvisited_nodes]\n    \n    # Dynamic exploration factor to avoid too early closure\n    distance_from_start = distance_matrix[destination_node, unvisited_nodes]\n    exploration_factor = np.max(distance_matrix) / (1 + distance_from_start)\n    \n    combined_score = distances_to_current + exploration_factor\n    \n    next_node_index = np.argmin(combined_score)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 10.35385,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: This algorithm prioritizes nodes by combining their distance to the current node, an anti-gravity score proportional to their inverse squared distance from the start, and includes a randomization factor to introduce variability and avoid falls into local optima.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_current = distance_matrix[current_node, unvisited_nodes]\n    distance_from_start = distance_matrix[destination_node, unvisited_nodes]\n    \n    anti_gravity_factor = 1 / (distance_from_start ** 2 + 1)  # Adding 1 to avoid division by zero\n    randomness_factor = np.random.rand(len(unvisited_nodes)) * np.mean(distance_matrix) / 10\n    \n    combined_score = distances_to_current + anti_gravity_factor + randomness_factor\n    \n    next_node_index = np.argmin(combined_score)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 13.83502,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next_node by combining a weighted average of distances to the destination node and distances to the unvisited nodes, placing higher priority on proximity to the destination when close, but initially favoring shorter paths to unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n\n    weights_to_destination = np.array([\n        np.exp(-distance_matrix[current_node][node]) for node in unvisited_nodes\n    ])\n    weights_to_unvisited = np.array([\n        1 / (distance_matrix[current_node][node] + 1e-5) for node in unvisited_nodes\n    ])\n    \n    total_weights = weights_to_destination + weights_to_unvisited\n    \n    next_node_idx = np.argmax(total_weights)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     }
+]

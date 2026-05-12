@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The algorithm selects the next node that minimizes a dynamically weighted combination of the distance from the current node and a heuristic distance toward the destination node, adjusting weights based on the proximity to the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n\n    # Calculate the total distance from the current node to each unvisited node\n    # and from each unvisited node to the destination node\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n\n    # Calculate the weight for heuristic: closer to destination gives more weight to destination\n    total_distance = np.sum(distance_matrix[current_node, destination_node])\n    proximity = distance_matrix[current_node, destination_node]\n    heuristic_weight = proximity / total_distance\n\n    # Combine distances using weights\n    combined_distances = heuristic_weight * current_distances + (1 - heuristic_weight) * destination_distances\n\n    # Find the index of the node with the minimum combined distance\n    next_node_index = np.argmin(combined_distances)\n\n    # Select the next node\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+          "objective": 15.81281,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The novel algorithm, named \"Destination-Driven Hybrid Node Selection,\" combines prioritization of proximity to the final destination node and overall minimal traversed distance by selecting, at each step, the unvisited node that maintains a balance between decreasing the Euclidean distance to the destination node and the shortest incremental path from the current node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate destination-driven priority and distance-driven priority scores\n    destination_distances = distance_matrix[current_node, unvisited_nodes] + distance_matrix[unvisited_nodes, destination_node]\n    min_distance_node = np.argmin(destination_distances)\n    \n    incremental_distances = distance_matrix[current_node, unvisited_nodes]\n    min_increment_node = np.argmin(incremental_distances)\n    \n    scores = destination_distances + incremental_distances\n    priority_scores = np.array([0.5 * destination_distances[i] / destination_distances[min_distance_node] + \n                                0.5 * incremental_distances[i] / incremental_distances[min_increment_node] \n                                for i in range(len(unvisited_nodes))])\n    \n    min_priority_score_index = np.argmin(priority_scores)\n    next_node = unvisited_nodes[min_priority_score_index]\n    return next_node",
+          "objective": 20.92877,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Choose the next node based on a heuristic that combines the minimum distance to the destination node with a penalty for moving away from the current node, balancing exploration and exploitation toward the final goal.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    penalty_factor = 0.5\n    heuristic_values = []\n\n    for node in unvisited_nodes:\n        distance_to_next = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n        \n        heuristic_value = distance_to_next + penalty_factor * distance_to_destination\n        heuristic_values.append((node, heuristic_value))\n\n    next_node = min(heuristic_values, key=lambda x: x[1])[0]\n    return next_node",
+          "objective": 23.75222,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The novel algorithm selects the next node not only by considering the shortest direct path but also by incorporating a desirability factor based on proximity to the destination node, thereby balancing immediate cost and strategic positioning for future moves.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    def desirability_factor(node):\n        return distance_matrix[node, destination_node]\n    \n    # Weights for direct distance and strategic positioning\n    direct_weight = 0.7\n    strategic_weight = 0.3\n    \n    min_cost = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        direct_cost = distance_matrix[current_node, node]\n        strategy_cost = desirability_factor(node)\n        \n        # Calculate combined cost\n        combined_cost = direct_weight * direct_cost + strategic_weight * strategy_cost\n        \n        # Select node with minimum combined cost\n        if combined_cost < min_cost:\n            min_cost = combined_cost\n            next_node = node\n    \n    return next_node",
+          "objective": 26.35373,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Iteratively select a next node by calculating a priority score for each unvisited node based on the sum of the distance to the node and a heuristic value derived from the distance to the destination node, choosing the node with the lowest score.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    priority_scores = {",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    priority_scores = {}\n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        heuristic_to_destination = distance_matrix[node, destination_node]\n        priority_scores[node] = distance_to_node + heuristic_to_destination\n    \n    next_node = min(priority_scores, key=priority_scores.get)\n    return next_node",
+          "objective": 40.85044,
+          "other_inf": null
+     }
+]

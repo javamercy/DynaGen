@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm: This algorithm selects the next node with the highest ratio of the total sum of distances to all truck nodes to the distance between the current node and the next node, while also ensuring that at least one truck can reach that node.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    max_ratio = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance_to_trucks = np.sum([distance_matrix[truck_node][node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            if distance_to_next_node > 0:\n                ratio = total_distance_to_trucks / distance_to_next_node\n                if ratio > max_ratio:\n                    max_ratio = ratio\n                    next_node = node\n    \n    return next_node",
+     "objective": 25.10143,
+     "other_inf": null
+}

@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "My new algorithm, \"Dynamic Re-evaluation Algorithm with Proximity Consideration (DRAPC)\", adapts at every step by calculating the shortest distance from the current position to the nearest unvisited node, considering the distances and dynamic additions to the 'unvisited' list, and helps balance the workload among trucks by factoring in their current distance from predicted next nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Find the index of the nearest unvisited node\n    next_destination = np.argmin(distances)\n    \n    # Check if any truck is closer to this node than the current truck\n    for truck in trucks:\n        if truck is not current:  # ensuring not to compare the truck with itself\n            truck_distance = np.linalg.norm(unvisited[next_destination] - truck)\n            current_distance = distances[next_destination]\n            if truck_distance < current_distance:\n                return None  # Suggest 'None' to wait and possibly rebalance the workload \n\n    # Return index of the next closest node if no truck is competitively closer\n    return next_destination",
+          "objective": 40.51431,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My new algorithm, \"Enhanced Coordination Routing (ECR)\", uses a scoring function based on the distance and work distribution to select the next optimal node for each truck to reduce overall travel time and balance the visitation load among all trucks.",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Initialize score array based on initial distance to unvisited nodes\n    scores = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Adjust scores by considering proximity of other trucks\n    for idx, unvisited_node in enumerate(unvisited):\n        proximity_penalty = 0\n        for truck in trucks:\n            truck_distance = np.linalg.norm(unvisited_node - truck)\n            # Penalizing by proximity to avoid choosing the same node for multiple trucks\n            proximity_penalty += truck_distance\n        # Update score by adding proximity penalty inversely (more penalty = worse choice)\n        scores[idx] += 1 / proximity_penalty\n\n    # Find the index of the unvisited node with the best (lowest) score\n    next_destination = np.argmin(scores)\n    return next_destination",
+          "objective": 40.67477,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Create a \"Balanced Demand-Proximity Algorithm (BDPA)\" that evaluates the demand zones based on the frequency of required visits and proximity to guide the allocation of routes, adapting in real-time to distribute the workload among trucks evenly and efficiently.",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Get frequency count for each unvisited node\n    frequency = np.array([np.sum(np.all(node == unvisited, axis=1)) for node in unvisited])\n    # Get distances from current truck location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    # Weight the frequency by a multiplier to emphasize frequent nodes and normalize distances\n    frequency_multiplier = 10.0\n    scores = distances - frequency_multiplier * frequency\n    # Choose the node with the lowest score\n    next_destination = np.argmin(scores)\n    return next_destination",
+          "objective": 44.21354,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Create a \"Dynamic Proximity-Capacity Algorithm (DPCA)\" that selects the next node based on a balance of shortest distance from the current location and the number of nearby unvisited nodes to distribute visits equitably and efficiently, while dynamically adjusting based on the truck's current capacity (assumed to be the remaining distance it can travel, supplied in 'destination').",
+          "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current position to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Calculate how many unvisited nodes are within a certain radius (e.g., a dynamic radius based on a fraction of remaining capacity)\n    radius = np.linalg.norm(destination - current) / 3  # use 1/3 of the remaining distance as a search radius\n    count_nearby_unvisited = np.array([\n        np.sum(np.linalg.norm(unvisited - node, axis=1) < radius)\n        for node in unvisited\n    ])\n    \n    # Score calculated by distance, slightly offset by the number of nearby unvisited nodes\n    scores = distances - 0.1 * count_nearby_unvisited\n    \n    # Choose the node with the lowest score\n    next_destination = np.argmin(scores)\n    \n    return next_destination",
+          "objective": 46.8905,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Using an adaptive thresholding approach, the algorithm 'Thresholding Distance Approach (TDA)', chooses the next node directly based on a distance threshold which adapts depending on how far trucks are from their nearest unvisited node, favoring shorter routes with an element of randomization for diversity in selections.",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current, destination, trucks, unvisited):\n    # Calculate the distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Find the minimum threshold distance\n    threshold = np.min(distances) * 1.5\n    \n    # Candidates within the threshold\n    candidates = [i for i, d in enumerate(distances) if d <= threshold]\n    \n    # If no candidates within the threshold, broaden the threshold\n    if not candidates:\n        threshold = np.mean(distances) * 1.2\n        candidates = [i for i, d in enumerate(distances) if d <= threshold]\n    \n    # Randomly select from candidates or choose the closest if no suitable candidates\n    if candidates:\n        next_destination = random.choice(candidates)\n    else:\n        next_destination = np.argmin(distances)\n    \n    return next_destination",
+          "objective": 47.18776,
+          "other_inf": null
+     }
+]

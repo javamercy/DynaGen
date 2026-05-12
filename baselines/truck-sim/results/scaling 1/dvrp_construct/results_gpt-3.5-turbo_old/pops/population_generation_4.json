@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nThe new algorithm aims to select the next node by considering the proximity to the current truck position and the potential demand growth at each node, which is calculated based on historical visitation frequency and recent activity in neighboring areas weighted by a growth factor.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    demand_scores = []\n    \n    for node in unvisited_customers:\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        demand_score = dist\n        \n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                demand_score += 1\n        \n        growth_factor = 0.2\n        \n        for pos in np.concatenate([unvisited_customers, all_truck_pos]):\n            if np.linalg.norm(node - pos) < dist:\n                demand_score += growth_factor\n        \n        demand_scores.append(demand_score)\n    \n    best_node = np.argmin(demand_scores)\n    \n    return best_node",
+          "objective": 37.10985,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm aims to select the next node based on the combined score of distance from the current truck position to the node and the ratio of expected future demand to the current demand at each node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    demand_scores = []\n    \n    for node in unvisited_customers:\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        demand_ratio = 0\n        \n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                demand_ratio += 1\n        \n        if demand_ratio > 0:\n            demand_ratio = demand_ratio / len(all_truck_pos)\n        \n        demand_score = dist + demand_ratio\n        \n        demand_scores.append(demand_score)\n    \n    best_node = np.argmin(demand_scores)\n    \n    return best_node",
+          "objective": 40.5705,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm incorporates a dynamic adjustment to the distances based on the truck proximity and estimated future demand by utilizing a decay factor that is calculated based on the time the node has been unvisited, resulting in a more adaptive route selection.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    distances = []\n    for idx, node in enumerate(unvisited_customers):\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        total_demand = 0\n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                total_demand += 1\n        \n        time_factor = 1 - (0.5 * (idx/len(unvisited_customers))) # Dynamic time decay factor\n        \n        distances.append((dist * total_demand) * time_factor)\n    \n    best_node = np.argmin(distances)\n    \n    return best_node",
+          "objective": 41.36798,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm description: The new algorithm incorporates a cost function that takes into account the current distance to the depot, the future demand estimate based on nearby trucks, and a random factor to introduce variability in route selection.\n\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    distances = []\n    for idx, node in enumerate(unvisited_customers):\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        total_demand = 0\n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                total_demand += 1\n        \n        random_factor = random.uniform(0.8, 1.2) # Random factor to introduce variability\n        \n        distances.append((dist + total_demand) * random_factor)\n    \n    best_node = np.argmin(distances)\n    \n    return best_node",
+          "objective": 41.57355,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm aims to select the next node by considering both the proximity to the current truck position and the expected future demand at each node, calculated based on historical visitation frequency and recent activity in neighboring areas.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    demand_scores = []\n    \n    for node in unvisited_customers:\n        dist = np.linalg.norm(node - cur_truck_pos)\n        \n        demand_score = dist\n        \n        for pos in all_truck_pos:\n            if np.linalg.norm(node - pos) < dist:\n                demand_score += 1\n        \n        demand_scores.append(demand_score)\n    \n    best_node = np.argmin(demand_scores)\n    \n    return best_node",
+          "objective": 41.90176,
+          "other_inf": null
+     }
+]

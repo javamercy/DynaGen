@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm prioritizes visiting customers based on their y-coordinate proximity to the current truck position, while also considering the x-coordinate distance and proximity to other trucks, balancing out the decision-making process in a different way than the existing algorithms.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        y_distance = abs(cur_truck_pos[1] - customer_pos[1])\n        x_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        min_dist_from_other_trucks = float('inf')\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < min_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                min_dist_from_other_trucks = dist\n        \n        total_score = y_distance + x_distance - min_dist_from_other_trucks\n        \n        if total_score < best_score:\n            best_score = total_score\n            best_node = idx\n    \n    return best_node",
+     "objective": 40.05386,
+     "other_inf": null
+}
