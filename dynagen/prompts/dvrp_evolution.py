@@ -6,21 +6,16 @@ from dynagen.prompts.dvrp_templates import (
     render_dvrp_candidates,
 )
 
-
 DVRP_STRATEGY_INSTRUCTIONS = {
-    "S1": """Explore: create a materially different dispatch rule from the parent.
-Use a new customer ranking idea such as spatial zones, customer isolation, depot direction, or truck-competition penalties.
-Do not just rename variables or slightly change constants.""",
+    "S1": """Explore: create a complete dispatch policy with materially different decision behavior from the parent.
+Change a core decision mechanism, not names or constants. Keep validity, budget use, and deterministic seed handling.""",
 
-    "S2": """Mutate and tune: preserve the parent's main structure but improve its scoring formula.
-Adjust weights, thresholds, tie-breaks, and wait behavior to reduce the last-truck return time.
-Make one or two focused changes rather than rewriting the whole policy.""",
+    "S2": """Refine: use parent metrics and reflection to make one or two targeted fixes.
+Preserve what works, address measured weakness, and avoid unrelated rewrites.""",
 
-    "S3": """Recombine and simplify: identify the strongest useful idea from each parent and merge them into one compact rule.
-Remove redundant conditions, avoid overfit constants, and resolve conflicts into a single cheap score.
-Do not concatenate policies or run multiple policies sequentially.""",
+    "S3": """Recombine: build one coherent policy from complementary parent strengths.
+Do not concatenate parents or run them sequentially. Resolve conflicts and keep the child simpler than the sum.""",
 }
-
 
 def build_dvrp_evolution_prompt(
         strategy: str,
