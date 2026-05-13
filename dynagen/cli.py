@@ -161,6 +161,14 @@ def _provider_from_config(config: RunConfig):
 
         provider = OpenAIProvider(model=config.llm.model, api_key_env=config.llm.api_key_env)
         return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
+    if config.llm.provider == "deepseek":
+        from dynagen.llm.deepseek_provider import DeepSeekProvider
+
+        provider = DeepSeekProvider(
+            model=config.llm.model,
+            api_key_env=config.llm.api_key_env,
+        )
+        return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
     if config.llm.provider.startswith("ollama"):
         from dynagen.llm.ollama_provider import OllamaProvider
 

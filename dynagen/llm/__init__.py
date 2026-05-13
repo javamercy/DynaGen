@@ -6,10 +6,16 @@ try:
 except ImportError:
     OpenAIProvider = None
 
+try:
+    from dynagen.llm.deepseek_provider import DeepSeekProvider
+except ImportError:
+    DeepSeekProvider = None
+
 __all__ = [
     "CountingLLMProvider",
     "LLMProvider",
     "LLMResponse",
     "OllamaProvider",
     "OpenAIProvider",
+    "DeepSeekProvider",
 ]
