@@ -34,7 +34,7 @@ class VerbalGradientConfig:
     max_llm_calls_per_generation: int = 2
     llm_model: str | None = None
     temperature: float = 0.2
-    max_chars: int = 1400
+    max_chars: int = 2000
 
     def __post_init__(self) -> None:
         self.enabled = bool(self.enabled)
@@ -42,7 +42,8 @@ class VerbalGradientConfig:
         self.llm_enabled = bool(self.llm_enabled)
         self.llm_every_n_generations = int(self.llm_every_n_generations)
         self.max_llm_calls_per_generation = int(self.max_llm_calls_per_generation)
-        self.llm_model = str(self.llm_model).strip() if self.llm_model is not None else None
+        if self.llm_model is not None:
+            self.llm_model = str(self.llm_model).strip() or None
         self.temperature = float(self.temperature)
         self.max_chars = int(self.max_chars)
         if self.llm_every_n_generations < 1:

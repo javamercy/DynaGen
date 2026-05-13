@@ -12,6 +12,8 @@ from dynagen.persistence.serialization import dump_json
 from dynagen.problems import problem_for_config
 from dynagen.reporting.summary import build_final_report
 
+_UNSET = object()
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dynagen")
@@ -60,10 +62,21 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
+        feedback_provider = None
+        gradient_config = config.evolution.verbal_gradients
+        if gradient_config.enabled and gradient_config.llm_enabled:
+            feedback_model = gradient_config.llm_model or config.llm.model
+            feedback_provider = provider if feedback_model == config.llm.model else _provider_from_config(
+                config,
+                model_override=feedback_model,
+                configured_budget=None,
+            )
+
         store = RunStore.create(config.output_dir, config.name, config.to_dict())
         population = EvolutionEngine(
             config=config,
             provider=provider,
+            feedback_provider=feedback_provider,
             search_evaluator=search_evaluator,
             test_evaluator=test_evaluator,
             store=store,
@@ -155,17 +168,24 @@ def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = Fal
         raise ValueError(f"Could not read candidate file {candidate_path}: {exc}") from exc
 
 
-def _provider_from_config(config: RunConfig):
+def _provider_from_config(
+        config: RunConfig,
+        *,
+        model_override: str | None = None,
+        configured_budget: int | None | object = _UNSET,
+):
+    model = model_override or config.llm.model
+    budget = scheduled_llm_calls(config) if configured_budget is _UNSET else configured_budget
     if config.llm.provider == "openai":
         from dynagen.llm.openai_provider import OpenAIProvider
 
-        provider = OpenAIProvider(model=config.llm.model, api_key_env=config.llm.api_key_env)
-        return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
+        provider = OpenAIProvider(model=model, api_key_env=config.llm.api_key_env)
+        return CountingLLMProvider(provider, configured_budget=budget)
     if config.llm.provider.startswith("ollama"):
         from dynagen.llm.ollama_provider import OllamaProvider
 
-        provider = OllamaProvider(model=config.llm.model)
-        return CountingLLMProvider(provider, configured_budget=scheduled_llm_calls(config))
+        provider = OllamaProvider(model=model)
+        return CountingLLMProvider(provider, configured_budget=budget)
     raise ValueError(f"Unsupported provider: {config.llm.provider}")
 
 

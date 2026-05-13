@@ -41,12 +41,14 @@ class EvolutionEngine:
             *,
             config: RunConfig,
             provider: LLMProvider,
+            feedback_provider: LLMProvider | None = None,
             search_evaluator: CandidateEvaluator,
             test_evaluator: CandidateEvaluator,
             store: RunStore,
     ) -> None:
         self.config = config
         self.provider = provider
+        self.feedback_provider = feedback_provider or provider
         self.search_evaluator = search_evaluator
         self.test_evaluator = test_evaluator
         self.store = store
@@ -95,28 +97,36 @@ class EvolutionEngine:
         return population
 
     def _llm_call_summary(self) -> dict:
-        summary_getter = getattr(self.provider, "summary", None)
-        summary = dict(summary_getter()) if callable(summary_getter) else {}
+        provider_summaries = self._provider_summaries()
         configured_budget = scheduled_llm_calls(self.config)
-        summary.setdefault("candidate_generation_calls", None)
-        summary.setdefault("reflection_calls", None)
-        summary.setdefault("total_api_calls", None)
-        summary.setdefault("failed_calls", None)
-        summary["llm_model"] = getattr(self.provider, "model", None)
-        summary["configured_candidate_generation_budget"] = configured_budget
-        calls = summary.get("candidate_generation_calls")
-        summary["budget_match"] = calls == configured_budget if calls is not None else None
-        feedback_calls = summary.get("feedback_calls", summary.get("reflection_calls"))
-        if feedback_calls is None:
-            feedback_calls = self._verbal_gradient_stats["llm_count"] + self._verbal_gradient_stats["llm_error_count"]
-        summary["feedback_calls"] = feedback_calls
-        if summary.get("reflection_calls") is None:
-            summary["reflection_calls"] = feedback_calls
-        summary["verbal_gradients"] = {
-            "enabled": self.config.evolution.verbal_gradients.enabled,
-            "static_enabled": self.config.evolution.verbal_gradients.static_enabled,
-            "llm_enabled": self.config.evolution.verbal_gradients.llm_enabled,
-            **self._verbal_gradient_stats,
+        main_summary = provider_summaries[0] if provider_summaries else {}
+        feedback_summary = provider_summaries[1] if len(provider_summaries) > 1 else main_summary
+        main_model = main_summary.get("llm_model") or getattr(self.provider, "model", None)
+        feedback_model = feedback_summary.get("llm_model") or getattr(self.feedback_provider, "model", None)
+        candidate_generation_calls = self._sum_provider_metric(provider_summaries, key="candidate_generation_calls") or 0
+        feedback_calls = self._sum_provider_metric(provider_summaries, key="feedback_calls") or 0
+        total_api_calls = self._sum_provider_metric(provider_summaries, key="total_api_calls") or 0
+        failed_calls = self._sum_provider_metric(provider_summaries, key="failed_calls") or 0
+        summary = {
+            "llm_model": main_model,
+            "feedback_llm_model": feedback_model,
+            "candidate_generation_calls": candidate_generation_calls,
+            "feedback_calls": feedback_calls,
+            "reflection_calls": feedback_calls,
+            "total_api_calls": total_api_calls,
+            "failed_calls": failed_calls,
+            "configured_candidate_generation_budget": configured_budget,
+            "budget_match": candidate_generation_calls == configured_budget,
+            "verbal_gradients": {
+                "enabled": self.config.evolution.verbal_gradients.enabled,
+                "static_enabled": self.config.evolution.verbal_gradients.static_enabled,
+                "llm_enabled": self.config.evolution.verbal_gradients.llm_enabled,
+                "llm_every_n_generations": self.config.evolution.verbal_gradients.llm_every_n_generations,
+                "llm_model": self.config.evolution.verbal_gradients.llm_model or feedback_model or main_model,
+                "feedback_llm_model": feedback_model,
+                "temperature": self.config.evolution.verbal_gradients.temperature,
+                **self._verbal_gradient_stats,
+            },
         }
         return summary
 
@@ -287,7 +297,11 @@ class EvolutionEngine:
             generation: int,
     ) -> None:
         gradient_config = self.config.evolution.verbal_gradients
-        if not gradient_config.enabled:
+        if (
+            not gradient_config.enabled
+            or not gradient_config.llm_enabled
+            or generation % gradient_config.llm_every_n_generations != 0
+        ):
             return
         for parent in parents:
             parent_parents = self._resolve_parents(parent)
@@ -321,7 +335,7 @@ class EvolutionEngine:
             static_gradient: dict,
     ) -> None:
         prompt_builder = getattr(self.problem, "build_llm_verbal_gradient_prompt", None)
-        text_completion = getattr(self.provider, "complete_text", None)
+        text_completion = getattr(self.feedback_provider, "complete_text", None)
         if not callable(prompt_builder) or not callable(text_completion):
             return
         gradient_config = self.config.evolution.verbal_gradients
@@ -337,7 +351,7 @@ class EvolutionEngine:
             "candidate_id": candidate.id,
             "problem": self.config.problem.type,
             "prompt": prompt,
-            "model": getattr(self.provider, "model", None),
+            "model": getattr(self.feedback_provider, "model", None),
             "status": "ok",
         }
         self._llm_gradient_calls_by_generation[generation] = (
@@ -350,7 +364,7 @@ class EvolutionEngine:
                 static_gradient=static_gradient,
                 candidate=candidate,
                 parents=parents,
-                generation=candidate.generation,
+                generation=generation,
             )
             set_candidate_gradient(candidate, gradient)
             feedback_record["response"] = text
@@ -367,6 +381,33 @@ class EvolutionEngine:
         self.store.save_feedback(feedback_record)
         self.store.save_candidate(candidate)
 
+    def _provider_summary(self, provider: LLMProvider | None) -> dict[str, object]:
+        if provider is None:
+            return {}
+        summary_getter = getattr(provider, "summary", None)
+        summary = dict(summary_getter()) if callable(summary_getter) else {}
+        model = summary.get("llm_model") or getattr(provider, "model", None)
+        if model is not None:
+            summary["llm_model"] = model
+        return summary
+
+    def _sum_provider_metric(
+            self,
+            summaries: list[dict[str, object]],
+            *,
+            key: str,
+    ) -> int | None:
+        values: list[int] = []
+        for summary in summaries:
+            value = summary.get(key)
+            if value is None:
+                continue
+            try:
+                values.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        return None if not values else sum(values)
+
     def _feedback_context(self, strategy: Strategy, parents: list[Candidate]) -> str:
         gradient_config = self.config.evolution.verbal_gradients
         if not gradient_config.enabled:
@@ -376,6 +417,13 @@ class EvolutionEngine:
             strategy=strategy,
             max_chars=gradient_config.max_chars,
         )
+
+    def _provider_summaries(self) -> list[dict[str, object]]:
+        providers: list[LLMProvider] = [self.provider]
+        if self.feedback_provider is not self.provider:
+            providers.append(self.feedback_provider)
+        summaries = [self._provider_summary(provider) for provider in providers]
+        return [summary for summary in summaries if summary]
 
     def _resolve_parents(self, candidate: Candidate) -> list[Candidate]:
         return [

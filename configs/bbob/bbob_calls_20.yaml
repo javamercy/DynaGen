@@ -23,9 +23,17 @@ llm:
 
 evolution:
   population_size: 3
-  generations: 5
+  generations: 6
   offspring_per_strategy: 1
   strategies: [ S1, S2, S3 ]
+  verbal_gradients:
+    enabled: true
+    static_enabled: true
+    llm_enabled: true
+    llm_every_n_generations: 2
+    max_llm_calls_per_generation: 2
+    llm_model: gpt-5.4-nano
+    temperature: 0.3
 
 evaluation:
   budget: 2000

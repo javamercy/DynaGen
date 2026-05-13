@@ -57,6 +57,10 @@ class CountingLLMProvider(LLMProvider):
             return self._failed_calls
 
     @property
+    def model(self) -> str | None:
+        return getattr(self.provider, "model", None)
+
+    @property
     def reflection_calls(self) -> int:
         return self.feedback_calls
 
@@ -111,6 +115,7 @@ class CountingLLMProvider(LLMProvider):
             "failed_calls": failed,
             "configured_candidate_generation_budget": self.configured_budget,
             "budget_match": budget_match,
+            "llm_model": self.model,
         }
 
     def _record_call(self) -> None:

@@ -121,5 +121,5 @@ Compare these artifacts from each run:
 - `llm_calls.json`
 - `test_result.json`
 
-Include the `model` field from `llm_calls.json` and the `llm_model` field from `test_result.json` when reporting
-results.
+Include the `llm_model` and `feedback_llm_model` fields from `llm_calls.json` and the `llm_model` field from
+`test_result.json` when reporting results.

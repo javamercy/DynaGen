@@ -135,7 +135,8 @@ def build_final_report(
                 f"- Feedback calls: {llm_calls.get('feedback_calls')}",
                 f"- Total API calls: {llm_calls.get('total_api_calls')}",
                 f"- Failed calls: {llm_calls.get('failed_calls')}",
-                f"- LLM model: {llm_calls.get('llm_model') or llm_calls.get('model')}",
+                f"- Main LLM model: {llm_calls.get('llm_model') or llm_calls.get('model')}",
+                f"- Feedback LLM model: {llm_calls.get('feedback_llm_model') or llm_calls.get('llm_model')}",
                 f"- Configured candidate-generation budget: {llm_calls.get('configured_candidate_generation_budget')}",
                 f"- Budget match: {llm_calls.get('budget_match')}",
             ]
@@ -144,6 +145,8 @@ def build_final_report(
         if isinstance(verbal_gradients, dict):
             lines.extend([
                 f"- Verbal gradients enabled: {verbal_gradients.get('enabled')}",
+                f"- Verbal gradient cadence: every {verbal_gradients.get('llm_every_n_generations')} generations",
+                f"- Verbal gradient model: {verbal_gradients.get('llm_model')}",
                 f"- Static verbal gradients: {verbal_gradients.get('static_count')}",
                 f"- LLM verbal gradients: {verbal_gradients.get('llm_count')}",
                 f"- LLM verbal gradient errors: {verbal_gradients.get('llm_error_count')}",

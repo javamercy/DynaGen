@@ -18,11 +18,13 @@ from dynagen.persistence.run_store import RunStore
 
 class VerbalGradientTests(unittest.TestCase):
     def test_config_parses_nested_verbal_gradient_options(self) -> None:
-        config = _run_config(llm_enabled=True)
+        config = _run_config(llm_enabled=True, llm_every_n_generations=3, llm_model="feedback-model")
 
         self.assertTrue(config.evolution.verbal_gradients.enabled)
         self.assertTrue(config.evolution.verbal_gradients.llm_enabled)
+        self.assertEqual(config.evolution.verbal_gradients.llm_every_n_generations, 3)
         self.assertEqual(config.evolution.verbal_gradients.max_llm_calls_per_generation, 1)
+        self.assertEqual(config.evolution.verbal_gradients.llm_model, "feedback-model")
         self.assertEqual(config.evolution.verbal_gradients.max_chars, 900)
 
     def test_tsp_static_gradient_records_timeout_weakness(self) -> None:
@@ -82,16 +84,18 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertIn("guarded late-budget", text)
 
     def test_engine_attaches_static_and_cached_llm_gradients(self) -> None:
-        provider = _FakeProvider()
+        provider = _FakeProvider(model="main-model")
+        feedback_provider = _FakeProvider(model="feedback-model")
         search_evaluator = _FakeEvaluator()
         test_evaluator = _FakeEvaluator()
-        config = _run_config(llm_enabled=True)
+        config = _run_config(llm_enabled=True, llm_every_n_generations=1, llm_model="feedback-model")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
             EvolutionEngine(
                 config=config,
                 provider=provider,
+                feedback_provider=feedback_provider,
                 search_evaluator=search_evaluator,
                 test_evaluator=test_evaluator,
                 store=store,
@@ -100,15 +104,47 @@ class VerbalGradientTests(unittest.TestCase):
             initial = store.load_candidate("cand_000001")
             offspring = store.load_candidate("cand_000002")
             initial_prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
+            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(provider.text_calls, 1)
+        self.assertEqual(provider.candidate_calls, 2)
+        self.assertEqual(feedback_provider.text_calls, 1)
         self.assertEqual(get_candidate_gradient(initial)["source"], "static+llm")
         self.assertEqual(get_candidate_gradient(offspring)["source"], "static")
         self.assertIn("PARENT-SPECIFIC VERBAL GRADIENTS", initial_prompt)
+        self.assertEqual(llm_calls["llm_model"], "main-model")
+        self.assertEqual(llm_calls["feedback_llm_model"], "feedback-model")
+        self.assertEqual(llm_calls["feedback_calls"], 1)
+        self.assertEqual(llm_calls["verbal_gradients"]["llm_every_n_generations"], 1)
+
+    def test_engine_skips_llm_feedback_on_non_matching_generation(self) -> None:
+        provider = _FakeProvider(model="main-model")
+        feedback_provider = _FakeProvider(model="feedback-model")
+        search_evaluator = _FakeEvaluator()
+        test_evaluator = _FakeEvaluator()
+        config = _run_config(llm_enabled=True, llm_every_n_generations=2, llm_model="feedback-model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = RunStore(tmpdir)
+            EvolutionEngine(
+                config=config,
+                provider=provider,
+                feedback_provider=feedback_provider,
+                search_evaluator=search_evaluator,
+                test_evaluator=test_evaluator,
+                store=store,
+            ).run()
+
+            initial = store.load_candidate("cand_000001")
+            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(feedback_provider.text_calls, 0)
+        self.assertEqual(get_candidate_gradient(initial)["source"], "static")
+        self.assertEqual(llm_calls["feedback_calls"], 0)
 
 
 class _FakeProvider:
-    def __init__(self) -> None:
+    def __init__(self, *, model: str) -> None:
+        self.model = model
         self.candidate_calls = 0
         self.text_calls = 0
 
@@ -137,6 +173,18 @@ class _FakeProvider:
             },
             "avoid": ["unbounded loops"],
         })
+
+    def summary(self):
+        return {
+            "candidate_generation_calls": self.candidate_calls,
+            "feedback_calls": self.text_calls,
+            "reflection_calls": self.text_calls,
+            "total_api_calls": self.candidate_calls + self.text_calls,
+            "failed_calls": 0,
+            "configured_candidate_generation_budget": None,
+            "budget_match": None,
+            "llm_model": self.model,
+        }
 
 
 class _FakeEvaluator:
@@ -171,7 +219,7 @@ class _FakeEvaluator:
         return EvaluationResult("valid", 10.0, metrics, score_name="distance")
 
 
-def _run_config(*, llm_enabled: bool) -> RunConfig:
+def _run_config(*, llm_enabled: bool, llm_every_n_generations: int = 1, llm_model: str = "feedback-model") -> RunConfig:
     return RunConfig.from_dict({
         "run": {"name": "test", "output_dir": "runs/test", "seed": 1},
         "llm": {
@@ -188,7 +236,9 @@ def _run_config(*, llm_enabled: bool) -> RunConfig:
                 "enabled": True,
                 "static_enabled": True,
                 "llm_enabled": llm_enabled,
+                "llm_every_n_generations": llm_every_n_generations,
                 "max_llm_calls_per_generation": 1,
+                "llm_model": llm_model,
                 "temperature": 0.2,
                 "max_chars": 900,
             },
