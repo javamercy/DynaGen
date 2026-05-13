@@ -33,18 +33,31 @@ def build_dvrp_evolution_prompt(
 ) -> list[dict[str, str]]:
     if strategy not in DVRP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
-    blocks = [
+    """blocks = [
         f"STRATEGY {strategy}: {DVRP_STRATEGY_INSTRUCTIONS[strategy]}",
         "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
+    ] """
+    blocks = [
+    DVRP_POLICY_CONTRACT.strip(),
+    DVRP_INTERNAL_CHECKLIST.strip(),
+    DVRP_RESPONSE_FORMAT.strip(),
+    f"PARENTS:\n{render_dvrp_candidates(parents)}",
     ]
     if generation_reflection:
         blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{generation_reflection}")
+
+    blocks.extend([
+    f"STRATEGY {strategy}: {DVRP_STRATEGY_INSTRUCTIONS[strategy]}",
+    "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
+    ])
+    
+    """    
     blocks.extend([
         f"PARENTS:\n{render_dvrp_candidates(parents)}",
         DVRP_POLICY_CONTRACT.strip(),
         DVRP_INTERNAL_CHECKLIST.strip(),
         DVRP_RESPONSE_FORMAT.strip(),
-    ])
+    ])"""
     user = "\n\n".join(blocks)
     return [
         {"role": "system", "content": "You generate compact online DVRP dispatch policies that minimize last-truck return time."},
