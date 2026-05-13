@@ -6,37 +6,39 @@ from dynagen.prompts.dvrp_templates import (
     render_dvrp_candidates,
 )
 
-
 DVRP_STRATEGY_INSTRUCTIONS = {
-    "S1": """Explore: create a materially different dispatch rule from the parent.
-Use a new customer ranking idea such as spatial zones, customer isolation, depot direction, or truck-competition penalties.
-Do not just rename variables or slightly change constants.""",
+    "S1": """Explore: produce a dispatch policy whose decision mechanism differs fundamentally from the parent.
+First, identify the parent's core decision mechanism in one short phrase — for example scoring, multi-step lookahead, regret comparison, clustering, or fleet-aware coordination.
+Then, choose a different mechanism class and design the new policy around it.
+Keep validity, deterministic seed handling, and budget-bounded per-call work.""",
 
-    "S2": """Mutate and tune: preserve the parent's main structure but improve its scoring formula.
-Adjust weights, thresholds, tie-breaks, and wait behavior to reduce the last-truck return time.
-Make one or two focused changes rather than rewriting the whole policy.""",
+    "S2": """Refine: improve the parent through targeted fixes grounded in its measured behavior.
+First, identify the parent's weakest measured case from its metrics (mean_gap, mean_makespan, gap_by_instance_size) and its prior thought.
+Then, propose one or two focused changes that directly address that weakness.
+Preserve what works; avoid unrelated rewrites.""",
 
-    "S3": """Recombine and simplify: identify the strongest useful idea from each parent and merge them into one compact rule.
-Remove redundant conditions, avoid overfit constants, and resolve conflicts into a single cheap score.
-Do not concatenate policies or run multiple policies sequentially.""",
+    "S3": """Recombine: produce a single coherent policy that captures the common principle behind the parents and introduces new mechanism.
+First, identify the common idea or principle the parents share — the underlying mechanism, not their surface features.
+Then, describe in one sentence a new policy built on that principle, with components not present in any parent.
+Finally, implement it as one decision pass; do not concatenate parents, run them sequentially, vote between them, or branch by instance condition.
+Keep the child simpler than the sum.""",
 }
 
 
 def build_dvrp_evolution_prompt(
-        strategy: str,
-        parents: list[Candidate],
-        *,
-        feedback_context: str = "",
+    strategy: str,
+    parents: list[Candidate],
+    *,
+    generation_reflection: str = "",
 ) -> list[dict[str, str]]:
     if strategy not in DVRP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
     blocks = [
         f"STRATEGY {strategy}: {DVRP_STRATEGY_INSTRUCTIONS[strategy]}",
         "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
-        "When customers are available, prefer assigning one instead of waiting unless waiting is clearly better.",
     ]
-    if feedback_context:
-        blocks.append(feedback_context)
+    if generation_reflection:
+        blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{generation_reflection}")
     blocks.extend([
         f"PARENTS:\n{render_dvrp_candidates(parents)}",
         DVRP_POLICY_CONTRACT.strip(),

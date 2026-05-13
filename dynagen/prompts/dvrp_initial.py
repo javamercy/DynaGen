@@ -18,28 +18,28 @@ class DVRPInitialRole:
 DVRP_INITIAL_ROLES = (
     DVRPInitialRole(
         1,
-        "a greedy distance minimizer",
-        "Choose the customer that most reduces immediate and near-term travel.",
+        "a spatiotemporal structure exploiter",
+        "Infer spatial clusters and temporal patterns from the snapshot to bias the current decision toward structurally good choices.",
     ),
     DVRPInitialRole(
         2,
-        "a fleet balancer",
-        "Prevent one truck from becoming much worse than the others when scores are close.",
+        "an anticipatory insertion planner",
+        "Estimate likely future customer reveals from current geometry and hedge the current choice against them.",
     ),
     DVRPInitialRole(
         3,
-        "a wait minimizer",
-        "Wait only if serving now is likely to be clearly worse than waiting briefly.",
+        "a multi-step lookahead planner",
+        "Use budget to simulate several steps ahead per candidate choice and pick the one with the best estimated makespan contribution.",
     ),
     DVRPInitialRole(
         4,
-        "a cluster follower",
-        "Prefer nearby customers that keep routes compact.",
+        "a fleet-wide coordination strategist",
+        "Decide for the active truck by reasoning about what other trucks would plausibly do, not in isolation.",
     ),
     DVRPInitialRole(
         5,
-        "a depot-aware finisher",
-        "Keep routes short and avoid choices that create expensive returns.",
+        "a regret-based adaptive decider",
+        "Score alternatives by estimated regret of committing now versus deferring, and use budget to refine the estimate.",
     ),
 )
 

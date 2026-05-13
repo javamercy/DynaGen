@@ -6,36 +6,34 @@ DVRP_POLICY_CONTRACT = """
 Implement exactly this interface:
 
 def choose_next_customer(
-    current_position: np.ndarray,
-    depot_position: np.ndarray,
-    truck_positions: np.ndarray,
-    available_customers: np.ndarray,
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
     current_time: float,
     seed: int,
     budget: int,
 ) -> int | None:
 
 Rules:
-- DVRP is an online dispatch problem; minimize time until the last truck returns to the depot.
-- Choose the next customer using only the current online state.
-- available_customers contains only currently known, unserved, unreserved customers.
-- Return an index into available_customers, or None only when waiting is clearly better than serving any visible customer.
+- DVRP is an online dispatch problem; the objective is to minimize the last-truck return time (makespan).
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
 - If available_customers is empty, return None.
-- Use current_position, depot_position, truck_positions, current_time, seed, and budget only.
-- Use seed only for deterministic tie-breaking.
-- Avoid waiting when customers are available; unnecessary waiting directly increases the last-truck finish time.
-- Prefer short assignments, spatial partitioning between trucks, and choices that avoid making one truck finish much later than the rest.
-- Keep each call cheap; this policy may be called hundreds of times in one simulation.
-- Do not hard-code dataset sizes, seeds, truck counts, coordinates, or evaluator-specific details.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- budget bounds compute for this single call; use it for internal lookahead, simulation, or scoring of alternatives if useful.
+- Use seed for any randomness; ties must be deterministic.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
 - Do not read/write files, use network, spawn subprocesses, or call external solvers.
 - Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
-- Keep code compact and robust; avoid heavy recursion, global mutable state, and unbounded loops.
+- No module-level mutable globals; the function may be called many times across instances.
 """
 
 DVRP_INTERNAL_CHECKLIST = """
-Internal check before final JSON: correct choose_next_customer signature, returns None or a valid available_customers index,
-handles empty and one-customer cases, avoids waiting when customers are available, minimizes last-truck return time,
-uses only online state, has bounded per-call work, allowed imports only, no I/O/network/subprocesses.
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers, deterministic use of seed, respects
+budget as a per-call compute cap, no module-level mutable state, allowed imports only, no
+I/O/network/subprocesses.
 """
 
 DVRP_RESPONSE_FORMAT = """
@@ -52,7 +50,11 @@ No Markdown, fences, or text outside JSON. The code string must define choose_ne
 
 
 def dvrp_system_prompt(role: str) -> str:
-    return f"You are {role}. Generate a compact online DVRP dispatch policy that minimizes the last-truck return time."
+    return (
+        f"You are {role}. Generate a compact online DVRP dispatch policy that "
+        "minimizes the last-truck return time. The policy is stateless across "
+        "decisions; do as much useful per-call reasoning as the budget allows."
+    )
 
 
 def render_dvrp_candidates(candidates: list[Candidate]) -> str:
