@@ -4,7 +4,10 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain.dvrp import DVRPInstance, load_dvrp_instances
 from dynagen.evaluation.dvrp_evaluator import DVRPCandidateEvaluator
-from dynagen.evaluation.dvrp_reflection import build_dvrp_llm_reflection_prompt
+from dynagen.evaluation.dvrp_gradient import (
+    build_dvrp_llm_verbal_gradient_prompt,
+    build_dvrp_static_verbal_gradient,
+)
 from dynagen.prompts.dvrp_evolution import build_dvrp_evolution_prompt
 from dynagen.prompts.dvrp_initial import DVRP_INITIAL_ROLES, DVRPInitialRole, build_dvrp_initial_prompt
 
@@ -40,22 +43,37 @@ class DVRPProblem:
             strategy: str,
             parents: list[Candidate],
             *,
-            generation_reflection: str = "",
+            feedback_context: str = "",
     ) -> list[dict[str, str]]:
         return build_dvrp_evolution_prompt(
             strategy,
             parents,
-            generation_reflection=generation_reflection,
+            feedback_context=feedback_context,
         )
 
-    def build_llm_reflection_prompt(
+    def build_static_verbal_gradient(
             self,
             candidate: Candidate,
             *,
             parents: list[Candidate],
             generation: int,
+    ) -> dict[str, Any]:
+        return build_dvrp_static_verbal_gradient(candidate, parents=parents, generation=generation)
+
+    def build_llm_verbal_gradient_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+            static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
-        return build_dvrp_llm_reflection_prompt(candidate, parents=parents, generation=generation)
+        return build_dvrp_llm_verbal_gradient_prompt(
+            candidate,
+            parents=parents,
+            generation=generation,
+            static_gradient=static_gradient,
+        )
 
 
 def create_dvrp_initial_roles(count: int) -> list[DVRPInitialRole]:

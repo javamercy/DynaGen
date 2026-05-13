@@ -26,7 +26,7 @@ def build_dvrp_evolution_prompt(
         strategy: str,
         parents: list[Candidate],
         *,
-        generation_reflection: str = "",
+        feedback_context: str = "",
 ) -> list[dict[str, str]]:
     if strategy not in DVRP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
@@ -35,8 +35,8 @@ def build_dvrp_evolution_prompt(
         "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
         "When customers are available, prefer assigning one instead of waiting unless waiting is clearly better.",
     ]
-    if generation_reflection:
-        blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{generation_reflection}")
+    if feedback_context:
+        blocks.append(feedback_context)
     blocks.extend([
         f"PARENTS:\n{render_dvrp_candidates(parents)}",
         DVRP_POLICY_CONTRACT.strip(),

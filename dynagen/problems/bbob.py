@@ -4,7 +4,10 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain.bbob import BBOBInstance, create_bbob_instances
 from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
-from dynagen.evaluation.bbob_reflection import build_bbob_llm_reflection_prompt
+from dynagen.evaluation.bbob_gradient import (
+    build_bbob_llm_verbal_gradient_prompt,
+    build_bbob_static_verbal_gradient,
+)
 from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
 from dynagen.prompts.bbob_initial import BBOB_INITIAL_ROLES, BBOBInitialRole, build_bbob_initial_prompt
 
@@ -35,22 +38,37 @@ class BBOBProblem:
             strategy: str,
             parents: list[Candidate],
             *,
-            generation_reflection: str = "",
+            feedback_context: str = "",
     ) -> list[dict[str, str]]:
         return build_bbob_evolution_prompt(
             strategy,
             parents,
-            generation_reflection=generation_reflection,
+            feedback_context=feedback_context,
         )
 
-    def build_llm_reflection_prompt(
+    def build_static_verbal_gradient(
             self,
             candidate: Candidate,
             *,
             parents: list[Candidate],
             generation: int,
+    ) -> dict[str, Any]:
+        return build_bbob_static_verbal_gradient(candidate, parents=parents, generation=generation)
+
+    def build_llm_verbal_gradient_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+            static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
-        return build_bbob_llm_reflection_prompt(candidate, parents=parents, generation=generation)
+        return build_bbob_llm_verbal_gradient_prompt(
+            candidate,
+            parents=parents,
+            generation=generation,
+            static_gradient=static_gradient,
+        )
 
 
 def create_bbob_initial_roles(count: int) -> list[BBOBInitialRole]:

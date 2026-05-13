@@ -26,17 +26,52 @@ class LLMConfig:
 
 
 @dataclass
+class VerbalGradientConfig:
+    enabled: bool = True
+    static_enabled: bool = True
+    llm_enabled: bool = False
+    llm_every_n_generations: int = 2
+    max_llm_calls_per_generation: int = 2
+    llm_model: str | None = None
+    temperature: float = 0.2
+    max_chars: int = 1400
+
+    def __post_init__(self) -> None:
+        self.enabled = bool(self.enabled)
+        self.static_enabled = bool(self.static_enabled)
+        self.llm_enabled = bool(self.llm_enabled)
+        self.llm_every_n_generations = int(self.llm_every_n_generations)
+        self.max_llm_calls_per_generation = int(self.max_llm_calls_per_generation)
+        self.llm_model = str(self.llm_model).strip() if self.llm_model is not None else None
+        self.temperature = float(self.temperature)
+        self.max_chars = int(self.max_chars)
+        if self.llm_every_n_generations < 1:
+            raise ValueError("verbal_gradients.llm_every_n_generations must be at least 1")
+        if self.max_llm_calls_per_generation < 0:
+            raise ValueError("verbal_gradients.max_llm_calls_per_generation must be non-negative")
+        if self.temperature < 0 or self.temperature > 2:
+            raise ValueError("verbal_gradients.temperature must be between 0 and 2")
+        if self.max_chars < 200:
+            raise ValueError("verbal_gradients.max_chars must be at least 200")
+
+
+@dataclass
 class EvolutionConfig:
     population_size: int
     generations: int
     offspring_per_strategy: int
     strategies: list[Strategy] = field(default_factory=lambda: list(Strategy))
+    verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
 
     def __post_init__(self) -> None:
         self.population_size = int(self.population_size)
         self.generations = int(self.generations)
         self.offspring_per_strategy = int(self.offspring_per_strategy)
         self.strategies = [Strategy(strategy) for strategy in self.strategies]
+        if isinstance(self.verbal_gradients, dict):
+            self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
+        elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
+            raise ValueError("evolution.verbal_gradients must be a mapping")
         if self.population_size < 1:
             raise ValueError("population_size must be at least 1")
         if self.generations < 0:

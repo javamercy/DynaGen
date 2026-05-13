@@ -26,6 +26,21 @@ def aggregate_dvrp_records(records: list[dict[str, Any]], *, timeout_penalty: fl
         for record in records
         if record.get("makespan") is not None and math.isfinite(float(record["makespan"]))
     ]
+    decisions = [
+        float(record["decisions"])
+        for record in records
+        if record.get("decisions") is not None and math.isfinite(float(record["decisions"]))
+    ]
+    waits = [
+        float(record["waits"])
+        for record in records
+        if record.get("waits") is not None and math.isfinite(float(record["waits"]))
+    ]
+    completed_counts = [
+        float(record["completed_count"])
+        for record in records
+        if record.get("completed_count") is not None and math.isfinite(float(record["completed_count"]))
+    ]
     runtimes = [float(record.get("runtime_seconds", 0.0)) for record in records]
     timeout_count = sum(1 for record in records if record["status"] == "timeout")
     timeout_fraction = timeout_count / len(records) if records else 0.0
@@ -39,6 +54,9 @@ def aggregate_dvrp_records(records: list[dict[str, Any]], *, timeout_penalty: fl
         "invalid_count": sum(1 for record in records if record["status"] == "invalid"),
         "runtime_error_count": sum(1 for record in records if record["status"] == "error"),
         "mean_makespan": _mean(makespans),
+        "mean_decisions": _mean(decisions),
+        "mean_waits": _mean(waits),
+        "mean_completed_count": _mean(completed_counts),
         "mean_gap": mean_gap,
         "timeout_fraction": timeout_fraction,
         "timeout_penalty": float(timeout_penalty),

@@ -24,15 +24,25 @@ class Problem(Protocol):
             strategy: str,
             parents: list[Candidate],
             *,
-            generation_reflection: str = "",
+            feedback_context: str = "",
     ) -> list[dict[str, str]]:
         ...
 
-    def build_llm_reflection_prompt(
+    def build_static_verbal_gradient(
             self,
             candidate: Candidate,
             *,
             parents: list[Candidate],
             generation: int,
+    ) -> dict[str, Any]:
+        ...
+
+    def build_llm_verbal_gradient_prompt(
+            self,
+            candidate: Candidate,
+            *,
+            parents: list[Candidate],
+            generation: int,
+            static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
         ...

@@ -23,6 +23,7 @@ Secondary checks:
 - `total_api_calls`
 - `failed_calls`
 - `budget_match`
+- `feedback_calls` when optional LLM verbal gradients are enabled; this is separate from candidate-generation calls
 
 ## DynaGen
 

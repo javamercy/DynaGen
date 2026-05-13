@@ -11,7 +11,7 @@ TSP_STRATEGY_INSTRUCTIONS = {
     "S1": """Explore: create a complete solver with materially different search behavior from the parent.
 Change a core decision rule or search dynamic, not names or constants. Keep validity, budget use, and early reporting.""",
 
-    "S2": """Refine: use parent metrics and reflection to make one or two targeted fixes.
+    "S2": """Refine: use parent metrics and verbal gradients to make one or two targeted fixes.
 Preserve what works, address measured weakness, and avoid unrelated rewrites.""",
 
     "S3": """Recombine: build one coherent solver from complementary parent strengths.
@@ -23,7 +23,7 @@ def build_tsp_evolution_prompt(
         strategy: str,
         parents: list[Candidate],
         *,
-        generation_reflection: str = "",
+        feedback_context: str = "",
 ) -> list[dict[str, str]]:
     if strategy not in TSP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
@@ -32,8 +32,8 @@ def build_tsp_evolution_prompt(
         f"STRATEGY {strategy}: {TSP_STRATEGY_INSTRUCTIONS[strategy]}",
         "Distance is the search objective for TSP; lower distance is better.",
     ]
-    if generation_reflection:
-        blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{generation_reflection}")
+    if feedback_context:
+        blocks.append(feedback_context)
     blocks.extend([
         f"PARENTS:\n{candidates_context}",
         TSP_SOLVER_CONTRACT.strip(),

@@ -69,7 +69,7 @@ def build_bbob_evolution_prompt(
         strategy: str,
         parents: list[Candidate],
         *,
-        generation_reflection: str = "",
+        feedback_context: str = "",
 ) -> list[dict[str, str]]:
     if strategy not in BBOB_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
@@ -78,8 +78,8 @@ def build_bbob_evolution_prompt(
     STRATEGY: {strategy}
     {BBOB_STRATEGY_INSTRUCTIONS[strategy]}
     MINIMIZATION GOAL: lower objective value under strict budget.
-    When reflection is present, use it as the strongest guidance for what to change next.
-    {f'REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{generation_reflection}' if generation_reflection else ''}
+    When parent-specific verbal gradients are present, use them as the strongest guidance for what to change next.
+    {feedback_context if feedback_context else ''}
     SELECTED PARENT(S) CONTEXT:
     {candidates_context}
 

@@ -132,6 +132,7 @@ def build_final_report(
                 "",
                 f"- Candidate-generation calls: {llm_calls.get('candidate_generation_calls')}",
                 f"- Reflection calls: {llm_calls.get('reflection_calls')}",
+                f"- Feedback calls: {llm_calls.get('feedback_calls')}",
                 f"- Total API calls: {llm_calls.get('total_api_calls')}",
                 f"- Failed calls: {llm_calls.get('failed_calls')}",
                 f"- LLM model: {llm_calls.get('llm_model') or llm_calls.get('model')}",
@@ -139,6 +140,14 @@ def build_final_report(
                 f"- Budget match: {llm_calls.get('budget_match')}",
             ]
         )
+        verbal_gradients = llm_calls.get("verbal_gradients")
+        if isinstance(verbal_gradients, dict):
+            lines.extend([
+                f"- Verbal gradients enabled: {verbal_gradients.get('enabled')}",
+                f"- Static verbal gradients: {verbal_gradients.get('static_count')}",
+                f"- LLM verbal gradients: {verbal_gradients.get('llm_count')}",
+                f"- LLM verbal gradient errors: {verbal_gradients.get('llm_error_count')}",
+            ])
     return "\n".join(lines) + "\n"
 
 

@@ -10,13 +10,18 @@ from dynagen.evaluation.base import CandidateEvaluator
 from dynagen.evolution.population import Population
 from dynagen.evolution.selection import select_parents, select_survivors
 from dynagen.evolution.strategies import parent_count, Strategy
+from dynagen.evolution.verbal_gradient import (
+    candidate_has_llm_gradient,
+    format_parent_verbal_gradients,
+    get_candidate_gradient,
+    parse_llm_verbal_gradient,
+    set_candidate_gradient,
+)
 from dynagen.llm.base import LLMProvider
 from dynagen.persistence.run_store import RunStore
 from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
 from dynagen.reporting.summary import build_final_report, generation_summary
-
-LLM_REFLECTION_PERIOD = 2
 
 
 @dataclass(frozen=True)
@@ -48,6 +53,12 @@ class EvolutionEngine:
         self.problem: Problem = problem_for_config(config)
         self.rng = random.Random(config.seed)
         self._candidate_index: dict[str, Candidate] = {}
+        self._llm_gradient_calls_by_generation: dict[int, int] = {}
+        self._verbal_gradient_stats: dict[str, int] = {
+            "static_count": 0,
+            "llm_count": 0,
+            "llm_error_count": 0,
+        }
 
     def run(self) -> Population:
         population = self._initial_population()
@@ -95,6 +106,18 @@ class EvolutionEngine:
         summary["configured_candidate_generation_budget"] = configured_budget
         calls = summary.get("candidate_generation_calls")
         summary["budget_match"] = calls == configured_budget if calls is not None else None
+        feedback_calls = summary.get("feedback_calls", summary.get("reflection_calls"))
+        if feedback_calls is None:
+            feedback_calls = self._verbal_gradient_stats["llm_count"] + self._verbal_gradient_stats["llm_error_count"]
+        summary["feedback_calls"] = feedback_calls
+        if summary.get("reflection_calls") is None:
+            summary["reflection_calls"] = feedback_calls
+        summary["verbal_gradients"] = {
+            "enabled": self.config.evolution.verbal_gradients.enabled,
+            "static_enabled": self.config.evolution.verbal_gradients.static_enabled,
+            "llm_enabled": self.config.evolution.verbal_gradients.llm_enabled,
+            **self._verbal_gradient_stats,
+        }
         return summary
 
     # ------------------------------------------------------------------
@@ -129,10 +152,7 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def _generate_offspring(self, generation: int, population: Population) -> list[Candidate]:
-        generation_reflection = ""
-        if self._include_llm_reflection(generation):
-            generation_reflection = self._generate_llm_reflection(generation, population.candidates)
-        tasks = self._build_offspring_tasks(generation, population, generation_reflection=generation_reflection)
+        tasks = self._build_offspring_tasks(generation, population)
         offspring = self._execute_tasks_parallel(tasks)
         self._register_candidates(offspring)
         return offspring
@@ -141,18 +161,18 @@ class EvolutionEngine:
             self,
             generation: int,
             population: Population,
-            *,
-            generation_reflection: str = "",
     ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
         for strategy in self.config.evolution.strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
                 parents = self._select_strategy_parents(strategy, population.candidates)
+                self._ensure_parent_verbal_gradients(strategy, parents, generation)
+                feedback_context = self._feedback_context(strategy, parents)
                 messages = self.problem.build_evolution_prompt(
                     strategy,
                     parents,
-                    generation_reflection=generation_reflection,
+                    feedback_context=feedback_context,
                 )
                 prompt = _format_messages(messages)
                 tasks.append(_CandidateTask(
@@ -220,6 +240,7 @@ class EvolutionEngine:
                 )
             else:
                 _mark_candidate_error(candidate, error_details)
+        self._attach_static_verbal_gradient(candidate, task.parents, task.generation)
         self.store.save_candidate(candidate)
         return candidate
 
@@ -230,58 +251,131 @@ class EvolutionEngine:
         metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
-    def _include_llm_reflection(self, generation: int) -> bool:
-        return self.config.problem.type in {"tsp", "bbob", "dvrp"} and generation > 0 and generation % LLM_REFLECTION_PERIOD == 0
+    def _attach_static_verbal_gradient(
+            self,
+            candidate: Candidate,
+            parents: list[Candidate],
+            generation: int,
+    ) -> dict | None:
+        gradient_config = self.config.evolution.verbal_gradients
+        if not gradient_config.enabled or not gradient_config.static_enabled:
+            return None
+        if get_candidate_gradient(candidate):
+            return get_candidate_gradient(candidate)
+        gradient = self._build_static_verbal_gradient(candidate, parents, generation)
+        if gradient is None:
+            return None
+        set_candidate_gradient(candidate, gradient)
+        self._verbal_gradient_stats["static_count"] += 1
+        return gradient
 
-    def _generate_llm_reflection(self, generation: int, candidates: list[Candidate]) -> str:
-        prompt_builder = getattr(self.problem, "build_llm_reflection_prompt", None)
+    def _build_static_verbal_gradient(
+            self,
+            candidate: Candidate,
+            parents: list[Candidate],
+            generation: int,
+    ) -> dict | None:
+        builder = getattr(self.problem, "build_static_verbal_gradient", None)
+        if not callable(builder):
+            return None
+        return dict(builder(candidate, parents=parents, generation=generation))
+
+    def _ensure_parent_verbal_gradients(
+            self,
+            strategy: Strategy,
+            parents: list[Candidate],
+            generation: int,
+    ) -> None:
+        gradient_config = self.config.evolution.verbal_gradients
+        if not gradient_config.enabled:
+            return
+        for parent in parents:
+            parent_parents = self._resolve_parents(parent)
+            static_gradient = get_candidate_gradient(parent)
+            if static_gradient is None and gradient_config.static_enabled:
+                static_gradient = self._attach_static_verbal_gradient(parent, parent_parents, parent.generation)
+                self.store.save_candidate(parent)
+            if not gradient_config.llm_enabled:
+                continue
+            if candidate_has_llm_gradient(parent):
+                continue
+            if self._llm_gradient_calls_by_generation.get(generation, 0) >= gradient_config.max_llm_calls_per_generation:
+                continue
+            if static_gradient is None:
+                static_gradient = self._build_static_verbal_gradient(parent, parent_parents, parent.generation)
+            if static_gradient is None:
+                continue
+            self._generate_llm_verbal_gradient(
+                candidate=parent,
+                parents=parent_parents,
+                generation=generation,
+                static_gradient=static_gradient,
+            )
+
+    def _generate_llm_verbal_gradient(
+            self,
+            *,
+            candidate: Candidate,
+            parents: list[Candidate],
+            generation: int,
+            static_gradient: dict,
+    ) -> None:
+        prompt_builder = getattr(self.problem, "build_llm_verbal_gradient_prompt", None)
         text_completion = getattr(self.provider, "complete_text", None)
         if not callable(prompt_builder) or not callable(text_completion):
-            return ""
-        candidate = self._select_reflection_candidate(candidates)
-        candidate.metrics = candidate.metrics or {}
-        reflection = candidate.metrics.setdefault("reflection", {})
-        if not isinstance(reflection, dict):
-            reflection = {}
-            candidate.metrics["reflection"] = reflection
-        resolved_parents = self._resolve_parents(candidate)
-        prompt = prompt_builder(candidate, parents=resolved_parents, generation=generation)
-        reflection_record = {
+            return
+        gradient_config = self.config.evolution.verbal_gradients
+        prompt = prompt_builder(
+            candidate,
+            parents=parents,
+            generation=generation,
+            static_gradient=static_gradient,
+        )
+        feedback_record = {
+            "type": "verbal_gradient",
             "generation": generation,
             "candidate_id": candidate.id,
-            "cadence": LLM_REFLECTION_PERIOD,
             "problem": self.config.problem.type,
             "prompt": prompt,
             "model": getattr(self.provider, "model", None),
             "status": "ok",
         }
+        self._llm_gradient_calls_by_generation[generation] = (
+            self._llm_gradient_calls_by_generation.get(generation, 0) + 1
+        )
         try:
-            text = text_completion(prompt, temperature=min(self.config.llm.temperature, 0.7))
-            normalized_text = " ".join(text.split())[:1200]
-            reflection["llm_reflection"] = {
-                "generation": generation,
-                "cadence": LLM_REFLECTION_PERIOD,
-                "candidate_id": candidate.id,
-                "text": normalized_text,
-            }
-            reflection_record["response"] = normalized_text
-            self.store.save_candidate(candidate)
-            self.store.save_reflection(reflection_record)
-            return normalized_text
+            text = text_completion(prompt, temperature=gradient_config.temperature)
+            gradient = parse_llm_verbal_gradient(
+                text,
+                static_gradient=static_gradient,
+                candidate=candidate,
+                parents=parents,
+                generation=candidate.generation,
+            )
+            set_candidate_gradient(candidate, gradient)
+            feedback_record["response"] = text
+            feedback_record["gradient"] = gradient
+            self._verbal_gradient_stats["llm_count"] += 1
         except Exception as exc:
-            reflection["llm_reflection_error"] = _exception_details(exc)
-            reflection_record["status"] = "error"
-            reflection_record["error_details"] = _exception_details(exc)
-            self.store.save_reflection(reflection_record)
-            self.store.save_candidate(candidate)
-            return ""
+            existing_gradient = get_candidate_gradient(candidate) or static_gradient
+            existing_gradient = dict(existing_gradient)
+            existing_gradient["llm_error"] = _exception_details(exc)
+            set_candidate_gradient(candidate, existing_gradient)
+            feedback_record["status"] = "error"
+            feedback_record["error_details"] = _exception_details(exc)
+            self._verbal_gradient_stats["llm_error_count"] += 1
+        self.store.save_feedback(feedback_record)
+        self.store.save_candidate(candidate)
 
-    def _select_reflection_candidate(self, candidates: list[Candidate]) -> Candidate:
-        ordered = select_survivors(candidates, len(candidates))
-        for candidate in ordered:
-            if self._resolve_parents(candidate):
-                return candidate
-        return ordered[0]
+    def _feedback_context(self, strategy: Strategy, parents: list[Candidate]) -> str:
+        gradient_config = self.config.evolution.verbal_gradients
+        if not gradient_config.enabled:
+            return ""
+        return format_parent_verbal_gradients(
+            parents,
+            strategy=strategy,
+            max_chars=gradient_config.max_chars,
+        )
 
     def _resolve_parents(self, candidate: Candidate) -> list[Candidate]:
         return [

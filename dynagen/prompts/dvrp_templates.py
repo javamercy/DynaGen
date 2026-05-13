@@ -1,4 +1,5 @@
 from dynagen.candidates.candidate import Candidate
+from dynagen.evolution.verbal_gradient import format_candidate_verbal_gradient
 
 
 DVRP_POLICY_CONTRACT = """
@@ -72,6 +73,9 @@ def _render_dvrp_candidate(candidate: Candidate) -> str:
     ]
     if candidate.error_details:
         parts.append(f"Error details: {candidate.error_details}")
+    gradient = format_candidate_verbal_gradient(candidate)
+    if gradient:
+        parts.extend(["", gradient])
     parts.extend([
         "Code:",
         "```python",

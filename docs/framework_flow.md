@@ -17,7 +17,7 @@ flowchart TD
     G --> I[Search evaluation tasks<br/>search_instances x seeds]
     H --> J[Test evaluation tasks<br/>test_instances x seeds]
 
-    B --> K[Create RunStore<br/>runs/tsp/timestamp_name<br/>config.json, candidates, prompts, generations]
+    B --> K[Create RunStore<br/>runs/tsp/timestamp_name<br/>config.json, candidates, prompts, generations, feedback]
     C --> L[EvolutionEngine.run]
     I --> L
     J --> L
@@ -58,20 +58,19 @@ flowchart TD
     AI --> AK
     AJ --> AK
     AK --> AL[Set candidate status and distance<br/>search: mean_tour_length when valid<br/>test: mean_gap when available<br/>timeout: timeout_distance<br/>invalid/error: inf]
-    Q --> AM[Persist candidate artifacts]
-    AL --> AM[Persist candidate artifacts<br/>candidates/*.json, candidates/*.py, prompts/*.txt]
+    Q --> AL2[Attach static verbal gradient<br/>metrics.verbal_gradient]
+    AL --> AL2[Attach static verbal gradient<br/>metrics.verbal_gradient]
+    AL2 --> AM[Persist candidate artifacts<br/>candidates/*.json, candidates/*.py, prompts/*.txt]
     AM --> AM2{Task batch source?}
 
     AM2 -- initial --> AN[Select generation 0 survivors<br/>status rank, distance, id]
     AN --> AO[Save generation_000<br/>population.json, offspring.json, summary.json]
     AO --> AP{More generations?}
 
-    AP -- Yes --> AQ0{Generation multiple of 2?}
-    AQ0 -- Yes --> AQ1[Call LLM reflection once<br/>selected previous child plus parent code and metrics<br/>store metrics.reflection.llm_reflection]
-    AQ0 -- No --> AQ[Build offspring tasks<br/>for each strategy S1, S2, S3 and offspring_per_strategy]
-    AQ1 --> AQ[Build offspring tasks<br/>inject reflection into every TSP evolution prompt]
-    AQ --> AR[Select parents<br/>S1/S2: 1 parent, S3: 2 parents<br/>rank-biased probabilities]
-    AR --> AT[Build TSP evolution prompt<br/>strategy instructions, parent context with any existing LLM reflection, solver contract]
+    AP -- Yes --> AQ[Build offspring tasks<br/>for each strategy S1, S2, S3 and offspring_per_strategy]
+    AQ --> AR[Select parents<br/>S1/S2: 1 parent, S3: 3 parents<br/>rank-biased probabilities]
+    AR --> AS[Ensure selected parent gradients<br/>static cached on every candidate<br/>optional capped LLM gradient per parent]
+    AS --> AT[Build TSP evolution prompt<br/>strategy instructions, selected parent verbal gradients, parent context, solver contract]
     AT --> N
 
     AM2 -- offspring --> AU[Combine current population and offspring]

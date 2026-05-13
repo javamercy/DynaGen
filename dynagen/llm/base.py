@@ -36,7 +36,7 @@ class CountingLLMProvider(LLMProvider):
         self.provider = provider
         self.configured_budget = configured_budget
         self._candidate_generation_calls = 0
-        self._reflection_calls = 0
+        self._feedback_calls = 0
         self._total_api_calls = 0
         self._failed_calls = 0
         self._lock = threading.Lock()
@@ -58,8 +58,12 @@ class CountingLLMProvider(LLMProvider):
 
     @property
     def reflection_calls(self) -> int:
+        return self.feedback_calls
+
+    @property
+    def feedback_calls(self) -> int:
         with self._lock:
-            return self._reflection_calls
+            return self._feedback_calls
 
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         self._record_call()
@@ -83,7 +87,7 @@ class CountingLLMProvider(LLMProvider):
             raise
 
     def complete_text(self, messages: list[dict[str, str]], *, temperature: float) -> str:
-        self._record_reflection_call()
+        self._record_feedback_call()
         try:
             return self.provider.complete_text(messages, temperature=temperature)
         except Exception:
@@ -93,7 +97,7 @@ class CountingLLMProvider(LLMProvider):
     def summary(self) -> dict[str, Any]:
         with self._lock:
             calls = self._candidate_generation_calls
-            reflections = self._reflection_calls
+            feedback = self._feedback_calls
             total = self._total_api_calls
             failed = self._failed_calls
         budget_match = None
@@ -101,7 +105,8 @@ class CountingLLMProvider(LLMProvider):
             budget_match = calls == self.configured_budget
         return {
             "candidate_generation_calls": calls,
-            "reflection_calls": reflections,
+            "reflection_calls": feedback,
+            "feedback_calls": feedback,
             "total_api_calls": total,
             "failed_calls": failed,
             "configured_candidate_generation_budget": self.configured_budget,
@@ -113,9 +118,9 @@ class CountingLLMProvider(LLMProvider):
             self._candidate_generation_calls += 1
             self._total_api_calls += 1
 
-    def _record_reflection_call(self) -> None:
+    def _record_feedback_call(self) -> None:
         with self._lock:
-            self._reflection_calls += 1
+            self._feedback_calls += 1
             self._total_api_calls += 1
 
     def _record_failure(self) -> None:

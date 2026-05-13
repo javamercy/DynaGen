@@ -16,10 +16,15 @@ class RunStore:
         self.generations_dir = self.root / "generations"
         self.candidates_dir = self.root / "candidates"
         self.prompts_dir = self.root / "prompts"
-        self.reflections_dir = self.root / "reflections"
+        self.feedback_dir = self.root / "feedback"
         self._counter = self._scan_counter()
         self._counter_lock = threading.Lock()
-        for directory in (self.generations_dir, self.candidates_dir, self.prompts_dir, self.reflections_dir):
+        for directory in (
+                self.generations_dir,
+                self.candidates_dir,
+                self.prompts_dir,
+                self.feedback_dir,
+        ):
             directory.mkdir(parents=True, exist_ok=True)
 
     @classmethod
@@ -87,12 +92,16 @@ class RunStore:
     def save_llm_calls(self, summary: dict[str, Any]) -> None:
         dump_json(self.root / "llm_calls.json", summary)
 
-    def save_reflection(self, reflection: dict[str, Any]) -> None:
-        generation = reflection.get("generation")
-        candidate_id = reflection.get("candidate_id", "unknown")
-        suffix = reflection.get("status", "ok")
-        filename = f"generation_{int(generation):03d}_{candidate_id}_{suffix}.json" if generation is not None else f"{candidate_id}_{suffix}.json"
-        dump_json(self.reflections_dir / filename, reflection)
+    def save_feedback(self, feedback: dict[str, Any]) -> None:
+        generation = feedback.get("generation")
+        candidate_id = feedback.get("candidate_id", "unknown")
+        feedback_type = feedback.get("type", "feedback")
+        suffix = feedback.get("status", "ok")
+        if generation is not None:
+            filename = f"generation_{int(generation):03d}_{candidate_id}_{feedback_type}_{suffix}.json"
+        else:
+            filename = f"{candidate_id}_{feedback_type}_{suffix}.json"
+        dump_json(self.feedback_dir / filename, feedback)
 
     def write_final_report(self, text: str) -> None:
         (self.root / "final_report.md").write_text(text, encoding="utf-8")
