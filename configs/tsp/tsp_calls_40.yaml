@@ -13,6 +13,18 @@ evolution:
   population_size: 4
   generations: 9
   offspring_per_strategy: 1
+  archive:
+    enabled: true
+    max_size: 64
+    max_per_bucket: 4
+    add_statuses: [ valid, evaluated, timeout ]
+    parent_sample_probability: 0.35
+    s3_archive_parent_min: 1
+    final_selection_uses_archive: true
+    deduplicate_code: true
+    diversity_weight: 0.25
+    recency_weight: 0.05
+    robustness_weight: 0.35
 
 evaluation:
   budget: 1000

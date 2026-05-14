@@ -1,7 +1,7 @@
 run:
   name: tsp_calls_20
   output_dir: runs/tsp
-  seed: 69
+  seed: 34
 
 llm:
   provider: openai
@@ -10,9 +10,21 @@ llm:
   api_key_env: OPENAI_API_KEY
 
 evolution:
-  population_size: 2
-  generations: 5
+  population_size: 3
+  generations: 4
   offspring_per_strategy: 1
+  archive:
+    enabled: true
+    max_size: 64
+    max_per_bucket: 4
+    add_statuses: [ valid, evaluated, timeout ]
+    parent_sample_probability: 0.35
+    s3_archive_parent_min: 1
+    final_selection_uses_archive: true
+    deduplicate_code: true
+    diversity_weight: 0.25
+    recency_weight: 0.05
+    robustness_weight: 0.35
   verbal_gradients:
     enabled: true
     static_enabled: true
@@ -20,15 +32,15 @@ evolution:
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 2
     llm_model: gpt-5.4-nano
-    temperature: 0.2
+    temperature: 0.3
 
 evaluation:
-  budget: 10000
-  timeout_seconds: 600
+  budget: 3000
+  timeout_seconds: 120
   timeout_penalty: 0
-  seeds: [ 69 ]
+  seeds: [ 15, 20 ]
   metric: average_gap
 
 data:
-  search_instances: synthetic:llamea:seeds=11,23,69:sizes=32,50,100,200
+  search_instances: synthetic:llamea:seeds=11,23:sizes=50,100,200
   test_instances: data/tsp/test_instances

@@ -7,6 +7,11 @@ from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.evaluation.base import CandidateEvaluator
+from dynagen.evolution.archive import (
+    archive_selection_ids,
+    CandidateArchive,
+    clear_archive_selection,
+)
 from dynagen.evolution.population import Population
 from dynagen.evolution.selection import select_parents, select_survivors
 from dynagen.evolution.strategies import parent_count, Strategy
@@ -55,6 +60,7 @@ class EvolutionEngine:
         self.problem: Problem = problem_for_config(config)
         self.rng = random.Random(config.seed)
         self._candidate_index: dict[str, Candidate] = {}
+        self.archive = CandidateArchive(config=config.evolution.archive, problem=config.problem.type)
         self._llm_gradient_calls_by_generation: dict[int, int] = {}
         self._verbal_gradient_stats: dict[str, int] = {
             "static_count": 0,
@@ -68,24 +74,41 @@ class EvolutionEngine:
             0,
             population=population.candidates,
             offspring=[],
-            summary=generation_summary(0, population.candidates, []),
+            summary=generation_summary(
+                0,
+                population.candidates,
+                [],
+                archive_summary=self._archive_summary(include_entries=False),
+            ),
         )
+        self._save_archive(0)
         for generation in range(1, self.config.evolution.generations + 1):
             offspring = self._generate_offspring(generation, population)
             next_candidates = select_survivors(population.candidates + offspring, self.config.evolution.population_size)
             population = Population(generation=generation, candidates=next_candidates)
-            summary = generation_summary(generation, population.candidates, offspring)
+            summary = generation_summary(
+                generation,
+                population.candidates,
+                offspring,
+                archive_summary=self._archive_summary(include_entries=False),
+            )
             self.store.save_generation(
                 generation,
                 population=population.candidates,
                 offspring=offspring,
                 summary=summary,
             )
-        search_best = population.best
+            self._save_archive(generation)
+        search_best = self._search_best(population)
+        self.archive.mark_final_selection(
+            search_best.id,
+            population_ids={candidate.id for candidate in population.candidates},
+        )
         test_result = self.test_evaluator.evaluate_code(search_best.code)
         self.store.save_test_result(search_best.id, test_result)
         llm_calls = self._llm_call_summary()
         self.store.save_llm_calls(llm_calls)
+        self.store.save_archive_summary(self._archive_summary(include_entries=True))
         self.store.write_final_report(
             build_final_report(
                 population.candidates,
@@ -127,6 +150,7 @@ class EvolutionEngine:
                 "temperature": self.config.evolution.verbal_gradients.temperature,
                 **self._verbal_gradient_stats,
             },
+            "archive": self._archive_summary(include_entries=False),
         }
         return summary
 
@@ -139,6 +163,7 @@ class EvolutionEngine:
         tasks = self._build_initial_tasks(roles)
         candidates = self._execute_tasks_parallel(tasks)
         self._register_candidates(candidates)
+        self._update_archive(candidates, generation=0)
         return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
 
     def _build_initial_tasks(self, roles: list) -> list[_CandidateTask]:
@@ -165,6 +190,7 @@ class EvolutionEngine:
         tasks = self._build_offspring_tasks(generation, population)
         offspring = self._execute_tasks_parallel(tasks)
         self._register_candidates(offspring)
+        self._update_archive(offspring, generation=generation)
         return offspring
 
     def _build_offspring_tasks(
@@ -255,7 +281,66 @@ class EvolutionEngine:
         return candidate
 
     def _select_strategy_parents(self, strategy: Strategy, candidates: list[Candidate]) -> list[Candidate]:
-        return select_parents(candidates, parent_count(strategy), self.rng)
+        count = parent_count(strategy)
+        if not self.archive.enabled or not self.archive.entries:
+            parents = select_parents(candidates, count, self.rng)
+            clear_archive_selection(parents)
+            return parents
+
+        selected: list[Candidate] = []
+        selected_ids: set[str] = set()
+        archive_min = (
+            self.config.evolution.archive.s3_archive_parent_min
+            if strategy == Strategy.S3
+            else 0
+        )
+        archive_min = min(archive_min, count)
+        if archive_min:
+            selected.extend(self.archive.select_parents(
+                count=archive_min,
+                rng=self.rng,
+                candidate_index=self._candidate_index,
+                exclude_ids=selected_ids,
+                diversify_buckets=True,
+            ))
+            selected_ids.update(candidate.id for candidate in selected)
+
+        while len(selected) < count:
+            remaining = count - len(selected)
+            use_archive = self.rng.random() < self.config.evolution.archive.parent_sample_probability
+            next_parent: list[Candidate] = []
+            if use_archive:
+                next_parent = self.archive.select_parents(
+                    count=1,
+                    rng=self.rng,
+                    candidate_index=self._candidate_index,
+                    exclude_ids=selected_ids,
+                    diversify_buckets=strategy == Strategy.S3,
+                )
+            if not next_parent:
+                pool = [candidate for candidate in candidates if candidate.id not in selected_ids]
+                if pool:
+                    next_parent = select_parents(pool, min(1, remaining), self.rng)
+                    clear_archive_selection(next_parent)
+            if not next_parent and not use_archive:
+                next_parent = self.archive.select_parents(
+                    count=1,
+                    rng=self.rng,
+                    candidate_index=self._candidate_index,
+                    exclude_ids=selected_ids,
+                    diversify_buckets=strategy == Strategy.S3,
+                )
+            if not next_parent:
+                break
+            selected.extend(next_parent)
+            selected_ids.update(candidate.id for candidate in next_parent)
+
+        if not selected:
+            selected = select_parents(candidates, count, self.rng)
+            clear_archive_selection(selected)
+        if archive_selection_ids(selected):
+            self.archive.note_offspring_with_archive_parent()
+        return selected
 
     def _empty_metrics(self) -> dict:
         metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
@@ -424,6 +509,38 @@ class EvolutionEngine:
             providers.append(self.feedback_provider)
         summaries = [self._provider_summary(provider) for provider in providers]
         return [summary for summary in summaries if summary]
+
+    def _update_archive(self, candidates: list[Candidate], *, generation: int) -> None:
+        if not self.archive.enabled:
+            return
+        profile_builder = getattr(self.problem, "build_archive_profile", None)
+        if not callable(profile_builder):
+            return
+        self.archive.update(
+            candidates,
+            generation=generation,
+            profile_builder=profile_builder,
+        )
+        for candidate in candidates:
+            self.store.save_candidate(candidate)
+
+    def _save_archive(self, generation: int) -> None:
+        if self.archive.enabled:
+            self.store.save_archive(generation, self._archive_summary(include_entries=True))
+
+    def _archive_summary(self, *, include_entries: bool) -> dict:
+        return self.archive.summary(include_entries=include_entries)
+
+    def _search_best(self, population: Population) -> Candidate:
+        if (
+            not self.archive.enabled
+            or not self.config.evolution.archive.final_selection_uses_archive
+        ):
+            return population.best
+        candidates_by_id = {candidate.id: candidate for candidate in population.candidates}
+        for candidate in self.archive.candidates(self._candidate_index):
+            candidates_by_id.setdefault(candidate.id, candidate)
+        return select_survivors(list(candidates_by_id.values()), 1)[0]
 
     def _resolve_parents(self, candidate: Candidate) -> list[Candidate]:
         return [

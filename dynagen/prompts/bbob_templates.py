@@ -1,4 +1,5 @@
 from dynagen.candidates.candidate import Candidate
+from dynagen.evolution.archive import format_archive_parent_context
 
 BBOB_SOLVER_CONTRACT = """
 Implement a complete continuous black-box optimizer with exactly this interface:
@@ -116,4 +117,7 @@ def _render_bbob_candidate(candidate: Candidate) -> str:
     ]
     if candidate.error_details:
         parts.insert(6, f"Error details: {candidate.error_details}")
+    archive_context = format_archive_parent_context(candidate)
+    if archive_context:
+        parts.insert(6 if not candidate.error_details else 7, archive_context)
     return "\n".join(parts)

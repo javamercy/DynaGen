@@ -46,3 +46,6 @@ class Problem(Protocol):
             static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
         ...
+
+    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
+        ...

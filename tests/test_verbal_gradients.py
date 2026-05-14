@@ -86,6 +86,39 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertIn("Next S2 mutation", text)
         self.assertIn("guarded late-budget", text)
 
+    def test_s3_parent_gradient_formatting_is_compact_and_keeps_all_parents(self) -> None:
+        parents = [
+            Candidate(
+                id=f"cand_{index}",
+                generation=0,
+                strategy="initial:1",
+                name="solver",
+                metrics={
+                    "problem": "tsp",
+                    "score_name": "distance",
+                    VERBAL_GRADIENT_KEY: {
+                        "source": "static",
+                        "summary": " ".join(["long summary about large instances and timeout risk"] * 6),
+                        "preserve": ["early reporting", "valid incumbent", "seeded construction"],
+                        "weaknesses": ["large instances", "timeout risk", "weak source bucket"],
+                        "next_mutations": {"S3": "Use only the complementary mechanism and avoid copying slow loops."},
+                        "avoid": ["unbounded all-pairs neighborhoods", "late reporting"],
+                    },
+                },
+                distance=10.0,
+                status=CandidateStatus.VALID,
+            )
+            for index in range(1, 4)
+        ]
+
+        text = format_parent_verbal_gradients(parents, strategy="S3", max_chars=1200)
+
+        self.assertLessEqual(len(text), 1200)
+        self.assertIn("Parent cand_1 gradient", text)
+        self.assertIn("Parent cand_2 gradient", text)
+        self.assertIn("Parent cand_3 gradient", text)
+        self.assertNotIn("- Summary: " + "long summary about large instances and timeout risk " * 3, text)
+
     def test_parent_renderers_do_not_duplicate_verbal_gradient_block(self) -> None:
         gradient = {
             "source": "static",

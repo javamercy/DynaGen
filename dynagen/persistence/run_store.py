@@ -17,6 +17,7 @@ class RunStore:
         self.candidates_dir = self.root / "candidates"
         self.prompts_dir = self.root / "prompts"
         self.feedback_dir = self.root / "feedback"
+        self.archive_dir = self.root / "archive"
         self._counter = self._scan_counter()
         self._counter_lock = threading.Lock()
         for directory in (
@@ -24,6 +25,7 @@ class RunStore:
                 self.candidates_dir,
                 self.prompts_dir,
                 self.feedback_dir,
+                self.archive_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -91,6 +93,13 @@ class RunStore:
 
     def save_llm_calls(self, summary: dict[str, Any]) -> None:
         dump_json(self.root / "llm_calls.json", summary)
+
+    def save_archive(self, generation: int, summary: dict[str, Any]) -> None:
+        dump_json(self.archive_dir / "archive.json", summary)
+        dump_json(self.archive_dir / f"generation_{generation:03d}.json", summary)
+
+    def save_archive_summary(self, summary: dict[str, Any]) -> None:
+        dump_json(self.root / "archive_summary.json", summary)
 
     def save_feedback(self, feedback: dict[str, Any]) -> None:
         generation = feedback.get("generation")
