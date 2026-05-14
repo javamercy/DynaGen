@@ -107,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         population = EvolutionEngine(
             config=config,
             provider=provider,
+            feedback_provider=feedback_provider,
             search_evaluator=search_evaluator,
             test_evaluator=test_evaluator,
             store=store,
