@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 
 from dynagen.baselines.bbob import get_bbob_baseline_code
+from dynagen.baselines.dvrp import get_dvrp_baseline_code
+from dynagen.baselines.tsp import get_tsp_baseline_code
 from dynagen.comparison.bbob import build_bbob_comparison_report, compare_bbob_candidate
 from dynagen.config import RunConfig, load_config
 from dynagen.evolution.engine import EvolutionEngine, scheduled_llm_calls
@@ -41,6 +43,35 @@ def main(argv: list[str] | None = None) -> int:
     compare_candidate_group.add_argument("--candidate-baseline")
     compare_parser.add_argument("--config", required=True, type=Path)
     compare_parser.add_argument("--output", type=Path)
+
+    dvrp_baselines_parser = subparsers.add_parser(
+        "run-dvrp-baselines",
+        help="Evaluate static DVRP baselines on the configured DVRP test pool",
+    )
+    dvrp_baselines_parser.add_argument("--config", required=True, type=Path)
+    dvrp_baselines_parser.add_argument("--baselines", nargs="*", default=["greedy", "heuristic"])
+
+    bbob_baselines_parser = subparsers.add_parser(
+        "run-bbob-baselines",
+        help="Evaluate static BBOB baselines on the configured BBOB test pool",
+    )
+    bbob_baselines_parser.add_argument("--config", required=True, type=Path)
+    bbob_baselines_parser.add_argument(
+        "--baselines",
+        nargs="*",
+        default=["random_search", "differential_evolution"],
+    )
+
+    tsp_baselines_parser = subparsers.add_parser(
+        "run-tsp-baselines",
+        help="Evaluate static TSP baselines on the configured TSP test pool",
+    )
+    tsp_baselines_parser.add_argument("--config", required=True, type=Path)
+    tsp_baselines_parser.add_argument(
+        "--baselines",
+        nargs="*",
+        default=["random_shuffle", "nearest_neighbor", "two_opt", "cheapest_insertion", "random_restart"],
+    )
 
     args = parser.parse_args(argv)
     if args.command == "init-run":
@@ -134,6 +165,105 @@ def main(argv: list[str] | None = None) -> int:
             print(report_path)
         else:
             print(report)
+        return 0
+    if args.command == "run-dvrp-baselines":
+        config = load_config(args.config)
+        if config.problem.type != "dvrp":
+            print("error: run-dvrp-baselines requires problem.type: dvrp", file=sys.stderr)
+            return 2
+        try:
+            evaluator = _build_evaluator(config, pool_name="test_instances")
+        except (RuntimeError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
+        base_dir = Path(config.output_dir) / "baselines"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        for baseline_name in args.baselines:
+            try:
+                code = get_dvrp_baseline_code(baseline_name)
+            except ValueError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+
+            store = RunStore.create(base_dir, baseline_name, config.to_dict())
+            result = evaluator.evaluate_code(code)
+            store.save_test_result(baseline_name, result)
+            store.write_final_report(
+                "\n".join([
+                    f"baseline={baseline_name}",
+                    f"status={result.status}",
+                    f"{result.score_name}={result.score}",
+                ])
+            )
+            print(store.root)
+        return 0
+    if args.command == "run-bbob-baselines":
+        config = load_config(args.config)
+        if config.problem.type != "bbob":
+            print("error: run-bbob-baselines requires problem.type: bbob", file=sys.stderr)
+            return 2
+        try:
+            evaluator = _build_evaluator(config, pool_name="test_instances")
+        except (RuntimeError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
+        base_dir = Path(config.output_dir) / "baselines"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        for baseline_name in args.baselines:
+            try:
+                code = get_bbob_baseline_code(baseline_name)
+            except ValueError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+
+            store = RunStore.create(base_dir, baseline_name, config.to_dict())
+            result = evaluator.evaluate_code(code)
+            store.save_test_result(baseline_name, result)
+            store.write_final_report(
+                "\n".join([
+                    f"baseline={baseline_name}",
+                    f"status={result.status}",
+                    f"{result.score_name}={result.score}",
+                ])
+            )
+            print(store.root)
+        return 0
+    if args.command == "run-tsp-baselines":
+        config = load_config(args.config)
+        if config.problem.type != "tsp":
+            print("error: run-tsp-baselines requires problem.type: tsp", file=sys.stderr)
+            return 2
+        try:
+            evaluator = _build_evaluator(config, pool_name="test_instances")
+        except (RuntimeError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
+        base_dir = Path(config.output_dir) / "baselines"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        for baseline_name in args.baselines:
+            try:
+                code = get_tsp_baseline_code(baseline_name)
+            except ValueError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+
+            store = RunStore.create(base_dir, baseline_name, config.to_dict())
+            result = evaluator.evaluate_code(code)
+            store.save_test_result(baseline_name, result)
+            store.write_final_report(
+                "\n".join([
+                    f"baseline={baseline_name}",
+                    f"status={result.status}",
+                    f"{result.score_name}={result.score}",
+                ])
+            )
+            print(store.root)
         return 0
     if args.command == "summarize":
         report = args.run / "final_report.md"
