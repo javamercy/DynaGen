@@ -14,6 +14,9 @@ from dynagen.evolution.verbal_gradient import (
     get_candidate_gradient,
 )
 from dynagen.persistence.run_store import RunStore
+from dynagen.prompts.bbob_templates import render_bbob_candidates
+from dynagen.prompts.dvrp_templates import render_dvrp_candidates
+from dynagen.prompts.tsp_templates import render_tsp_candidates
 
 
 class VerbalGradientTests(unittest.TestCase):
@@ -82,6 +85,46 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertIn("PARENT-SPECIFIC VERBAL GRADIENTS", text)
         self.assertIn("Next S2 mutation", text)
         self.assertIn("guarded late-budget", text)
+
+    def test_parent_renderers_do_not_duplicate_verbal_gradient_block(self) -> None:
+        gradient = {
+            "source": "static",
+            "summary": "Do not duplicate this guidance.",
+            "preserve": ["valid incumbent"],
+            "weaknesses": ["large instances"],
+            "next_mutations": {"S2": "Make one focused change."},
+            "avoid": ["unbounded loops"],
+        }
+        candidate = Candidate(
+            id="cand_1",
+            generation=0,
+            strategy="initial:1",
+            name="solver",
+            thought="candidate thought",
+            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            metrics={
+                "problem": "tsp",
+                "score_name": "distance",
+                VERBAL_GRADIENT_KEY: gradient,
+                "mean_aocc": 0.5,
+                "mean_final_error": 1.0,
+                "aocc_by_group": {"separable": 0.5},
+                "mean_gap": 1.0,
+                "mean_makespan": 10.0,
+                "score_by_instance_size": {"33": 1.0},
+            },
+            distance=10.0,
+            status=CandidateStatus.VALID,
+        )
+
+        for rendered in (
+            render_tsp_candidates([candidate]),
+            render_bbob_candidates([candidate]),
+            render_dvrp_candidates([candidate]),
+        ):
+            self.assertIn("Code:", rendered)
+            self.assertNotIn("Parent cand_1 gradient", rendered)
+            self.assertNotIn("Do not duplicate this guidance.", rendered)
 
     def test_engine_attaches_static_and_cached_llm_gradients(self) -> None:
         provider = _FakeProvider(model="main-model")

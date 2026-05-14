@@ -1,5 +1,4 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.evolution.verbal_gradient import format_candidate_verbal_gradient
 
 BBOB_SOLVER_CONTRACT = """
 Implement a complete continuous black-box optimizer with exactly this interface:
@@ -117,7 +116,4 @@ def _render_bbob_candidate(candidate: Candidate) -> str:
     ]
     if candidate.error_details:
         parts.insert(6, f"Error details: {candidate.error_details}")
-    gradient = format_candidate_verbal_gradient(candidate)
-    if gradient:
-        parts.extend(["", gradient])
     return "\n".join(parts)

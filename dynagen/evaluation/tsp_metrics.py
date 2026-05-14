@@ -55,8 +55,12 @@ def aggregate_tsp_records(records: list[dict[str, Any]], *, timeout_penalty: flo
         "worst_gap": max(gaps) if gaps else None,
         "best_gap": min(gaps) if gaps else None,
         "mean_runtime": _mean(runtimes),
-        "score_by_instance_size": _group_mean_gap(records, "dimension"),
-        "score_by_instance_source": _group_mean_gap(records, "source"),
+        "score_by_instance_size": _group_mean_primary_score(records, "dimension"),
+        "score_by_instance_source": _group_mean_primary_score(records, "source"),
+        "gap_by_instance_size": _group_mean_gap(records, "dimension"),
+        "gap_by_instance_source": _group_mean_gap(records, "source"),
+        "tour_length_by_instance_size": _group_mean_number(records, "dimension", "tour_length"),
+        "tour_length_by_instance_source": _group_mean_number(records, "source", "tour_length"),
         "records": records,
     }
     return metrics
@@ -75,6 +79,16 @@ def _has_finite_gap(record: dict[str, Any]) -> bool:
     return gap is not None and math.isfinite(gap)
 
 
+def _group_mean_primary_score(records: list[dict[str, Any]], key: str) -> dict[str, float | None]:
+    groups: dict[str, list[float]] = defaultdict(list)
+    all_keys = {str(record.get(key, "unknown")) for record in records}
+    for record in records:
+        score = _primary_score(record)
+        if score is not None:
+            groups[str(record.get(key, "unknown"))].append(score)
+    return {group: _mean(groups[group]) for group in sorted(all_keys)}
+
+
 def _group_mean_gap(records: list[dict[str, Any]], key: str) -> dict[str, float | None]:
     groups: dict[str, list[float]] = defaultdict(list)
     all_keys = {str(record.get(key, "unknown")) for record in records}
@@ -82,3 +96,22 @@ def _group_mean_gap(records: list[dict[str, Any]], key: str) -> dict[str, float 
         if _has_finite_gap(record):
             groups[str(record.get(key, "unknown"))].append(float(record["gap"]))
     return {group: _mean(groups[group]) for group in sorted(all_keys)}
+
+
+def _group_mean_number(records: list[dict[str, Any]], group_key: str, value_key: str) -> dict[str, float | None]:
+    groups: dict[str, list[float]] = defaultdict(list)
+    all_keys = {str(record.get(group_key, "unknown")) for record in records}
+    for record in records:
+        value = record.get(value_key)
+        if value is not None and math.isfinite(float(value)):
+            groups[str(record.get(group_key, "unknown"))].append(float(value))
+    return {group: _mean(groups[group]) for group in sorted(all_keys)}
+
+
+def _primary_score(record: dict[str, Any]) -> float | None:
+    if _has_finite_gap(record):
+        return float(record["gap"])
+    tour_length = record.get("tour_length")
+    if tour_length is not None and math.isfinite(float(tour_length)):
+        return float(tour_length)
+    return None

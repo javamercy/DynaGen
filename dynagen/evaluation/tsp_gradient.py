@@ -98,6 +98,10 @@ def build_tsp_static_verbal_gradient(
         "mean_runtime": metrics.get("mean_runtime"),
         "score_by_instance_size": metrics.get("score_by_instance_size"),
         "score_by_instance_source": metrics.get("score_by_instance_source"),
+        "gap_by_instance_size": metrics.get("gap_by_instance_size"),
+        "gap_by_instance_source": metrics.get("gap_by_instance_source"),
+        "tour_length_by_instance_size": metrics.get("tour_length_by_instance_size"),
+        "tour_length_by_instance_source": metrics.get("tour_length_by_instance_source"),
         "error_details": candidate.error_details,
     }
     return base_verbal_gradient(

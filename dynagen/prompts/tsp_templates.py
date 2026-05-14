@@ -1,5 +1,4 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.evolution.verbal_gradient import format_candidate_verbal_gradient
 
 TSP_SOLVER_CONTRACT = """
 Implement exactly this interface:
@@ -59,10 +58,6 @@ def _render_tsp_candidate(candidate: Candidate) -> str:
 
     if candidate.error_details:
         parts.append(f"Error details: {candidate.error_details}")
-
-    gradient = format_candidate_verbal_gradient(candidate)
-    if gradient:
-        parts.extend(["", gradient])
 
     parts.extend([
         "Code:",

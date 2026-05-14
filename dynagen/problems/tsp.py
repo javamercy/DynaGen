@@ -5,7 +5,7 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_spec
+from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_specs
 from dynagen.evaluation.tsp_gradient import (
     build_tsp_llm_verbal_gradient_prompt,
     build_tsp_static_verbal_gradient,
@@ -85,10 +85,12 @@ def load_tsp_instances(path: str | Path | None) -> list[TSPInstance]:
     if not path:
         raise ValueError("TSP data.search_instances and data.test_instances must be specified")
 
-    synthetic_spec = parse_llamea_tsp_spec(str(path))
-    if synthetic_spec is not None:
-        seed, size = synthetic_spec
-        return [generate_llamea_tsp_instance(seed=seed, size=size)]
+    synthetic_specs = parse_llamea_tsp_specs(str(path))
+    if synthetic_specs is not None:
+        return [
+            generate_llamea_tsp_instance(seed=seed, size=size)
+            for seed, size in synthetic_specs
+        ]
 
     path = Path(path)
     if path.is_dir():
