@@ -50,6 +50,26 @@ class MetricVectorSelectionTests(unittest.TestCase):
 
         self.assertEqual(survivors[0].id, "cand_1")
 
+    def test_timeout_candidate_with_materially_better_score_can_survive_for_any_problem(self) -> None:
+        for problem in ("tsp", "bbob", "dvrp"):
+            with self.subTest(problem=problem):
+                timeout_but_strong = _problem_candidate(
+                    "cand_timeout",
+                    problem=problem,
+                    score=100.0,
+                    status=CandidateStatus.TIMEOUT,
+                )
+                valid_but_weak = _problem_candidate(
+                    "cand_valid",
+                    problem=problem,
+                    score=130.0,
+                    status=CandidateStatus.VALID,
+                )
+
+                survivors = select_survivors([valid_but_weak, timeout_but_strong], 1)
+
+                self.assertEqual(survivors[0].id, "cand_timeout")
+
     def test_equal_scores_keep_novel_candidate_over_duplicate(self) -> None:
         duplicate_a = _tsp_candidate(
             "cand_1",
@@ -110,6 +130,66 @@ def _tsp_candidate(
             "mean_runtime": runtime,
             "score_by_instance_size": {"33": score, "201": worst_size},
             "score_by_instance_source": {"synthetic:llamea:11:200": worst_size},
+        },
+    )
+
+
+def _problem_candidate(
+        candidate_id: str,
+        *,
+        problem: str,
+        score: float,
+        status: CandidateStatus,
+) -> Candidate:
+    timeout_fraction = 0.5 if status == CandidateStatus.TIMEOUT else 0.0
+    valid_count = 2 if status == CandidateStatus.TIMEOUT else 4
+    if problem in {"tsp", "dvrp"}:
+        metrics = {
+            "problem": problem,
+            "score_name": "distance",
+            "distance": score,
+            "runs": 4,
+            "valid_count": valid_count,
+            "timeout_fraction": timeout_fraction,
+            "mean_runtime": 1.0,
+            "score_by_instance_size": {"small": score, "large": score},
+            "score_by_instance_source": {"synthetic": score},
+        }
+        if problem == "tsp":
+            metrics.update({"mean_tour_length": score, "mean_gap": score, "worst_gap": score})
+        else:
+            metrics.update({"mean_makespan": score, "mean_gap": score, "worst_gap": score})
+        return Candidate(
+            id=candidate_id,
+            generation=0,
+            strategy="S1",
+            name=f"{problem}_solver",
+            thought="",
+            code=f"def {problem}_solver():\n    return None",
+            distance=score,
+            status=status,
+            metrics=metrics,
+        )
+
+    return Candidate(
+        id=candidate_id,
+        generation=0,
+        strategy="S1",
+        name="bbob_optimizer",
+        thought="",
+        code="class Optimizer:\n    pass",
+        fitness=score,
+        status=status,
+        metrics={
+            "problem": "bbob",
+            "score_name": "fitness",
+            "runs": 4,
+            "valid_count": valid_count,
+            "timeout_fraction": timeout_fraction,
+            "mean_runtime": 1.0,
+            "mean_final_error": score,
+            "worst_final_error": score,
+            "aocc_by_group": {"separable": 0.5, "multimodal": 0.5},
         },
     )
 

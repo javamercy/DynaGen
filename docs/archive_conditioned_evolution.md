@@ -34,7 +34,8 @@ survivor set. The intended behavior is to keep both global elites and niche elit
 Current evolution uses only the active population for parent selection:
 
 1. Generation 0 candidates are evaluated.
-2. `select_survivors` keeps `population_size` candidates by status, scalar score, runtime, generation, and ID.
+2. `select_survivors` keeps `population_size` candidates by metric-vector ranking: usable status class, scalar score
+   band, robustness metrics, runtime, novelty, raw scalar score, generation, and ID.
 3. Each offspring task selects parents from the current population with rank-biased probabilities.
 4. Offspring and current survivors are merged.
 5. `select_survivors` creates the next population.
@@ -187,9 +188,10 @@ Parent selection should use a mixed source:
 6. For S3, ensure at least `s3_archive_parent_min` archived parents when enough eligible archived entries exist.
 7. Prefer complementary archive entries for S3 by sampling different primary buckets where possible.
 
-The prompt does not need a new archive-specific section at first. Archived parents are still normal `Candidate` objects,
-so existing parent context and per-candidate verbal gradients should work. Add only a compact marker in the rendered
-parent context:
+Archived parents are still normal `Candidate` objects, so existing parent context and per-candidate verbal gradients
+remain the main evidence. Each evolution prompt also includes a generic parent-awareness block that identifies the best
+scored parent, invalid or timed-out parents, archive-selected specialists, and strategy-specific parent-use guidance.
+Keep the rendered archive marker concise:
 
 ```text
 Archive source: yes
@@ -197,7 +199,8 @@ Archive bucket: tsp:size:100
 Archive role: size specialist
 ```
 
-This keeps the feature visible to the LLM without bloating prompts.
+This keeps the archive role visible to the LLM while the generic parent-awareness block explains how that role should
+condition mutation or recombination.
 
 ### Survivor And Final Selection
 
@@ -654,10 +657,10 @@ Risk: Problem-specific logic could leak into the engine.
 
 Decision: The engine manages archive lifecycle and sampling only. Problems build archive profiles.
 
-Risk: Prompt bloat could increase if archive metadata is verbose.
+Risk: Archive metadata could distract the model if it becomes verbose.
 
-Decision: Archived parents should be rendered like normal parents with one compact archive marker. Existing verbal
-gradients remain the main feedback text.
+Decision: Archived parents should be rendered like normal parents with one compact archive marker. The parent-awareness
+block may reference the marker, but full verbal gradients remain the main feedback text.
 
 Risk: Archive candidates might come from stale evaluation conditions.
 

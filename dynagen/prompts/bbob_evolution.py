@@ -1,4 +1,5 @@
 from dynagen.candidates.candidate import Candidate
+from dynagen.prompts.parent_awareness import render_parent_awareness
 from dynagen.prompts.bbob_templates import (
     BBOB_INTERNAL_CHECKLIST,
     BBOB_RESPONSE_FORMAT,
@@ -74,12 +75,19 @@ def build_bbob_evolution_prompt(
     if strategy not in BBOB_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
     candidates_context = render_bbob_candidates(parents)
+    parent_awareness = render_parent_awareness(
+        parents,
+        strategy=strategy,
+        problem="bbob",
+        score_label="fitness",
+    )
     user = f"""
     STRATEGY: {strategy}
     {BBOB_STRATEGY_INSTRUCTIONS[strategy]}
     MINIMIZATION GOAL: lower objective value under strict budget.
     When parent-specific verbal gradients are present, use them as the strongest guidance for what to change next.
     {feedback_context if feedback_context else ''}
+    {parent_awareness if parent_awareness else ''}
     SELECTED PARENT(S) CONTEXT:
     {candidates_context}
 

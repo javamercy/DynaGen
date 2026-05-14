@@ -34,7 +34,6 @@ class VerbalGradientConfig:
     max_llm_calls_per_generation: int = 2
     llm_model: str | None = None
     temperature: float = 0.2
-    max_chars: int = 2000
 
     def __post_init__(self) -> None:
         self.enabled = bool(self.enabled)
@@ -45,15 +44,12 @@ class VerbalGradientConfig:
         if self.llm_model is not None:
             self.llm_model = str(self.llm_model).strip() or None
         self.temperature = float(self.temperature)
-        self.max_chars = int(self.max_chars)
         if self.llm_every_n_generations < 1:
             raise ValueError("verbal_gradients.llm_every_n_generations must be at least 1")
         if self.max_llm_calls_per_generation < 0:
             raise ValueError("verbal_gradients.max_llm_calls_per_generation must be non-negative")
         if self.temperature < 0 or self.temperature > 2:
             raise ValueError("verbal_gradients.temperature must be between 0 and 2")
-        if self.max_chars < 200:
-            raise ValueError("verbal_gradients.max_chars must be at least 200")
 
 
 @dataclass
@@ -116,7 +112,11 @@ class EvolutionConfig:
         self.offspring_per_strategy = int(self.offspring_per_strategy)
         self.strategies = [Strategy(strategy) for strategy in self.strategies]
         if isinstance(self.verbal_gradients, dict):
-            self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
+            verbal_gradient_values = dict(self.verbal_gradients)
+            # Legacy configs may still contain this option. Prompt guidance is no
+            # longer character-limited, so the value is accepted but ignored.
+            verbal_gradient_values.pop("max_chars", None)
+            self.verbal_gradients = VerbalGradientConfig(**verbal_gradient_values)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
             raise ValueError("evolution.verbal_gradients must be a mapping")
         if isinstance(self.archive, dict):

@@ -1,4 +1,5 @@
 from dynagen.candidates.candidate import Candidate
+from dynagen.prompts.parent_awareness import render_parent_awareness
 from dynagen.prompts.dvrp_templates import (
     DVRP_INTERNAL_CHECKLIST,
     DVRP_POLICY_CONTRACT,
@@ -33,15 +34,22 @@ def build_dvrp_evolution_prompt(
 ) -> list[dict[str, str]]:
     if strategy not in DVRP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
+    parent_awareness = render_parent_awareness(
+        parents,
+        strategy=strategy,
+        problem="dvrp",
+        score_label="distance",
+    )
     blocks = [
         DVRP_POLICY_CONTRACT.strip(),
-        f"PARENTS:\n{render_dvrp_candidates(parents)}",
         f"STRATEGY {strategy}: {DVRP_STRATEGY_INSTRUCTIONS[strategy]}",
     ]
     if feedback_context:
         blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{feedback_context}")
+    if parent_awareness:
+        blocks.append(parent_awareness)
     blocks.extend([
-        
+        f"PARENTS:\n{render_dvrp_candidates(parents)}",
         "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
         DVRP_INTERNAL_CHECKLIST.strip(),
         DVRP_RESPONSE_FORMAT.strip(),

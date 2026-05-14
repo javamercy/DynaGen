@@ -10,12 +10,16 @@ from dynagen.evaluation.tsp_gradient import build_tsp_static_verbal_gradient
 from dynagen.evolution.engine import EvolutionEngine
 from dynagen.evolution.verbal_gradient import (
     VERBAL_GRADIENT_KEY,
+    build_llm_gradient_messages,
     format_parent_verbal_gradients,
     get_candidate_gradient,
 )
 from dynagen.persistence.run_store import RunStore
+from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
 from dynagen.prompts.bbob_templates import render_bbob_candidates
+from dynagen.prompts.dvrp_evolution import build_dvrp_evolution_prompt
 from dynagen.prompts.dvrp_templates import render_dvrp_candidates
+from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
 from dynagen.prompts.tsp_templates import render_tsp_candidates
 
 
@@ -28,7 +32,7 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertEqual(config.evolution.verbal_gradients.llm_every_n_generations, 3)
         self.assertEqual(config.evolution.verbal_gradients.max_llm_calls_per_generation, 1)
         self.assertEqual(config.evolution.verbal_gradients.llm_model, "feedback-model")
-        self.assertEqual(config.evolution.verbal_gradients.max_chars, 900)
+        self.assertFalse(hasattr(config.evolution.verbal_gradients, "max_chars"))
 
     def test_tsp_static_gradient_records_timeout_weakness(self) -> None:
         candidate = Candidate(
@@ -80,13 +84,13 @@ class VerbalGradientTests(unittest.TestCase):
             status=CandidateStatus.VALID,
         )
 
-        text = format_parent_verbal_gradients([candidate], strategy="S2", max_chars=1000)
+        text = format_parent_verbal_gradients([candidate], strategy="S2")
 
         self.assertIn("PARENT-SPECIFIC VERBAL GRADIENTS", text)
         self.assertIn("Next S2 mutation", text)
         self.assertIn("guarded late-budget", text)
 
-    def test_s3_parent_gradient_formatting_is_compact_and_keeps_all_parents(self) -> None:
+    def test_s3_parent_gradient_formatting_is_unlimited_and_keeps_all_parents(self) -> None:
         parents = [
             Candidate(
                 id=f"cand_{index}",
@@ -111,13 +115,85 @@ class VerbalGradientTests(unittest.TestCase):
             for index in range(1, 4)
         ]
 
-        text = format_parent_verbal_gradients(parents, strategy="S3", max_chars=1200)
+        text = format_parent_verbal_gradients(parents, strategy="S3")
 
-        self.assertLessEqual(len(text), 1200)
         self.assertIn("Parent cand_1 gradient", text)
         self.assertIn("Parent cand_2 gradient", text)
         self.assertIn("Parent cand_3 gradient", text)
-        self.assertNotIn("- Summary: " + "long summary about large instances and timeout risk " * 3, text)
+        self.assertIn(" ".join(["long summary about large instances and timeout risk"] * 6), text)
+
+    def test_evolution_prompts_include_parent_awareness_for_all_problems(self) -> None:
+        parent = Candidate(
+            id="cand_1",
+            generation=0,
+            strategy="initial:1",
+            name="solver",
+            thought="candidate thought",
+            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            metrics={
+                "problem": "tsp",
+                "score_name": "distance",
+                VERBAL_GRADIENT_KEY: {
+                    "source": "static",
+                    "summary": "Keep the useful incumbent behavior.",
+                    "preserve": ["valid incumbent"],
+                    "weaknesses": ["large instances"],
+                    "next_mutations": {"S2": "Make one focused change."},
+                    "avoid": ["unbounded loops"],
+                },
+                "mean_gap": 1.0,
+                "worst_gap": 2.0,
+                "mean_tour_length": 10.0,
+            },
+            distance=10.0,
+            status=CandidateStatus.VALID,
+        )
+
+        for messages in (
+            build_tsp_evolution_prompt("S2", [parent]),
+            build_bbob_evolution_prompt("S2", [parent]),
+            build_dvrp_evolution_prompt("S2", [parent]),
+        ):
+            user = messages[1]["content"]
+            self.assertIn("PARENT AWARENESS", user)
+            self.assertIn("Best available parent", user)
+            self.assertIn("cand_1", user)
+            self.assertIn("Keep the useful incumbent behavior.", user)
+
+    def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
+        full_code = "def solve_tsp(distance_matrix, seed, budget):\n    " + "x = 1\n    " * 600 + "return []\n"
+        candidate = Candidate(
+            id="cand_full",
+            generation=1,
+            strategy="S2",
+            name="solver",
+            thought="candidate thought",
+            code=full_code,
+            metrics={"problem": "tsp", "score_name": "distance"},
+            distance=10.0,
+            status=CandidateStatus.VALID,
+        )
+
+        messages = build_llm_gradient_messages(
+            problem="tsp",
+            goal="lower distance",
+            focus="TSP",
+            candidate=candidate,
+            parents=[],
+            generation=1,
+            static_gradient={
+                "summary": "static",
+                "preserve": [],
+                "weaknesses": [],
+                "next_mutations": {},
+                "avoid": [],
+            },
+        )
+        user = messages[1]["content"]
+        evidence = json.loads(user.split("Evidence:\n", 1)[1])
+
+        self.assertEqual(evidence["candidate"]["code"], full_code)
+        self.assertNotIn("code_excerpt", evidence["candidate"])
 
     def test_parent_renderers_do_not_duplicate_verbal_gradient_block(self) -> None:
         gradient = {

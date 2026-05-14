@@ -331,8 +331,10 @@ This document describes the current TSP flow implemented in DynaGen. It follows 
 1. `_initial_population` registers all generated candidates and updates the archive before survivor selection.
 2. `_initial_population` returns `Population.from_candidates(0, candidates, size=population_size)`.
 3. `Population.from_candidates` calls `select_survivors`.
-4. `select_survivors` sorts by status rank, then distance, then candidate ID.
-5. Status rank order is `valid` and `evaluated`, then `timeout`, then `invalid`, then `error`, then `pending`.
+4. `select_survivors` uses metric-vector ranking: usable status class, scalar score band, worst group score,
+   timeout fraction, validity, status penalty, runtime, novelty, raw scalar score, generation, and candidate ID.
+5. `valid`, `evaluated`, and `timeout` candidates share the usable status class, so a scoreable timeout can beat a
+   valid candidate when its scalar score is materially better.
 6. Only the first `population_size` candidates survive.
 7. `EvolutionEngine.run` saves `generation_000` immediately after the initial population is selected.
 8. `generation_000/population.json` contains survivor metadata.
@@ -365,7 +367,7 @@ This document describes the current TSP flow implemented in DynaGen. It follows 
 18. Parent selection is without replacement for a single task because a selected parent is removed from the temporary
     pool.
 19. Archive-selected parents receive a compact parent-context marker with archive source, bucket, and role.
-20. The engine formats only the selected parents' verbal gradients into a parent-specific feedback block.
+20. The engine formats only the selected parents' full verbal gradients into a parent-specific feedback block.
 21. Optional LLM gradients are cached on parent candidates, so repeated parent use does not require repeated feedback
     calls.
 22. Offspring generation does not use the old generation-wide reflection broadcast.
@@ -388,13 +390,15 @@ This document describes the current TSP flow implemented in DynaGen. It follows 
 11. `S3` asks the LLM to combine mechanisms from selected parents without concatenating solvers or running them
     sequentially.
 12. Every evolution prompt includes selected parent context.
-13. Every evolution prompt includes selected parent verbal gradients when enabled.
-14. `S1`, `S2`, and `S3` each receive their strategy-specific next-mutation advice from the selected parent gradients.
-15. Every evolution prompt includes the same TSP solver contract, internal checklist, and JSON response format used for
+13. Every evolution prompt includes selected parent awareness: scalar parent ranking, invalid/timeout caution,
+    archive-specialist cues, and strategy-specific instructions for how to use the parents.
+14. Every evolution prompt includes selected parent verbal gradients when enabled.
+15. `S1`, `S2`, and `S3` each receive their strategy-specific next-mutation advice from the selected parent gradients.
+16. Every evolution prompt includes the same TSP solver contract, internal checklist, and JSON response format used for
     initial prompts.
-16. Optional LLM verbal-gradient calls happen only for selected parents missing an LLM gradient and only up to the
+17. Optional LLM verbal-gradient calls happen only for selected parents missing an LLM gradient and only up to the
     configured per-generation cap.
-17. Offspring tasks are executed, evaluated, and persisted through the same candidate task execution path as initial
+18. Offspring tasks are executed, evaluated, and persisted through the same candidate task execution path as initial
     tasks.
 
 ## 21. Population Update Per Generation
@@ -416,7 +420,7 @@ This document describes the current TSP flow implemented in DynaGen. It follows 
 1. After the last configured generation, the engine selects the best search candidate.
 2. When `archive.final_selection_uses_archive` is true, final search-best selection considers the final population plus
    archive candidates.
-3. The same survivor ordering is used: status rank, distance, then candidate ID.
+3. The same metric-vector survivor ordering is used, including scalar score for scoreable timeout candidates.
 4. The selected candidate is called `search_best`.
 5. `search_best` is the only candidate evaluated on the held-out test pool by `EvolutionEngine.run`.
 
@@ -480,7 +484,8 @@ This document describes the current TSP flow implemented in DynaGen. It follows 
     known optimum.
 3. Test distance for a valid TSP candidate is `mean_gap` when TSPLIB optimal lengths are present.
 4. Lower distance is always better.
-5. A timeout candidate outranks invalid and error candidates in survivor selection, but it receives `timeout_distance`.
+5. A scoreable timeout candidate competes with valid candidates by scalar distance, while timeout fraction and timeout
+   status remain robustness penalties inside the metric vector.
 6. A partial timeout is only gap-scored when the instance has an optimal reference and the reported tour is valid.
 7. `report_best_tour` is useful because a solver that times out can still expose a valid incumbent for partial
    evaluation.

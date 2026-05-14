@@ -1,4 +1,5 @@
 from dynagen.candidates.candidate import Candidate
+from dynagen.prompts.parent_awareness import render_parent_awareness
 from dynagen.prompts.tsp_templates import (
     TSP_INTERNAL_CHECKLIST,
     TSP_RESPONSE_FORMAT,
@@ -28,12 +29,20 @@ def build_tsp_evolution_prompt(
     if strategy not in TSP_STRATEGY_INSTRUCTIONS:
         raise ValueError(f"Unknown strategy: {strategy}")
     candidates_context = render_tsp_candidates(parents)
+    parent_awareness = render_parent_awareness(
+        parents,
+        strategy=strategy,
+        problem="tsp",
+        score_label="distance",
+    )
     blocks = [
         f"STRATEGY {strategy}: {TSP_STRATEGY_INSTRUCTIONS[strategy]}",
         "Distance is the search objective for TSP; lower distance is better.",
     ]
     if feedback_context:
         blocks.append(feedback_context)
+    if parent_awareness:
+        blocks.append(parent_awareness)
     blocks.extend([
         f"PARENTS:\n{candidates_context}",
         TSP_SOLVER_CONTRACT.strip(),

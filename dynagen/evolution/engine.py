@@ -500,7 +500,6 @@ class EvolutionEngine:
         return format_parent_verbal_gradients(
             parents,
             strategy=strategy,
-            max_chars=gradient_config.max_chars,
         )
 
     def _provider_summaries(self) -> list[dict[str, object]]:

@@ -134,38 +134,33 @@ def format_parent_verbal_gradients(
         parents: list[Candidate],
         *,
         strategy: str,
-        max_chars: int,
 ) -> str:
-    compact = str(strategy) == "S3" or len(parents) > 1
     blocks = []
     for parent in parents:
-        block = format_candidate_verbal_gradient(parent, strategy=strategy, compact=compact)
+        block = format_candidate_verbal_gradient(parent, strategy=strategy)
         if block:
             blocks.append(block)
     if not blocks:
         return ""
-    return _fit_parent_gradient_blocks(blocks, max_chars=max_chars)
+    return "PARENT-SPECIFIC VERBAL GRADIENTS:\n\n" + "\n\n".join(blocks)
 
 
 def format_candidate_verbal_gradient(
         candidate: Candidate,
         *,
         strategy: str | None = None,
-        compact: bool = False,
 ) -> str:
     gradient = get_candidate_gradient(candidate)
     if not gradient:
         return ""
-    if compact:
-        return _format_compact_candidate_verbal_gradient(candidate, gradient, strategy=strategy)
     lines = [f"Parent {candidate.id} gradient ({gradient.get('source', 'unknown')}):"]
     summary = _clean_text(gradient.get("summary"))
     if summary:
         lines.append(f"- Summary: {summary}")
-    preserve = _clean_list(gradient.get("preserve"), limit=4)
+    preserve = _clean_list(gradient.get("preserve"))
     if preserve:
         lines.append(f"- Preserve: {'; '.join(preserve)}")
-    weaknesses = _clean_list(gradient.get("weaknesses"), limit=4)
+    weaknesses = _clean_list(gradient.get("weaknesses"))
     if weaknesses:
         lines.append(f"- Weaknesses: {'; '.join(weaknesses)}")
     next_mutations = gradient.get("next_mutations")
@@ -176,67 +171,10 @@ def format_candidate_verbal_gradient(
         if next_step:
             label = f"Next {strategy} mutation" if strategy else "Next mutation"
             lines.append(f"- {label}: {next_step}")
-    avoid = _clean_list(gradient.get("avoid"), limit=4)
+    avoid = _clean_list(gradient.get("avoid"))
     if avoid:
         lines.append(f"- Avoid: {'; '.join(avoid)}")
     return "\n".join(lines)
-
-
-def _format_compact_candidate_verbal_gradient(
-        candidate: Candidate,
-        gradient: dict[str, Any],
-        *,
-        strategy: str | None,
-) -> str:
-    source = gradient.get("source", "unknown")
-    summary = _field("Summary", gradient.get("summary"), max_chars=110)
-    preserve = _field("Preserve", _clean_list(gradient.get("preserve"), limit=2), max_chars=100)
-    weaknesses = _field("Weak", _clean_list(gradient.get("weaknesses"), limit=2), max_chars=120)
-    next_mutation = ""
-    next_mutations = gradient.get("next_mutations")
-    if isinstance(next_mutations, dict):
-        next_step = _clean_text(next_mutations.get(str(strategy))) if strategy else ""
-        if not next_step:
-            next_step = _clean_text(next_mutations.get("default"))
-        next_mutation = _field(f"Next {strategy}" if strategy else "Next", next_step, max_chars=140)
-    avoid = _field("Avoid", _clean_list(gradient.get("avoid"), limit=1), max_chars=90)
-    parts = [
-        f"Parent {candidate.id} gradient ({source}):",
-        summary,
-        preserve,
-        weaknesses,
-        next_mutation,
-        avoid,
-    ]
-    return "\n".join(part for part in parts if part)
-
-
-def _field(label: str, value: object, *, max_chars: int) -> str:
-    if isinstance(value, (list, tuple, set)):
-        text = "; ".join(_clean_list(value, limit=3))
-    else:
-        text = _clean_text(value)
-    if not text:
-        return ""
-    return f"- {label}: {trim_text(text, max_chars=max_chars)}"
-
-
-def _fit_parent_gradient_blocks(blocks: list[str], *, max_chars: int) -> str:
-    header = "PARENT-SPECIFIC VERBAL GRADIENTS:"
-    text = header + "\n\n" + "\n\n".join(blocks)
-    if len(text) <= max_chars:
-        return text
-    if max_chars <= len(header) + 12:
-        return trim_text(text, max_chars=max_chars)
-
-    separator_chars = 2 * max(0, len(blocks) - 1)
-    available = max_chars - len(header) - 2 - separator_chars
-    per_block = max(120, available // max(1, len(blocks)))
-    trimmed_blocks = [trim_text(block, max_chars=per_block) for block in blocks]
-    text = header + "\n\n" + "\n\n".join(trimmed_blocks)
-    if len(text) <= max_chars:
-        return text
-    return trim_text(text, max_chars=max_chars)
 
 
 def build_llm_gradient_messages(
@@ -317,13 +255,6 @@ def worst_numeric_group(groups: object, *, higher_is_better: bool) -> tuple[str,
     return min(values, key=lambda item: item[1]) if higher_is_better else max(values, key=lambda item: item[1])
 
 
-def trim_text(text: str, *, max_chars: int) -> str:
-    text = "\n".join(line.rstrip() for line in str(text).strip().splitlines())
-    if len(text) <= max_chars:
-        return text
-    return text[:max(0, max_chars - 3)].rstrip() + "..."
-
-
 def _json_object_from_text(text: str) -> dict[str, Any]:
     try:
         data = json.loads(text)
@@ -353,11 +284,11 @@ def _candidate_snapshot(candidate: Candidate) -> dict[str, Any]:
             key: value for key, value in metrics.items()
             if key not in {VERBAL_GRADIENT_KEY, "records"}
         },
-        "code_excerpt": candidate.code[:2500],
+        "code": candidate.code,
     }
 
 
-def _clean_list(value: object, *, limit: int = 6) -> list[str]:
+def _clean_list(value: object, *, limit: int | None = None) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
@@ -367,7 +298,10 @@ def _clean_list(value: object, *, limit: int = 6) -> list[str]:
     else:
         items = [value]
     cleaned = [_clean_text(item) for item in items]
-    return [item for item in cleaned if item][:limit]
+    cleaned_items = [item for item in cleaned if item]
+    if limit is None:
+        return cleaned_items
+    return cleaned_items[:limit]
 
 
 def _clean_text(value: object) -> str:

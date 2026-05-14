@@ -5,13 +5,22 @@ from dataclasses import dataclass
 from dynagen.candidates import CandidateStatus
 from dynagen.candidates.candidate import Candidate
 
-_STATUS_ORDER = {
+_HARD_STATUS_ORDER = {
     CandidateStatus.VALID: 0,
     CandidateStatus.EVALUATED: 0,
-    CandidateStatus.TIMEOUT: 1,
-    CandidateStatus.INVALID: 2,
-    CandidateStatus.ERROR: 3,
-    CandidateStatus.PENDING: 4,
+    CandidateStatus.TIMEOUT: 0,
+    CandidateStatus.INVALID: 1,
+    CandidateStatus.ERROR: 1,
+    CandidateStatus.PENDING: 1,
+}
+
+_STATUS_BADNESS = {
+    CandidateStatus.VALID: 0.0,
+    CandidateStatus.EVALUATED: 0.0,
+    CandidateStatus.TIMEOUT: 0.35,
+    CandidateStatus.INVALID: 1.0,
+    CandidateStatus.ERROR: 1.25,
+    CandidateStatus.PENDING: 1.5,
 }
 
 
@@ -91,7 +100,8 @@ def _rank_biased_probabilities(candidates: list[Candidate]) -> list[float]:
 def _sort_key(candidate: Candidate, context: _SelectionContext | None = None) -> tuple:
     if context is None:
         context = _selection_context([candidate])
-    status_rank = _STATUS_ORDER.get(candidate.status, 99)
+    hard_status_rank = _HARD_STATUS_ORDER.get(candidate.status, 1)
+    status_badness = _STATUS_BADNESS.get(candidate.status, 1.5)
     score = _finite_or_inf(candidate.score_value)
     score_band = _score_band(score, context)
     worst_group = _normalize(_worst_group_badness(candidate), context.worst_group_min, context.worst_group_max)
@@ -100,12 +110,15 @@ def _sort_key(candidate: Candidate, context: _SelectionContext | None = None) ->
     runtime = _normalize(_metric_float(candidate, "mean_runtime"), context.runtime_min, context.runtime_max)
     novelty = context.novelty_by_id.get(candidate.id, 0.0)
     # Mean score remains the main pressure, but close-score candidates are separated by robustness and novelty.
+    # Timeouts are not a hard wall: a timeout candidate with a materially better score can survive or parent
+    # future mutations, while timeout rate and status still act as robustness penalties inside close score bands.
     return (
-        status_rank,
+        hard_status_rank,
         score_band,
         worst_group,
         timeout_fraction,
         validity_badness,
+        status_badness,
         runtime,
         -novelty,
         score,
