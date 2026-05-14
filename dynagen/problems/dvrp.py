@@ -3,6 +3,7 @@ from typing import Any
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain.dvrp import DVRPInstance, load_dvrp_instances
+from dynagen.evaluation.dvrp_archive import build_dvrp_archive_profile
 from dynagen.evaluation.dvrp_evaluator import DVRPCandidateEvaluator
 from dynagen.evaluation.dvrp_gradient import (
     build_dvrp_llm_verbal_gradient_prompt,
@@ -74,6 +75,9 @@ class DVRPProblem:
             generation=generation,
             static_gradient=static_gradient,
         )
+
+    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
+        return build_dvrp_archive_profile(candidate)
 
 
 def create_dvrp_initial_roles(count: int) -> list[DVRPInitialRole]:

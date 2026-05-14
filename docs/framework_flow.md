@@ -14,7 +14,7 @@ flowchart TD
     F --> H[Load test TSP instances<br/>TSPLIB .tsp files]
     G --> I[Search evaluation tasks<br/>search_instances x seeds]
     H --> J[Test evaluation tasks<br/>test_instances x seeds]
-    B --> K[Create RunStore<br/>runs/tsp/timestamp_name<br/>config.json, candidates, prompts, generations, feedback]
+    B --> K[Create RunStore<br/>runs/tsp/timestamp_name<br/>config.json, candidates, prompts, generations, feedback, archive]
     C --> L[EvolutionEngine.run]
     I --> L
     J --> L
@@ -54,25 +54,27 @@ AJ --> AK
 AK --> AL[Set candidate status and distance<br/>search: mean_tour_length when valid<br/>test: mean_gap when available<br/>timeout: timeout_distance<br/>invalid/error: inf]
 Q --> AL2[Attach static verbal gradient<br/>metrics.verbal_gradient]
 AL --> AL2[Attach static verbal gradient<br/>metrics.verbal_gradient]
-AL2 --> AM[Persist candidate artifacts<br/>candidates/*.json, candidates/*.py, prompts/*.txt]
-AM --> AM2{Task batch source?}
+    AL2 --> AM[Persist candidate artifacts<br/>candidates/*.json, candidates/*.py, prompts/*.txt]
+    AM --> AM2{Task batch source?}
 
-AM2 -- initial --> AN[Select generation 0 survivors<br/>status rank, distance, id]
-AN --> AO[Save generation_000<br/>population.json, offspring.json, summary.json]
+    AM2 -- initial --> AN0[Update archive<br/>quality-diversity buckets, code dedupe, archive snapshot]
+    AN0 --> AN[Select generation 0 survivors<br/>status rank, distance, id]
+    AN --> AO[Save generation_000<br/>population.json, offspring.json, summary.json, archive]
 AO --> AP{More generations?}
 
 AP -- Yes --> AQ[Build offspring tasks<br/>for each strategy S1, S2, S3 and offspring_per_strategy]
-AQ --> AR[Select parents<br/>S1/S2: 1 parent, S3: 3 parents<br/>rank-biased probabilities]
+    AQ --> AR[Select parents<br/>current population mixed with archive<br/>S1/S2: 1 parent, S3: 3 parents]
 AR --> AS[Ensure selected parent gradients<br/>static cached on every candidate<br/>optional capped LLM gradient per parent]
 AS --> AT[Build TSP evolution prompt<br/>strategy instructions, selected parent verbal gradients, parent context, solver contract]
 AT --> N
 
-AM2 -- offspring --> AU[Combine current population and offspring]
-AU --> AV[Select survivors<br/>population_size by status, distance, id]
+    AM2 -- offspring --> AU0[Update archive<br/>current-run evaluated candidates only]
+    AU0 --> AU[Combine current population and offspring]
+    AU --> AV[Select survivors<br/>population_size by status, distance, id<br/>archive does not force survivor re-entry]
 AV --> AW[Save generation_N artifacts]
 AW --> AP
 
-AP -- No --> AX[Choose best search candidate]
+    AP -- No --> AX[Choose best search candidate<br/>final population plus archive when enabled]
 AX --> AY[Offline test evaluation<br/>best code x test_instances x seeds<br/>no LLM, no mutation]
 AY --> AZ[Save test_result.json]
 AZ --> BA[Save llm_calls.json]

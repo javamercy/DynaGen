@@ -6,6 +6,7 @@ from dynagen.config import RunConfig
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
 from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_specs
+from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
 from dynagen.evaluation.tsp_gradient import (
     build_tsp_llm_verbal_gradient_prompt,
     build_tsp_static_verbal_gradient,
@@ -71,6 +72,9 @@ class TSPProblem:
             generation=generation,
             static_gradient=static_gradient,
         )
+
+    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
+        return build_tsp_archive_profile(candidate)
 
 
 def create_tsp_initial_roles(count: int) -> list[TSPInitialRole]:

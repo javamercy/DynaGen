@@ -4,7 +4,13 @@ from dynagen.evaluation.base import EvaluationResult
 from dynagen.evolution.selection import select_survivors
 
 
-def generation_summary(generation: int, population: list[Candidate], offspring: list[Candidate]) -> dict:
+def generation_summary(
+        generation: int,
+        population: list[Candidate],
+        offspring: list[Candidate],
+        *,
+        archive_summary: dict | None = None,
+) -> dict:
     best = select_survivors(population, 1)[0] if population else None
     valid_offspring = sum(1 for candidate in offspring if candidate.status == CandidateStatus.VALID)
     summary = {
@@ -17,6 +23,8 @@ def generation_summary(generation: int, population: list[Candidate], offspring: 
     }
     if best is not None:
         summary[f"best_{best.score_name}"] = best.score_value
+    if archive_summary is not None:
+        summary["archive"] = archive_summary
     return summary
 
 
@@ -150,6 +158,21 @@ def build_final_report(
                 f"- Static verbal gradients: {verbal_gradients.get('static_count')}",
                 f"- LLM verbal gradients: {verbal_gradients.get('llm_count')}",
                 f"- LLM verbal gradient errors: {verbal_gradients.get('llm_error_count')}",
+            ])
+        archive = llm_calls.get("archive")
+        if isinstance(archive, dict):
+            lines.extend([
+                "",
+                "## Archive",
+                "",
+                f"- Archive enabled: {archive.get('enabled')}",
+                f"- Archive size: {archive.get('size')} / {archive.get('max_size')}",
+                f"- Archive buckets: {archive.get('bucket_count')}",
+                f"- Added candidates: {archive.get('added_count')}",
+                f"- Duplicate rejections: {archive.get('rejected_duplicate_count')}",
+                f"- Archive parent selections: {archive.get('parent_selections_from_archive')}",
+                f"- Offspring with archive parent: {archive.get('offspring_with_archive_parent')}",
+                f"- Final selection from archive: {bool(archive.get('final_selection_from_archive'))}",
             ])
     return "\n".join(lines) + "\n"
 
