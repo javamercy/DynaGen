@@ -11,8 +11,12 @@ Use only these matching knobs:
 
 TSP protocol:
 
-- search instance: `synthetic:llamea:69:32`, matching LLaMEA's `generate_tsp_test(seed=69, size=32)` synthetic instance
+- search instances: `synthetic:llamea:seeds=11,23,69:sizes=32,50,100,200`, generated inside DynaGen as a 12-instance
+  synthetic LLaMEA grid
 - test instances: `data/tsp/test_instances`
+
+Baseline TSP commands shown below may need matching loader support before they can be used for strict multi-instance
+comparisons.
 
 Primary metric:
 
@@ -29,7 +33,8 @@ Secondary checks:
 
 ### TSP
 
-The TSP configs search on `synthetic:llamea:69:32` and test on `data/tsp/test_instances`.
+The TSP configs search on `synthetic:llamea:seeds=11,23,69:sizes=32,50,100,200` and test on
+`data/tsp/test_instances`.
 
 | Target calls | Config                          | Command                                                             |
 |-------------:|---------------------------------|---------------------------------------------------------------------|
