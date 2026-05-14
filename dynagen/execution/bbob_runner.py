@@ -20,6 +20,7 @@ class BBOBExecutionResult:
     history: list[float] = field(default_factory=list)
     evaluations: int = 0
     runtime_seconds: float = 0.0
+    timeout_limit_seconds: float | None = None
     error: str | None = None
 
 
@@ -31,6 +32,7 @@ class BBOBRunResult:
     history: list[float]
     evaluations: int
     runtime_seconds: float
+    timeout_limit_seconds: float | None = None
     error: str | None = None
     partial: bool = False
 
@@ -59,6 +61,7 @@ def run_bbob_optimizer(
                 execution.history,
                 execution.evaluations,
                 execution.runtime_seconds,
+                execution.timeout_limit_seconds,
                 execution.error,
                 partial=True,
             )
@@ -69,6 +72,7 @@ def run_bbob_optimizer(
             [],
             execution.evaluations,
             execution.runtime_seconds,
+            execution.timeout_limit_seconds,
             execution.error,
         )
     if execution.status != "ok":
@@ -79,6 +83,7 @@ def run_bbob_optimizer(
             execution.history,
             execution.evaluations,
             execution.runtime_seconds,
+            execution.timeout_limit_seconds,
             execution.error,
         )
     if execution.best_value is None or execution.best_x is None or not np.isfinite(execution.best_value):
@@ -89,6 +94,7 @@ def run_bbob_optimizer(
             execution.history,
             execution.evaluations,
             execution.runtime_seconds,
+            execution.timeout_limit_seconds,
             "Optimizer did not evaluate and return a finite incumbent",
         )
     if len(execution.best_x) != instance.dimension:
@@ -99,6 +105,7 @@ def run_bbob_optimizer(
             execution.history,
             execution.evaluations,
             execution.runtime_seconds,
+            execution.timeout_limit_seconds,
             f"Returned incumbent dimension {len(execution.best_x)} does not match {instance.dimension}",
         )
     return BBOBRunResult(
@@ -108,6 +115,7 @@ def run_bbob_optimizer(
         execution.history,
         execution.evaluations,
         execution.runtime_seconds,
+        execution.timeout_limit_seconds,
     )
 
 
@@ -128,10 +136,20 @@ def execute_bbob_code(
         target=_worker,
         args=(code, instance, int(seed), int(budget), result_queue, best_x, best_value, has_best),
     )
+    timeout_limit = float(timeout_seconds)
     start = time.perf_counter()
     process.start()
-    process.join(timeout_seconds)
+    payload = _get_worker_result_until_deadline(result_queue, process, start=start, timeout_seconds=timeout_limit)
     runtime = time.perf_counter() - start
+    if payload is not None:
+        process.join(1.0)
+        if process.is_alive():
+            process.terminate()
+            process.join(1.0)
+            if process.is_alive():
+                process.kill()
+                process.join()
+        return _execution_result_from_payload(payload, timeout_limit_seconds=timeout_limit)
     if process.is_alive():
         process.terminate()
         process.join(1.0)
@@ -144,7 +162,8 @@ def execute_bbob_code(
             best_value=reported_value,
             best_x=reported_x,
             runtime_seconds=runtime,
-            error="Optimizer timed out",
+            timeout_limit_seconds=timeout_limit,
+            error=f"Optimizer timed out after {runtime:.6g}s (timeout_seconds={timeout_limit:.6g})",
         )
     try:
         status, value, point, history, evaluations, child_runtime, error = result_queue.get_nowait()
@@ -156,6 +175,7 @@ def execute_bbob_code(
                 best_value=reported_value,
                 best_x=reported_x,
                 runtime_seconds=runtime,
+                timeout_limit_seconds=timeout_limit,
                 error="Optimizer exited without returning a result",
             )
         return BBOBExecutionResult(
@@ -163,6 +183,7 @@ def execute_bbob_code(
             best_value=reported_value,
             best_x=reported_x,
             runtime_seconds=runtime,
+            timeout_limit_seconds=timeout_limit,
             error=f"Optimizer process exited with code {process.exitcode}",
         )
     return BBOBExecutionResult(
@@ -172,6 +193,34 @@ def execute_bbob_code(
         history=history or [],
         evaluations=int(evaluations or 0),
         runtime_seconds=child_runtime,
+        timeout_limit_seconds=timeout_limit,
+        error=error,
+    )
+
+
+def _get_worker_result_until_deadline(result_queue, process, *, start: float, timeout_seconds: float):
+    deadline = start + float(timeout_seconds)
+    while True:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return None
+        try:
+            return result_queue.get(timeout=min(0.05, remaining))
+        except queue.Empty:
+            if not process.is_alive():
+                return None
+
+
+def _execution_result_from_payload(payload, *, timeout_limit_seconds: float) -> BBOBExecutionResult:
+    status, value, point, history, evaluations, child_runtime, error = payload
+    return BBOBExecutionResult(
+        status,
+        best_value=value,
+        best_x=point,
+        history=history or [],
+        evaluations=int(evaluations or 0),
+        runtime_seconds=child_runtime,
+        timeout_limit_seconds=timeout_limit_seconds,
         error=error,
     )
 

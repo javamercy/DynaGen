@@ -17,6 +17,7 @@ class TSPSolverRunResult:
     runtime_seconds: float
     error: str | None = None
     partial: bool = False
+    timeout_limit_seconds: float | None = None
 
 
 def run_tsp_solver(
@@ -39,14 +40,43 @@ def run_tsp_solver(
         if execution.reported_value is not None:
             try:
                 tour, length = _validated_tour(instance, execution.reported_value)
-                return TSPSolverRunResult("timeout", tour, length, execution.runtime_seconds, execution.error, partial=True)
+                return TSPSolverRunResult(
+                    "timeout",
+                    tour,
+                    length,
+                    execution.runtime_seconds,
+                    execution.error,
+                    partial=True,
+                    timeout_limit_seconds=execution.timeout_limit_seconds,
+                )
             except Exception as exc:
                 error = f"{execution.error}; reported best tour invalid: {exc}"
-                return TSPSolverRunResult("timeout", None, None, execution.runtime_seconds, error)
-        return TSPSolverRunResult("timeout", None, None, execution.runtime_seconds, execution.error)
+                return TSPSolverRunResult(
+                    "timeout",
+                    None,
+                    None,
+                    execution.runtime_seconds,
+                    error,
+                    timeout_limit_seconds=execution.timeout_limit_seconds,
+                )
+        return TSPSolverRunResult(
+            "timeout",
+            None,
+            None,
+            execution.runtime_seconds,
+            execution.error,
+            timeout_limit_seconds=execution.timeout_limit_seconds,
+        )
 
     if execution.status != "ok":
-        return TSPSolverRunResult("error", None, None, execution.runtime_seconds, execution.error)
+        return TSPSolverRunResult(
+            "error",
+            None,
+            None,
+            execution.runtime_seconds,
+            execution.error,
+            timeout_limit_seconds=execution.timeout_limit_seconds,
+        )
 
     try:
         tour, length = _validated_tour(instance, execution.value)
@@ -56,9 +86,16 @@ def run_tsp_solver(
             None,
             None,
             execution.runtime_seconds,
-            error=_short_error_message(exc)
+            error=_short_error_message(exc),
+            timeout_limit_seconds=execution.timeout_limit_seconds,
         )
-    return TSPSolverRunResult("valid", tour, length, execution.runtime_seconds)
+    return TSPSolverRunResult(
+        "valid",
+        tour,
+        length,
+        execution.runtime_seconds,
+        timeout_limit_seconds=execution.timeout_limit_seconds,
+    )
 
 
 def _validated_tour(instance: TSPInstance, value: object) -> tuple[list[int], float]:

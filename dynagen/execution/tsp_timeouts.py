@@ -17,6 +17,7 @@ class TSPSolverExecutionResult:
     reported_value: Any = None
     runtime_seconds: float = 0.0
     error: str | None = None
+    timeout_limit_seconds: float | None = None
 
 
 def execute_tsp_solver_code(
@@ -37,10 +38,24 @@ def execute_tsp_solver_code(
     process = context.Process(target=_worker,
                               args=(code, distance_matrix_arr, seed, budget, result_queue, best_tour_a, best_tour_b,
                                     active_tour_index))
+    timeout_limit = float(timeout_seconds)
     start = time.perf_counter()
     process.start()
-    process.join(timeout_seconds)
+    payload = _get_worker_result_until_deadline(result_queue, process, start=start, timeout_seconds=timeout_limit)
     runtime = time.perf_counter() - start
+    if payload is not None:
+        process.join(1.0)
+        if process.is_alive():
+            process.terminate()
+            process.join(1.0)
+            if process.is_alive():
+                process.kill()
+                process.join()
+        return _execution_result_from_payload(
+            payload,
+            reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
+            timeout_limit_seconds=timeout_limit,
+        )
     if process.is_alive():
         process.terminate()
         process.join(1.0)
@@ -49,7 +64,9 @@ def execute_tsp_solver_code(
             process.join()
         return TSPSolverExecutionResult("timeout", reported_value=_reported_tour(best_tour_a, best_tour_b,
                                                                                   active_tour_index),
-                                         runtime_seconds=runtime, error="Solver timed out")
+                                         runtime_seconds=runtime,
+                                         error=f"Solver timed out after {runtime:.6g}s (timeout_seconds={timeout_limit:.6g})",
+                                         timeout_limit_seconds=timeout_limit)
     try:
         status, value, child_runtime, error = result_queue.get_nowait()
     except queue.Empty:
@@ -57,13 +74,46 @@ def execute_tsp_solver_code(
             return TSPSolverExecutionResult("error", reported_value=_reported_tour(best_tour_a, best_tour_b,
                                                                                    active_tour_index),
                                             runtime_seconds=runtime,
-                                            error="Solver exited without returning a result")
+                                            error="Solver exited without returning a result",
+                                            timeout_limit_seconds=timeout_limit)
         return TSPSolverExecutionResult("error", runtime_seconds=runtime,
                                          reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
-                                         error=f"Solver process exited with code {process.exitcode}")
+                                         error=f"Solver process exited with code {process.exitcode}",
+                                         timeout_limit_seconds=timeout_limit)
     return TSPSolverExecutionResult(status, value=value,
                                      reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
-                                     runtime_seconds=child_runtime, error=error)
+                                     runtime_seconds=child_runtime, error=error,
+                                     timeout_limit_seconds=timeout_limit)
+
+
+def _get_worker_result_until_deadline(result_queue, process, *, start: float, timeout_seconds: float):
+    deadline = start + float(timeout_seconds)
+    while True:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return None
+        try:
+            return result_queue.get(timeout=min(0.05, remaining))
+        except queue.Empty:
+            if not process.is_alive():
+                return None
+
+
+def _execution_result_from_payload(
+        payload,
+        *,
+        reported_value: Any | None,
+        timeout_limit_seconds: float,
+) -> TSPSolverExecutionResult:
+    status, value, child_runtime, error = payload
+    return TSPSolverExecutionResult(
+        status,
+        value=value,
+        reported_value=reported_value,
+        runtime_seconds=child_runtime,
+        error=error,
+        timeout_limit_seconds=timeout_limit_seconds,
+    )
 
 
 def _worker(code: str, distance_matrix: np.ndarray, seed: int, budget: int, result_queue, best_tour_a, best_tour_b,

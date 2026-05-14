@@ -122,6 +122,7 @@ class BBOBCandidateEvaluator:
             "evaluations": run.evaluations,
             "partial": run.partial,
             "runtime_seconds": run.runtime_seconds,
+            "timeout_limit_seconds": run.timeout_limit_seconds,
             "error": run.error,
         }
 
@@ -130,6 +131,7 @@ class BBOBCandidateEvaluator:
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
+        metrics["timeout_seconds"] = self.timeout_seconds
         metrics["timeout_penalty"] = self.timeout_penalty
         metrics["aocc_lower_bound"] = self.aocc_lower_bound
         metrics["aocc_upper_bound"] = self.aocc_upper_bound

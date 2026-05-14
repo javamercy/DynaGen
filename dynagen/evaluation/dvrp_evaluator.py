@@ -114,6 +114,7 @@ class DVRPCandidateEvaluator:
             "waits": run.waits,
             "completed_count": run.completed_count,
             "runtime_seconds": run.runtime_seconds,
+            "timeout_limit_seconds": run.timeout_limit_seconds,
             "error": run.error,
         }
 
@@ -125,6 +126,7 @@ class DVRPCandidateEvaluator:
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
+        metrics["timeout_seconds"] = self.timeout_seconds
         metrics["timeout_penalty"] = self.timeout_penalty
         return metrics
 
