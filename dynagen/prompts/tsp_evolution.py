@@ -12,7 +12,7 @@ TSP_STRATEGY_INSTRUCTIONS = {
     "S1": """Explore: create a complete solver with materially different search behavior from the parent.
 Change a core decision rule or search dynamic, not names or constants. Keep validity, budget use, and early reporting.""",
 
-    "S2": """Refine: use parent metrics and verbal gradients to make one or two targeted fixes.
+    "S2": """Refine: use parent metrics and LLM reflections to make one or two targeted fixes.
 Preserve what works, address measured weakness, and avoid unrelated rewrites.""",
 
     "S3": """Recombine: build one coherent solver from complementary parent strengths.

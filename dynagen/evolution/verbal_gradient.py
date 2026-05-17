@@ -8,45 +8,6 @@ VERBAL_GRADIENT_KEY = "verbal_gradient"
 VERBAL_GRADIENT_VERSION = 1
 
 
-def base_verbal_gradient(
-        *,
-        problem: str,
-        candidate: Candidate,
-        parents: list[Candidate],
-        generation: int,
-        source: str = "static",
-        summary: str = "",
-        preserve: list[str] | None = None,
-        weaknesses: list[str] | None = None,
-        next_mutations: dict[str, str] | None = None,
-        avoid: list[str] | None = None,
-        evidence: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    return normalize_verbal_gradient(
-        {
-            "version": VERBAL_GRADIENT_VERSION,
-            "problem": problem,
-            "source": source,
-            "candidate_id": candidate.id,
-            "generation": generation,
-            "parent_ids": [parent.id for parent in parents],
-            "score_name": candidate.score_name,
-            "score_value": _finite_or_none(candidate.score_value),
-            "delta_vs_best_parent": score_delta_vs_best_parent(candidate, parents),
-            "summary": summary,
-            "preserve": preserve or [],
-            "weaknesses": weaknesses or [],
-            "next_mutations": next_mutations or {},
-            "avoid": avoid or [],
-            "evidence": evidence or {},
-        },
-        fallback_problem=problem,
-        fallback_candidate=candidate,
-        fallback_generation=generation,
-        fallback_parents=parents,
-    )
-
-
 def normalize_verbal_gradient(
         value: dict[str, Any],
         *,
@@ -57,18 +18,10 @@ def normalize_verbal_gradient(
         source: str | None = None,
 ) -> dict[str, Any]:
     gradient = dict(value) if isinstance(value, dict) else {}
-    next_mutations = gradient.get("next_mutations")
-    if not isinstance(next_mutations, dict):
-        next_mutations = {}
-    normalized_next = {
-        str(key): _clean_text(value)
-        for key, value in next_mutations.items()
-        if _clean_text(value)
-    }
     return {
         "version": int(gradient.get("version") or VERBAL_GRADIENT_VERSION),
         "problem": str(gradient.get("problem") or fallback_problem),
-        "source": str(source or gradient.get("source") or "static"),
+        "source": str(source or gradient.get("source") or "llm"),
         "candidate_id": str(gradient.get("candidate_id") or fallback_candidate.id),
         "generation": int(gradient.get("generation") or fallback_generation),
         "parent_ids": _clean_list(gradient.get("parent_ids")) or [parent.id for parent in fallback_parents],
@@ -78,9 +31,9 @@ def normalize_verbal_gradient(
             gradient.get("delta_vs_best_parent", score_delta_vs_best_parent(fallback_candidate, fallback_parents))
         ),
         "summary": _clean_text(gradient.get("summary")),
+        "aim": _clean_text(gradient.get("aim")),
         "preserve": _clean_list(gradient.get("preserve")),
-        "weaknesses": _clean_list(gradient.get("weaknesses")),
-        "next_mutations": normalized_next,
+        "change": _clean_list(gradient.get("change")),
         "avoid": _clean_list(gradient.get("avoid")),
         "evidence": gradient.get("evidence") if isinstance(gradient.get("evidence"), dict) else {},
     }
@@ -89,34 +42,25 @@ def normalize_verbal_gradient(
 def parse_llm_verbal_gradient(
         text: str,
         *,
-        static_gradient: dict[str, Any],
+        problem: str,
         candidate: Candidate,
         parents: list[Candidate],
         generation: int,
 ) -> dict[str, Any]:
     data = _json_object_from_text(text)
-    merged = dict(static_gradient)
-    for key in ("summary", "preserve", "weaknesses", "next_mutations", "avoid"):
-        if key in data:
-            merged[key] = data[key]
-    evidence = dict(static_gradient.get("evidence") or {})
-    llm_evidence = data.get("evidence")
-    if isinstance(llm_evidence, dict):
-        evidence.update(llm_evidence)
-    merged["evidence"] = evidence
     return normalize_verbal_gradient(
-        merged,
-        fallback_problem=str(static_gradient.get("problem") or ""),
+        data,
+        fallback_problem=problem,
         fallback_candidate=candidate,
         fallback_generation=generation,
         fallback_parents=parents,
-        source="static+llm",
+        source="llm",
     )
 
 
 def candidate_has_llm_gradient(candidate: Candidate) -> bool:
     gradient = (candidate.metrics or {}).get(VERBAL_GRADIENT_KEY)
-    return isinstance(gradient, dict) and "llm" in str(gradient.get("source", ""))
+    return isinstance(gradient, dict) and str(gradient.get("source")) == "llm"
 
 
 def get_candidate_gradient(candidate: Candidate) -> dict[str, Any] | None:
@@ -142,7 +86,7 @@ def format_parent_verbal_gradients(
             blocks.append(block)
     if not blocks:
         return ""
-    return "PARENT-SPECIFIC VERBAL GRADIENTS:\n\n" + "\n\n".join(blocks)
+    return "PARENT-SPECIFIC LLM REFLECTIONS:\n\n" + "\n\n".join(blocks)
 
 
 def format_candidate_verbal_gradient(
@@ -151,26 +95,22 @@ def format_candidate_verbal_gradient(
         strategy: str | None = None,
 ) -> str:
     gradient = get_candidate_gradient(candidate)
-    if not gradient:
+    if not gradient or str(gradient.get("source")) != "llm":
         return ""
-    lines = [f"Parent {candidate.id} gradient ({gradient.get('source', 'unknown')}):"]
+    lines = [f"Parent {candidate.id} LLM reflection:"]
     summary = _clean_text(gradient.get("summary"))
     if summary:
         lines.append(f"- Summary: {summary}")
+    aim = _clean_text(gradient.get("aim"))
+    if aim:
+        lines.append(f"- Aim: {aim}")
     preserve = _clean_list(gradient.get("preserve"))
     if preserve:
         lines.append(f"- Preserve: {'; '.join(preserve)}")
-    weaknesses = _clean_list(gradient.get("weaknesses"))
-    if weaknesses:
-        lines.append(f"- Weaknesses: {'; '.join(weaknesses)}")
-    next_mutations = gradient.get("next_mutations")
-    if isinstance(next_mutations, dict):
-        next_step = _clean_text(next_mutations.get(str(strategy))) if strategy else ""
-        if not next_step:
-            next_step = _clean_text(next_mutations.get("default"))
-        if next_step:
-            label = f"Next {strategy} mutation" if strategy else "Next mutation"
-            lines.append(f"- {label}: {next_step}")
+    change = _clean_list(gradient.get("change"))
+    if change:
+        label = f"Change for {strategy}" if strategy else "Change"
+        lines.append(f"- {label}: {'; '.join(change)}")
     avoid = _clean_list(gradient.get("avoid"))
     if avoid:
         lines.append(f"- Avoid: {'; '.join(avoid)}")
@@ -185,7 +125,6 @@ def build_llm_gradient_messages(
         candidate: Candidate,
         parents: list[Candidate],
         generation: int,
-        static_gradient: dict[str, Any],
 ) -> list[dict[str, str]]:
     evidence = {
         "generation": generation,
@@ -193,22 +132,27 @@ def build_llm_gradient_messages(
         "goal": goal,
         "candidate": _candidate_snapshot(candidate),
         "parents": [_candidate_snapshot(parent) for parent in parents],
-        "static_gradient": static_gradient,
+        "delta_vs_best_parent": score_delta_vs_best_parent(candidate, parents),
     }
     user = (
-        "Convert evaluator evidence into a concise parent-specific verbal gradient for future mutations. "
-        "The gradient must be actionable for evolutionary code generation, not a generic review. "
+        "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. "
+        "Use measured evaluator evidence, parent comparison, code, thought, and errors. "
+        "Do not invent unsupported weaknesses.\n"
         f"Optimization goal: {goal}\n"
         f"Domain focus: {focus}\n\n"
-        "Return exactly one JSON object with these keys: summary, preserve, weaknesses, next_mutations, avoid. "
-        "next_mutations must be an object with S1, S2, S3, and default string values. "
-        "Do not include Markdown, code, or text outside JSON.\n\n"
+        "Return exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\n"
+        "summary: one sentence describing the measured outcome.\n"
+        "aim: one concrete objective for the next mutation, directly aligned with the optimization goal.\n"
+        "preserve: a short list of mechanisms worth keeping.\n"
+        "change: a short list of one or two targeted changes to try next.\n"
+        "avoid: a short list of failure modes or distracting edits to avoid.\n"
+        "Keep every value concise. Do not include Markdown, code, or text outside JSON.\n\n"
         f"Evidence:\n{json.dumps(evidence, sort_keys=True, separators=(',', ':'))}\n"
     )
     return [
         {
             "role": "system",
-            "content": "Produce compact evaluator-grounded verbal gradients for algorithm mutation.",
+            "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
         },
         {"role": "user", "content": user},
     ]
@@ -242,19 +186,6 @@ def best_numeric_group(groups: object, *, higher_is_better: bool) -> tuple[str, 
     return max(values, key=lambda item: item[1]) if higher_is_better else min(values, key=lambda item: item[1])
 
 
-def worst_numeric_group(groups: object, *, higher_is_better: bool) -> tuple[str, float] | None:
-    if not isinstance(groups, dict):
-        return None
-    values = [
-        (str(key), number)
-        for key, value in groups.items()
-        if (number := _finite_or_none(value)) is not None
-    ]
-    if not values:
-        return None
-    return min(values, key=lambda item: item[1]) if higher_is_better else max(values, key=lambda item: item[1])
-
-
 def _json_object_from_text(text: str) -> dict[str, Any]:
     try:
         data = json.loads(text)
@@ -265,7 +196,7 @@ def _json_object_from_text(text: str) -> dict[str, Any]:
             raise
         data = json.loads(text[start:end + 1])
     if not isinstance(data, dict):
-        raise ValueError("Verbal gradient response must be a JSON object")
+        raise ValueError("Reflection response must be a JSON object")
     return data
 
 

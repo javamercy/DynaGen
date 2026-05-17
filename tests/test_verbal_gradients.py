@@ -5,8 +5,10 @@ import unittest
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
+from dynagen.evaluation.bbob_gradient import build_bbob_llm_verbal_gradient_prompt
 from dynagen.evaluation.base import EvaluationResult
-from dynagen.evaluation.tsp_gradient import build_tsp_static_verbal_gradient
+from dynagen.evaluation.dvrp_gradient import build_dvrp_llm_verbal_gradient_prompt
+from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
 from dynagen.evolution.engine import EvolutionEngine
 from dynagen.evolution.verbal_gradient import (
     VERBAL_GRADIENT_KEY,
@@ -25,16 +27,17 @@ from dynagen.prompts.tsp_templates import render_tsp_candidates
 
 class VerbalGradientTests(unittest.TestCase):
     def test_config_parses_nested_verbal_gradient_options(self) -> None:
-        config = _run_config(llm_enabled=True, llm_every_n_generations=3, llm_model="feedback-model")
+        config = _run_config(llm_every_n_generations=3, llm_model="feedback-model")
 
         self.assertTrue(config.evolution.verbal_gradients.enabled)
-        self.assertTrue(config.evolution.verbal_gradients.llm_enabled)
         self.assertEqual(config.evolution.verbal_gradients.llm_every_n_generations, 3)
         self.assertEqual(config.evolution.verbal_gradients.max_llm_calls_per_generation, 1)
         self.assertEqual(config.evolution.verbal_gradients.llm_model, "feedback-model")
+        self.assertFalse(hasattr(config.evolution.verbal_gradients, "static_enabled"))
+        self.assertFalse(hasattr(config.evolution.verbal_gradients, "llm_enabled"))
         self.assertFalse(hasattr(config.evolution.verbal_gradients, "max_chars"))
 
-    def test_tsp_static_gradient_records_timeout_weakness(self) -> None:
+    def test_llm_reflection_prompts_exist_for_all_problems(self) -> None:
         candidate = Candidate(
             id="cand_1",
             generation=1,
@@ -55,12 +58,17 @@ class VerbalGradientTests(unittest.TestCase):
             },
         )
 
-        gradient = build_tsp_static_verbal_gradient(candidate, parents=[], generation=1)
+        for builder in (
+            build_tsp_llm_verbal_gradient_prompt,
+            build_bbob_llm_verbal_gradient_prompt,
+            build_dvrp_llm_verbal_gradient_prompt,
+        ):
+            messages = builder(candidate, parents=[], generation=1)
+            user = messages[1]["content"]
 
-        self.assertEqual(gradient["problem"], "tsp")
-        self.assertEqual(gradient["source"], "static")
-        self.assertIn("S2", gradient["next_mutations"])
-        self.assertTrue(any("timed out" in weakness for weakness in gradient["weaknesses"]))
+            self.assertIn("aim-guided LLM reflection", user)
+            self.assertIn("summary, aim, preserve, change, avoid", user)
+            self.assertNotIn("static_gradient", user)
 
     def test_parent_gradient_formatting_is_strategy_specific(self) -> None:
         candidate = Candidate(
@@ -72,11 +80,11 @@ class VerbalGradientTests(unittest.TestCase):
                 "problem": "tsp",
                 "score_name": "distance",
                 VERBAL_GRADIENT_KEY: {
-                    "source": "static",
+                    "source": "llm",
                     "summary": "Good incumbent, weak large instances.",
+                    "aim": "Improve large-instance behavior without losing valid tours.",
                     "preserve": ["early reporting"],
-                    "weaknesses": ["large instances"],
-                    "next_mutations": {"S2": "Add a guarded late-budget local pass."},
+                    "change": ["Add a guarded late-budget local pass."],
                     "avoid": ["unbounded loops"],
                 },
             },
@@ -86,8 +94,8 @@ class VerbalGradientTests(unittest.TestCase):
 
         text = format_parent_verbal_gradients([candidate], strategy="S2")
 
-        self.assertIn("PARENT-SPECIFIC VERBAL GRADIENTS", text)
-        self.assertIn("Next S2 mutation", text)
+        self.assertIn("PARENT-SPECIFIC LLM REFLECTIONS", text)
+        self.assertIn("Change for S2", text)
         self.assertIn("guarded late-budget", text)
 
     def test_s3_parent_gradient_formatting_is_unlimited_and_keeps_all_parents(self) -> None:
@@ -101,11 +109,11 @@ class VerbalGradientTests(unittest.TestCase):
                     "problem": "tsp",
                     "score_name": "distance",
                     VERBAL_GRADIENT_KEY: {
-                        "source": "static",
+                        "source": "llm",
                         "summary": " ".join(["long summary about large instances and timeout risk"] * 6),
+                        "aim": "Use complementary mechanisms while keeping valid construction.",
                         "preserve": ["early reporting", "valid incumbent", "seeded construction"],
-                        "weaknesses": ["large instances", "timeout risk", "weak source bucket"],
-                        "next_mutations": {"S3": "Use only the complementary mechanism and avoid copying slow loops."},
+                        "change": ["Use only the complementary mechanism and avoid copying slow loops."],
                         "avoid": ["unbounded all-pairs neighborhoods", "late reporting"],
                     },
                 },
@@ -117,9 +125,9 @@ class VerbalGradientTests(unittest.TestCase):
 
         text = format_parent_verbal_gradients(parents, strategy="S3")
 
-        self.assertIn("Parent cand_1 gradient", text)
-        self.assertIn("Parent cand_2 gradient", text)
-        self.assertIn("Parent cand_3 gradient", text)
+        self.assertIn("Parent cand_1 LLM reflection", text)
+        self.assertIn("Parent cand_2 LLM reflection", text)
+        self.assertIn("Parent cand_3 LLM reflection", text)
         self.assertIn(" ".join(["long summary about large instances and timeout risk"] * 6), text)
 
     def test_evolution_prompts_include_parent_awareness_for_all_problems(self) -> None:
@@ -134,11 +142,11 @@ class VerbalGradientTests(unittest.TestCase):
                 "problem": "tsp",
                 "score_name": "distance",
                 VERBAL_GRADIENT_KEY: {
-                    "source": "static",
+                    "source": "llm",
                     "summary": "Keep the useful incumbent behavior.",
+                    "aim": "Reduce large-instance gap with one focused change.",
                     "preserve": ["valid incumbent"],
-                    "weaknesses": ["large instances"],
-                    "next_mutations": {"S2": "Make one focused change."},
+                    "change": ["Make one focused change."],
                     "avoid": ["unbounded loops"],
                 },
                 "mean_gap": 1.0,
@@ -149,15 +157,17 @@ class VerbalGradientTests(unittest.TestCase):
             status=CandidateStatus.VALID,
         )
 
+        feedback_context = format_parent_verbal_gradients([parent], strategy="S2")
         for messages in (
-            build_tsp_evolution_prompt("S2", [parent]),
-            build_bbob_evolution_prompt("S2", [parent]),
-            build_dvrp_evolution_prompt("S2", [parent]),
+            build_tsp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
+            build_bbob_evolution_prompt("S2", [parent], feedback_context=feedback_context),
+            build_dvrp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
         ):
             user = messages[1]["content"]
             self.assertIn("PARENT AWARENESS", user)
             self.assertIn("Best available parent", user)
             self.assertIn("cand_1", user)
+            self.assertIn("reflection=llm", user)
             self.assertIn("Keep the useful incumbent behavior.", user)
 
     def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
@@ -181,27 +191,21 @@ class VerbalGradientTests(unittest.TestCase):
             candidate=candidate,
             parents=[],
             generation=1,
-            static_gradient={
-                "summary": "static",
-                "preserve": [],
-                "weaknesses": [],
-                "next_mutations": {},
-                "avoid": [],
-            },
         )
         user = messages[1]["content"]
         evidence = json.loads(user.split("Evidence:\n", 1)[1])
 
         self.assertEqual(evidence["candidate"]["code"], full_code)
         self.assertNotIn("code_excerpt", evidence["candidate"])
+        self.assertNotIn("static_gradient", evidence)
 
     def test_parent_renderers_do_not_duplicate_verbal_gradient_block(self) -> None:
         gradient = {
-            "source": "static",
+            "source": "llm",
             "summary": "Do not duplicate this guidance.",
+            "aim": "Keep guidance outside candidate code blocks.",
             "preserve": ["valid incumbent"],
-            "weaknesses": ["large instances"],
-            "next_mutations": {"S2": "Make one focused change."},
+            "change": ["Make one focused change."],
             "avoid": ["unbounded loops"],
         }
         candidate = Candidate(
@@ -232,15 +236,15 @@ class VerbalGradientTests(unittest.TestCase):
             render_dvrp_candidates([candidate]),
         ):
             self.assertIn("Code:", rendered)
-            self.assertNotIn("Parent cand_1 gradient", rendered)
+            self.assertNotIn("Parent cand_1 LLM reflection", rendered)
             self.assertNotIn("Do not duplicate this guidance.", rendered)
 
-    def test_engine_attaches_static_and_cached_llm_gradients(self) -> None:
+    def test_engine_generates_cached_llm_reflections(self) -> None:
         provider = _FakeProvider(model="main-model")
         feedback_provider = _FakeProvider(model="feedback-model")
         search_evaluator = _FakeEvaluator()
         test_evaluator = _FakeEvaluator()
-        config = _run_config(llm_enabled=True, llm_every_n_generations=1, llm_model="feedback-model")
+        config = _run_config(llm_every_n_generations=1, llm_model="feedback-model")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -260,20 +264,21 @@ class VerbalGradientTests(unittest.TestCase):
 
         self.assertEqual(provider.candidate_calls, 2)
         self.assertEqual(feedback_provider.text_calls, 1)
-        self.assertEqual(get_candidate_gradient(initial)["source"], "static+llm")
-        self.assertEqual(get_candidate_gradient(offspring)["source"], "static")
-        self.assertIn("PARENT-SPECIFIC VERBAL GRADIENTS", initial_prompt)
+        self.assertEqual(get_candidate_gradient(initial)["source"], "llm")
+        self.assertIsNone(get_candidate_gradient(offspring))
+        self.assertIn("PARENT-SPECIFIC LLM REFLECTIONS", initial_prompt)
         self.assertEqual(llm_calls["llm_model"], "main-model")
         self.assertEqual(llm_calls["feedback_llm_model"], "feedback-model")
         self.assertEqual(llm_calls["feedback_calls"], 1)
         self.assertEqual(llm_calls["verbal_gradients"]["llm_every_n_generations"], 1)
+        self.assertNotIn("static_count", llm_calls["verbal_gradients"])
 
     def test_engine_skips_llm_feedback_on_non_matching_generation(self) -> None:
         provider = _FakeProvider(model="main-model")
         feedback_provider = _FakeProvider(model="feedback-model")
         search_evaluator = _FakeEvaluator()
         test_evaluator = _FakeEvaluator()
-        config = _run_config(llm_enabled=True, llm_every_n_generations=2, llm_model="feedback-model")
+        config = _run_config(llm_every_n_generations=2, llm_model="feedback-model")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -290,7 +295,7 @@ class VerbalGradientTests(unittest.TestCase):
             llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
 
         self.assertEqual(feedback_provider.text_calls, 0)
-        self.assertEqual(get_candidate_gradient(initial)["source"], "static")
+        self.assertIsNone(get_candidate_gradient(initial))
         self.assertEqual(llm_calls["feedback_calls"], 0)
 
 
@@ -315,14 +320,9 @@ class _FakeProvider:
         self.text_calls += 1
         return json.dumps({
             "summary": "LLM-targeted parent guidance.",
+            "aim": "Reduce large-instance gap with one focused mutation.",
             "preserve": ["early incumbent reporting"],
-            "weaknesses": ["large instances"],
-            "next_mutations": {
-                "S1": "Explore a different construction.",
-                "S2": "Refine the local pass.",
-                "S3": "Use only the construction mechanism.",
-                "default": "Improve robustness.",
-            },
+            "change": ["Refine the local pass."],
             "avoid": ["unbounded loops"],
         })
 
@@ -371,7 +371,7 @@ class _FakeEvaluator:
         return EvaluationResult("valid", 10.0, metrics, score_name="distance")
 
 
-def _run_config(*, llm_enabled: bool, llm_every_n_generations: int = 1, llm_model: str = "feedback-model") -> RunConfig:
+def _run_config(*, llm_every_n_generations: int = 1, llm_model: str = "feedback-model") -> RunConfig:
     return RunConfig.from_dict({
         "run": {"name": "test", "output_dir": "runs/test", "seed": 1},
         "llm": {
@@ -386,13 +386,10 @@ def _run_config(*, llm_enabled: bool, llm_every_n_generations: int = 1, llm_mode
             "strategies": ["S1"],
             "verbal_gradients": {
                 "enabled": True,
-                "static_enabled": True,
-                "llm_enabled": llm_enabled,
                 "llm_every_n_generations": llm_every_n_generations,
                 "max_llm_calls_per_generation": 1,
                 "llm_model": llm_model,
                 "temperature": 0.2,
-                "max_chars": 900,
             },
         },
         "evaluation": {

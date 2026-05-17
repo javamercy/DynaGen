@@ -28,17 +28,13 @@ class LLMConfig:
 @dataclass
 class VerbalGradientConfig:
     enabled: bool = True
-    static_enabled: bool = True
-    llm_enabled: bool = False
     llm_every_n_generations: int = 2
     max_llm_calls_per_generation: int = 2
     llm_model: str | None = None
-    temperature: float = 0.2
+    temperature: float = 0.3
 
     def __post_init__(self) -> None:
         self.enabled = bool(self.enabled)
-        self.static_enabled = bool(self.static_enabled)
-        self.llm_enabled = bool(self.llm_enabled)
         self.llm_every_n_generations = int(self.llm_every_n_generations)
         self.max_llm_calls_per_generation = int(self.max_llm_calls_per_generation)
         if self.llm_model is not None:
@@ -112,11 +108,7 @@ class EvolutionConfig:
         self.offspring_per_strategy = int(self.offspring_per_strategy)
         self.strategies = [Strategy(strategy) for strategy in self.strategies]
         if isinstance(self.verbal_gradients, dict):
-            verbal_gradient_values = dict(self.verbal_gradients)
-            # Legacy configs may still contain this option. Prompt guidance is no
-            # longer character-limited, so the value is accepted but ignored.
-            verbal_gradient_values.pop("max_chars", None)
-            self.verbal_gradients = VerbalGradientConfig(**verbal_gradient_values)
+            self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
             raise ValueError("evolution.verbal_gradients must be a mapping")
         if isinstance(self.archive, dict):

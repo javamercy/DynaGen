@@ -85,7 +85,7 @@ def build_bbob_evolution_prompt(
     STRATEGY: {strategy}
     {BBOB_STRATEGY_INSTRUCTIONS[strategy]}
     MINIMIZATION GOAL: lower objective value under strict budget.
-    When parent-specific verbal gradients are present, use them as the strongest guidance for what to change next.
+    When parent-specific LLM reflections are present, use them as the strongest guidance for what to change next.
     {feedback_context if feedback_context else ''}
     {parent_awareness if parent_awareness else ''}
     SELECTED PARENT(S) CONTEXT:

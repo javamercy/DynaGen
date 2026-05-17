@@ -18,7 +18,7 @@ from dynagen.evolution.strategies import parent_count, Strategy
 from dynagen.evolution.verbal_gradient import (
     candidate_has_llm_gradient,
     format_parent_verbal_gradients,
-    get_candidate_gradient,
+    normalize_verbal_gradient,
     parse_llm_verbal_gradient,
     set_candidate_gradient,
 )
@@ -63,7 +63,6 @@ class EvolutionEngine:
         self.archive = CandidateArchive(config=config.evolution.archive, problem=config.problem.type)
         self._llm_gradient_calls_by_generation: dict[int, int] = {}
         self._verbal_gradient_stats: dict[str, int] = {
-            "static_count": 0,
             "llm_count": 0,
             "llm_error_count": 0,
         }
@@ -142,8 +141,6 @@ class EvolutionEngine:
             "budget_match": candidate_generation_calls == configured_budget,
             "verbal_gradients": {
                 "enabled": self.config.evolution.verbal_gradients.enabled,
-                "static_enabled": self.config.evolution.verbal_gradients.static_enabled,
-                "llm_enabled": self.config.evolution.verbal_gradients.llm_enabled,
                 "llm_every_n_generations": self.config.evolution.verbal_gradients.llm_every_n_generations,
                 "llm_model": self.config.evolution.verbal_gradients.llm_model or feedback_model or main_model,
                 "feedback_llm_model": feedback_model,
@@ -203,7 +200,7 @@ class EvolutionEngine:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
                 parents = self._select_strategy_parents(strategy, population.candidates)
-                self._ensure_parent_verbal_gradients(strategy, parents, generation)
+                self._ensure_parent_verbal_gradients(parents, generation)
                 feedback_context = self._feedback_context(strategy, parents)
                 messages = self.problem.build_evolution_prompt(
                     strategy,
@@ -276,7 +273,6 @@ class EvolutionEngine:
                 )
             else:
                 _mark_candidate_error(candidate, error_details)
-        self._attach_static_verbal_gradient(candidate, task.parents, task.generation)
         self.store.save_candidate(candidate)
         return candidate
 
@@ -346,69 +342,27 @@ class EvolutionEngine:
         metrics_getter = getattr(self.search_evaluator, "empty_metrics", None)
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
-    def _attach_static_verbal_gradient(
-            self,
-            candidate: Candidate,
-            parents: list[Candidate],
-            generation: int,
-    ) -> dict | None:
-        gradient_config = self.config.evolution.verbal_gradients
-        if not gradient_config.enabled or not gradient_config.static_enabled:
-            return None
-        if get_candidate_gradient(candidate):
-            return get_candidate_gradient(candidate)
-        gradient = self._build_static_verbal_gradient(candidate, parents, generation)
-        if gradient is None:
-            return None
-        set_candidate_gradient(candidate, gradient)
-        self._verbal_gradient_stats["static_count"] += 1
-        return gradient
-
-    def _build_static_verbal_gradient(
-            self,
-            candidate: Candidate,
-            parents: list[Candidate],
-            generation: int,
-    ) -> dict | None:
-        builder = getattr(self.problem, "build_static_verbal_gradient", None)
-        if not callable(builder):
-            return None
-        return dict(builder(candidate, parents=parents, generation=generation))
-
     def _ensure_parent_verbal_gradients(
             self,
-            strategy: Strategy,
             parents: list[Candidate],
             generation: int,
     ) -> None:
         gradient_config = self.config.evolution.verbal_gradients
         if (
             not gradient_config.enabled
-            or not gradient_config.llm_enabled
             or generation % gradient_config.llm_every_n_generations != 0
         ):
             return
         for parent in parents:
             parent_parents = self._resolve_parents(parent)
-            static_gradient = get_candidate_gradient(parent)
-            if static_gradient is None and gradient_config.static_enabled:
-                static_gradient = self._attach_static_verbal_gradient(parent, parent_parents, parent.generation)
-                self.store.save_candidate(parent)
-            if not gradient_config.llm_enabled:
-                continue
             if candidate_has_llm_gradient(parent):
                 continue
             if self._llm_gradient_calls_by_generation.get(generation, 0) >= gradient_config.max_llm_calls_per_generation:
-                continue
-            if static_gradient is None:
-                static_gradient = self._build_static_verbal_gradient(parent, parent_parents, parent.generation)
-            if static_gradient is None:
                 continue
             self._generate_llm_verbal_gradient(
                 candidate=parent,
                 parents=parent_parents,
                 generation=generation,
-                static_gradient=static_gradient,
             )
 
     def _generate_llm_verbal_gradient(
@@ -417,7 +371,6 @@ class EvolutionEngine:
             candidate: Candidate,
             parents: list[Candidate],
             generation: int,
-            static_gradient: dict,
     ) -> None:
         prompt_builder = getattr(self.problem, "build_llm_verbal_gradient_prompt", None)
         text_completion = getattr(self.feedback_provider, "complete_text", None)
@@ -428,10 +381,9 @@ class EvolutionEngine:
             candidate,
             parents=parents,
             generation=generation,
-            static_gradient=static_gradient,
         )
         feedback_record = {
-            "type": "verbal_gradient",
+            "type": "reflection",
             "generation": generation,
             "candidate_id": candidate.id,
             "problem": self.config.problem.type,
@@ -446,7 +398,7 @@ class EvolutionEngine:
             text = text_completion(prompt, temperature=gradient_config.temperature)
             gradient = parse_llm_verbal_gradient(
                 text,
-                static_gradient=static_gradient,
+                problem=self.config.problem.type,
                 candidate=candidate,
                 parents=parents,
                 generation=generation,
@@ -456,10 +408,16 @@ class EvolutionEngine:
             feedback_record["gradient"] = gradient
             self._verbal_gradient_stats["llm_count"] += 1
         except Exception as exc:
-            existing_gradient = get_candidate_gradient(candidate) or static_gradient
-            existing_gradient = dict(existing_gradient)
-            existing_gradient["llm_error"] = _exception_details(exc)
-            set_candidate_gradient(candidate, existing_gradient)
+            error_gradient = normalize_verbal_gradient(
+                {},
+                fallback_problem=self.config.problem.type,
+                fallback_candidate=candidate,
+                fallback_generation=generation,
+                fallback_parents=parents,
+                source="llm_error",
+            )
+            error_gradient["llm_error"] = _exception_details(exc)
+            set_candidate_gradient(candidate, error_gradient)
             feedback_record["status"] = "error"
             feedback_record["error_details"] = _exception_details(exc)
             self._verbal_gradient_stats["llm_error_count"] += 1

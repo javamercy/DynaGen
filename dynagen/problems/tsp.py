@@ -7,10 +7,7 @@ from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
 from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_specs
 from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
-from dynagen.evaluation.tsp_gradient import (
-    build_tsp_llm_verbal_gradient_prompt,
-    build_tsp_static_verbal_gradient,
-)
+from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
 from dynagen.evaluation.tsp_evaluator import TSPCandidateEvaluator
 from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
 from dynagen.prompts.tsp_initial import TSP_INITIAL_ROLES, TSPInitialRole, build_tsp_initial_prompt
@@ -49,28 +46,17 @@ class TSPProblem:
             feedback_context=feedback_context,
         )
 
-    def build_static_verbal_gradient(
-            self,
-            candidate: Candidate,
-            *,
-            parents: list[Candidate],
-            generation: int,
-    ) -> dict[str, Any]:
-        return build_tsp_static_verbal_gradient(candidate, parents=parents, generation=generation)
-
     def build_llm_verbal_gradient_prompt(
             self,
             candidate: Candidate,
             *,
             parents: list[Candidate],
             generation: int,
-            static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
         return build_tsp_llm_verbal_gradient_prompt(
             candidate,
             parents=parents,
             generation=generation,
-            static_gradient=static_gradient,
         )
 
     def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:

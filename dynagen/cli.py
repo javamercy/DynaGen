@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
 
         feedback_provider = None
         gradient_config = config.evolution.verbal_gradients
-        if gradient_config.enabled and gradient_config.llm_enabled:
+        if gradient_config.enabled:
             feedback_model = gradient_config.llm_model or config.llm.model
             feedback_provider = provider if feedback_model == config.llm.model else _provider_from_config(
                 config,

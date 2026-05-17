@@ -38,7 +38,7 @@ def render_parent_awareness(
     if invalid_parents:
         lines.append(
             "- Timeout, invalid, or error parents should be treated as failure evidence except for mechanisms "
-            f"explicitly preserved by their verbal gradients: {', '.join(invalid_parents)}."
+            f"explicitly preserved by their LLM reflections: {', '.join(invalid_parents)}."
         )
     if archive_parents:
         lines.append(
@@ -65,7 +65,7 @@ def _strategy_guidance(strategy: str) -> str:
     if strategy == "S2":
         return (
             "use the strongest valid parent as the backbone and make one or two measured fixes from its "
-            "weaknesses and next-mutation guidance."
+            "LLM reflection aim and change guidance."
         )
     if strategy == "S3":
         return (
@@ -95,24 +95,23 @@ def _parent_snapshot(
     archive = _archive_snapshot(parent)
     if archive:
         pieces.append(f"archive={archive}")
-    gradient = _gradient_snapshot(parent)
-    if gradient:
-        pieces.append(f"gradient={gradient}")
+    reflection = _reflection_snapshot(parent)
+    if reflection:
+        pieces.append(f"reflection={reflection}")
     problem_metrics = _problem_metric_snapshot(parent, problem=problem)
     if problem_metrics:
         pieces.append(problem_metrics)
     return "; ".join(pieces)
 
 
-def _gradient_snapshot(parent: Candidate) -> str:
+def _reflection_snapshot(parent: Candidate) -> str:
     metrics = parent.metrics if isinstance(parent.metrics, dict) else {}
     gradient = metrics.get(VERBAL_GRADIENT_KEY)
     if not isinstance(gradient, dict):
-        return "none"
+        return ""
     source = str(gradient.get("source") or "unknown")
-    summary = str(gradient.get("summary") or "").strip()
-    if summary:
-        return f"{source}; summary={summary}"
+    if source != "llm":
+        return ""
     return source
 
 

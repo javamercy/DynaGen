@@ -17,11 +17,11 @@ llm:
 
 evolution:
   population_size: 2
-  generations: 6
+  generations: 3
   offspring_per_strategy: 1
   strategies: [ S1, S2, S3 ]
   archive:
-    enabled: true
+    enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -34,8 +34,6 @@ evolution:
     robustness_weight: 0.35
   verbal_gradients:
     enabled: true
-    static_enabled: false
-    llm_enabled: true
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 2
     llm_model: deepseek-v4-flash

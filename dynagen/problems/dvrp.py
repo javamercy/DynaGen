@@ -5,10 +5,7 @@ from dynagen.config import RunConfig
 from dynagen.domain.dvrp import DVRPInstance, load_dvrp_instances
 from dynagen.evaluation.dvrp_archive import build_dvrp_archive_profile
 from dynagen.evaluation.dvrp_evaluator import DVRPCandidateEvaluator
-from dynagen.evaluation.dvrp_gradient import (
-    build_dvrp_llm_verbal_gradient_prompt,
-    build_dvrp_static_verbal_gradient,
-)
+from dynagen.evaluation.dvrp_gradient import build_dvrp_llm_verbal_gradient_prompt
 from dynagen.prompts.dvrp_evolution import build_dvrp_evolution_prompt
 from dynagen.prompts.dvrp_initial import DVRP_INITIAL_ROLES, DVRPInitialRole, build_dvrp_initial_prompt
 
@@ -52,28 +49,17 @@ class DVRPProblem:
             feedback_context=feedback_context,
         )
 
-    def build_static_verbal_gradient(
-            self,
-            candidate: Candidate,
-            *,
-            parents: list[Candidate],
-            generation: int,
-    ) -> dict[str, Any]:
-        return build_dvrp_static_verbal_gradient(candidate, parents=parents, generation=generation)
-
     def build_llm_verbal_gradient_prompt(
             self,
             candidate: Candidate,
             *,
             parents: list[Candidate],
             generation: int,
-            static_gradient: dict[str, Any],
     ) -> list[dict[str, str]]:
         return build_dvrp_llm_verbal_gradient_prompt(
             candidate,
             parents=parents,
             generation=generation,
-            static_gradient=static_gradient,
         )
 
     def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:

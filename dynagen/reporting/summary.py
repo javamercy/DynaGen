@@ -154,12 +154,11 @@ def build_final_report(
         verbal_gradients = llm_calls.get("verbal_gradients")
         if isinstance(verbal_gradients, dict):
             lines.extend([
-                f"- Verbal gradients enabled: {verbal_gradients.get('enabled')}",
-                f"- Verbal gradient cadence: every {verbal_gradients.get('llm_every_n_generations')} generations",
-                f"- Verbal gradient model: {verbal_gradients.get('llm_model')}",
-                f"- Static verbal gradients: {verbal_gradients.get('static_count')}",
-                f"- LLM verbal gradients: {verbal_gradients.get('llm_count')}",
-                f"- LLM verbal gradient errors: {verbal_gradients.get('llm_error_count')}",
+                f"- LLM reflections enabled: {verbal_gradients.get('enabled')}",
+                f"- LLM reflection cadence: every {verbal_gradients.get('llm_every_n_generations')} generations",
+                f"- LLM reflection model: {verbal_gradients.get('llm_model')}",
+                f"- LLM reflections: {verbal_gradients.get('llm_count')}",
+                f"- LLM reflection errors: {verbal_gradients.get('llm_error_count')}",
             ])
         archive = llm_calls.get("archive")
         if isinstance(archive, dict):
