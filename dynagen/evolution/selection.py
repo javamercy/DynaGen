@@ -178,7 +178,7 @@ def _worst_group_badness(candidate: Candidate) -> float:
         group_values.extend(_numeric_values(metrics.get(key)))
     if group_values:
         return max(group_values)
-    for key in ("worst_gap", "penalized_mean_gap", "mean_gap", "mean_tour_length", "mean_makespan"):
+    for key in ("worst_gap", "penalized_mean_gap", "mean_gap", "mean_tour_length", "mean_ttt"):
         value = _finite_or_none(metrics.get(key))
         if value is not None:
             return value

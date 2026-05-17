@@ -16,7 +16,7 @@ def choose_next_customer(
 ) -> int | None:
 
 Rules:
-- DVRP is an online dispatch problem; the objective is to minimize the last-truck return time (makespan).
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
 - Decide which customer the active truck (at current_position) should head to next.
 - Return an index into available_customers, or None to wait at the current position.
 - If available_customers is empty, return None.
@@ -52,7 +52,7 @@ No Markdown, fences, or text outside JSON. The code string must define choose_ne
 def dvrp_system_prompt(role: str) -> str:
     return (
         f"You are {role}. Generate a compact online DVRP dispatch policy that "
-        "minimizes the last-truck return time. The policy is stateless across "
+        "minimizes TTT (last-truck return time). The policy is stateless across "
         "decisions; do as much useful per-call reasoning as the budget allows."
     )
 
@@ -62,16 +62,17 @@ def render_dvrp_candidates(candidates: list[Candidate]) -> str:
 
 
 def _render_dvrp_candidate(candidate: Candidate) -> str:
-    distance = candidate.score_value
-    distance_str = "unknown" if distance is None else f"{float(distance):.6g}"
+    ttt = candidate.score_value
+    ttt_str = "unknown" if ttt is None else f"{float(ttt):.6g}"
     metrics = candidate.metrics or {}
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; distance: {distance_str}",
+        f"Status: {candidate.status}; TTT: {ttt_str}",
         f"Thought: {candidate.thought}",
+        f"Mean TTT: {metrics.get('mean_ttt')}",
         f"Mean gap: {metrics.get('mean_gap')}",
-        f"Mean makespan: {metrics.get('mean_makespan')}",
-        f"Gap by instance size: {metrics.get('score_by_instance_size')}",
+        f"TTT by instance size: {metrics.get('score_by_instance_size')}",
+        f"Gap by instance size: {metrics.get('gap_by_instance_size')}",
     ]
     if candidate.error_details:
         parts.append(f"Error details: {candidate.error_details}")

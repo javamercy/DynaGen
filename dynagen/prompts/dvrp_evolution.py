@@ -14,7 +14,7 @@ Then, choose a different mechanism class and design the new policy around it.
 Keep validity, deterministic seed handling, and budget-bounded per-call work.""",
 
     "S2": """Refine: improve the parent through targeted fixes grounded in its measured behavior.
-First, identify the parent's weakest measured case from its metrics (mean_gap, mean_makespan, gap_by_instance_size) and its prior thought.
+First, identify the parent's weakest measured case from its metrics (mean_ttt, mean_gap, TTT/gap by instance size) and its prior thought.
 Then, propose one or two focused changes that directly address that weakness.
 Preserve what works; avoid unrelated rewrites.""",
 
@@ -38,7 +38,7 @@ def build_dvrp_evolution_prompt(
         parents,
         strategy=strategy,
         problem="dvrp",
-        score_label="distance",
+        score_label="TTT",
     )
     blocks = [
         DVRP_POLICY_CONTRACT.strip(),
@@ -50,12 +50,12 @@ def build_dvrp_evolution_prompt(
         blocks.append(parent_awareness)
     blocks.extend([
         f"PARENTS:\n{render_dvrp_candidates(parents)}",
-        "Minimize time until the last truck returns to the depot. This is the only optimization goal.",
+        "Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.",
         DVRP_INTERNAL_CHECKLIST.strip(),
         DVRP_RESPONSE_FORMAT.strip(),
     ])
     user = "\n\n".join(blocks)
     return [
-        {"role": "system", "content": "You generate compact online DVRP dispatch policies that minimize last-truck return time."},
+        {"role": "system", "content": "You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time)."},
         {"role": "user", "content": user},
     ]

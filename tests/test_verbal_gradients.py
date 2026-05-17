@@ -219,7 +219,7 @@ class VerbalGradientTests(unittest.TestCase):
                 "mean_final_error": 1.0,
                 "aocc_by_group": {"separable": 0.5},
                 "mean_gap": 1.0,
-                "mean_makespan": 10.0,
+                "mean_ttt": 10.0,
                 "score_by_instance_size": {"33": 1.0},
             },
             distance=10.0,

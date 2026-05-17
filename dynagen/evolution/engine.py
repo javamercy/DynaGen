@@ -573,10 +573,11 @@ def _build_candidate_from_response(
         metrics: dict | None = None,
     ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
-    uses_distance = _uses_distance_metrics(candidate_metrics)
-    if uses_distance:
-        candidate_metrics.setdefault("score_name", "distance")
-        candidate_metrics["distance"] = math.inf
+    score_name = _minimized_score_name(candidate_metrics)
+    uses_distance = score_name is not None
+    if score_name is not None:
+        candidate_metrics["score_name"] = score_name
+        candidate_metrics[score_name] = math.inf
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -602,12 +603,13 @@ def _failed_candidate(
         parents: list[str] | None = None,
         error_details: str | None = None,
         metrics: dict | None = None,
-) -> Candidate:
+    ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
-    uses_distance = _uses_distance_metrics(candidate_metrics)
-    if uses_distance:
-        candidate_metrics.setdefault("score_name", "distance")
-        candidate_metrics["distance"] = math.inf
+    score_name = _minimized_score_name(candidate_metrics)
+    uses_distance = score_name is not None
+    if score_name is not None:
+        candidate_metrics["score_name"] = score_name
+        candidate_metrics[score_name] = math.inf
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -634,23 +636,34 @@ def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
     candidate.status = CandidateStatus.ERROR
     if not candidate.metrics:
         candidate.metrics = {}
-    if candidate.score_name == "distance":
+    score_name = candidate.score_name
+    if score_name != "fitness":
         candidate.distance = math.inf
         candidate.fitness = None
-        candidate.metrics.setdefault("score_name", "distance")
-        candidate.metrics["distance"] = math.inf
+        candidate.metrics["score_name"] = score_name
+        candidate.metrics[score_name] = math.inf
     else:
         candidate.fitness = math.inf
     candidate.error_details = error_details
 
 
 def _uses_distance_metrics(metrics: dict) -> bool:
-    return (
-        metrics.get("problem") == "tsp"
-        or metrics.get("problem") == "dvrp"
-        or metrics.get("score_name") == "distance"
-        or "distance" in metrics
-    )
+    return _minimized_score_name(metrics) is not None
+
+
+def _minimized_score_name(metrics: dict) -> str | None:
+    if metrics.get("problem") == "dvrp":
+        return "ttt"
+    if metrics.get("problem") == "tsp":
+        return "distance"
+    score_name = metrics.get("score_name")
+    if score_name in {"distance", "ttt"}:
+        return str(score_name)
+    if "ttt" in metrics:
+        return "ttt"
+    if "distance" in metrics:
+        return "distance"
+    return None
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:

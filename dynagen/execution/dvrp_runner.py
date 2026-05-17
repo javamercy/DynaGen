@@ -25,7 +25,7 @@ class DVRPExecutionResult:
 @dataclass(frozen=True)
 class DVRPRunResult:
     status: DVRPRunStatus
-    makespan: float | None
+    ttt: float | None
     routes: list[list[int]]
     decisions: int
     waits: int
@@ -102,13 +102,13 @@ def run_dvrp_policy(
             execution.timeout_limit_seconds,
         )
 
-    if not np.isfinite(simulation.makespan) or simulation.makespan <= 0:
+    if not np.isfinite(simulation.ttt) or simulation.ttt <= 0:
         return DVRPRunResult("invalid", None, [], simulation.decisions, simulation.waits, simulation.completed_count,
-                             execution.runtime_seconds, "Policy produced an invalid makespan",
+                             execution.runtime_seconds, "Policy produced an invalid TTT",
                              execution.timeout_limit_seconds)
     return DVRPRunResult(
         "valid",
-        simulation.makespan,
+        simulation.ttt,
         simulation.routes,
         simulation.decisions,
         simulation.waits,

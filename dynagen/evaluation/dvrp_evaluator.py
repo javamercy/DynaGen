@@ -10,6 +10,8 @@ from dynagen.evaluation.base import EvaluationResult, EvaluationStatus
 from dynagen.evaluation.dvrp_metrics import aggregate_dvrp_records, compute_dvrp_gap
 from dynagen.execution.dvrp_runner import run_dvrp_policy
 
+DVRP_SCORE_NAME = "ttt"
+
 
 class DVRPCandidateEvaluator:
     def __init__(
@@ -49,7 +51,7 @@ class DVRPCandidateEvaluator:
         candidate.distance = result.score
         candidate.fitness = None
         candidate.metrics = dict(result.metrics)
-        candidate.metrics["distance"] = result.score
+        candidate.metrics[DVRP_SCORE_NAME] = result.score
         candidate.error_details = result.error_feedback
         return result
 
@@ -57,16 +59,16 @@ class DVRPCandidateEvaluator:
         validation = validate_dvrp_generated_code(code)
         if not validation.valid:
             metrics = self.empty_metrics()
-            metrics["distance"] = math.inf
-            return EvaluationResult("invalid", math.inf, metrics, validation.error, score_name="distance")
+            metrics[DVRP_SCORE_NAME] = math.inf
+            return EvaluationResult("invalid", math.inf, metrics, validation.error, score_name=DVRP_SCORE_NAME)
 
         records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_dvrp_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        distance = _candidate_distance(status, metrics)
-        metrics["distance"] = distance
+        ttt = _candidate_ttt(status, metrics)
+        metrics[DVRP_SCORE_NAME] = ttt
         error_feedback = _error_feedback(records) if status != "valid" else None
-        return EvaluationResult(status, distance, metrics, error_feedback, score_name="distance")
+        return EvaluationResult(status, ttt, metrics, error_feedback, score_name=DVRP_SCORE_NAME)
 
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
         tasks = [
@@ -95,8 +97,8 @@ class DVRPCandidateEvaluator:
             budget=self.budget,
             timeout_seconds=self.timeout_seconds,
         )
-        scored = run.status == "valid" and run.makespan is not None
-        gap = compute_dvrp_gap(run.makespan, instance.reference_makespan) if scored else None
+        scored = run.status == "valid" and run.ttt is not None
+        gap = compute_dvrp_gap(run.ttt, instance.reference_ttt) if scored else None
         return {
             "instance": instance.name,
             "pool": self.pool_name,
@@ -106,9 +108,9 @@ class DVRPCandidateEvaluator:
             "source": instance.metadata.get("source", "unknown"),
             "seed": seed,
             "status": run.status,
-            "makespan": run.makespan,
-            "reference_makespan": instance.reference_makespan,
-            "reference_kind": "ortools_static_full_future" if instance.reference_makespan is not None else None,
+            "ttt": run.ttt,
+            "reference_ttt": instance.reference_ttt,
+            "reference_kind": "ortools_static_full_future" if instance.reference_ttt is not None else None,
             "gap": gap,
             "decisions": run.decisions,
             "waits": run.waits,
@@ -121,8 +123,8 @@ class DVRPCandidateEvaluator:
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
         metrics = dict(metrics)
         metrics["problem"] = "dvrp"
-        metrics["score_name"] = "distance"
-        metrics.setdefault("distance", math.inf)
+        metrics["score_name"] = DVRP_SCORE_NAME
+        metrics.setdefault(DVRP_SCORE_NAME, math.inf)
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
@@ -143,16 +145,14 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     return "invalid"
 
 
-def _candidate_distance(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
+def _candidate_ttt(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
     if status == "valid":
-        if metrics["mean_gap"] is not None:
-            return float(metrics["mean_gap"])
-        if metrics["mean_makespan"] is not None:
-            return float(metrics["mean_makespan"])
+        if metrics["mean_ttt"] is not None:
+            return float(metrics["mean_ttt"])
         return math.inf
     if status == "timeout":
-        timeout_distance = metrics.get("timeout_distance")
-        return float(timeout_distance) if timeout_distance is not None else math.inf
+        timeout_ttt = metrics.get("timeout_ttt")
+        return float(timeout_ttt) if timeout_ttt is not None else math.inf
     return math.inf
 
 

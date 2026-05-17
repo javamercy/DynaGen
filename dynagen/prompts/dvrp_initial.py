@@ -29,7 +29,7 @@ DVRP_INITIAL_ROLES = (
     DVRPInitialRole(
         3,
         "a multi-step lookahead planner",
-        "Use budget to simulate several steps ahead per candidate choice and pick the one with the best estimated makespan contribution.",
+        "Use budget to simulate several steps ahead per candidate choice and pick the one with the best estimated TTT contribution.",
     ),
     DVRPInitialRole(
         4,

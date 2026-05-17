@@ -19,7 +19,7 @@ class DVRPInstance:
     coordinates: np.ndarray
     arrival_times: np.ndarray
     truck_count: int
-    reference_makespan: float | None = None
+    reference_ttt: float | None = None
     reference: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -43,10 +43,10 @@ class DVRPInstance:
         self.truck_count = int(self.truck_count)
         if self.truck_count < 1:
             raise ValueError("DVRP truck_count must be positive")
-        if self.reference_makespan is not None:
-            self.reference_makespan = float(self.reference_makespan)
-            if not np.isfinite(self.reference_makespan) or self.reference_makespan <= 0:
-                raise ValueError("DVRP reference_makespan must be positive when provided")
+        if self.reference_ttt is not None:
+            self.reference_ttt = float(self.reference_ttt)
+            if not np.isfinite(self.reference_ttt) or self.reference_ttt <= 0:
+                raise ValueError("DVRP reference_ttt must be positive when provided")
 
     @property
     def dimension(self) -> int:
@@ -63,7 +63,7 @@ class DVRPInstance:
 
 @dataclass(frozen=True)
 class DVRPSimulationResult:
-    makespan: float
+    ttt: float
     routes: list[list[int]]
     decisions: int
     waits: int
@@ -71,7 +71,7 @@ class DVRPSimulationResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "makespan": float(self.makespan),
+            "ttt": float(self.ttt),
             "routes": [list(route) for route in self.routes],
             "decisions": int(self.decisions),
             "waits": int(self.waits),
@@ -81,7 +81,7 @@ class DVRPSimulationResult:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DVRPSimulationResult":
         return cls(
-            makespan=float(data["makespan"]),
+            ttt=float(data["ttt"]),
             routes=[list(map(int, route)) for route in data["routes"]],
             decisions=int(data["decisions"]),
             waits=int(data["waits"]),
@@ -179,12 +179,12 @@ def simulate_dvrp_policy(
 
     routes = [list(map(int, truck.route)) for truck in trucks]
     _validate_routes(routes, instance.dimension)
-    makespans = [truck.tour_cost() for truck in trucks]
-    makespan = float(max(makespans))
-    if not np.isfinite(makespan) or makespan <= 0:
-        raise DVRPSimulationError("DVRP policy produced a non-finite makespan")
+    route_times = [truck.tour_cost() for truck in trucks]
+    ttt = float(max(route_times))
+    if not np.isfinite(ttt) or ttt <= 0:
+        raise DVRPSimulationError("DVRP policy produced a non-finite TTT")
     return DVRPSimulationResult(
-        makespan=makespan,
+        ttt=ttt,
         routes=routes,
         decisions=decisions,
         waits=waits,
@@ -214,7 +214,7 @@ def _instance_from_pickle_item(path: Path, index: int, item: object) -> DVRPInst
         raise ValueError(f"DVRP reference item {index} in {path} must be a dict")
     routes = reference.get("routes") or []
     truck_count = len(routes)
-    reference_makespan = reference.get("max_distance")
+    reference_ttt = reference.get("max_distance")
     metadata = {
         "source": str(path),
         "source_file": path.name,
@@ -225,7 +225,7 @@ def _instance_from_pickle_item(path: Path, index: int, item: object) -> DVRPInst
         coordinates=np.asarray(coordinates, dtype=float),
         arrival_times=np.asarray(arrival_times, dtype=float),
         truck_count=truck_count,
-        reference_makespan=None if reference_makespan is None else float(reference_makespan),
+        reference_ttt=None if reference_ttt is None else float(reference_ttt),
         reference=_plain_reference(reference),
         metadata=metadata,
     )

@@ -21,7 +21,7 @@ def build_dvrp_static_verbal_gradient(
     status = str(getattr(candidate.status, "value", candidate.status))
     delta = score_delta_vs_best_parent(candidate, parents)
     mean_gap = metric_float(metrics, "mean_gap")
-    mean_makespan = metric_float(metrics, "mean_makespan")
+    mean_ttt = metric_float(metrics, "mean_ttt")
     mean_waits = metric_float(metrics, "mean_waits")
     timeout_fraction = metric_float(metrics, "timeout_fraction") or 0.0
     invalid_count = int(metrics.get("invalid_count") or 0)
@@ -40,8 +40,8 @@ def build_dvrp_static_verbal_gradient(
             preserve.append("the changed dispatch scoring mechanism that improved over the best parent")
     if mean_gap is not None:
         preserve.append("finite-gap dispatch behavior across the evaluated dynamic instances")
-    if mean_makespan is not None:
-        preserve.append("depot-return awareness that keeps makespan finite")
+    if mean_ttt is not None:
+        preserve.append("depot-return awareness that keeps TTT finite")
 
     if status == "invalid" or invalid_count:
         weaknesses.append("candidate returned an invalid dispatch decision on at least one simulation")
@@ -53,7 +53,7 @@ def build_dvrp_static_verbal_gradient(
         weaknesses.append("candidate timed out during repeated online policy calls")
         avoid.append("expensive pairwise or nested scoring that scales poorly per decision")
     if mean_waits is not None and mean_waits > 0:
-        weaknesses.append(f"policy waited {mean_waits:.4g} times on average; unnecessary waiting can increase makespan")
+        weaknesses.append(f"policy waited {mean_waits:.4g} times on average; unnecessary waiting can increase TTT")
     if worst_size and best_size and worst_size[0] != best_size[0] and worst_size[1] > best_size[1] + 5.0:
         weaknesses.append(f"instance size {worst_size[0]} is the weakest measured group")
     if worst_truck:
@@ -85,13 +85,13 @@ def build_dvrp_static_verbal_gradient(
     }
     evidence = {
         "status": status,
-        "distance": candidate.score_value,
+        "ttt": candidate.score_value,
         "delta_vs_best_parent": delta,
         "mean_gap": mean_gap,
         "median_gap": metrics.get("median_gap"),
         "worst_gap": metrics.get("worst_gap"),
         "best_gap": metrics.get("best_gap"),
-        "mean_makespan": mean_makespan,
+        "mean_ttt": mean_ttt,
         "mean_decisions": metrics.get("mean_decisions"),
         "mean_waits": mean_waits,
         "mean_completed_count": metrics.get("mean_completed_count"),
@@ -106,7 +106,7 @@ def build_dvrp_static_verbal_gradient(
         candidate=candidate,
         parents=parents,
         generation=generation,
-        summary=_summary(status, delta, mean_gap, mean_makespan, primary_weakness),
+        summary=_summary(status, delta, mean_gap, mean_ttt, primary_weakness),
         preserve=preserve,
         weaknesses=weaknesses,
         next_mutations=next_mutations,
@@ -140,14 +140,14 @@ def _summary(
         status: str,
         delta: float | None,
         mean_gap: float | None,
-        mean_makespan: float | None,
+        mean_ttt: float | None,
         weakness: str,
 ) -> str:
     score_text = ""
-    if mean_gap is not None:
+    if mean_ttt is not None:
+        score_text = f" mean TTT {mean_ttt:.4g}."
+    elif mean_gap is not None:
         score_text = f" mean gap {mean_gap:.4g}."
-    elif mean_makespan is not None:
-        score_text = f" mean makespan {mean_makespan:.4g}."
     if delta is not None:
         direction = "improved over" if delta < 0 else "regressed against" if delta > 0 else "tied"
         return f"{status} DVRP candidate {direction} its best parent by {abs(delta):.4g};{score_text} Main mutation target: {weakness}."

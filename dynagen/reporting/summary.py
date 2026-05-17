@@ -52,7 +52,7 @@ def build_final_report(
             f"- ID: `{best.id}`",
             f"- Name: {best.name}",
             f"- Status: {best.status}",
-            f"- Search {best.score_name}: {best.score_value}",
+            f"- Search {_score_title(best.score_name)}: {best.score_value}",
             f"- Thought: {best.thought}",
         ]
         if best.error_details:
@@ -94,18 +94,20 @@ def build_final_report(
                     "",
                     f"- Problem: DVRP",
                     f"- Status: {test_result.status}",
-                    f"- Test distance: {test_result.score}",
+                    f"- Test TTT: {test_result.score}",
                     f"- Instances evaluated: {instances_evaluated}",
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                    f"- Mean TTT: {metrics.get('mean_ttt')}",
+                    f"- Penalized mean TTT: {metrics.get('penalized_mean_ttt')}",
                     f"- Mean gap: {metrics.get('mean_gap')}",
                     f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
-                    f"- Mean makespan: {metrics.get('mean_makespan')}",
                     f"- Timeout penalty: {metrics.get('timeout_penalty')}",
                     f"- Median gap: {metrics.get('median_gap')}",
                     f"- Worst gap: {metrics.get('worst_gap')}",
                     f"- Best gap: {metrics.get('best_gap')}",
-                    f"- Gap by instance size: {metrics.get('score_by_instance_size')}",
+                    f"- TTT by instance size: {metrics.get('score_by_instance_size')}",
+                    f"- Gap by instance size: {metrics.get('gap_by_instance_size')}",
                 ]
             )
         else:
@@ -186,10 +188,14 @@ def _status_counts(candidates: list[Candidate]) -> dict[str, int]:
 
 def _population_score_name(candidates: list[Candidate]) -> str:
     for candidate in candidates:
-        if candidate.score_name == "distance":
-            return "distance"
+        if candidate.score_name != "fitness":
+            return candidate.score_name
     return "fitness"
 
 
 def _score_title(score_name: str) -> str:
-    return "Distance" if score_name == "distance" else "Fitness"
+    if score_name == "distance":
+        return "Distance"
+    if score_name == "ttt":
+        return "TTT"
+    return "Fitness"

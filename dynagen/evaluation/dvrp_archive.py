@@ -11,10 +11,10 @@ def build_dvrp_archive_profile(candidate: Candidate) -> dict[str, Any]:
     mean_gap = metric_float(metrics, "penalized_mean_gap")
     if mean_gap is None:
         mean_gap = metric_float(metrics, "mean_gap")
-    mean_makespan = metric_float(metrics, "mean_makespan")
-    distance = metric_float(metrics, "distance")
-    score_value = mean_gap if mean_gap is not None else mean_makespan if mean_makespan is not None else distance
-    scale = 100.0 if mean_gap is not None else 1000.0
+    mean_ttt = metric_float(metrics, "mean_ttt")
+    ttt = metric_float(metrics, "ttt")
+    score_value = mean_ttt if mean_ttt is not None else ttt if ttt is not None else mean_gap
+    scale = 1000.0 if mean_ttt is not None or ttt is not None else 100.0
     quality_score = _lower_score(score_value, scale=scale)
     timeout_fraction = metric_float(metrics, "timeout_fraction") or 0.0
     valid_ratio = _ratio(metrics.get("valid_count"), metrics.get("runs"))
@@ -130,13 +130,14 @@ def _completion_score(metrics: dict[str, Any]) -> float:
 
 def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
     keys = [
-        "distance",
+        "ttt",
+        "mean_ttt",
+        "penalized_mean_ttt",
         "mean_gap",
         "penalized_mean_gap",
         "median_gap",
         "worst_gap",
         "best_gap",
-        "mean_makespan",
         "mean_decisions",
         "mean_waits",
         "mean_completed_count",
@@ -180,4 +181,3 @@ def _float(value: object) -> float | None:
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, float(value)))
-

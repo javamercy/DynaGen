@@ -144,10 +144,11 @@ def _problem_candidate(
     timeout_fraction = 0.5 if status == CandidateStatus.TIMEOUT else 0.0
     valid_count = 2 if status == CandidateStatus.TIMEOUT else 4
     if problem in {"tsp", "dvrp"}:
+        score_name = "ttt" if problem == "dvrp" else "distance"
         metrics = {
             "problem": problem,
-            "score_name": "distance",
-            "distance": score,
+            "score_name": score_name,
+            score_name: score,
             "runs": 4,
             "valid_count": valid_count,
             "timeout_fraction": timeout_fraction,
@@ -158,7 +159,7 @@ def _problem_candidate(
         if problem == "tsp":
             metrics.update({"mean_tour_length": score, "mean_gap": score, "worst_gap": score})
         else:
-            metrics.update({"mean_makespan": score, "mean_gap": score, "worst_gap": score})
+            metrics.update({"mean_ttt": score, "mean_gap": score, "worst_gap": score})
         return Candidate(
             id=candidate_id,
             generation=0,

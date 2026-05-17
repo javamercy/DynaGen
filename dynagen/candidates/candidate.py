@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+MINIMIZED_SCORE_NAMES = {"distance", "ttt"}
+
 
 class CandidateStatus(StrEnum):
     PENDING = "pending"
@@ -37,17 +39,29 @@ class Candidate:
         self.status = CandidateStatus(self.status)
         if self._uses_distance():
             if self.distance is None:
-                self.distance = _float_or_none(self.metrics.get("distance", self.fitness))
+                score_name = self.score_name
+                self.distance = _first_float_or_none(
+                    self.metrics.get(score_name),
+                    self.metrics.get("ttt"),
+                    self.metrics.get("distance"),
+                    self.fitness,
+                )
             self.fitness = None
 
     @property
     def score_name(self) -> str:
-        return "distance" if self._uses_distance() else "fitness"
+        return self._minimized_score_name() if self._uses_distance() else "fitness"
 
     @property
     def score_value(self) -> float | None:
         if self._uses_distance():
-            return _float_or_none(self.distance if self.distance is not None else self.metrics.get("distance"))
+            score_name = self.score_name
+            return _first_float_or_none(
+                self.metrics.get(score_name),
+                self.distance,
+                self.metrics.get("ttt"),
+                self.metrics.get("distance"),
+            )
         return _float_or_none(self.fitness)
 
     def to_dict(self, *, include_code: bool = True) -> dict[str, Any]:
@@ -67,7 +81,7 @@ class Candidate:
         }
 
         if self._uses_distance():
-            data["distance"] = self.score_value
+            data[self.score_name] = self.score_value
         else:
             data["fitness"] = self.fitness
 
@@ -80,12 +94,25 @@ class Candidate:
             return True
         if not isinstance(self.metrics, dict):
             return False
+        score_name = self.metrics.get("score_name")
         return (
             self.metrics.get("problem") == "tsp"
             or self.metrics.get("problem") == "dvrp"
-            or self.metrics.get("score_name") == "distance"
+            or score_name in MINIMIZED_SCORE_NAMES
             or "distance" in self.metrics
+            or "ttt" in self.metrics
         )
+
+    def _minimized_score_name(self) -> str:
+        if isinstance(self.metrics, dict) and self.metrics.get("problem") == "dvrp":
+            return "ttt"
+        if isinstance(self.metrics, dict):
+            score_name = self.metrics.get("score_name")
+            if score_name in MINIMIZED_SCORE_NAMES:
+                return str(score_name)
+            if "ttt" in self.metrics:
+                return "ttt"
+        return "distance"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], *, code: str | None = None) -> "Candidate":
@@ -93,6 +120,14 @@ class Candidate:
         candidate_id = candidate_dict.pop("candidate_id", None)
         if "id" not in candidate_dict and candidate_id is not None:
             candidate_dict["id"] = candidate_id
+
+        ttt = candidate_dict.pop("ttt", None)
+        if ttt is not None:
+            candidate_dict.setdefault("distance", ttt)
+            metrics = dict(candidate_dict.get("metrics") or {})
+            metrics.setdefault("score_name", "ttt")
+            metrics.setdefault("ttt", ttt)
+            candidate_dict["metrics"] = metrics
 
         if code is not None:
             candidate_dict["code"] = code
@@ -109,3 +144,11 @@ def _float_or_none(value: object) -> float | None:
         return float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _first_float_or_none(*values: object) -> float | None:
+    for value in values:
+        number = _float_or_none(value)
+        if number is not None:
+            return number
+    return None

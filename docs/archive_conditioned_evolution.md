@@ -529,7 +529,7 @@ Use existing DVRP metrics:
 
 | Signal                | Metric key                                                    |
 |-----------------------|---------------------------------------------------------------|
-| Main quality          | `distance`, `mean_gap`, `penalized_mean_gap`, `mean_makespan` |
+| Main quality          | `ttt`, `mean_ttt`, `penalized_mean_ttt`, `mean_gap`           |
 | Robustness            | `worst_gap`, `median_gap`, `best_gap`                         |
 | Dispatch behavior     | `mean_decisions`, `mean_waits`, `mean_completed_count`        |
 | Size specialization   | `score_by_instance_size`                                      |
@@ -565,12 +565,12 @@ Mechanism buckets can start with static features:
 
 ### DVRP Quality And Robustness Scores
 
-Use lower-is-better gap or makespan. Include completion and waiting behavior because they explain dispatch quality.
+Use lower-is-better TTT. Include gap as an OR-Tools comparison metric, and include completion and waiting behavior because they explain dispatch quality.
 
 Recommended quality:
 
 ```text
-quality_score = normalized_inverse(penalized_mean_gap or mean_gap or mean_makespan)
+quality_score = normalized_inverse(penalized_mean_ttt or mean_ttt or ttt)
 ```
 
 Recommended robustness:
@@ -584,7 +584,7 @@ robustness_score =
   + 0.15 * normalized_inverse(mean_waits)
 ```
 
-If gap is unavailable for some instances, use makespan and completion count. Do not over-reward low waits if completion
+If TTT is unavailable for some instances, use completion count. Do not over-reward low waits if completion
 falls; low waits are useful only when completion remains strong.
 
 ### DVRP Parent Sampling Bias
