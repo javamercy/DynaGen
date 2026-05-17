@@ -110,6 +110,31 @@ def build_final_report(
                     f"- Gap by instance size: {metrics.get('gap_by_instance_size')}",
                 ]
             )
+        elif metrics.get("problem") == "vrp":
+            lines.extend(
+                [
+                    "",
+                    "## Test Evaluation",
+                    "",
+                    f"- Problem: VRP",
+                    f"- Status: {test_result.status}",
+                    f"- Test distance: {test_result.score}",
+                    f"- Instances evaluated: {instances_evaluated}",
+                    f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
+                    f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
+                    f"- Partial timeout runs: {metrics.get('partial_timeout_count')}",
+                    f"- Mean gap: {metrics.get('mean_gap')}",
+                    f"- Penalized mean gap: {metrics.get('penalized_mean_gap')}",
+                    f"- Mean max route distance: {metrics.get('mean_max_route_distance')}",
+                    f"- Mean total route distance: {metrics.get('mean_total_route_distance')}",
+                    f"- Timeout penalty: {metrics.get('timeout_penalty')}",
+                    f"- Median gap: {metrics.get('median_gap')}",
+                    f"- Worst gap: {metrics.get('worst_gap')}",
+                    f"- Best gap: {metrics.get('best_gap')}",
+                    f"- Score by instance size: {metrics.get('score_by_instance_size')}",
+                    f"- Score by truck count: {metrics.get('score_by_truck_count')}",
+                ]
+            )
         else:
             search_metric_label = "Mean tour distance" if metrics.get("pool") == "search_instances" else "Mean gap"
             penalized_metric_label = "Penalized mean tour distance" if metrics.get("pool") == "search_instances" else "Penalized mean gap"

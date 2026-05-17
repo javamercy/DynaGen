@@ -1,0 +1,88 @@
+from dynagen.candidates.candidate import Candidate
+from dynagen.evolution.archive import format_archive_parent_context
+
+
+VRP_SOLVER_CONTRACT = """
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+    seed: int,
+    budget: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- budget bounds total solver work. Use it to limit construction candidates, local search moves, restarts, or population iterations.
+- Use seed for all randomness; ties must be deterministic.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+"""
+
+VRP_INTERNAL_CHECKLIST = """
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+budget bounds loops, deterministic seed handling, report_best_vrp used for incumbents, allowed
+imports only, no I/O/network/subprocesses.
+"""
+
+VRP_RESPONSE_FORMAT = """
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
+"""
+
+
+def vrp_system_prompt(role: str) -> str:
+    return (
+        f"You are {role}. Generate a compact VRP metaheuristic that builds complete "
+        "multi-truck routes and minimizes the maximum route distance. Prioritize feasibility, "
+        "budget correctness, fleet balance, and robust anytime improvement."
+    )
+
+
+def render_vrp_candidates(candidates: list[Candidate]) -> str:
+    return "\n\n".join(_render_vrp_candidate(candidate) for candidate in candidates)
+
+
+def _render_vrp_candidate(candidate: Candidate) -> str:
+    distance = candidate.score_value
+    distance_str = "unknown" if distance is None else f"{float(distance):.6g}"
+    metrics = candidate.metrics or {}
+    parts = [
+        f"Candidate {candidate.id}: {candidate.name}",
+        f"Status: {candidate.status}; distance: {distance_str}",
+        f"Thought: {candidate.thought}",
+        f"Mean gap: {metrics.get('mean_gap')}",
+        f"Mean max route distance: {metrics.get('mean_max_route_distance')}",
+        f"Mean total route distance: {metrics.get('mean_total_route_distance')}",
+        f"Score by instance size: {metrics.get('score_by_instance_size')}",
+        f"Score by truck count: {metrics.get('score_by_truck_count')}",
+        f"Gap by instance size: {metrics.get('gap_by_instance_size')}",
+    ]
+    if candidate.error_details:
+        parts.append(f"Error details: {candidate.error_details}")
+    archive_context = format_archive_parent_context(candidate)
+    if archive_context:
+        parts.append(archive_context)
+    parts.extend([
+        "Code:",
+        "```python",
+        candidate.code,
+        "```",
+    ])
+    return "\n".join(parts)

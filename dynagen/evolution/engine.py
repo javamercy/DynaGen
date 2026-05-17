@@ -612,6 +612,8 @@ def _uses_distance_metrics(metrics: dict) -> bool:
 def _minimized_score_name(metrics: dict) -> str | None:
     if metrics.get("problem") == "dvrp":
         return "ttt"
+    if metrics.get("problem") == "vrp":
+        return "distance"
     if metrics.get("problem") == "tsp":
         return "distance"
     score_name = metrics.get("score_name")

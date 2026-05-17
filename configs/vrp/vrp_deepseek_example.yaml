@@ -1,0 +1,51 @@
+run:
+  name: vrp_deepseek_example
+  output_dir: runs/vrp_deepseek
+  seed: 100
+
+problem:
+  type: vrp
+  vrp_search_limit: 10
+  vrp_test_sizes: [ 10, 20, 50, 100, 200 ]
+  vrp_test_limit_per_size: 64
+
+llm:
+  provider: deepseek
+  model: deepseek-v4-flash
+  temperature: 0.7
+  api_key_env: DEEPSEEK_API_KEY
+
+evolution:
+  population_size: 2
+  generations: 4
+  offspring_per_strategy: 1
+  strategies: [ S1, S2, S3 ]
+  verbal_gradients:
+    enabled: true
+    llm_every_n_generations: 2
+    max_llm_calls_per_generation: 2
+    llm_model: deepseek-v4-flash
+    temperature: 0.3
+  archive:
+    enabled: false
+    max_size: 64
+    max_per_bucket: 4
+    add_statuses: [ valid, evaluated, timeout ]
+    parent_sample_probability: 0.35
+    s3_archive_parent_min: 1
+    final_selection_uses_archive: true
+    deduplicate_code: true
+    diversity_weight: 0.25
+    recency_weight: 0.05
+    robustness_weight: 0.35
+
+evaluation:
+  budget: 7000
+  timeout_seconds: 60
+  timeout_penalty: 0
+  seeds: [ 100 ]
+  metric: mean_gap
+
+data:
+  search_instances: data/vrp/train/instances.pkl
+  test_instances: data/vrp/test

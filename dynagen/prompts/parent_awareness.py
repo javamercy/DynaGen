@@ -123,6 +123,8 @@ def _problem_metric_snapshot(parent: Candidate, *, problem: str) -> str:
         fields = ("timeout_fraction", "mean_aocc", "mean_final_error", "worst_final_error")
     elif problem == "dvrp":
         fields = ("timeout_fraction", "mean_ttt", "mean_gap", "worst_gap", "mean_waits")
+    elif problem == "vrp":
+        fields = ("timeout_fraction", "mean_gap", "worst_gap", "mean_max_route_distance", "mean_total_route_distance")
     else:
         fields = ("timeout_fraction",)
     values = [

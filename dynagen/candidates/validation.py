@@ -53,6 +53,10 @@ def validate_dvrp_generated_code(code: str) -> ValidationResult:
     return _validate_generated_code(code, contract="dvrp")
 
 
+def validate_vrp_generated_code(code: str) -> ValidationResult:
+    return _validate_generated_code(code, contract="vrp")
+
+
 def _validate_generated_code(code: str, *, contract: str) -> ValidationResult:
     try:
         tree = ast.parse(code)
@@ -87,6 +91,7 @@ def validate_solver_signature(func) -> ValidationResult:
 
 def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
     solver_node: ast.FunctionDef | None = None
+    vrp_solver_node: ast.FunctionDef | None = None
     dvrp_policy_node: ast.FunctionDef | None = None
     optimizer_node: ast.ClassDef | None = None
     top_level_allowed = (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign, ast.Expr)
@@ -104,6 +109,8 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
                 return result
         elif isinstance(node, ast.FunctionDef) and node.name == "solve_tsp":
             solver_node = node
+        elif isinstance(node, ast.FunctionDef) and node.name == "solve_vrp":
+            vrp_solver_node = node
         elif isinstance(node, ast.FunctionDef) and node.name == "choose_next_customer":
             dvrp_policy_node = node
         elif isinstance(node, ast.ClassDef) and node.name == "Optimizer":
@@ -120,6 +127,10 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
         if dvrp_policy_node is None:
             return ValidationResult(False, "Missing required choose_next_customer function")
         return _validate_dvrp_policy_signature_ast(dvrp_policy_node)
+    if contract == "vrp":
+        if vrp_solver_node is None:
+            return ValidationResult(False, "Missing required solve_vrp function")
+        return _validate_vrp_solver_signature_ast(vrp_solver_node)
     if solver_node is None:
         return ValidationResult(False, "Missing required solve_tsp function")
     return _validate_solver_signature_ast(solver_node)
@@ -151,6 +162,17 @@ def _validate_dvrp_policy_signature_ast(node: ast.FunctionDef) -> ValidationResu
         return ValidationResult(False, "choose_next_customer must accept exactly seven parameters")
     if [arg.arg for arg in positional] != expected:
         return ValidationResult(False, "choose_next_customer parameters must be current_position, depot_position, truck_positions, available_customers, current_time, seed, budget")
+    return ValidationResult(True)
+
+
+def _validate_vrp_solver_signature_ast(node: ast.FunctionDef) -> ValidationResult:
+    args = node.args
+    positional = list(args.posonlyargs) + list(args.args)
+    expected = ["distance_matrix", "truck_count", "seed", "budget"]
+    if len(positional) != len(expected) or args.vararg or args.kwonlyargs or args.kwarg:
+        return ValidationResult(False, "solve_vrp must accept exactly four parameters")
+    if [arg.arg for arg in positional] != expected:
+        return ValidationResult(False, "solve_vrp parameters must be distance_matrix, truck_count, seed, budget")
     return ValidationResult(True)
 
 

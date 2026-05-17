@@ -9,6 +9,7 @@ from dynagen.evaluation.bbob_gradient import build_bbob_llm_verbal_gradient_prom
 from dynagen.evaluation.base import EvaluationResult
 from dynagen.evaluation.dvrp_gradient import build_dvrp_llm_verbal_gradient_prompt
 from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
+from dynagen.evaluation.vrp_gradient import build_vrp_llm_verbal_gradient_prompt
 from dynagen.evolution.engine import EvolutionEngine
 from dynagen.evolution.verbal_gradient import (
     VERBAL_GRADIENT_KEY,
@@ -23,6 +24,8 @@ from dynagen.prompts.dvrp_evolution import build_dvrp_evolution_prompt
 from dynagen.prompts.dvrp_templates import render_dvrp_candidates
 from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
 from dynagen.prompts.tsp_templates import render_tsp_candidates
+from dynagen.prompts.vrp_evolution import build_vrp_evolution_prompt
+from dynagen.prompts.vrp_templates import render_vrp_candidates
 
 
 class VerbalGradientTests(unittest.TestCase):
@@ -62,6 +65,7 @@ class VerbalGradientTests(unittest.TestCase):
             build_tsp_llm_verbal_gradient_prompt,
             build_bbob_llm_verbal_gradient_prompt,
             build_dvrp_llm_verbal_gradient_prompt,
+            build_vrp_llm_verbal_gradient_prompt,
         ):
             messages = builder(candidate, parents=[], generation=1)
             user = messages[1]["content"]
@@ -162,6 +166,7 @@ class VerbalGradientTests(unittest.TestCase):
             build_tsp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
             build_bbob_evolution_prompt("S2", [parent], feedback_context=feedback_context),
             build_dvrp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
+            build_vrp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
         ):
             user = messages[1]["content"]
             self.assertIn("PARENT AWARENESS", user)
@@ -234,6 +239,7 @@ class VerbalGradientTests(unittest.TestCase):
             render_tsp_candidates([candidate]),
             render_bbob_candidates([candidate]),
             render_dvrp_candidates([candidate]),
+            render_vrp_candidates([candidate]),
         ):
             self.assertIn("Code:", rendered)
             self.assertNotIn("Parent cand_1 LLM reflection", rendered)

@@ -51,7 +51,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
         self.assertEqual(survivors[0].id, "cand_1")
 
     def test_timeout_candidate_with_materially_better_score_can_survive_for_any_problem(self) -> None:
-        for problem in ("tsp", "bbob", "dvrp"):
+        for problem in ("tsp", "bbob", "dvrp", "vrp"):
             with self.subTest(problem=problem):
                 timeout_but_strong = _problem_candidate(
                     "cand_timeout",
@@ -143,7 +143,7 @@ def _problem_candidate(
 ) -> Candidate:
     timeout_fraction = 0.5 if status == CandidateStatus.TIMEOUT else 0.0
     valid_count = 2 if status == CandidateStatus.TIMEOUT else 4
-    if problem in {"tsp", "dvrp"}:
+    if problem in {"tsp", "dvrp", "vrp"}:
         score_name = "ttt" if problem == "dvrp" else "distance"
         metrics = {
             "problem": problem,
@@ -158,8 +158,10 @@ def _problem_candidate(
         }
         if problem == "tsp":
             metrics.update({"mean_tour_length": score, "mean_gap": score, "worst_gap": score})
-        else:
+        elif problem == "dvrp":
             metrics.update({"mean_ttt": score, "mean_gap": score, "worst_gap": score})
+        else:
+            metrics.update({"mean_max_route_distance": score, "mean_gap": score, "worst_gap": score})
         return Candidate(
             id=candidate_id,
             generation=0,

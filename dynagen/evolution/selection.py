@@ -174,11 +174,12 @@ def _worst_group_badness(candidate: Candidate) -> float:
             "score_by_truck_count",
             "gap_by_instance_size",
             "gap_by_instance_source",
-    ):
+            "gap_by_truck_count",
+        ):
         group_values.extend(_numeric_values(metrics.get(key)))
     if group_values:
         return max(group_values)
-    for key in ("worst_gap", "penalized_mean_gap", "mean_gap", "mean_tour_length", "mean_ttt"):
+    for key in ("worst_gap", "penalized_mean_gap", "mean_gap", "mean_tour_length", "mean_ttt", "mean_max_route_distance"):
         value = _finite_or_none(metrics.get(key))
         if value is not None:
             return value
@@ -192,6 +193,8 @@ def _validity_badness(candidate: Candidate) -> float:
     if runs is None or runs <= 0 or valid_count is None:
         return 0.0 if candidate.status in (CandidateStatus.VALID, CandidateStatus.EVALUATED) else 1.0
     invalid_count = _finite_or_none(metrics.get("invalid_tour_count"))
+    if invalid_count is None:
+        invalid_count = _finite_or_none(metrics.get("invalid_route_count"))
     if invalid_count is None:
         invalid_count = _finite_or_none(metrics.get("invalid_count")) or 0.0
     error_count = _finite_or_none(metrics.get("runtime_error_count")) or 0.0
@@ -243,6 +246,11 @@ def _novelty_features(candidate: Candidate) -> set[str]:
             "depot",
             "wait",
             "lookahead",
+            "sweep",
+            "savings",
+            "relocate",
+            "exchange",
+            "balance",
     ):
         if marker in text:
             features.add(f"code:{marker}")

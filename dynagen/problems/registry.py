@@ -16,6 +16,10 @@ def get_problem(problem_type: str) -> Problem:
         from dynagen.problems.tsp import TSPProblem
 
         return TSPProblem()
+    if normalized == "vrp":
+        from dynagen.problems.vrp import VRPProblem
+
+        return VRPProblem()
     raise ValueError(f"Unsupported problem type: {problem_type}")
 
 

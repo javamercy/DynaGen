@@ -173,11 +173,14 @@ class ProblemConfig:
     dvrp_search_limit: int = 8
     dvrp_test_sizes: list[int] = field(default_factory=lambda: [10, 20, 50, 100, 200])
     dvrp_test_limit_per_size: int = 64
+    vrp_search_limit: int = 8
+    vrp_test_sizes: list[int] = field(default_factory=lambda: [10, 20, 50, 100, 200])
+    vrp_test_limit_per_size: int = 64
 
     def __post_init__(self) -> None:
         self.type = str(self.type).lower()
-        if self.type not in {"tsp", "bbob", "dvrp"}:
-            raise ValueError("problem.type must be 'tsp', 'bbob', or 'dvrp'")
+        if self.type not in {"tsp", "bbob", "dvrp", "vrp"}:
+            raise ValueError("problem.type must be 'tsp', 'bbob', 'dvrp', or 'vrp'")
 
         self.function_ids = [int(function_id) for function_id in self.function_ids]
         self.dimension = int(self.dimension)
@@ -191,11 +194,16 @@ class ProblemConfig:
         self.dvrp_search_limit = int(self.dvrp_search_limit)
         self.dvrp_test_sizes = [int(size) for size in self.dvrp_test_sizes]
         self.dvrp_test_limit_per_size = int(self.dvrp_test_limit_per_size)
+        self.vrp_search_limit = int(self.vrp_search_limit)
+        self.vrp_test_sizes = [int(size) for size in self.vrp_test_sizes]
+        self.vrp_test_limit_per_size = int(self.vrp_test_limit_per_size)
 
         if self.type == "bbob":
             _validate_bbob_problem_config(self)
         if self.type == "dvrp":
             _validate_dvrp_problem_config(self)
+        if self.type == "vrp":
+            _validate_vrp_problem_config(self)
 
 
 @dataclass
@@ -231,6 +239,17 @@ def _validate_dvrp_problem_config(config: ProblemConfig) -> None:
         raise ValueError("DVRP test sizes must be at least 2")
     if config.dvrp_test_limit_per_size < 1:
         raise ValueError("problem.dvrp_test_limit_per_size must be at least 1")
+
+
+def _validate_vrp_problem_config(config: ProblemConfig) -> None:
+    if config.vrp_search_limit < 1:
+        raise ValueError("problem.vrp_search_limit must be at least 1")
+    if not config.vrp_test_sizes:
+        raise ValueError("problem.vrp_test_sizes must not be empty")
+    if any(size < 2 for size in config.vrp_test_sizes):
+        raise ValueError("VRP test sizes must be at least 2")
+    if config.vrp_test_limit_per_size < 1:
+        raise ValueError("problem.vrp_test_limit_per_size must be at least 1")
 
 
 @dataclass

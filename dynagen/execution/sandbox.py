@@ -13,6 +13,7 @@ from dynagen.candidates.validation import (
     ALLOWED_IMPORTS,
     validate_bbob_generated_code,
     validate_dvrp_generated_code,
+    validate_vrp_generated_code,
     validate_generated_code,
 )
 
@@ -118,10 +119,29 @@ def load_dvrp_policy(
     return policy
 
 
+def load_vrp_solver(
+        code: str,
+        *,
+        validate_static: bool = True,
+        best_routes_reporter: Callable[[object], None] | None = None,
+) -> Callable[..., object]:
+    if validate_static:
+        result = validate_vrp_generated_code(code)
+        if not result.valid:
+            raise ValueError(result.error)
+    namespace = _sandbox_namespace(best_routes_reporter=best_routes_reporter)
+    exec(compile(code, "<generated_candidate>", "exec"), namespace, namespace)
+    solver = namespace.get("solve_vrp")
+    if not callable(solver):
+        raise ValueError("Generated code did not define callable solve_vrp")
+    return solver
+
+
 def _sandbox_namespace(
         *,
         best_tour_reporter: Callable[[object], None] | None = None,
         best_value_reporter: Callable[[object, object], None] | None = None,
+        best_routes_reporter: Callable[[object], None] | None = None,
 ) -> dict[str, Any]:
     safe_builtins = dict(SAFE_BUILTINS)
     safe_builtins["__import__"] = _safe_import
@@ -134,6 +154,8 @@ def _sandbox_namespace(
         "random": random,
         "report_best_tour": best_tour_reporter or _ignore_best_tour,
         "report_best": best_value_reporter or _ignore_best_value,
+        "report_best_vrp": best_routes_reporter or _ignore_best_routes,
+        "report_best_routes": best_routes_reporter or _ignore_best_routes,
         "heapq": heapq,
         "itertools": itertools,
         "collections": collections,
@@ -147,6 +169,10 @@ def _ignore_best_tour(tour: object) -> None:
 
 
 def _ignore_best_value(value: object, x: object) -> None:
+    return None
+
+
+def _ignore_best_routes(routes: object) -> None:
     return None
 
 

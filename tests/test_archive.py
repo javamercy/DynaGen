@@ -9,6 +9,7 @@ from dynagen.evaluation.bbob_archive import build_bbob_archive_profile
 from dynagen.evaluation.base import EvaluationResult
 from dynagen.evaluation.dvrp_archive import build_dvrp_archive_profile
 from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
+from dynagen.evaluation.vrp_archive import build_vrp_archive_profile
 from dynagen.evolution.archive import CandidateArchive
 from dynagen.persistence.run_store import RunStore
 from dynagen.evolution.engine import EvolutionEngine
@@ -123,6 +124,41 @@ class ArchiveTests(unittest.TestCase):
         self.assertIn("dvrp:trucks:2", profile["buckets"])
         self.assertIn("dvrp:waits:low", profile["buckets"])
         self.assertIn("dvrp:mechanism:nearest_available", profile["buckets"])
+
+    def test_vrp_archive_profile_uses_size_truck_and_mechanism_buckets(self) -> None:
+        candidate = Candidate(
+            id="cand_1",
+            generation=0,
+            strategy="initial:1",
+            name="vrp_solver",
+            thought="",
+            code="def solve_vrp(*args):\n    # sweep savings two_opt balance restart\n    return []",
+            distance=10.0,
+            status=CandidateStatus.VALID,
+            metrics={
+                "problem": "vrp",
+                "score_name": "distance",
+                "distance": 10.0,
+                "runs": 2,
+                "valid_count": 2,
+                "mean_gap": 10.0,
+                "worst_gap": 20.0,
+                "mean_max_route_distance": 2.5,
+                "mean_total_route_distance": 8.0,
+                "timeout_fraction": 0.0,
+                "mean_runtime": 0.1,
+                "score_by_instance_size": {"10": 8.0, "20": 12.0},
+                "score_by_truck_count": {"3": 8.0},
+                "score_by_instance_source": {"vrp_train": 8.0},
+            },
+        )
+
+        profile = build_vrp_archive_profile(candidate)
+
+        self.assertIn("vrp:size:10", profile["buckets"])
+        self.assertIn("vrp:trucks:3", profile["buckets"])
+        self.assertIn("vrp:mechanism:sweep", profile["buckets"])
+        self.assertIn("vrp:mechanism:savings", profile["buckets"])
 
     def test_archive_rejects_duplicate_code_when_weaker(self) -> None:
         archive = CandidateArchive(config=_run_config(population_size=1, generations=0).evolution.archive, problem="tsp")
