@@ -11,6 +11,11 @@ try:
 except ImportError:
     DeepSeekProvider = None
 
+try:
+    from dynagen.llm.openrouter_provider import OpenRouterProvider
+except ImportError:
+    OpenRouterProvider = None
+
 __all__ = [
     "CountingLLMProvider",
     "LLMProvider",
@@ -18,4 +23,5 @@ __all__ = [
     "OllamaProvider",
     "OpenAIProvider",
     "DeepSeekProvider",
+    "OpenRouterProvider",
 ]

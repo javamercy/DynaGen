@@ -1,20 +1,20 @@
 run:
   name: tsp_calls_20
   output_dir: runs/tsp
-  seed: 34
+  seed: 100
 
 llm:
-  provider: openai
-  model: gpt-5.4-mini
+  provider: deepseek
+  model: deepseek-v4-flash
   temperature: 0.7
-  api_key_env: OPENAI_API_KEY
+  api_key_env: DEEPSEEK_API_KEY
 
 evolution:
   population_size: 3
   generations: 8
   offspring_per_strategy: 1
   archive:
-    enabled: true
+    enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -29,14 +29,14 @@ evolution:
     enabled: true
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 2
-    llm_model: gpt-5.4-nano
+    llm_model: deepseek-v4-flash
     temperature: 0.3
 
 evaluation:
-  budget: 5000
-  timeout_seconds: 120
+  budget: 10000
+  timeout_seconds: 180
   timeout_penalty: 0
-  seeds: [ 15, 20 ]
+  seeds: [ 100 ]
   metric: average_gap
 
 data:

@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 TSP_BASELINES = {
     "random_shuffle": r'''import numpy as np
 import random

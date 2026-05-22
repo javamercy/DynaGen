@@ -1,32 +1,33 @@
 run:
   name: vrp_calls_20
   output_dir: runs/vrp
-  seed: 23
+  seed: 100
 
 problem:
   type: vrp
-  vrp_search_limit: 8
+  vrp_search_limit: 10
   vrp_test_sizes: [ 10, 20, 50, 100, 200 ]
   vrp_test_limit_per_size: 64
 
 llm:
-  provider: openai
-  model: gpt-5.4-mini
+  provider: ollama
+  model: gemma4:31b-cloud
   temperature: 0.7
-  api_key_env: OPENAI_API_KEY
+  api_key_env: OLLAMA_API_KEY
 
 evolution:
-  population_size: 2
-  generations: 6
+  population_size: 3
+  generations: 8
   offspring_per_strategy: 1
   strategies: [ S1, S2, S3 ]
   verbal_gradients:
     enabled: true
+    llm_model: gemma4:31b-cloud
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 2
     temperature: 0.2
   archive:
-    enabled: true
+    enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -39,10 +40,10 @@ evolution:
     robustness_weight: 0.35
 
 evaluation:
-  budget: 2000
-  timeout_seconds: 60
+  budget: 10000
+  timeout_seconds: 180
   timeout_penalty: 0
-  seeds: [ 11 ]
+  seeds: [ 100 ]
   metric: mean_gap
 
 data:

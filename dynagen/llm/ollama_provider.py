@@ -31,7 +31,6 @@ class OllamaProvider(LLMProvider):
     def complete_with_metadata(self, messages: list[dict[str, str]], *, temperature: float) -> LLMResponse:
         response_data = self._chat(messages, temperature=temperature)
         content = self._message_content(response_data)
-        print(f"Ollama response content: {content}")
         return LLMResponse(
             parsed_candidate_response=ParsedCandidateResponse.from_json(content),
             metadata=self._metadata(response_data),

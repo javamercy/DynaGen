@@ -310,9 +310,17 @@ def _provider_from_config(
         from dynagen.llm.openai_provider import OpenAIProvider
         provider = OpenAIProvider(model=model, api_key_env=config.llm.api_key_env)
         return CountingLLMProvider(provider, configured_budget=budget)
+    elif config.llm.provider == "ollama":
+        from dynagen.llm.ollama_provider import OllamaProvider
+        provider = OllamaProvider(model=model)
+        return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "deepseek":
         from dynagen.llm.deepseek_provider import DeepSeekProvider
         provider = DeepSeekProvider(model=model, api_key_env=config.llm.api_key_env)
+        return CountingLLMProvider(provider, configured_budget=budget)
+    elif config.llm.provider == "openrouter":
+        from dynagen.llm.openrouter_provider import OpenRouterProvider
+        provider = OpenRouterProvider(model=model, api_key_env=config.llm.api_key_env)
         return CountingLLMProvider(provider, configured_budget=budget)
     raise RuntimeError(f"Unsupported LLM provider: {config.llm.provider}")
 
