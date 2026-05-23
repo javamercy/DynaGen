@@ -1,6 +1,7 @@
 from typing import Optional
 import logging
 import subprocess
+import signal
 import numpy as np
 import os
 from omegaconf import DictConfig
@@ -203,7 +204,7 @@ class ReEvo:
             except subprocess.TimeoutExpired as e:
                 logging.info(f"Error for response_id {response_id}: {e}")
                 population[response_id] = self.mark_invalid_individual(population[response_id], str(e))
-                inner_run.kill()
+                self._terminate_process_group(inner_run)
                 continue
 
             individual = population[response_id]
@@ -239,11 +240,35 @@ class ReEvo:
         # Execute the python file with flags
         with open(individual["stdout_filepath"], 'w',encoding="utf-8") as f:
             eval_file_path = f'{self.root_dir}/problems/{self.problem}/eval.py' if self.problem_type != "black_box" else f'{self.root_dir}/problems/{self.problem}/eval_black_box.py' 
-            process = subprocess.Popen(['python', '-u', eval_file_path, f'{self.problem_size}', self.root_dir, "train"],
-                                        stdout=f, stderr=f)
+            process = subprocess.Popen(
+                ['python', '-u', eval_file_path, f'{self.problem_size}', self.root_dir, "train"],
+                stdout=f,
+                stderr=f,
+                start_new_session=True,
+            )
 
         block_until_running(individual["stdout_filepath"], log_status=True, iter_num=self.iteration, response_id=response_id)
         return process
+
+
+    def _terminate_process_group(self, process: subprocess.Popen) -> None:
+        """Terminate a subprocess and all of its children."""
+        try:
+            pgid = os.getpgid(process.pid)
+        except ProcessLookupError:
+            return
+
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(pgid, sig)
+                process.wait(timeout=5)
+                return
+            except ProcessLookupError:
+                return
+            except subprocess.TimeoutExpired:
+                continue
+            except Exception:
+                continue
 
     
     def update_iter(self) -> None:
