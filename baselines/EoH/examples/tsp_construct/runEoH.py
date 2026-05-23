@@ -11,12 +11,12 @@ if __name__ == "__main__":
     llm = LLMConfig(
         api_endpoint='api.deepseek.com',
         api_key=os.environ.get("DEEPSEEK_API_KEY", "sk-xxx"),
-        model='deepseek-chat',
+        model='deepseek-v4-flash',
         timeout=150,
     )
 
-    pop_size = 4
-    n_pop = 4
+    pop_size = 5
+    n_pop = 10
 
     task = TSPCONST(problem_size=500, n_instance=20, timeout=60, n_processes=4)
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         problem=task,
         pop_size=pop_size,
         n_pop=n_pop,
-        operators=['e1', 'e2', 'm1', 'm2'],
+        operators=['e1', 'e2', 'm1', 'm2', 'm3'],
         output_dir=output_dir,
     )
 
