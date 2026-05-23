@@ -25,7 +25,7 @@ class InterfaceLocalLLM:
             'repeat_prompt': 1,
             'params': {
                 'do_sample': True,
-                'temperature': None,
+                'temperature': 0.7,
                 'top_k': None,
                 'top_p': None,
                 'add_special_tokens': False,
