@@ -1,0 +1,32 @@
+[
+    {
+        "algorithm": "The algorithm selects the next node by computing a composite score: for each unvisited node, it calculates the distance from the current node plus a discounted distance to the destination, where the discount factor is the ratio of remaining unvisited nodes to total nodes, and chooses the node with the smallest composite score.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    remaining = len(unvisited_nodes)\n    total = distance_matrix.shape[0]\n    discount = remaining / total\n    scores = distance_matrix[current_node, unvisited_nodes] + discount * distance_matrix[unvisited_nodes, destination_node]\n    next_node = unvisited_nodes[np.argmin(scores)]\n    return next_node",
+        "objective": 20.77599,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Select the next node that maximizes the difference between its distance to the destination and its distance to the current node, thereby prioritizing nodes far from the destination and close to the current node.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    # Compute distances from current node and to destination for all unvisited nodes\n    dist_from_current = distance_matrix[current_node, unvisited_nodes]\n    dist_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    # Score: larger is better (far from destination, close to current)\n    scores = dist_to_destination - dist_from_current\n    # Select node with maximum score\n    next_node = unvisited_nodes[np.argmax(scores)]\n    return next_node",
+        "objective": 21.0561,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Novel algorithm selects next node by minimizing distance to current node plus a dynamic weight times distance to destination, where the weight starts at 0 and increases linearly with the proportion of nodes visited, encouraging early exploration and later convergence.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    n_total = distance_matrix.shape[0]\n    remaining = len(unvisited_nodes)\n    visited = n_total - remaining - 1  # exclude current and unvisited\n    alpha = visited / (n_total - 1) if n_total > 1 else 0.0\n    scores = distance_matrix[current_node][unvisited_nodes] + alpha * distance_matrix[unvisited_nodes][:, destination_node]\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 22.59296,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Select the next node that minimizes a weighted sum of the distance from the current node and the distance to the destination, where the weight on the destination distance increases as fewer nodes remain unvisited, thereby encouraging early exploration and later convergence to the start.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    # Determine total number of nodes from the distance matrix\n    total_nodes = distance_matrix.shape[0]\n    # Number of unvisited nodes\n    n_unvisited = len(unvisited_nodes)\n    \n    # If only one unvisited node, it must be chosen (could be destination)\n    if n_unvisited == 1:\n        return unvisited_nodes[0]\n    \n    # Make a list of candidates, excluding the destination if it's not the last node\n    if destination_node in unvisited_nodes and n_unvisited > 1:\n        candidates = unvisited_nodes[unvisited_nodes != destination_node]\n    else:\n        candidates = unvisited_nodes\n    \n    # Compute weight alpha: increases as fewer nodes remain\n    # alpha = proportion of visited nodes (0 to 1)\n    visited_count = total_nodes - n_unvisited\n    alpha = visited_count / total_nodes  # 0 when all unvisited, near 1 when few left\n    \n    # Compute scores for each candidate: dist(current, candidate) + alpha * dist(candidate, destination)\n    dist_from_current = distance_matrix[current_node, candidates]\n    dist_to_dest = distance_matrix[candidates, destination_node]\n    scores = dist_from_current + alpha * dist_to_dest\n    \n    # Select the candidate with minimum score\n    best_idx = np.argmin(scores)\n    return candidates[best_idx]",
+        "objective": 22.59346,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node that minimizes the detour cost, i.e., the increase in path length if the node is visited before proceeding directly to the destination.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    # Compute detour cost for each unvisited node\n    dist_to_current = distance_matrix[current_node, unvisited_nodes]\n    dist_to_dest = distance_matrix[unvisited_nodes, destination_node]\n    direct_dist = distance_matrix[current_node, destination_node]\n    detour = dist_to_current + dist_to_dest - direct_dist\n    # Select node with minimum detour\n    next_idx = np.argmin(detour)\n    return unvisited_nodes[next_idx]",
+        "objective": 23.2761,
+        "other_inf": null
+    }
+]

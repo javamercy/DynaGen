@@ -1,0 +1,32 @@
+[
+    {
+        "algorithm": "The algorithm selects the next node that minimizes a weighted sum of the direct distance from the current node and the look\u2011ahead distance to the destination, divided by the number of remaining unvisited nodes, thereby balancing immediate cost with progress toward the return.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    # Number of remaining nodes (including the destination if still unvisited)\n    n_remaining = len(unvisited_nodes)\n    # Avoid division by zero when only one node left\n    n_remaining = max(n_remaining, 1)\n    \n    # Compute scores for each unvisited candidate\n    current_dist = distance_matrix[current_node, unvisited_nodes]\n    future_dist = distance_matrix[unvisited_nodes, destination_node]\n    scores = current_dist + future_dist / n_remaining\n    \n    # Select the candidate with the smallest score\n    best_idx = np.argmin(scores)\n    return unvisited_nodes[best_idx]",
+        "objective": 20.69913,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Regret-based greedy: For each unvisited node, compute the immediate cost (distance from current) and the future cost (minimum distance to any other unvisited node or destination), then choose the node with the largest regret (future cost minus immediate cost).",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"\n    Select the next node to visit using a regret-based greedy heuristic.\n    \"\"\"\n    U = unvisited_nodes\n    n = len(U)\n    if n == 0:\n        return None  # Should not happen in normal TSP construction\n\n    # Submatrix of distances among unvisited nodes\n    sub_dist = distance_matrix[np.ix_(U, U)]\n    np.fill_diagonal(sub_dist, np.inf)  # Ignore self-distances\n    min_to_others = np.min(sub_dist, axis=1)  # Best distance to another unvisited node\n\n    # Distance from each unvisited node to the final destination\n    to_dest = distance_matrix[U, destination_node]\n\n    # Future cost = min(nearest other unvisited, distance to destination)\n    future = np.minimum(min_to_others, to_dest)\n\n    # Immediate cost from current node\n    immediate = distance_matrix[current_node, U]\n\n    # Regret = future - immediate (larger \u2192 more urgent to visit now)\n    regret = future - immediate\n    best_idx = np.argmax(regret)\n    return U[best_idx]",
+        "objective": 21.37856,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node by minimizing the sum of the direct distance from the current node and a penalty term equal to the product of the distance from the candidate to the destination and the standard deviation of the candidate's distances to all other unvisited nodes, normalized by the mean distance from the current node to all unvisited nodes, to balance immediate cost and future routing difficulty.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    if len(unvisited_nodes) == 1:\n        return unvisited_nodes[0]\n    \n    cur_dist = distance_matrix[current_node][unvisited_nodes]\n    dest_dist = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Distances among unvisited nodes (excluding self)\n    sub_mat = distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]\n    mask = ~np.eye(len(unvisited_nodes), dtype=bool)\n    off_diag = sub_mat[mask].reshape(len(unvisited_nodes), len(unvisited_nodes) - 1)\n    std_vals = np.std(off_diag, axis=1)\n    \n    mean_cur = np.mean(cur_dist)\n    if mean_cur == 0:\n        mean_cur = 1e-9\n    penalty = (dest_dist * std_vals) / mean_cur\n    scores = cur_dist + penalty\n    best_idx = np.argmin(scores)\n    return unvisited_nodes[best_idx]",
+        "objective": 21.94833,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The novel algorithm selects the next node by minimizing the sum of the distance from the current node to the candidate and the distance from the candidate to its nearest unvisited neighbor (excluding the current node), thereby anticipating future path connectivity.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    best_score = np.inf\n    best_node = None\n    for node in unvisited_nodes:\n        dist_current = distance_matrix[current_node, node]\n        other_unvisited = unvisited_nodes[unvisited_nodes != node]\n        if len(other_unvisited) > 0:\n            min_dist_to_other = np.min(distance_matrix[node, other_unvisited])\n        else:\n            min_dist_to_other = 0\n        score = dist_current + min_dist_to_other\n        if score < best_score:\n            best_score = score\n            best_node = node\n    return best_node",
+        "objective": 25.26735,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node by minimizing the sum of the distance from the current node to the candidate and the distance from the candidate to the destination, divided by the average distance from the candidate to all other unvisited nodes, to promote nodes that are well-connected.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    best_score = float('inf')\n    best_node = None\n    for candidate in unvisited_nodes:\n        d_curr = distance_matrix[current_node, candidate]\n        d_dest = distance_matrix[candidate, destination_node]\n        others = unvisited_nodes[unvisited_nodes != candidate]\n        if len(others) > 0:\n            avg_dist = np.mean(distance_matrix[candidate, others])\n        else:\n            avg_dist = 1.0  # single candidate, pick it\n        score = (d_curr + d_dest) / (avg_dist + 1e-9)\n        if score < best_score:\n            best_score = score\n            best_node = candidate\n    return best_node",
+        "objective": 53.28914,
+        "other_inf": null
+    }
+]

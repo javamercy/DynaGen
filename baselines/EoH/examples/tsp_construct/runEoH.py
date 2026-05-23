@@ -16,7 +16,7 @@ if __name__ == "__main__":
     )
 
     pop_size = 5
-    n_pop = 10
+    n_pop = 20
 
     task = TSPCONST(problem_size=500, n_instance=20, timeout=60, n_processes=4)
 
