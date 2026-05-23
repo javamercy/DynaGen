@@ -65,7 +65,7 @@ class EOH:
             "  EoH",
             f"  LLM      : {llm.model} @ {llm.api_endpoint}",
             f"  EC       : gen={self.n_pop}  pop={self.pop_size}  ops=[{ops}]",
-            f"  Sampling : init={init_n} (2×pop)  per_gen={self.pop_size}  parallel={self.problem.n_processes}",
+            f"  Sampling : init={init_n} (2×pop)  per_gen={self.pop_size * len(self.operators)}  parallel={self.problem.n_processes}",
             f"  Timeout  : llm={llm.timeout}s  eval={self.problem.timeout}s",
             "=" * 54,
         ]:
@@ -145,7 +145,7 @@ class EOH:
             self._logger.info(f"\n[Gen {gen+1}/{self.n_pop}]")
 
             selected_ops = random.choices(
-                self.operators, weights=self.operator_weights, k=self.pop_size
+                self.operators, weights=self.operator_weights, k=self.pop_size * len(self.operators)
             )
 
             _, offspring = self.evolution.get_algorithm(population, selected_ops)
