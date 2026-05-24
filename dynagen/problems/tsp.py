@@ -7,7 +7,7 @@ from dynagen.config import RunConfig
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
 from dynagen.domain.tsp_synthetic import generate_tsp_construct_instances, parse_tsp_construct_spec
-from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
+from dynagen.evaluation.tsp_history import build_tsp_history_profile
 from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
 from dynagen.evaluation.tsp_evaluator import TSPCandidateEvaluator
 from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
@@ -66,8 +66,8 @@ class TSPProblem:
             generation=generation,
         )
 
-    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
-        return build_tsp_archive_profile(candidate)
+    def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
+        return build_tsp_history_profile(candidate)
 
 
 def create_tsp_initial_roles(count: int) -> list[TSPInitialRole]:

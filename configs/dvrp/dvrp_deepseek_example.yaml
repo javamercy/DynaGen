@@ -20,14 +20,14 @@ evolution:
   generations: 3
   offspring_per_strategy: 1
   strategies: [ S1, S2, S3 ]
-  archive:
+  history:
     enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
     parent_sample_probability: 0.35
-    s3_archive_parent_min: 1
-    final_selection_uses_archive: true
+    s3_history_parent_min: 1
+    final_selection_uses_history: true
     deduplicate_code: true
     diversity_weight: 0.25
     recency_weight: 0.05

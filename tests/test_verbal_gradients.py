@@ -62,10 +62,10 @@ class VerbalGradientTests(unittest.TestCase):
         )
 
         for builder in (
-            build_tsp_llm_verbal_gradient_prompt,
-            build_bbob_llm_verbal_gradient_prompt,
-            build_dvrp_llm_verbal_gradient_prompt,
-            build_vrp_llm_verbal_gradient_prompt,
+                build_tsp_llm_verbal_gradient_prompt,
+                build_bbob_llm_verbal_gradient_prompt,
+                build_dvrp_llm_verbal_gradient_prompt,
+                build_vrp_llm_verbal_gradient_prompt,
         ):
             messages = builder(candidate, parents=[], generation=1)
             user = messages[1]["content"]
@@ -164,15 +164,14 @@ class VerbalGradientTests(unittest.TestCase):
 
         feedback_context = format_parent_verbal_gradients([parent])
         for messages in (
-            build_tsp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-            build_bbob_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-            build_dvrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-            build_vrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+                build_tsp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+                build_bbob_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+                build_dvrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+                build_vrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
         ):
             user = messages[1]["content"]
-            self.assertNotIn("PARENT AWARENESS", user)
             self.assertNotIn("STRATEGY", user)
-            self.assertIn("VERBAL GRADIENT MODE", user)
+            self.assertIn("VERBAL GRADIENT", user)
 
     def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
         full_code = "def solve_tsp(distance_matrix, seed, budget):\n    " + "x = 1\n    " * 600 + "return []\n"
@@ -234,9 +233,12 @@ class VerbalGradientTests(unittest.TestCase):
             status=CandidateStatus.VALID,
         )
 
+        bbob_rendered = render_bbob_candidates([candidate])
+        self.assertNotIn("fitness", bbob_rendered.lower())
+
         for rendered in (
             render_tsp_candidates([candidate]),
-            render_bbob_candidates([candidate]),
+            bbob_rendered,
             render_dvrp_candidates([candidate]),
             render_vrp_candidates([candidate]),
         ):

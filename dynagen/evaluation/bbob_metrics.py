@@ -58,8 +58,8 @@ def aggregate_bbob_records(records: list[dict[str, Any]], *, timeout_penalty: fl
         "runtime_error_count": sum(1 for record in records if record["status"] == "error"),
         "mean_aocc": mean_aocc,
         "penalized_mean_aocc": penalized_mean_aocc,
-        "timeout_fitness": 1.0 - penalized_mean_aocc if penalized_mean_aocc is not None else (
-            1.0 if timeout_count else None
+        "timeout_mean_aocc": penalized_mean_aocc if penalized_mean_aocc is not None else (
+            0.0 if timeout_count else None
         ),
         "median_aocc": _median(aoccs),
         "best_aocc": max(aoccs) if aoccs else None,

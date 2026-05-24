@@ -1,5 +1,5 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.evolution.archive import format_archive_parent_context
+from dynagen.evolution.history import format_history_parent_context
 
 BBOB_SOLVER_CONTRACT = """
 Implement a complete continuous black-box optimizer with exactly this interface:
@@ -19,22 +19,14 @@ Functional rules:
 - Never call func more than self.budget times.
 - Use self.dim and the bounds; do not assume a fixed dimension.
 - seed must control stochastic behavior when randomness is used.
-- Always create and evaluate at least one feasible incumbent early.
 - Keep all candidate points inside the bounds, using clipping or bounded sampling.
 - Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
 - Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
-- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
 
 Timeout and reporting rules:
 - A global helper report_best(value, x) is available.
 - Call report_best(best_value, best_x) whenever you improve the incumbent.
 - report_best does not replace returning (best_value, best_x).
-
-Implementation rules:
-- The submitted code may include helper functions and the Optimizer class.
-- Keep the implementation compact and robust.
-- Prefer bounded, budget-aware search loops over unbounded while loops.
-- Avoid recursion-heavy or memory-heavy designs.
 """
 
 BBOB_INTERNAL_CHECKLIST = """
@@ -72,28 +64,12 @@ Strict formatting rules:
 """
 
 
-def bbob_system_prompt(role: str) -> str:
+def bbob_system_prompt() -> str:
     return f"""
-You are {role}. Generate robust, compact Python optimizers for continuous black-box minimization.
-
-The optimizer must work without gradients across diverse landscapes: separable, nonseparable, ill-conditioned, multimodal, weakly structured, and noisy-looking objective surfaces.
-
-Focus on complete optimizers, not isolated heuristic components.
-
-You may use, simplify, hybridize, or adapt strong known optimization ideas such as evolution strategies, differential evolution, coordinate search, pattern search, restart methods, population search, distribution adaptation, and local stochastic search.
-
-Prefer mechanisms that are likely to improve objective value under a strict function-evaluation budget.
-
-Important priorities:
-1. never exceed the function-evaluation budget
-2. always maintain and report a feasible incumbent
-3. adapt search scale to bounds, dimension, and observed progress
-4. balance global exploration with local improvement
-5. keep the implementation compact and reliable
-6. improve performance over the selected parent when parent context is provided
-
-Follow the contract exactly.
-"""
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        """
 
 
 def render_bbob_candidates(candidates: list[Candidate]) -> str:
@@ -101,11 +77,12 @@ def render_bbob_candidates(candidates: list[Candidate]) -> str:
 
 
 def _render_bbob_candidate(candidate: Candidate) -> str:
-    fitness = "unknown" if candidate.fitness is None else f"{candidate.fitness:.6g}"
     metrics = candidate.metrics or {}
+    score = candidate.score_value if candidate.score_name == "mean_aocc" else metrics.get("mean_aocc")
+    mean_aocc_score = "unknown" if score is None else f"{float(score):.6g}"
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; fitness: {fitness}",
+        f"Status: {candidate.status}; mean AOCC score: {mean_aocc_score} (higher is better)",
         f"Thought: {candidate.thought}",
         f"Mean AOCC: {metrics.get('mean_aocc')}",
         f"Mean final error: {metrics.get('mean_final_error')}",
@@ -117,7 +94,7 @@ def _render_bbob_candidate(candidate: Candidate) -> str:
     ]
     if candidate.error_details:
         parts.insert(6, f"Error details: {candidate.error_details}")
-    archive_context = format_archive_parent_context(candidate)
-    if archive_context:
-        parts.insert(6 if not candidate.error_details else 7, archive_context)
+    history_context = format_history_parent_context(candidate)
+    if history_context:
+        parts.insert(6 if not candidate.error_details else 7, history_context)
     return "\n".join(parts)

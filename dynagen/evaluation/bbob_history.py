@@ -6,7 +6,7 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.verbal_gradient import metric_float
 
 
-def build_bbob_archive_profile(candidate: Candidate) -> dict[str, Any]:
+def build_bbob_history_profile(candidate: Candidate) -> dict[str, Any]:
     metrics = candidate.metrics or {}
     mean_aocc = metric_float(metrics, "penalized_mean_aocc")
     if mean_aocc is None:

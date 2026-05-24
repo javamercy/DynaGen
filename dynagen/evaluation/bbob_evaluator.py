@@ -51,8 +51,11 @@ class BBOBCandidateEvaluator:
     def evaluate_candidate(self, candidate: Candidate) -> EvaluationResult:
         result = self.evaluate_code(candidate.code)
         candidate.status = CandidateStatus(result.status)
-        candidate.fitness = result.fitness
-        candidate.metrics = result.metrics
+        candidate.fitness = None
+        candidate.distance = None
+        candidate.metrics = dict(result.metrics)
+        candidate.metrics["score_name"] = "mean_aocc"
+        candidate.metrics["mean_aocc"] = result.score
         candidate.error_details = result.error_feedback
         return result
 
@@ -60,14 +63,16 @@ class BBOBCandidateEvaluator:
         validation = validate_bbob_generated_code(code)
         if not validation.valid:
             metrics = self.empty_metrics()
-            return EvaluationResult("invalid", math.inf, metrics, validation.error)
+            metrics["mean_aocc"] = 0.0
+            return EvaluationResult("invalid", 0.0, metrics, validation.error, score_name="mean_aocc")
 
         records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_bbob_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        fitness = _candidate_fitness(status, metrics)
+        mean_aocc = _candidate_mean_aocc_score(status, metrics)
+        metrics["mean_aocc"] = mean_aocc
         error_feedback = _error_feedback(records) if status != "valid" else None
-        return EvaluationResult(status, fitness, metrics, error_feedback)
+        return EvaluationResult(status, mean_aocc, metrics, error_feedback, score_name="mean_aocc")
 
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
         tasks = [
@@ -129,6 +134,8 @@ class BBOBCandidateEvaluator:
 
     def _with_context(self, metrics: dict[str, Any]) -> dict[str, Any]:
         metrics = dict(metrics)
+        metrics["problem"] = "bbob"
+        metrics["score_name"] = "mean_aocc"
         metrics["pool"] = self.pool_name
         metrics["seeds"] = list(self.seeds)
         metrics["budget"] = self.budget
@@ -151,14 +158,20 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     return "invalid"
 
 
-def _candidate_fitness(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
+def _candidate_mean_aocc_score(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
     if status == "valid":
-        mean_aocc = metrics.get("mean_aocc")
-        return 1.0 - float(mean_aocc) if mean_aocc is not None else math.inf
+        return _finite_or_zero(metrics.get("mean_aocc"))
     if status == "timeout":
-        timeout_fitness = metrics.get("timeout_fitness")
-        return float(timeout_fitness) if timeout_fitness is not None else math.inf
-    return math.inf
+        return _finite_or_zero(metrics.get("timeout_mean_aocc"))
+    return 0.0
+
+
+def _finite_or_zero(value: object) -> float:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+    return number if math.isfinite(number) else 0.0
 
 
 def _error_feedback(records: list[dict[str, Any]]) -> str | None:

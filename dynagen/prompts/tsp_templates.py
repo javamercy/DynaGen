@@ -1,5 +1,5 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.evolution.archive import format_archive_parent_context
+from dynagen.evolution.history import format_history_parent_context
 
 TSP_SOLVER_CONTRACT = """
 Implement this function only:
@@ -63,9 +63,9 @@ def _render_tsp_candidate(candidate: Candidate) -> str:
     if candidate.error_details:
         parts.append(f"Error details: {candidate.error_details}")
 
-    archive_context = format_archive_parent_context(candidate)
-    if archive_context:
-        parts.append(archive_context)
+    history_context = format_history_parent_context(candidate)
+    if history_context:
+        parts.append(history_context)
 
     parts.extend([
         "Code:",

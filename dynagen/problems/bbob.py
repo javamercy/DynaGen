@@ -4,7 +4,7 @@ from typing import Any
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain.bbob import BBOBInstance, create_bbob_instances
-from dynagen.evaluation.bbob_archive import build_bbob_archive_profile
+from dynagen.evaluation.bbob_history import build_bbob_history_profile
 from dynagen.evaluation.bbob_evaluator import BBOBCandidateEvaluator
 from dynagen.evaluation.bbob_gradient import build_bbob_llm_verbal_gradient_prompt
 from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
@@ -63,8 +63,8 @@ class BBOBProblem:
             generation=generation,
         )
 
-    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
-        return build_bbob_archive_profile(candidate)
+    def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
+        return build_bbob_history_profile(candidate)
 
 
 def create_bbob_initial_roles(count: int) -> list[BBOBInitialRole]:

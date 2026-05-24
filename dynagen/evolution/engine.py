@@ -6,13 +6,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
-from dynagen.candidates.candidate import Candidate
+from dynagen.candidates.candidate import Candidate, MAXIMIZED_SCORE_NAMES, MINIMIZED_SCORE_NAMES, NAMED_SCORE_NAMES
 from dynagen.config import RunConfig
 from dynagen.evaluation.base import CandidateEvaluator
-from dynagen.evolution.archive import (
-    archive_selection_ids,
-    CandidateArchive,
-    clear_archive_selection,
+from dynagen.evolution.history import (
+    history_selection_ids,
+    CandidateHistory,
+    clear_history_selection,
 )
 from dynagen.evolution.population import Population
 from dynagen.evolution.selection import select_parents, select_survivors
@@ -65,7 +65,7 @@ class EvolutionEngine:
         self.problem: Problem = problem_for_config(config)
         self.rng = random.Random(config.seed)
         self._candidate_index: dict[str, Candidate] = {}
-        self.archive = CandidateArchive(config=config.evolution.archive, problem=config.problem.type)
+        self.history = CandidateHistory(config=config.evolution.history, problem=config.problem.type)
         self._llm_gradient_calls_by_generation: dict[int, int] = {}
         self._verbal_gradient_stats: dict[str, int] = {
             "llm_count": 0,
@@ -82,10 +82,10 @@ class EvolutionEngine:
                 0,
                 population.candidates,
                 [],
-                archive_summary=self._archive_summary(include_entries=False),
+                history_summary=self._history_summary(include_entries=False),
             ),
         )
-        self._save_archive(0)
+        self._save_history(0)
         for generation in range(1, self.config.evolution.generations + 1):
             offspring = self._generate_offspring(generation, population)
             next_candidates = select_survivors(population.candidates + offspring, self.config.evolution.population_size)
@@ -94,7 +94,7 @@ class EvolutionEngine:
                 generation,
                 population.candidates,
                 offspring,
-                archive_summary=self._archive_summary(include_entries=False),
+                history_summary=self._history_summary(include_entries=False),
             )
             self.store.save_generation(
                 generation,
@@ -102,9 +102,9 @@ class EvolutionEngine:
                 offspring=offspring,
                 summary=summary,
             )
-            self._save_archive(generation)
+            self._save_history(generation)
         search_best = self._search_best(population)
-        self.archive.mark_final_selection(
+        self.history.mark_final_selection(
             search_best.id,
             population_ids={candidate.id for candidate in population.candidates},
         )
@@ -121,7 +121,7 @@ class EvolutionEngine:
         self.store.save_test_result(search_best.id, test_result)
         llm_calls = self._llm_call_summary()
         self.store.save_llm_calls(llm_calls)
-        self.store.save_archive_summary(self._archive_summary(include_entries=True))
+        self.store.save_history_summary(self._history_summary(include_entries=True))
         self.store.write_final_report(
             build_final_report(
                 population.candidates,
@@ -161,7 +161,7 @@ class EvolutionEngine:
                 "temperature": self.config.evolution.verbal_gradients.temperature,
                 **self._verbal_gradient_stats,
             },
-            "archive": self._archive_summary(include_entries=False),
+            "history": self._history_summary(include_entries=False),
         }
         return summary
 
@@ -179,7 +179,7 @@ class EvolutionEngine:
         tasks = self._build_initial_tasks(roles)
         candidates = self._execute_tasks_parallel(tasks)
         self._register_candidates(candidates)
-        self._update_archive(candidates, generation=0)
+        self._update_history(candidates, generation=0)
         return Population.from_candidates(0, candidates, size=self.config.evolution.population_size)
 
     def _build_initial_tasks(self, roles: list) -> list[_CandidateTask]:
@@ -206,7 +206,7 @@ class EvolutionEngine:
         tasks = self._build_offspring_tasks(generation, population)
         offspring = self._execute_tasks_parallel(tasks)
         self._register_candidates(offspring)
-        self._update_archive(offspring, generation=generation)
+        self._update_history(offspring, generation=generation)
         return offspring
 
     def _build_offspring_tasks(
@@ -317,22 +317,22 @@ class EvolutionEngine:
 
     def _select_strategy_parents(self, strategy: Strategy, candidates: list[Candidate]) -> list[Candidate]:
         count = parent_count(strategy)
-        if not self.archive.enabled or not self.archive.entries:
+        if not self.history.enabled or not self.history.entries:
             parents = select_parents(candidates, count, self.rng)
-            clear_archive_selection(parents)
+            clear_history_selection(parents)
             return parents
 
         selected: list[Candidate] = []
         selected_ids: set[str] = set()
-        archive_min = (
-            self.config.evolution.archive.s3_archive_parent_min
+        history_min = (
+            self.config.evolution.history.s3_history_parent_min
             if strategy == Strategy.E3_HYBRID_RECOMBINATION
             else 0
         )
-        archive_min = min(archive_min, count)
-        if archive_min:
-            selected.extend(self.archive.select_parents(
-                count=archive_min,
+        history_min = min(history_min, count)
+        if history_min:
+            selected.extend(self.history.select_parents(
+                count=history_min,
                 rng=self.rng,
                 candidate_index=self._candidate_index,
                 exclude_ids=selected_ids,
@@ -342,10 +342,10 @@ class EvolutionEngine:
 
         while len(selected) < count:
             remaining = count - len(selected)
-            use_archive = self.rng.random() < self.config.evolution.archive.parent_sample_probability
+            use_history = self.rng.random() < self.config.evolution.history.parent_sample_probability
             next_parent: list[Candidate] = []
-            if use_archive:
-                next_parent = self.archive.select_parents(
+            if use_history:
+                next_parent = self.history.select_parents(
                     count=1,
                     rng=self.rng,
                     candidate_index=self._candidate_index,
@@ -356,9 +356,9 @@ class EvolutionEngine:
                 pool = [candidate for candidate in candidates if candidate.id not in selected_ids]
                 if pool:
                     next_parent = select_parents(pool, min(1, remaining), self.rng)
-                    clear_archive_selection(next_parent)
-            if not next_parent and not use_archive:
-                next_parent = self.archive.select_parents(
+                    clear_history_selection(next_parent)
+            if not next_parent and not use_history:
+                next_parent = self.history.select_parents(
                     count=1,
                     rng=self.rng,
                     candidate_index=self._candidate_index,
@@ -372,9 +372,9 @@ class EvolutionEngine:
 
         if not selected:
             selected = select_parents(candidates, count, self.rng)
-            clear_archive_selection(selected)
-        if archive_selection_ids(selected):
-            self.archive.note_offspring_with_archive_parent()
+            clear_history_selection(selected)
+        if history_selection_ids(selected):
+            self.history.note_offspring_with_history_parent()
         return selected
 
     def _empty_metrics(self) -> dict:
@@ -510,13 +510,13 @@ class EvolutionEngine:
         summaries = [self._provider_summary(provider) for provider in providers]
         return [summary for summary in summaries if summary]
 
-    def _update_archive(self, candidates: list[Candidate], *, generation: int) -> None:
-        if not self.archive.enabled:
+    def _update_history(self, candidates: list[Candidate], *, generation: int) -> None:
+        if not self.history.enabled:
             return
-        profile_builder = getattr(self.problem, "build_archive_profile", None)
+        profile_builder = getattr(self.problem, "build_history_profile", None)
         if not callable(profile_builder):
             return
-        self.archive.update(
+        self.history.update(
             candidates,
             generation=generation,
             profile_builder=profile_builder,
@@ -524,21 +524,21 @@ class EvolutionEngine:
         for candidate in candidates:
             self.store.save_candidate(candidate)
 
-    def _save_archive(self, generation: int) -> None:
-        if self.archive.enabled:
-            self.store.save_archive(generation, self._archive_summary(include_entries=True))
+    def _save_history(self, generation: int) -> None:
+        if self.history.enabled:
+            self.store.save_history(generation, self._history_summary(include_entries=True))
 
-    def _archive_summary(self, *, include_entries: bool) -> dict:
-        return self.archive.summary(include_entries=include_entries)
+    def _history_summary(self, *, include_entries: bool) -> dict:
+        return self.history.summary(include_entries=include_entries)
 
     def _search_best(self, population: Population) -> Candidate:
         if (
-            not self.archive.enabled
-            or not self.config.evolution.archive.final_selection_uses_archive
+            not self.history.enabled
+            or not self.config.evolution.history.final_selection_uses_history
         ):
             return population.best
         candidates_by_id = {candidate.id: candidate for candidate in population.candidates}
-        for candidate in self.archive.candidates(self._candidate_index):
+        for candidate in self.history.candidates(self._candidate_index):
             candidates_by_id.setdefault(candidate.id, candidate)
         return select_survivors(list(candidates_by_id.values()), 1)[0]
 
@@ -578,11 +578,11 @@ def _build_candidate_from_response(
         metrics: dict | None = None,
     ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
-    score_name = _minimized_score_name(candidate_metrics)
-    uses_distance = score_name is not None
+    score_name = _metric_score_name(candidate_metrics)
     if score_name is not None:
+        score_value = _default_score_value(score_name)
         candidate_metrics["score_name"] = score_name
-        candidate_metrics[score_name] = math.inf
+        candidate_metrics[score_name] = score_value
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -591,8 +591,8 @@ def _build_candidate_from_response(
         thought=response.thought,
         code=response.code,
         parents=list(parents or []),
-        fitness=None if uses_distance else None,
-        distance=math.inf if uses_distance else None,
+        fitness=None,
+        distance=score_value if score_name in MINIMIZED_SCORE_NAMES else None,
         metrics=candidate_metrics,
         status=CandidateStatus.PENDING,
         prompt=prompt,
@@ -610,11 +610,11 @@ def _failed_candidate(
         metrics: dict | None = None,
     ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
-    score_name = _minimized_score_name(candidate_metrics)
-    uses_distance = score_name is not None
+    score_name = _metric_score_name(candidate_metrics)
     if score_name is not None:
+        score_value = _default_score_value(score_name)
         candidate_metrics["score_name"] = score_name
-        candidate_metrics[score_name] = math.inf
+        candidate_metrics[score_name] = score_value
     return Candidate(
         id=candidate_id,
         generation=generation,
@@ -623,8 +623,8 @@ def _failed_candidate(
         thought="",
         code="",
         parents=list(parents or []),
-        fitness=None if uses_distance else math.inf,
-        distance=math.inf if uses_distance else None,
+        fitness=None if score_name is not None else math.inf,
+        distance=score_value if score_name in MINIMIZED_SCORE_NAMES else None,
         metrics=candidate_metrics,
         status=CandidateStatus.ERROR,
         prompt=prompt,
@@ -643,20 +643,23 @@ def _mark_candidate_error(candidate: Candidate, error_details: str) -> None:
         candidate.metrics = {}
     score_name = candidate.score_name
     if score_name != "fitness":
-        candidate.distance = math.inf
+        score_value = _default_score_value(score_name)
+        candidate.distance = score_value if score_name in MINIMIZED_SCORE_NAMES else None
         candidate.fitness = None
         candidate.metrics["score_name"] = score_name
-        candidate.metrics[score_name] = math.inf
+        candidate.metrics[score_name] = score_value
     else:
         candidate.fitness = math.inf
     candidate.error_details = error_details
 
 
 def _uses_distance_metrics(metrics: dict) -> bool:
-    return _minimized_score_name(metrics) is not None
+    return _metric_score_name(metrics) in MINIMIZED_SCORE_NAMES
 
 
-def _minimized_score_name(metrics: dict) -> str | None:
+def _metric_score_name(metrics: dict) -> str | None:
+    if metrics.get("problem") == "bbob":
+        return "mean_aocc"
     if metrics.get("problem") == "dvrp":
         return "ttt"
     if metrics.get("problem") == "vrp":
@@ -664,13 +667,19 @@ def _minimized_score_name(metrics: dict) -> str | None:
     if metrics.get("problem") == "tsp":
         return "distance"
     score_name = metrics.get("score_name")
-    if score_name in {"distance", "ttt"}:
+    if score_name in NAMED_SCORE_NAMES:
         return str(score_name)
     if "ttt" in metrics:
         return "ttt"
     if "distance" in metrics:
         return "distance"
+    if "mean_aocc" in metrics:
+        return "mean_aocc"
     return None
+
+
+def _default_score_value(score_name: str) -> float:
+    return 0.0 if score_name in MAXIMIZED_SCORE_NAMES else math.inf
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:

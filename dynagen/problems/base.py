@@ -37,5 +37,5 @@ class Problem(Protocol):
     ) -> list[dict[str, str]]:
         ...
 
-    def build_archive_profile(self, candidate: Candidate) -> dict[str, Any]:
+    def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
         ...

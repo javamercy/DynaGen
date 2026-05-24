@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Persistent candidate history used for parent sampling and reporting."""
+
 import hashlib
 import math
 import random
@@ -8,14 +10,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from dynagen.candidates.candidate import Candidate
-from dynagen.config import ArchiveConfig
+from dynagen.config import HistoryConfig
 
-ARCHIVE_KEY = "archive"
-ARCHIVE_SELECTION_KEY = "archive_selection"
+HISTORY_KEY = "history"
+HISTORY_SELECTION_KEY = "history_selection"
 
 
 @dataclass
-class ArchiveEntry:
+class HistoryEntry:
     candidate_id: str
     problem: str
     generation: int
@@ -24,7 +26,7 @@ class ArchiveEntry:
     score_value: float | None
     buckets: list[str]
     primary_bucket: str
-    archive_score: float
+    history_score: float
     quality_score: float
     robustness_score: float
     diversity_score: float
@@ -45,7 +47,7 @@ class ArchiveEntry:
             "score_value": self.score_value,
             "buckets": list(self.buckets),
             "primary_bucket": self.primary_bucket,
-            "archive_score": self.archive_score,
+            "history_score": self.history_score,
             "quality_score": self.quality_score,
             "robustness_score": self.robustness_score,
             "diversity_score": self.diversity_score,
@@ -58,11 +60,11 @@ class ArchiveEntry:
         }
 
 
-class CandidateArchive:
-    def __init__(self, *, config: ArchiveConfig, problem: str) -> None:
+class CandidateHistory:
+    def __init__(self, *, config: HistoryConfig, problem: str) -> None:
         self.config = config
         self.problem = problem
-        self.entries: dict[str, ArchiveEntry] = {}
+        self.entries: dict[str, HistoryEntry] = {}
         self.stats: dict[str, int] = {
             "added_count": 0,
             "updated_count": 0,
@@ -70,9 +72,9 @@ class CandidateArchive:
             "rejected_score_count": 0,
             "rejected_duplicate_count": 0,
             "pruned_count": 0,
-            "parent_selections_from_archive": 0,
-            "offspring_with_archive_parent": 0,
-            "final_selection_from_archive": 0,
+            "parent_selections_from_history": 0,
+            "offspring_with_history_parent": 0,
+            "final_selection_from_history": 0,
         }
 
     @property
@@ -93,17 +95,17 @@ class CandidateArchive:
         self._recompute_scores(current_generation=generation)
         self._prune()
 
-    def add_candidate(self, candidate: Candidate, *, generation: int, profile_builder) -> ArchiveEntry | None:
+    def add_candidate(self, candidate: Candidate, *, generation: int, profile_builder) -> HistoryEntry | None:
         status = _status_value(candidate)
         if status not in set(self.config.add_statuses):
             self.stats["rejected_status_count"] += 1
-            _set_archive_metadata(candidate, in_archive=False, reason="status")
+            _set_history_metadata(candidate, in_history=False, reason="status")
             return None
 
         score_value = _finite_or_none(candidate.score_value)
         if score_value is None:
             self.stats["rejected_score_count"] += 1
-            _set_archive_metadata(candidate, in_archive=False, reason="score")
+            _set_history_metadata(candidate, in_history=False, reason="score")
             return None
 
         profile = dict(profile_builder(candidate))
@@ -121,7 +123,7 @@ class CandidateArchive:
                 new_quality = _score(profile.get("quality_score"))
                 if duplicate.quality_score >= new_quality:
                     self.stats["rejected_duplicate_count"] += 1
-                    _set_archive_metadata(candidate, in_archive=False, reason="duplicate")
+                    _set_history_metadata(candidate, in_history=False, reason="duplicate")
                     return None
                 self._remove_entry(duplicate.candidate_id)
 
@@ -130,7 +132,7 @@ class CandidateArchive:
         diversity_score = _score(profile.get("diversity_score"))
         if "diversity_score" not in profile:
             diversity_score = self._diversity_score(primary_bucket, diversity_features, exclude_id=candidate.id)
-        entry = ArchiveEntry(
+        entry = HistoryEntry(
             candidate_id=candidate.id,
             problem=self.problem,
             generation=int(candidate.generation),
@@ -139,7 +141,7 @@ class CandidateArchive:
             score_value=score_value,
             buckets=buckets,
             primary_bucket=primary_bucket,
-            archive_score=0.0,
+            history_score=0.0,
             quality_score=_score(profile.get("quality_score")),
             robustness_score=_score(profile.get("robustness_score")),
             diversity_score=diversity_score,
@@ -152,7 +154,7 @@ class CandidateArchive:
         self.entries[candidate.id] = entry
         self._recompute_entry_score(entry, current_generation=generation)
         self.stats["updated_count" if existing else "added_count"] += 1
-        _set_archive_metadata(candidate, in_archive=True, entry=entry)
+        _set_history_metadata(candidate, in_history=True, entry=entry)
         return entry
 
     def select_parents(
@@ -178,13 +180,13 @@ class CandidateArchive:
                     choices = diverse_choices
             if not choices:
                 break
-            entry, candidate = _rank_biased_archive_choice(choices, rng)
+            entry, candidate = _rank_biased_history_choice(choices, rng)
             selected.append(candidate)
             used_ids.add(candidate.id)
             used_buckets.add(entry.primary_bucket)
-            _set_archive_selection(candidate, entry)
+            _set_history_selection(candidate, entry)
         if selected:
-            self.stats["parent_selections_from_archive"] += len(selected)
+            self.stats["parent_selections_from_history"] += len(selected)
         return selected
 
     def candidates(self, candidate_index: dict[str, Candidate]) -> list[Candidate]:
@@ -198,12 +200,12 @@ class CandidateArchive:
     def candidate_ids(self) -> set[str]:
         return set(self.entries)
 
-    def note_offspring_with_archive_parent(self) -> None:
-        self.stats["offspring_with_archive_parent"] += 1
+    def note_offspring_with_history_parent(self) -> None:
+        self.stats["offspring_with_history_parent"] += 1
 
     def mark_final_selection(self, candidate_id: str, *, population_ids: set[str] | None = None) -> None:
         population_ids = set(population_ids or set())
-        self.stats["final_selection_from_archive"] = int(candidate_id in self.entries and candidate_id not in population_ids)
+        self.stats["final_selection_from_history"] = int(candidate_id in self.entries and candidate_id not in population_ids)
 
     def summary(self, *, include_entries: bool = True) -> dict[str, Any]:
         bucket_map = self._bucket_map()
@@ -214,8 +216,8 @@ class CandidateArchive:
                 top_buckets.append({
                     "bucket": bucket,
                     "candidate_id": entries[0].candidate_id,
-                    "archive_score": entries[0].archive_score,
-                    "bucket_score": entries[0].bucket_scores.get(bucket, entries[0].archive_score),
+                    "history_score": entries[0].history_score,
+                    "bucket_score": entries[0].bucket_scores.get(bucket, entries[0].history_score),
                 })
         summary = {
             "enabled": self.enabled,
@@ -235,8 +237,8 @@ class CandidateArchive:
             candidate_index: dict[str, Candidate],
             *,
             exclude_ids: set[str],
-    ) -> list[tuple[ArchiveEntry, Candidate]]:
-        entries: list[tuple[ArchiveEntry, Candidate]] = []
+    ) -> list[tuple[HistoryEntry, Candidate]]:
+        entries: list[tuple[HistoryEntry, Candidate]] = []
         for entry in self.entries.values():
             if entry.candidate_id in exclude_ids:
                 continue
@@ -246,7 +248,7 @@ class CandidateArchive:
             entries.append((entry, candidate))
         return sorted(entries, key=lambda item: _entry_sort_key(item[0]))
 
-    def _duplicate_for_hash(self, code_hash: str, *, exclude_id: str) -> ArchiveEntry | None:
+    def _duplicate_for_hash(self, code_hash: str, *, exclude_id: str) -> HistoryEntry | None:
         for entry in self.entries.values():
             if entry.candidate_id != exclude_id and entry.code_hash == code_hash:
                 return entry
@@ -275,12 +277,12 @@ class CandidateArchive:
         for entry in self.entries.values():
             self._recompute_entry_score(entry, current_generation=current_generation)
 
-    def _recompute_entry_score(self, entry: ArchiveEntry, *, current_generation: int) -> None:
+    def _recompute_entry_score(self, entry: HistoryEntry, *, current_generation: int) -> None:
         if current_generation <= 0:
             entry.recency_score = 1.0
         else:
             entry.recency_score = max(0.0, min(1.0, float(entry.generation) / float(current_generation)))
-        entry.archive_score = (
+        entry.history_score = (
             entry.quality_score
             + self.config.robustness_weight * entry.robustness_score
             + self.config.diversity_weight * entry.diversity_score
@@ -313,8 +315,8 @@ class CandidateArchive:
     def _remove_entry(self, candidate_id: str) -> None:
         self.entries.pop(candidate_id, None)
 
-    def _bucket_map(self) -> dict[str, list[ArchiveEntry]]:
-        buckets: dict[str, list[ArchiveEntry]] = {}
+    def _bucket_map(self) -> dict[str, list[HistoryEntry]]:
+        buckets: dict[str, list[HistoryEntry]] = {}
         for entry in self.entries.values():
             for bucket in entry.buckets:
                 buckets.setdefault(bucket, []).append(entry)
@@ -326,72 +328,72 @@ def normalized_code_hash(code: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def clear_archive_selection(candidates: list[Candidate]) -> None:
+def clear_history_selection(candidates: list[Candidate]) -> None:
     for candidate in candidates:
         if isinstance(candidate.metrics, dict):
-            candidate.metrics.pop(ARCHIVE_SELECTION_KEY, None)
+            candidate.metrics.pop(HISTORY_SELECTION_KEY, None)
 
 
-def archive_selection_ids(candidates: list[Candidate]) -> set[str]:
+def history_selection_ids(candidates: list[Candidate]) -> set[str]:
     result: set[str] = set()
     for candidate in candidates:
-        if isinstance(candidate.metrics, dict) and isinstance(candidate.metrics.get(ARCHIVE_SELECTION_KEY), dict):
+        if isinstance(candidate.metrics, dict) and isinstance(candidate.metrics.get(HISTORY_SELECTION_KEY), dict):
             result.add(candidate.id)
     return result
 
 
-def format_archive_parent_context(candidate: Candidate) -> str:
+def format_history_parent_context(candidate: Candidate) -> str:
     metrics = candidate.metrics if isinstance(candidate.metrics, dict) else {}
-    selection = metrics.get(ARCHIVE_SELECTION_KEY)
+    selection = metrics.get(HISTORY_SELECTION_KEY)
     if not isinstance(selection, dict):
         return ""
     lines = [
-        "Archive source: yes",
-        f"Archive bucket: {selection.get('primary_bucket')}",
+        "History source: yes",
+        f"History bucket: {selection.get('primary_bucket')}",
     ]
     role = selection.get("role")
     if role:
-        lines.append(f"Archive role: {role}")
+        lines.append(f"History role: {role}")
     return "\n".join(lines)
 
 
-def _set_archive_metadata(
+def _set_history_metadata(
         candidate: Candidate,
         *,
-        in_archive: bool,
-        entry: ArchiveEntry | None = None,
+        in_history: bool,
+        entry: HistoryEntry | None = None,
         reason: str | None = None,
 ) -> None:
     if not isinstance(candidate.metrics, dict):
         candidate.metrics = {}
-    data: dict[str, Any] = {"in_archive": bool(in_archive)}
+    data: dict[str, Any] = {"in_history": bool(in_history)}
     if entry is not None:
         data.update({
             "buckets": list(entry.buckets),
             "primary_bucket": entry.primary_bucket,
-            "archive_score": entry.archive_score,
+            "history_score": entry.history_score,
             "quality_score": entry.quality_score,
             "robustness_score": entry.robustness_score,
             "diversity_score": entry.diversity_score,
         })
     if reason:
         data["rejected_reason"] = reason
-    candidate.metrics[ARCHIVE_KEY] = data
+    candidate.metrics[HISTORY_KEY] = data
 
 
-def _set_archive_selection(candidate: Candidate, entry: ArchiveEntry) -> None:
+def _set_history_selection(candidate: Candidate, entry: HistoryEntry) -> None:
     if not isinstance(candidate.metrics, dict):
         candidate.metrics = {}
-    candidate.metrics[ARCHIVE_SELECTION_KEY] = {
+    candidate.metrics[HISTORY_SELECTION_KEY] = {
         "primary_bucket": entry.primary_bucket,
         "buckets": list(entry.buckets),
-        "archive_score": entry.archive_score,
-        "bucket_score": entry.bucket_scores.get(entry.primary_bucket, entry.archive_score),
-        "role": _archive_role(entry.primary_bucket),
+        "history_score": entry.history_score,
+        "bucket_score": entry.bucket_scores.get(entry.primary_bucket, entry.history_score),
+        "role": _history_role(entry.primary_bucket),
     }
 
 
-def _archive_role(bucket: str) -> str:
+def _history_role(bucket: str) -> str:
     if ":runtime:" in bucket:
         return "runtime specialist"
     if ":size:" in bucket or ":trucks:" in bucket or ":function:" in bucket or ":group:" in bucket:
@@ -400,13 +402,13 @@ def _archive_role(bucket: str) -> str:
         return "mechanism specialist"
     if "global" in bucket:
         return "global elite"
-    return "archive specialist"
+    return "history specialist"
 
 
-def _rank_biased_archive_choice(
-        choices: list[tuple[ArchiveEntry, Candidate]],
+def _rank_biased_history_choice(
+        choices: list[tuple[HistoryEntry, Candidate]],
         rng: random.Random,
-) -> tuple[ArchiveEntry, Candidate]:
+) -> tuple[HistoryEntry, Candidate]:
     ordered = sorted(choices, key=lambda item: _entry_sort_key(item[0]))
     population_size = len(ordered)
     weights_by_id = {
@@ -417,9 +419,9 @@ def _rank_biased_archive_choice(
     return rng.choices(choices, weights=weights, k=1)[0]
 
 
-def _entry_sort_key(entry: ArchiveEntry) -> tuple[float, float, float, int, str]:
+def _entry_sort_key(entry: HistoryEntry) -> tuple[float, float, float, int, str]:
     return (
-        -entry.archive_score,
+        -entry.history_score,
         -entry.quality_score,
         -entry.robustness_score,
         -entry.generation,
@@ -427,11 +429,11 @@ def _entry_sort_key(entry: ArchiveEntry) -> tuple[float, float, float, int, str]
     )
 
 
-def _bucket_sort_key(entry: ArchiveEntry, bucket: str) -> tuple[float, float, float, int, str]:
-    bucket_score = entry.bucket_scores.get(bucket, entry.archive_score)
+def _bucket_sort_key(entry: HistoryEntry, bucket: str) -> tuple[float, float, float, int, str]:
+    bucket_score = entry.bucket_scores.get(bucket, entry.history_score)
     return (
         -bucket_score,
-        -entry.archive_score,
+        -entry.history_score,
         -entry.quality_score,
         -entry.generation,
         entry.candidate_id,

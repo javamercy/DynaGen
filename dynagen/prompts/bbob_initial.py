@@ -15,50 +15,79 @@ class BBOBInitialRole:
     intended_bias: str
 
 
-BBOB_INITIAL_ROLES = (
+BBOB_INITIAL_ROLES = [
     BBOBInitialRole(
-        1,
-        "a scale-adaptive evolution strategy designer",
-        "Design an optimizer inspired by strong evolution-strategy principles: adaptive sampling radius, elite selection, success-based updates, restart behavior, and dimension-aware scaling.",
+        slot=1,
+        role="CMA-ES-style covariance adaptation solver",
+        intended_bias=(
+            "Use a population-based Gaussian search distribution with adaptive step size "
+            "and covariance-like directional learning. Bias toward robustness on rotated, "
+            "non-separable, ill-conditioned continuous landscapes."
+        ),
     ),
     BBOBInitialRole(
-        2,
-        "a population recombination optimizer engineer",
-        "Design a compact population-based optimizer using mutation, recombination, replacement, and diversity control to make reliable progress across separable, conditioned, and multimodal functions.",
+        slot=2,
+        role="Differential-evolution-style population solver",
+        intended_bias=(
+            "Maintain a diverse population and generate candidates by vector differences, "
+            "crossover, and greedy replacement. Bias toward global exploration on multimodal "
+            "and weakly structured landscapes."
+        ),
     ),
     BBOBInitialRole(
-        3,
-        "a restart-based global-local search strategist",
-        "Design an optimizer that combines broad exploration, local improvement, stagnation detection, and restarts or radius resets to escape poor basins while preserving the best incumbent.",
+        slot=3,
+        role="Restarted adaptive random search solver",
+        intended_bias=(
+            "Use randomized sampling around the best incumbent with adaptive radius control "
+            "and restarts after stagnation. Bias toward simple, budget-safe anytime performance "
+            "across many function types."
+        ),
     ),
     BBOBInitialRole(
-        4,
-        "a coordinate and pattern search specialist",
-        "Design an optimizer that exploits coordinate-wise, directional, or pattern-based local moves with adaptive step sizes and bounded evaluation discipline.",
+        slot=4,
+        role="Coordinate and pattern-search solver",
+        intended_bias=(
+            "Probe coordinate directions and simple search patterns with adaptive step sizes. "
+            "Bias toward separable, partially separable, low-dimensional, and locally smooth "
+            "problems while remaining derivative-free."
+        ),
     ),
     BBOBInitialRole(
-        5,
-        "a hybrid adaptive optimizer architect",
-        "Design a compact hybrid optimizer that combines complementary mechanisms such as population sampling, local refinement, success memory, adaptive step control, and restart logic.",
+        slot=5,
+        role="Memetic global-local solver",
+        intended_bias=(
+            "Combine broad global sampling with local refinement around the best candidates. "
+            "Bias toward balancing exploration on multimodal functions with exploitation on "
+            "unimodal or funnel-like regions."
+        ),
     ),
-)
+]
 
 
 def build_bbob_initial_prompt(role: BBOBInitialRole) -> list[dict[str, str]]:
-    user = f"""Generate initial population slot {role.slot}.
+    system = bbob_system_prompt()
 
-Assigned optimizer perspective:
-{role.role}
+    user = "\n\n".join([
+        "# Initial Candidate Identity",
+        f"Candidate ID: {role.slot}",
+        f"Role: {role.role}",
+        f"Intended bias: {role.intended_bias}",
 
-Behavioral bias:
-{role.intended_bias}
+        "# DynaGen Scoring",
+        "DynaGen score: mean AOCC; higher is better. The Optimizer itself still minimizes objective values.",
 
-{BBOB_SOLVER_CONTRACT}
+        "# Internal Quality Checklist",
+        BBOB_INTERNAL_CHECKLIST.strip(),
 
-{BBOB_INTERNAL_CHECKLIST}
+        "# Solver Contract",
+        BBOB_SOLVER_CONTRACT.strip(),
 
-{BBOB_RESPONSE_FORMAT}"""
+        "# Response Format",
+        BBOB_RESPONSE_FORMAT.strip(),
+
+    ])
+
     return [
-        {"role": "system", "content": bbob_system_prompt(role.role)},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]

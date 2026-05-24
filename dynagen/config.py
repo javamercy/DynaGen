@@ -49,14 +49,16 @@ class VerbalGradientConfig:
 
 
 @dataclass
-class ArchiveConfig:
+class HistoryConfig:
+    """Configuration for persistent candidate history."""
+
     enabled: bool = True
     max_size: int = 64
     max_per_bucket: int = 4
     add_statuses: list[str] = field(default_factory=lambda: ["valid", "evaluated", "timeout"])
     parent_sample_probability: float = 0.35
-    s3_archive_parent_min: int = 1
-    final_selection_uses_archive: bool = True
+    s3_history_parent_min: int = 1
+    final_selection_uses_history: bool = True
     deduplicate_code: bool = True
     diversity_weight: float = 0.25
     recency_weight: float = 0.05
@@ -68,26 +70,26 @@ class ArchiveConfig:
         self.max_per_bucket = int(self.max_per_bucket)
         self.add_statuses = [str(status).strip().lower() for status in self.add_statuses if str(status).strip()]
         self.parent_sample_probability = float(self.parent_sample_probability)
-        self.s3_archive_parent_min = int(self.s3_archive_parent_min)
-        self.final_selection_uses_archive = bool(self.final_selection_uses_archive)
+        self.s3_history_parent_min = int(self.s3_history_parent_min)
+        self.final_selection_uses_history = bool(self.final_selection_uses_history)
         self.deduplicate_code = bool(self.deduplicate_code)
         self.diversity_weight = float(self.diversity_weight)
         self.recency_weight = float(self.recency_weight)
         self.robustness_weight = float(self.robustness_weight)
         if self.max_size < 1:
-            raise ValueError("archive.max_size must be at least 1")
+            raise ValueError("history.max_size must be at least 1")
         if self.max_per_bucket < 1:
-            raise ValueError("archive.max_per_bucket must be at least 1")
+            raise ValueError("history.max_per_bucket must be at least 1")
         if not self.add_statuses:
-            raise ValueError("archive.add_statuses must not be empty")
+            raise ValueError("history.add_statuses must not be empty")
         if self.parent_sample_probability < 0 or self.parent_sample_probability > 1:
-            raise ValueError("archive.parent_sample_probability must be between 0 and 1")
-        if self.s3_archive_parent_min < 0:
-            raise ValueError("archive.s3_archive_parent_min must be non-negative")
+            raise ValueError("history.parent_sample_probability must be between 0 and 1")
+        if self.s3_history_parent_min < 0:
+            raise ValueError("history.s3_history_parent_min must be non-negative")
         for name, value in (
-                ("archive.diversity_weight", self.diversity_weight),
-                ("archive.recency_weight", self.recency_weight),
-                ("archive.robustness_weight", self.robustness_weight),
+                ("history.diversity_weight", self.diversity_weight),
+                ("history.recency_weight", self.recency_weight),
+                ("history.robustness_weight", self.robustness_weight),
         ):
             if value < 0:
                 raise ValueError(f"{name} must be non-negative")
@@ -100,7 +102,7 @@ class EvolutionConfig:
     offspring_per_strategy: int
     strategies: list[Strategy] = field(default_factory=lambda: list(Strategy))
     verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
-    archive: ArchiveConfig | dict[str, Any] = field(default_factory=ArchiveConfig)
+    history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
 
     def __post_init__(self) -> None:
         self.population_size = int(self.population_size)
@@ -111,10 +113,10 @@ class EvolutionConfig:
             self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
             raise ValueError("evolution.verbal_gradients must be a mapping")
-        if isinstance(self.archive, dict):
-            self.archive = ArchiveConfig(**self.archive)
-        elif not isinstance(self.archive, ArchiveConfig):
-            raise ValueError("evolution.archive must be a mapping")
+        if isinstance(self.history, dict):
+            self.history = HistoryConfig(**self.history)
+        elif not isinstance(self.history, HistoryConfig):
+            raise ValueError("evolution.history must be a mapping")
         if self.population_size < 1:
             raise ValueError("population_size must be at least 1")
         if self.generations < 0:

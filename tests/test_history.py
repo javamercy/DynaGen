@@ -5,27 +5,27 @@ import unittest
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
 from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
-from dynagen.evaluation.bbob_archive import build_bbob_archive_profile
+from dynagen.evaluation.bbob_history import build_bbob_history_profile
 from dynagen.evaluation.base import EvaluationResult
-from dynagen.evaluation.dvrp_archive import build_dvrp_archive_profile
-from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
-from dynagen.evaluation.vrp_archive import build_vrp_archive_profile
-from dynagen.evolution.archive import CandidateArchive
+from dynagen.evaluation.dvrp_history import build_dvrp_history_profile
+from dynagen.evaluation.tsp_history import build_tsp_history_profile
+from dynagen.evaluation.vrp_history import build_vrp_history_profile
+from dynagen.evolution.history import CandidateHistory
 from dynagen.persistence.run_store import RunStore
 from dynagen.evolution.engine import EvolutionEngine
 
 
-class ArchiveTests(unittest.TestCase):
-    def test_archive_config_parses_nested_options(self) -> None:
+class HistoryTests(unittest.TestCase):
+    def test_history_config_parses_nested_options(self) -> None:
         config = _run_config(population_size=1, generations=0)
 
-        self.assertTrue(config.evolution.archive.enabled)
-        self.assertEqual(config.evolution.archive.max_size, 8)
-        self.assertEqual(config.evolution.archive.max_per_bucket, 2)
-        self.assertEqual(config.evolution.archive.parent_sample_probability, 1.0)
-        self.assertEqual(config.evolution.archive.s3_archive_parent_min, 1)
+        self.assertTrue(config.evolution.history.enabled)
+        self.assertEqual(config.evolution.history.max_size, 8)
+        self.assertEqual(config.evolution.history.max_per_bucket, 2)
+        self.assertEqual(config.evolution.history.parent_sample_probability, 1.0)
+        self.assertEqual(config.evolution.history.s3_history_parent_min, 1)
 
-    def test_tsp_archive_profile_uses_size_and_mechanism_buckets(self) -> None:
+    def test_tsp_history_profile_uses_size_and_mechanism_buckets(self) -> None:
         candidate = Candidate(
             id="cand_1",
             generation=0,
@@ -49,7 +49,7 @@ class ArchiveTests(unittest.TestCase):
             },
         )
 
-        profile = build_tsp_archive_profile(candidate)
+        profile = build_tsp_history_profile(candidate)
 
         self.assertIn("global", profile["buckets"])
         self.assertIn("tsp:size:33", profile["buckets"])
@@ -58,7 +58,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertIn("tsp:runtime:robust", profile["buckets"])
         self.assertEqual(profile["primary_bucket"], "tsp:size:33")
 
-    def test_bbob_archive_profile_uses_group_and_mechanism_buckets(self) -> None:
+    def test_bbob_history_profile_uses_group_and_mechanism_buckets(self) -> None:
         candidate = Candidate(
             id="cand_1",
             generation=0,
@@ -66,10 +66,10 @@ class ArchiveTests(unittest.TestCase):
             name="optimizer",
             thought="",
             code="class Optimizer:\n    # population restart coordinate search\n    pass",
-            fitness=0.2,
             status=CandidateStatus.VALID,
             metrics={
                 "problem": "bbob",
+                "score_name": "mean_aocc",
                 "runs": 2,
                 "valid_count": 2,
                 "mean_aocc": 0.8,
@@ -82,14 +82,14 @@ class ArchiveTests(unittest.TestCase):
             },
         )
 
-        profile = build_bbob_archive_profile(candidate)
+        profile = build_bbob_history_profile(candidate)
 
         self.assertIn("bbob:group:separable", profile["buckets"])
         self.assertIn("bbob:function:1", profile["buckets"])
         self.assertIn("bbob:mechanism:evolution_strategy", profile["buckets"])
         self.assertIn("bbob:mechanism:restart", profile["buckets"])
 
-    def test_dvrp_archive_profile_uses_size_truck_and_behavior_buckets(self) -> None:
+    def test_dvrp_history_profile_uses_size_truck_and_behavior_buckets(self) -> None:
         candidate = Candidate(
             id="cand_1",
             generation=0,
@@ -118,14 +118,14 @@ class ArchiveTests(unittest.TestCase):
             },
         )
 
-        profile = build_dvrp_archive_profile(candidate)
+        profile = build_dvrp_history_profile(candidate)
 
         self.assertIn("dvrp:size:10", profile["buckets"])
         self.assertIn("dvrp:trucks:2", profile["buckets"])
         self.assertIn("dvrp:waits:low", profile["buckets"])
         self.assertIn("dvrp:mechanism:nearest_available", profile["buckets"])
 
-    def test_vrp_archive_profile_uses_size_truck_and_mechanism_buckets(self) -> None:
+    def test_vrp_history_profile_uses_size_truck_and_mechanism_buckets(self) -> None:
         candidate = Candidate(
             id="cand_1",
             generation=0,
@@ -153,26 +153,26 @@ class ArchiveTests(unittest.TestCase):
             },
         )
 
-        profile = build_vrp_archive_profile(candidate)
+        profile = build_vrp_history_profile(candidate)
 
         self.assertIn("vrp:size:10", profile["buckets"])
         self.assertIn("vrp:trucks:3", profile["buckets"])
         self.assertIn("vrp:mechanism:sweep", profile["buckets"])
         self.assertIn("vrp:mechanism:savings", profile["buckets"])
 
-    def test_archive_rejects_duplicate_code_when_weaker(self) -> None:
-        archive = CandidateArchive(config=_run_config(population_size=1, generations=0).evolution.archive, problem="tsp")
+    def test_history_rejects_duplicate_code_when_weaker(self) -> None:
+        history = CandidateHistory(config=_run_config(population_size=1, generations=0).evolution.history, problem="tsp")
         strong = _candidate("cand_1", score=10.0, code="def solve_tsp(a,b,c):\n    return []")
         weak = _candidate("cand_2", score=20.0, code="def solve_tsp(a,b,c):\n    return []")
 
-        archive.update([strong], generation=0, profile_builder=build_tsp_archive_profile)
-        archive.update([weak], generation=0, profile_builder=build_tsp_archive_profile)
+        history.update([strong], generation=0, profile_builder=build_tsp_history_profile)
+        history.update([weak], generation=0, profile_builder=build_tsp_history_profile)
 
-        self.assertIn("cand_1", archive.entries)
-        self.assertNotIn("cand_2", archive.entries)
-        self.assertEqual(archive.stats["rejected_duplicate_count"], 1)
+        self.assertIn("cand_1", history.entries)
+        self.assertNotIn("cand_2", history.entries)
+        self.assertEqual(history.stats["rejected_duplicate_count"], 1)
 
-    def test_engine_samples_archive_parent_and_persists_summary(self) -> None:
+    def test_engine_samples_history_parent_and_persists_summary(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
         config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"])
@@ -188,22 +188,22 @@ class ArchiveTests(unittest.TestCase):
             ).run()
 
             prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
-            archive_summary = json.loads((store.root / "archive_summary.json").read_text(encoding="utf-8"))
+            history_summary = json.loads((store.root / "history_summary.json").read_text(encoding="utf-8"))
             generation_summary = json.loads(
                 (store.generations_dir / "generation_001" / "summary.json").read_text(encoding="utf-8")
             )
             llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
 
-        self.assertIn("Archive source: yes", prompt)
-        self.assertGreaterEqual(archive_summary["size"], 1)
-        self.assertIn("archive", generation_summary)
-        self.assertIn("archive", llm_calls)
-        self.assertGreaterEqual(llm_calls["archive"]["parent_selections_from_archive"], 1)
+        self.assertIn("History source: yes", prompt)
+        self.assertGreaterEqual(history_summary["size"], 1)
+        self.assertIn("history", generation_summary)
+        self.assertIn("history", llm_calls)
+        self.assertGreaterEqual(llm_calls["history"]["parent_selections_from_history"], 1)
 
-    def test_archive_disabled_omits_archive_parent_context(self) -> None:
+    def test_history_disabled_omits_history_parent_context(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
-        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"], archive_enabled=False)
+        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"], history_enabled=False)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -218,8 +218,8 @@ class ArchiveTests(unittest.TestCase):
             prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
             llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
 
-        self.assertNotIn("Archive source: yes", prompt)
-        self.assertFalse(llm_calls["archive"]["enabled"])
+        self.assertNotIn("History source: yes", prompt)
+        self.assertFalse(llm_calls["history"]["enabled"])
 
 
 def _candidate(candidate_id: str, *, score: float, code: str) -> Candidate:
@@ -319,10 +319,10 @@ def _run_config(
         population_size: int,
         generations: int,
         strategies: list[str] | None = None,
-        archive_enabled: bool = True,
+        history_enabled: bool = True,
 ) -> RunConfig:
     return RunConfig.from_dict({
-        "run": {"name": "archive_test", "output_dir": "runs/test", "seed": 1},
+        "run": {"name": "history_test", "output_dir": "runs/test", "seed": 1},
         "llm": {
             "provider": "ollama",
             "model": "fake",
@@ -333,13 +333,13 @@ def _run_config(
             "generations": generations,
             "offspring_per_strategy": 1,
             "strategies": strategies or ["e1_radical_exploration"],
-            "archive": {
-                "enabled": archive_enabled,
+            "history": {
+                "enabled": history_enabled,
                 "max_size": 8,
                 "max_per_bucket": 2,
                 "parent_sample_probability": 1.0,
-                "s3_archive_parent_min": 1,
-                "final_selection_uses_archive": True,
+                "s3_history_parent_min": 1,
+                "final_selection_uses_history": True,
                 "deduplicate_code": True,
             },
         },

@@ -2,7 +2,7 @@ import json
 import math
 from typing import Any
 
-from dynagen.candidates.candidate import Candidate
+from dynagen.candidates.candidate import Candidate, MAXIMIZED_SCORE_NAMES
 
 VERBAL_GRADIENT_KEY = "verbal_gradient"
 VERBAL_GRADIENT_VERSION = 1
@@ -161,6 +161,8 @@ def score_delta_vs_best_parent(candidate: Candidate, parents: list[Candidate]) -
     ]
     if child_score is None or not parent_scores:
         return None
+    if candidate.score_name in MAXIMIZED_SCORE_NAMES:
+        return child_score - max(parent_scores)
     return child_score - min(parent_scores)
 
 

@@ -18,23 +18,25 @@ def build_tsp_evolution_prompt(
     meta = STRATEGIES_METADATA[strategy_enum]
     candidates_context = render_tsp_candidates(parents)
 
+    blocks = [
+        f"PARENTS:\n{candidates_context}"
+    ]
     if feedback_context:
-        blocks = [
-            "VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.",
+        blocks.extend([
+            "VERBAL GRADIENT: follow the reflection below as the primary source of change.",
             "Use the supplied parents as supporting evidence only.",
             feedback_context,
             "Distance is the search objective for TSP; lower distance is better.",
-        ]
+        ])
     else:
-        blocks = [
+        blocks.extend([
             f"STRATEGY: {strategy}",
             f"GOAL: {meta['description']}",
             "Use the provided parent(s) as the primary source of design changes.",
             "Distance is the search objective for TSP; lower distance is better.",
-        ]
+        ])
 
     blocks.extend([
-        f"PARENTS:\n{candidates_context}",
         TSP_SOLVER_CONTRACT.strip(),
         TSP_INTERNAL_CHECKLIST.strip(),
         TSP_RESPONSE_FORMAT.strip(),

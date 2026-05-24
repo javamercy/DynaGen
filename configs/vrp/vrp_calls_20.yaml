@@ -26,14 +26,14 @@ evolution:
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 2
     temperature: 0.2
-  archive:
+  history:
     enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
     parent_sample_probability: 0.35
-    s3_archive_parent_min: 1
-    final_selection_uses_archive: true
+    s3_history_parent_min: 1
+    final_selection_uses_history: true
     deduplicate_code: true
     diversity_weight: 0.25
     recency_weight: 0.05

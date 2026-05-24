@@ -3,7 +3,7 @@ import random
 from dataclasses import dataclass
 
 from dynagen.candidates import CandidateStatus
-from dynagen.candidates.candidate import Candidate
+from dynagen.candidates.candidate import Candidate, MAXIMIZED_SCORE_NAMES
 
 _HARD_STATUS_ORDER = {
     CandidateStatus.VALID: 0,
@@ -102,7 +102,7 @@ def _sort_key(candidate: Candidate, context: _SelectionContext | None = None) ->
         context = _selection_context([candidate])
     hard_status_rank = _HARD_STATUS_ORDER.get(candidate.status, 1)
     status_badness = _STATUS_BADNESS.get(candidate.status, 1.5)
-    score = _finite_or_inf(candidate.score_value)
+    score = _ranking_score(candidate)
     score_band = _score_band(score, context)
     worst_group = _normalize(_worst_group_badness(candidate), context.worst_group_min, context.worst_group_max)
     timeout_fraction = _metric_float(candidate, "timeout_fraction", default=0.0)
@@ -128,7 +128,7 @@ def _sort_key(candidate: Candidate, context: _SelectionContext | None = None) ->
 
 
 def _selection_context(candidates: list[Candidate]) -> _SelectionContext:
-    scores = [_finite_or_inf(candidate.score_value) for candidate in candidates]
+    scores = [_ranking_score(candidate) for candidate in candidates]
     finite_scores = [score for score in scores if _is_finite(score)]
     best_score = min(finite_scores) if finite_scores else float("inf")
     worst_score = max(finite_scores) if finite_scores else best_score
@@ -165,7 +165,10 @@ def _worst_group_badness(candidate: Candidate) -> float:
         final_error = _finite_or_none(metrics.get("worst_final_error"))
         if final_error is not None:
             return final_error
-        return _finite_or_inf(candidate.score_value)
+        score = _finite_or_none(candidate.score_value)
+        if score is not None:
+            return 1.0 - max(0.0, min(1.0, score))
+        return float("inf")
 
     group_values: list[float] = []
     for key in (
@@ -224,12 +227,12 @@ def _novelty_features(candidate: Candidate) -> set[str]:
         f"status:{candidate.status}",
         f"code_hash:{hashlib.sha256(_normalized_code(candidate.code).encode('utf-8')).hexdigest()}",
     }
-    archive = metrics.get("archive")
-    if isinstance(archive, dict):
-        primary_bucket = archive.get("primary_bucket")
+    history = metrics.get("history")
+    if isinstance(history, dict):
+        primary_bucket = history.get("primary_bucket")
         if primary_bucket:
-            features.add(f"archive:{primary_bucket}")
-        for bucket in archive.get("buckets") or []:
+            features.add(f"history:{primary_bucket}")
+        for bucket in history.get("buckets") or []:
             features.add(f"bucket:{bucket}")
     text = str(candidate.code or "").lower()
     for marker in (
@@ -323,6 +326,17 @@ def _finite_or_none(value: object) -> float | None:
 def _finite_or_inf(value: object) -> float:
     number = _finite_or_none(value)
     return number if number is not None else float("inf")
+
+
+def _ranking_score(candidate: Candidate) -> float:
+    score = _finite_or_none(candidate.score_value)
+    if score is None:
+        return float("inf")
+    return -score if _higher_is_better(candidate) else score
+
+
+def _higher_is_better(candidate: Candidate) -> bool:
+    return candidate.score_name in MAXIMIZED_SCORE_NAMES
 
 
 def _is_finite(value: float) -> bool:

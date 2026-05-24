@@ -6,7 +6,7 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.verbal_gradient import best_numeric_group, metric_float
 
 
-def build_dvrp_archive_profile(candidate: Candidate) -> dict[str, Any]:
+def build_dvrp_history_profile(candidate: Candidate) -> dict[str, Any]:
     metrics = candidate.metrics or {}
     mean_gap = metric_float(metrics, "penalized_mean_gap")
     if mean_gap is None:

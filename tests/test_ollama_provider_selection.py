@@ -8,7 +8,7 @@ from dynagen.config import RunConfig, load_config
 
 class OllamaProviderSelectionTests(unittest.TestCase):
     def test_load_config_preserves_ollama_model_suffix(self) -> None:
-        config = load_config(Path("configs/tsp/tsp_calls_20.yaml"))
+        config = load_config(Path("configs/tsp/tsp.yaml"))
 
         self.assertEqual(config.llm.provider, "deepseek")
         self.assertEqual(config.llm.model, "deepseek-v4-flash")

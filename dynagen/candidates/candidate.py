@@ -4,6 +4,8 @@ from enum import StrEnum
 from typing import Any
 
 MINIMIZED_SCORE_NAMES = {"distance", "ttt"}
+MAXIMIZED_SCORE_NAMES = {"mean_aocc"}
+NAMED_SCORE_NAMES = MINIMIZED_SCORE_NAMES | MAXIMIZED_SCORE_NAMES
 
 
 class CandidateStatus(StrEnum):
@@ -37,9 +39,9 @@ class Candidate:
         self.generation = int(self.generation)
         self.parents = list(self.parents)
         self.status = CandidateStatus(self.status)
-        if self._uses_distance():
+        score_name = self._configured_score_name()
+        if score_name in MINIMIZED_SCORE_NAMES:
             if self.distance is None:
-                score_name = self.score_name
                 self.distance = _first_float_or_none(
                     self.metrics.get(score_name),
                     self.metrics.get("ttt"),
@@ -47,21 +49,28 @@ class Candidate:
                     self.fitness,
                 )
             self.fitness = None
+        elif score_name in MAXIMIZED_SCORE_NAMES:
+            if isinstance(self.metrics, dict):
+                self.metrics.setdefault("score_name", score_name)
+            self.distance = None
+            self.fitness = None
 
     @property
     def score_name(self) -> str:
-        return self._minimized_score_name() if self._uses_distance() else "fitness"
+        return self._configured_score_name() or "fitness"
 
     @property
     def score_value(self) -> float | None:
-        if self._uses_distance():
-            score_name = self.score_name
+        score_name = self.score_name
+        if score_name in MINIMIZED_SCORE_NAMES:
             return _first_float_or_none(
                 self.metrics.get(score_name),
                 self.distance,
                 self.metrics.get("ttt"),
                 self.metrics.get("distance"),
             )
+        if score_name in MAXIMIZED_SCORE_NAMES:
+            return _first_float_or_none(self.metrics.get(score_name))
         return _float_or_none(self.fitness)
 
     def to_dict(self, *, include_code: bool = True) -> dict[str, Any]:
@@ -80,7 +89,7 @@ class Candidate:
             "created_at": self.created_at,
         }
 
-        if self._uses_distance():
+        if self.score_name != "fitness":
             data[self.score_name] = self.score_value
         else:
             data["fitness"] = self.fitness
@@ -90,29 +99,28 @@ class Candidate:
         return data
 
     def _uses_distance(self) -> bool:
-        if self.distance is not None:
-            return True
-        if not isinstance(self.metrics, dict):
-            return False
-        score_name = self.metrics.get("score_name")
-        return (
-            self.metrics.get("problem") == "tsp"
-            or self.metrics.get("problem") == "dvrp"
-            or score_name in MINIMIZED_SCORE_NAMES
-            or "distance" in self.metrics
-            or "ttt" in self.metrics
-        )
+        return self.score_name in MINIMIZED_SCORE_NAMES
 
-    def _minimized_score_name(self) -> str:
-        if isinstance(self.metrics, dict) and self.metrics.get("problem") == "dvrp":
+    def _configured_score_name(self) -> str | None:
+        if not isinstance(self.metrics, dict):
+            return "distance" if self.distance is not None else None
+        score_name = self.metrics.get("score_name")
+        if score_name in NAMED_SCORE_NAMES:
+            return str(score_name)
+        problem = self.metrics.get("problem")
+        if problem == "bbob":
+            return "mean_aocc"
+        if problem == "dvrp":
             return "ttt"
-        if isinstance(self.metrics, dict):
-            score_name = self.metrics.get("score_name")
-            if score_name in MINIMIZED_SCORE_NAMES:
-                return str(score_name)
-            if "ttt" in self.metrics:
-                return "ttt"
-        return "distance"
+        if problem in {"tsp", "vrp"}:
+            return "distance"
+        if "ttt" in self.metrics:
+            return "ttt"
+        if "distance" in self.metrics or self.distance is not None:
+            return "distance"
+        if "mean_aocc" in self.metrics:
+            return "mean_aocc"
+        return None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], *, code: str | None = None) -> "Candidate":
@@ -128,6 +136,15 @@ class Candidate:
             metrics.setdefault("score_name", "ttt")
             metrics.setdefault("ttt", ttt)
             candidate_dict["metrics"] = metrics
+
+        mean_aocc = candidate_dict.pop("mean_aocc", None)
+        if mean_aocc is not None:
+            metrics = dict(candidate_dict.get("metrics") or {})
+            metrics.setdefault("problem", "bbob")
+            metrics.setdefault("score_name", "mean_aocc")
+            metrics.setdefault("mean_aocc", mean_aocc)
+            candidate_dict["metrics"] = metrics
+            candidate_dict["fitness"] = None
 
         if code is not None:
             candidate_dict["code"] = code

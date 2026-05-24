@@ -33,7 +33,7 @@ def compare_bbob_candidate(
         evaluated_names.add(baseline_name)
 
     algorithms = _evaluate_algorithms_parallel(evaluator, tasks)
-    algorithms.sort(key=lambda item: (item["fitness"] is None, float("inf") if item["fitness"] is None else item["fitness"]))
+    algorithms.sort(key=lambda item: (item["mean_aocc"] is None, -_score_or_zero(item["mean_aocc"])))
     return {
         "problem": "bbob",
         "settings": {
@@ -90,14 +90,14 @@ def build_bbob_comparison_report(comparison: dict[str, Any]) -> str:
         "",
         "## Results",
         "",
-        "| Rank | Algorithm | Kind | Status | Fitness | Mean AOCC | Mean Final Error | Valid Runs |",
-        "|---:|---|---|---|---:|---:|---:|---:|",
+        "| Rank | Algorithm | Kind | Status | Mean AOCC | Mean Final Error | Valid Runs |",
+        "|---:|---|---|---|---:|---:|---:|",
     ]
     for rank, algorithm in enumerate(comparison.get("algorithms", []), start=1):
         metrics = algorithm.get("metrics", {})
         lines.append(
             f"| {rank} | {algorithm.get('name')} | {algorithm.get('kind')} | {algorithm.get('status')} | "
-            f"{_fmt(algorithm.get('fitness'))} | {_fmt(metrics.get('mean_aocc'))} | "
+            f"{_fmt(algorithm.get('mean_aocc'))} | "
             f"{_fmt(metrics.get('mean_final_error'))} | {metrics.get('valid_count')} / {metrics.get('runs')} |"
         )
     return "\n".join(lines) + "\n"
@@ -113,10 +113,17 @@ def _evaluate_algorithm(evaluator: CandidateEvaluator, name: str, kind: str, cod
         "name": name,
         "kind": kind,
         "status": result.status,
-        "fitness": result.fitness,
+        "mean_aocc": result.score,
         "error_details": result.error_feedback,
         "metrics": result.metrics,
     }
+
+
+def _score_or_zero(value: object) -> float:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _fmt(value: object) -> str:

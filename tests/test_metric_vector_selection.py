@@ -53,22 +53,32 @@ class MetricVectorSelectionTests(unittest.TestCase):
     def test_timeout_candidate_with_materially_better_score_can_survive_for_any_problem(self) -> None:
         for problem in ("tsp", "bbob", "dvrp", "vrp"):
             with self.subTest(problem=problem):
+                timeout_score = 0.9 if problem == "bbob" else 100.0
+                valid_score = 0.4 if problem == "bbob" else 130.0
                 timeout_but_strong = _problem_candidate(
                     "cand_timeout",
                     problem=problem,
-                    score=100.0,
+                    score=timeout_score,
                     status=CandidateStatus.TIMEOUT,
                 )
                 valid_but_weak = _problem_candidate(
                     "cand_valid",
                     problem=problem,
-                    score=130.0,
+                    score=valid_score,
                     status=CandidateStatus.VALID,
                 )
 
                 survivors = select_survivors([valid_but_weak, timeout_but_strong], 1)
 
                 self.assertEqual(survivors[0].id, "cand_timeout")
+
+    def test_bbob_higher_mean_aocc_is_better(self) -> None:
+        weak = _problem_candidate("cand_weak", problem="bbob", score=0.25, status=CandidateStatus.VALID)
+        strong = _problem_candidate("cand_strong", problem="bbob", score=0.85, status=CandidateStatus.VALID)
+
+        survivors = select_survivors([weak, strong], 1)
+
+        self.assertEqual(survivors[0].id, "cand_strong")
 
     def test_equal_scores_keep_novel_candidate_over_duplicate(self) -> None:
         duplicate_a = _tsp_candidate(
@@ -181,18 +191,19 @@ def _problem_candidate(
         name="bbob_optimizer",
         thought="",
         code="class Optimizer:\n    pass",
-        fitness=score,
         status=status,
         metrics={
             "problem": "bbob",
-            "score_name": "fitness",
+            "score_name": "mean_aocc",
+            "mean_aocc": score,
+            "penalized_mean_aocc": score,
             "runs": 4,
             "valid_count": valid_count,
             "timeout_fraction": timeout_fraction,
             "mean_runtime": 1.0,
-            "mean_final_error": score,
-            "worst_final_error": score,
-            "aocc_by_group": {"separable": 0.5, "multimodal": 0.5},
+            "mean_final_error": 1.0 - score,
+            "worst_final_error": 1.0 - score,
+            "aocc_by_group": {"separable": score, "multimodal": score},
         },
     )
 

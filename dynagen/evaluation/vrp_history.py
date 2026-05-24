@@ -6,24 +6,26 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.verbal_gradient import best_numeric_group, metric_float
 
 
-def build_tsp_archive_profile(candidate: Candidate) -> dict[str, Any]:
+def build_vrp_history_profile(candidate: Candidate) -> dict[str, Any]:
     metrics = candidate.metrics or {}
-    mean_gap = metric_float(metrics, "mean_gap")
-    mean_tour_length = metric_float(metrics, "mean_tour_length")
+    mean_gap = metric_float(metrics, "penalized_mean_gap")
+    if mean_gap is None:
+        mean_gap = metric_float(metrics, "mean_gap")
+    mean_distance = metric_float(metrics, "mean_max_route_distance")
     distance = metric_float(metrics, "distance")
-    score_value = mean_gap if mean_gap is not None else mean_tour_length if mean_tour_length is not None else distance
-    gap_scale = 25.0 if mean_gap is not None else 1000.0
-    quality_score = _lower_score(score_value, scale=gap_scale)
+    score_value = mean_gap if mean_gap is not None else mean_distance if mean_distance is not None else distance
+    scale = 25.0 if mean_gap is not None else 10.0
+    quality_score = _lower_score(score_value, scale=scale)
     runtime_score = _lower_score(metric_float(metrics, "mean_runtime"), scale=1.0)
     timeout_fraction = metric_float(metrics, "timeout_fraction") or 0.0
     valid_ratio = _ratio(metrics.get("valid_count"), metrics.get("runs"))
     worst_gap = metric_float(metrics, "worst_gap")
     worst_score = _lower_score(worst_gap, scale=50.0) if worst_gap is not None else quality_score
     robustness_score = _clamp(
-        0.45 * worst_score
-        + 0.30 * (1.0 - _clamp(timeout_fraction))
-        + 0.15 * valid_ratio
-        + 0.10 * runtime_score
+        0.40 * worst_score
+        + 0.25 * (1.0 - _clamp(timeout_fraction))
+        + 0.20 * valid_ratio
+        + 0.15 * runtime_score
     )
 
     buckets = ["global"]
@@ -32,33 +34,36 @@ def build_tsp_archive_profile(candidate: Candidate) -> dict[str, Any]:
     size_scores = _numeric_group(metrics.get("score_by_instance_size"))
     best_size = best_numeric_group(size_scores, higher_is_better=False)
     for size, value in size_scores.items():
-        bucket = f"tsp:size:{size}"
+        bucket = f"vrp:size:{size}"
         buckets.append(bucket)
-        bucket_scores[bucket] = _lower_score(value, scale=gap_scale)
+        bucket_scores[bucket] = _lower_score(value, scale=scale)
+
+    truck_scores = _numeric_group(metrics.get("score_by_truck_count"))
+    for truck_count, value in truck_scores.items():
+        bucket = f"vrp:trucks:{truck_count}"
+        buckets.append(bucket)
+        bucket_scores[bucket] = _lower_score(value, scale=scale)
 
     source_scores = _numeric_group(metrics.get("score_by_instance_source"))
     for source, value in source_scores.items():
-        bucket = f"tsp:source:{_bucket_token(source)}"
+        bucket = f"vrp:source:{_bucket_token(source)}"
         buckets.append(bucket)
-        bucket_scores[bucket] = _lower_score(value, scale=gap_scale)
+        bucket_scores[bucket] = _lower_score(value, scale=scale)
 
     if runtime_score >= 0.5:
-        buckets.append("tsp:runtime:fast")
-        bucket_scores["tsp:runtime:fast"] = runtime_score
+        buckets.append("vrp:runtime:fast")
+        bucket_scores["vrp:runtime:fast"] = runtime_score
     if timeout_fraction <= 0.0:
-        buckets.append("tsp:runtime:robust")
-        bucket_scores["tsp:runtime:robust"] = robustness_score
-    if worst_gap is not None:
-        buckets.append("tsp:gap:worst_case")
-        bucket_scores["tsp:gap:worst_case"] = worst_score
+        buckets.append("vrp:runtime:robust")
+        bucket_scores["vrp:runtime:robust"] = robustness_score
 
-    mechanisms = _tsp_mechanisms(candidate.code)
+    mechanisms = _vrp_mechanisms(candidate.code)
     for mechanism in mechanisms:
-        bucket = f"tsp:mechanism:{mechanism}"
+        bucket = f"vrp:mechanism:{mechanism}"
         buckets.append(bucket)
         bucket_scores[bucket] = _clamp(0.5 * quality_score + 0.5 * robustness_score)
 
-    primary_bucket = f"tsp:size:{best_size[0]}" if best_size else "global"
+    primary_bucket = f"vrp:size:{best_size[0]}" if best_size else "global"
     if not mechanisms and primary_bucket == "global":
         mechanisms = ["unknown"]
 
@@ -77,20 +82,26 @@ def build_tsp_archive_profile(candidate: Candidate) -> dict[str, Any]:
     }
 
 
-def _tsp_mechanisms(code: str) -> list[str]:
+def _vrp_mechanisms(code: str) -> list[str]:
     text = str(code or "").lower()
     mechanisms: list[str] = []
-    if "nearest" in text or "best_d" in text or "argmin" in text:
-        mechanisms.append("nearest_neighbor")
-    if "2-opt" in text or "two_opt" in text or "reversed(" in text or ".reverse(" in text:
+    if "nearest" in text or "argmin" in text or "distance" in text:
+        mechanisms.append("nearest")
+    if "sweep" in text or "angle" in text or "polar" in text:
+        mechanisms.append("sweep")
+    if "cluster" in text or "kmeans" in text or "sector" in text:
+        mechanisms.append("cluster_first")
+    if "savings" in text or "clarke" in text or "wright" in text:
+        mechanisms.append("savings")
+    if "two_opt" in text or "2-opt" in text or "reversed(" in text:
         mechanisms.append("two_opt")
-    if "insert" in text or "cheapest" in text:
-        mechanisms.append("insertion")
-    if "restart" in text or "shuffle" in text or "rng.randrange" in text:
-        mechanisms.append("random_restart")
-    if "candidate" in text or "nearest_k" in text or "neighbors" in text:
-        mechanisms.append("candidate_list")
-    return mechanisms[:5]
+    if "relocate" in text or "exchange" in text or "swap" in text:
+        mechanisms.append("route_repair")
+    if "restart" in text or "shuffle" in text or "population" in text:
+        mechanisms.append("restart_search")
+    if "balance" in text or "max_route" in text or "route_load" in text:
+        mechanisms.append("fleet_balance")
+    return mechanisms[:7]
 
 
 def _numeric_group(value: object) -> dict[str, float]:
@@ -107,8 +118,10 @@ def _numeric_group(value: object) -> dict[str, float]:
 def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
     keys = [
         "distance",
-        "mean_tour_length",
         "mean_gap",
+        "penalized_mean_gap",
+        "mean_max_route_distance",
+        "mean_total_route_distance",
         "median_gap",
         "worst_gap",
         "best_gap",
@@ -117,6 +130,7 @@ def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
         "runs",
         "mean_runtime",
         "score_by_instance_size",
+        "score_by_truck_count",
         "score_by_instance_source",
     ]
     return {key: metrics.get(key) for key in keys if key in metrics}
@@ -151,4 +165,3 @@ def _float(value: object) -> float | None:
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, float(value)))
-

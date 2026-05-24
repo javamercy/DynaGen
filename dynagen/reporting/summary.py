@@ -9,7 +9,7 @@ def generation_summary(
         population: list[Candidate],
         offspring: list[Candidate],
         *,
-        archive_summary: dict | None = None,
+        history_summary: dict | None = None,
 ) -> dict:
     best = select_survivors(population, 1)[0] if population else None
     valid_offspring = sum(1 for candidate in offspring if candidate.status == CandidateStatus.VALID)
@@ -23,8 +23,8 @@ def generation_summary(
     }
     if best is not None:
         summary[f"best_{best.score_name}"] = best.score_value
-    if archive_summary is not None:
-        summary["archive"] = archive_summary
+    if history_summary is not None:
+        summary["history"] = history_summary
     return summary
 
 
@@ -71,7 +71,7 @@ def build_final_report(
                     "",
                     f"- Problem: BBOB",
                     f"- Status: {test_result.status}",
-                    f"- Test fitness: {test_result.score}",
+                    f"- Test mean AOCC: {test_result.score}",
                     f"- Problem instances evaluated: {instances_evaluated}",
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
@@ -185,20 +185,20 @@ def build_final_report(
                 f"- LLM reflections: {verbal_gradients.get('llm_count')}",
                 f"- LLM reflection errors: {verbal_gradients.get('llm_error_count')}",
             ])
-        archive = llm_calls.get("archive")
-        if isinstance(archive, dict):
+        history = llm_calls.get("history")
+        if isinstance(history, dict):
             lines.extend([
                 "",
-                "## Archive",
+                "## History",
                 "",
-                f"- Archive enabled: {archive.get('enabled')}",
-                f"- Archive size: {archive.get('size')} / {archive.get('max_size')}",
-                f"- Archive buckets: {archive.get('bucket_count')}",
-                f"- Added candidates: {archive.get('added_count')}",
-                f"- Duplicate rejections: {archive.get('rejected_duplicate_count')}",
-                f"- Archive parent selections: {archive.get('parent_selections_from_archive')}",
-                f"- Offspring with archive parent: {archive.get('offspring_with_archive_parent')}",
-                f"- Final selection from archive: {bool(archive.get('final_selection_from_archive'))}",
+                f"- History enabled: {history.get('enabled')}",
+                f"- History size: {history.get('size')} / {history.get('max_size')}",
+                f"- History buckets: {history.get('bucket_count')}",
+                f"- Added candidates: {history.get('added_count')}",
+                f"- Duplicate rejections: {history.get('rejected_duplicate_count')}",
+                f"- History parent selections: {history.get('parent_selections_from_history')}",
+                f"- History offspring with history parent: {history.get('offspring_with_history_parent')}",
+                f"- Final selection from history: {bool(history.get('final_selection_from_history'))}",
             ])
     return "\n".join(lines) + "\n"
 
@@ -222,4 +222,6 @@ def _score_title(score_name: str) -> str:
         return "Distance"
     if score_name == "ttt":
         return "TTT"
+    if score_name == "mean_aocc":
+        return "Mean AOCC"
     return "Fitness"

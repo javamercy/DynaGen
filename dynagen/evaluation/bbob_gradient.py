@@ -10,7 +10,7 @@ def build_bbob_llm_verbal_gradient_prompt(
 ) -> list[dict[str, str]]:
     return build_llm_gradient_messages(
         problem="bbob",
-        goal="maximize AOCC, equivalently minimize DynaGen fitness, under strict objective-evaluation budgets",
+        goal="maximize mean AOCC under strict objective-evaluation budgets",
         focus=(
             "step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, "
             "local refinement, bound handling, and budget accounting"
