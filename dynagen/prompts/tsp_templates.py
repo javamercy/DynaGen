@@ -2,25 +2,26 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.archive import format_archive_parent_context
 
 TSP_SOLVER_CONTRACT = """
-Implement exactly this interface:
+Implement this function only:
 
 def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
 
-Rules:
-- Distance is the search objective for TSP; lower distance is better.
-- Return a 1D tour with each node exactly once; do not repeat the start node.
-- Handle all n; for n <= 2 return the trivial valid tour.
-- Always return a valid tour, even with tiny budget.
-- Use only distance_matrix; do not assume coordinates or hard-code instances.
-- Use seed for randomness and budget as a hard cap on search effort.
-- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.
-- Do not read/write files, use network, spawn subprocesses, or call external solvers.
-- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
-- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
 """
 
 TSP_INTERNAL_CHECKLIST = """
-Internal check before final JSON: correct signature, valid tour on every return path,
+correct signature, valid tour on every return path,
 early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
 """
 
@@ -28,17 +29,19 @@ TSP_RESPONSE_FORMAT = """
 Return one JSON object and nothing else:
 
 {
-  "name": "short snake_case_or_title name",
-  "thought": "brief public summary of the idea, seed use, and budget use",
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
   "code": "complete Python code as a JSON string"
 }
-
 No Markdown, fences, or text outside JSON. The code string must define solve_tsp.
 """
 
 
-def tsp_system_prompt(role: str) -> str:
-    return f"You are {role}. Generate compact TSP solver code that follows the contract."
+def tsp_system_prompt() -> str:
+    return """
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    """
 
 
 def render_tsp_candidates(candidates: list[Candidate]) -> str:
@@ -70,4 +73,4 @@ def _render_tsp_candidate(candidate: Candidate) -> str:
         candidate.code,
         "```",
     ])
-    return "\n".join(parts)
+    return "\n\n".join(parts)
