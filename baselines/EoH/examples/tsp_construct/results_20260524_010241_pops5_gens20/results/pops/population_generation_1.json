@@ -1,0 +1,32 @@
+[
+    {
+        "algorithm": "New algorithm uses nearest neighbor heuristic, selecting the closest unvisited node from the current node.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    return unvisited_nodes[np.argmin(distance_matrix[current_node][unvisited_nodes])]",
+        "objective": 20.58484,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Select the next node that minimizes the sum of the distance from the current node and the standard deviation of the distances from the candidate to all other unvisited nodes and the destination.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    best_score = np.inf\n    best_node = unvisited_nodes[0]\n    for u in unvisited_nodes:\n        d_current = distance_matrix[current_node, u]\n        others = unvisited_nodes[unvisited_nodes != u]\n        if len(others) > 0:\n            dists = distance_matrix[u, others]\n        else:\n            dists = np.array([])\n        dist_to_dest = distance_matrix[u, destination_node]\n        all_dists = np.append(dists, dist_to_dest)\n        if len(all_dists) > 1:\n            std_dev = np.std(all_dists)\n        else:\n            std_dev = 0.0\n        score = d_current + std_dev\n        if score < best_score:\n            best_score = score\n            best_node = u\n    return best_node",
+        "objective": 20.6848,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node by minimizing the sum of the distance from current node to candidate multiplied by the number of remaining unvisited nodes and the distance from candidate to destination, to balance immediate proximity and future connectivity.",
+        "code": "import numpy as np\n\ndef select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    dist_current = distance_matrix[current_node, unvisited_nodes]\n    dist_to_dest = distance_matrix[unvisited_nodes, destination_node]\n    scores = dist_current * len(unvisited_nodes) + dist_to_dest\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 20.69913,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The new algorithm selects the next node by minimizing a weighted sum of the distance from the current node and the distance to the destination, with the weight on the destination distance proportional to the fraction of unvisited nodes, thus encouraging visiting nearby nodes early and far nodes later.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    n_total = distance_matrix.shape[0]\n    n_unvisited = len(unvisited_nodes)\n    if n_unvisited == 0:\n        return destination_node\n    alpha = n_unvisited / n_total\n    scores = distance_matrix[current_node, unvisited_nodes] + alpha * distance_matrix[unvisited_nodes, destination_node]\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 20.77599,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Weighted regret nearest neighbor with parameter alpha=0.3: at each step, select the unvisited node that minimizes dist_from_current + alpha * regret, where regret is the difference between the nearest and second nearest distances to other unvisited nodes (excluding the destination).",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    alpha = 0.3\n    best_score = np.inf\n    best_node = unvisited_nodes[0]\n    \n    for candidate in unvisited_nodes:\n        dist_from_current = distance_matrix[current_node, candidate]\n        \n        # distances from candidate to other unvisited nodes (excluding destination)\n        others = unvisited_nodes[unvisited_nodes != candidate]\n        if len(others) > 0:\n            dists_to_others = distance_matrix[candidate, others]\n        else:\n            dists_to_others = np.array([], dtype=float)\n        \n        # compute regret only from other unvisited nodes (no destination)\n        if len(dists_to_others) >= 2:\n            sorted_dists = np.sort(dists_to_others)\n            best = sorted_dists[0]\n            second_best = sorted_dists[1]\n        elif len(dists_to_others) == 1:\n            best = dists_to_others[0]\n            second_best = best  # regret = 0\n        else:\n            best = 0\n            second_best = 0\n        \n        regret = second_best - best\n        score = dist_from_current + alpha * regret\n        \n        if score < best_score:\n            best_score = score\n            best_node = candidate\n    \n    return best_node",
+        "objective": 21.48797,
+        "other_inf": null
+    }
+]

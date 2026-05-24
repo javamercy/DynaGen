@@ -1,0 +1,7 @@
+{
+    "sample_order": 500,
+    "operator": "m2",
+    "algorithm": "New algorithm: Select next node that minimizes the ratio of the distance from the current node to the candidate over the product of the square root of the distance from the candidate to the destination and the candidate's average distance to other unvisited nodes.",
+    "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    n_remaining = len(unvisited_nodes)\n    if n_remaining == 1:\n        return unvisited_nodes[0]\n\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n\n    sum_dist = np.array([\n        np.sum(distance_matrix[u, unvisited_nodes[unvisited_nodes != u]])\n        for u in unvisited_nodes\n    ])\n    avg_dist = sum_dist / (n_remaining - 1)\n\n    # Use square root of destination distance as exponent parameter\n    product = np.sqrt(dist_dest) * avg_dist\n    product = np.where(product == 0, np.inf, product)\n\n    scores = dist_curr / product\n    return unvisited_nodes[np.argmin(scores)]",
+    "objective": 19.47111
+}

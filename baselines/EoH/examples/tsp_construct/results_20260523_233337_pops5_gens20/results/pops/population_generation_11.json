@@ -1,0 +1,32 @@
+[
+    {
+        "algorithm": "The algorithm selects the next node by minimizing a linear combination of distance to current node and negative distance to destination, specifically score = dist_curr - 0.5 * dist_dest, favoring nodes that are close to current and far from destination.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n    scores = dist_curr - 0.5 * dist_dest\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 19.23315,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node by minimizing the ratio of the distance from the current node to the distance to the destination node, thereby favoring nodes that are close to the current and far from the destination.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    n_remaining = len(unvisited_nodes)\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n    epsilon = 1e-12\n    scores = dist_curr / (dist_dest + epsilon)\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 20.12723,
+        "other_inf": null
+    },
+    {
+        "algorithm": " The algorithm selects the next node by minimizing the square of the distance from the current node divided by the cube of the distance to the destination, thereby placing more emphasis on avoiding nodes far from the destination. ",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n    epsilon = 1e-12\n    scores = (dist_curr ** 2) / (dist_dest ** 3 + epsilon)\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 20.1373,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The new algorithm selects the next node by minimizing the ratio of the distance from the current node to the squared distance to the destination node, adding a small constant to avoid division by zero.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n    epsilon = 1e-12\n    scores = dist_curr / (dist_dest ** 2 + epsilon)\n    return unvisited_nodes[np.argmin(scores)]",
+        "objective": 20.22033,
+        "other_inf": null
+    },
+    {
+        "algorithm": "The algorithm selects the next node by maximizing the ratio of the distance to the destination to the distance from the current node, thus favoring nodes far from the current and close to the destination.",
+        "code": "def select_next_node(current_node: int, destination_node: int, unvisited_nodes: np.ndarray, distance_matrix: np.ndarray) -> int:\n    \"\"\"Select the next node to visit in a TSP greedy construction.\n\n    Args:\n        current_node: ID of the current node\n        destination_node: ID of the destination (return) node\n        unvisited_nodes: array of unvisited node IDs\n        distance_matrix: pairwise distance matrix between all nodes\n    Returns:\n        next_node: ID of the next node to visit\n    \"\"\"\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n    dist_dest = distance_matrix[unvisited_nodes, destination_node]\n    epsilon = 1e-12\n    scores = dist_dest / (dist_curr + epsilon)\n    return unvisited_nodes[np.argmax(scores)]",
+        "objective": 20.25043,
+        "other_inf": null
+    }
+]
