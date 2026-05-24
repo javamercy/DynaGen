@@ -4,25 +4,50 @@
 # - A task prompt that describes the problem to be solved.
 # - An LLM instance that will generate the code based on the task prompt.
 
+import contextlib
 import os
 import pickle
+import sys
 import textwrap
 from datetime import datetime
 
 import numpy as np
 from ioh import get_problem, logger
+from joblib import Parallel, delayed
 
 from llamea import LLaMEA
 from llamea.llm import DeepSeek_LLM
 from llamea.utils import prepare_namespace, clean_local_namespace
 from misc import OverBudgetException, aoc_logger, correct_aoc
 
+
+def _evaluate_single_run(code, algorithm_name, dim, budget, fid, iid, rep, is_train):
+    """Worker: re-exec the generated code in a fresh namespace and run one (fid, iid, rep)."""
+    global_ns, _ = prepare_namespace(code, allowed=["numpy"])
+    local_ns = {}
+    exec(code, global_ns, local_ns)
+    local_ns = clean_local_namespace(local_ns, global_ns)
+
+    l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
+    problem = get_problem(fid, iid, dim)
+    problem.attach_logger(l2)
+
+    np.random.seed(rep)
+    try:
+        algorithm = local_ns[algorithm_name](budget=budget, dim=dim)
+        algorithm(problem)
+    except OverBudgetException:
+        pass
+
+    return correct_aoc(problem, l2, budget), is_train
+
+
 if __name__ == "__main__":
     # Execution code starts here
     api_key = os.getenv("DEEPSEEK_API_KEY")
     ai_model = "deepseek-v4-flash"
     llm = DeepSeek_LLM(api_key, model=ai_model)
-    n_gens = 5
+    n_gens = 100
     experiment_name = f"bbob-{n_gens}_gens"
 
 
@@ -45,53 +70,31 @@ if __name__ == "__main__":
             solution.set_scores(float("-inf"), feedback, e)
             return solution
 
-        train_aucs = []
-        test_aucs = []
-
-        algorithm = None
+        tasks = []
         for dim in [5]:
             budget = 2000 * dim
-            l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
-            for fid in np.arange(1, 25):
-                # Train instances (used for LLM feedback)
+            for fid in range(1, 25):
                 for iid in [1, 2, 3]:
-                    problem = get_problem(fid, iid, dim)
-                    problem.attach_logger(l2)
-
                     for rep in range(3):
-                        np.random.seed(rep)
-                        try:
-                            algorithm = local_ns[algorithm_name](
-                                budget=budget, dim=dim
-                            )
-                            algorithm(problem)
-                        except OverBudgetException:
-                            pass
-
-                        auc = correct_aoc(problem, l2, budget)
-                        train_aucs.append(auc)
-                        l2.reset(problem)
-                        problem.reset()
-
-                # Test instances (held-out evaluation)
+                        tasks.append((dim, budget, fid, iid, rep, True))
                 for iid in [4, 5]:
-                    problem = get_problem(fid, iid, dim)
-                    problem.attach_logger(l2)
-
                     for rep in range(3):
-                        np.random.seed(rep)
-                        try:
-                            algorithm = local_ns[algorithm_name](
-                                budget=budget, dim=dim
-                            )
-                            algorithm(problem)
-                        except OverBudgetException:
-                            pass
+                        tasks.append((dim, budget, fid, iid, rep, False))
 
-                        auc = correct_aoc(problem, l2, budget)
-                        test_aucs.append(auc)
-                        l2.reset(problem)
-                        problem.reset()
+        # Cap workers at OS logical CPU count so we don't oversubscribe.
+        n_jobs = min(os.cpu_count() or 1, len(tasks))
+        # LLaMEA wraps this call in `redirect_stdout(None)`, which breaks loky's
+        # worker spawn (it calls sys.stdout.flush()). Temporarily restore stdout.
+        with contextlib.redirect_stdout(sys.__stdout__):
+            results = Parallel(n_jobs=n_jobs, backend="loky")(
+                delayed(_evaluate_single_run)(
+                    code, algorithm_name, dim, budget, fid, iid, rep, is_train
+                )
+                for (dim, budget, fid, iid, rep, is_train) in tasks
+            )
+
+        train_aucs = [auc for auc, is_train in results if is_train]
+        test_aucs = [auc for auc, is_train in results if not is_train]
 
         train_auc_mean = np.mean(train_aucs)
         train_auc_std = np.std(train_aucs)
@@ -100,7 +103,7 @@ if __name__ == "__main__":
 
         feedback = f"The algorithm {algorithm_name} got an average AOCC score of {train_auc_mean:0.4f} (train) / {test_auc_mean:0.4f} (test)."
 
-        print(algorithm_name, algorithm, train_auc_mean, test_auc_mean)
+        print(algorithm_name, train_auc_mean, test_auc_mean)
         solution.add_metadata("train_aucs", train_aucs)
         solution.add_metadata("test_aucs", test_aucs)
         solution.add_metadata("train_fitness", train_auc_mean)
@@ -129,6 +132,6 @@ if __name__ == "__main__":
             elitism=True,
             HPO=False,
             budget=n_gens,
-            eval_timeout=180
+            eval_timeout=600
         )
         print(es.run())
