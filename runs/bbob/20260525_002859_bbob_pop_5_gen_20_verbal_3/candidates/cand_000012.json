@@ -1,0 +1,58 @@
+{
+  "created_at": "2026-05-24T21:31:10.198684+00:00",
+  "error_details": "Import not allowed: array",
+  "generation": 2,
+  "id": "cand_000012",
+  "mean_aocc": 0.0,
+  "metrics": {
+    "aocc_by_function": {},
+    "aocc_by_group": {},
+    "aocc_lower_bound": 1e-08,
+    "aocc_upper_bound": 100.0,
+    "best_aocc": null,
+    "best_final_error": null,
+    "budget": 10000,
+    "final_error_by_function": {},
+    "history": {
+      "in_history": false,
+      "rejected_reason": "status"
+    },
+    "invalid_count": 0,
+    "mean_aocc": 0.0,
+    "mean_evaluations": null,
+    "mean_final_error": null,
+    "mean_runtime": null,
+    "median_aocc": null,
+    "median_final_error": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_aocc": null,
+    "pool": "search_instances",
+    "problem": "bbob",
+    "records": [],
+    "runs": 0,
+    "runtime_error_count": 0,
+    "score_name": "mean_aocc",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_fraction": 0.0,
+    "timeout_mean_aocc": null,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "unscored_timeout_count": 0,
+    "valid_count": 0,
+    "worst_aocc": null,
+    "worst_final_error": null
+  },
+  "name": "multi_start_adaptive_search",
+  "parents": [
+    "cand_000003"
+  ],
+  "prompt": "[system]\n\n        You generate robust, compact Python optimizers for continuous black-box minimization.\n        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.\n        Follow the requested interface exactly.\n        \n\n[user]\nPARENTS:\nCandidate cand_000003: restarted_adaptive_random_search\nStatus: valid; mean AOCC score: 0.189544 (higher is better)\nThought: An adaptive random search that maintains a radius around the current best point. Candidates are sampled from a normal distribution scaled by the radius and clipped to bounds. The radius expands after improvements and contracts after failures. If no improvement for a number of iterations proportional to dimension, a restart occurs by sampling a fresh random point and resetting the radius. The random generator is seeded for reproducibility.\nMean AOCC: 0.18954352153573661\nMean final error: 121.71780682230542\nAOCC by group: {'high_conditioning_unimodal': 0.10372796674362263, 'low_moderate_conditioning': 0.17023668966683916, 'multimodal_strong_global_structure': 0.18302367297576805, 'multimodal_weak_global_structure': 0.1872669772309248, 'separable': 0.29960093468774895}\nHistory source: yes\nHistory bucket: bbob:group:separable\nHistory role: regime specialist\nCode:\n```python\nimport numpy as np\nimport math\n\nclass Optimizer:\n    def __init__(self, budget: int, dim: int, seed: int):\n        self.budget = budget\n        self.dim = dim\n        self.rng = np.random.RandomState(seed)\n        self.best_value = None\n        self.best_x = None\n\n    def __call__(self, func):\n        lb = np.array(func.bounds.lb, dtype=float)\n        ub = np.array(func.bounds.ub, dtype=float)\n        dim = self.dim\n        budget = self.budget\n        rng = self.rng\n\n        # Initial point\n        x0 = lb + rng.rand(dim) * (ub - lb)\n        f0 = func(x0)\n        self.best_value = f0\n        self.best_x = x0.copy()\n        best_value = f0\n        best_x = x0.copy()\n        # Call report_best initially (should be fine)\n        # report_best(best_value, best_x)  # uncomment if environment provides it\n\n        # Adaptive radius\n        radius = (ub - lb).mean() / 5.0\n        # Stagnation counter\n        stagnation = 0\n        max_stagnation = max(10, 2 * dim)\n        evaluations = 1\n\n        while evaluations < budget:\n            # Check if restart is needed\n            if stagnation >= max_stagnation:\n                # Restart: sample new random point\n                x = lb + rng.rand(dim) * (ub - lb)\n                radius = (ub - lb).mean() / 5.0\n                stagnation = 0\n            else:\n                # Generate candidate around best_x\n                x = best_x + radius * rng.randn(dim)\n                x = np.clip(x, lb, ub)\n\n            if evaluations >= budget:\n                break\n            f = func(x)\n            evaluations += 1\n\n            if f < best_value:\n                best_value = f\n                best_x = x.copy()\n                radius *= 1.2  # increase radius\n                stagnation = 0\n                # report_best(best_value, best_x)\n            else:\n                radius *= 0.8  # decrease radius\n                stagnation += 1\n\n            # Ensure radius doesn't become too small\n            radius = max(radius, 1e-10 * (ub - lb).mean())\n\n        return best_value, best_x\n```\n\nDynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.\n\nSTRATEGY: m6_diversify_search\n\nGOAL: Create a more exploration-focused version of one parent. Improve how it generates diverse candidates, escapes stagnation, varies search trajectories, uses restarts or perturbations, or avoids premature convergence while respecting the contract.\n\nUse the provided parent(s) as the primary source of design changes.\n\nImplement a complete continuous black-box optimizer with exactly this interface:\n\nclass Optimizer:\n    def __init__(self, budget: int, dim: int, seed: int):\n        ...\n\n    def __call__(self, func):\n        ...\n\nFunctional rules:\n- func(x) evaluates one NumPy-compatible point x with shape (dim,).\n- The objective is minimization.\n- The search bounds are available as func.bounds.lb and func.bounds.ub.\n- Return the best observed objective value and its point as (best_value, best_x).\n- Never call func more than self.budget times.\n- Use self.dim and the bounds; do not assume a fixed dimension.\n- seed must control stochastic behavior when randomness is used.\n- Keep all candidate points inside the bounds, using clipping or bounded sampling.\n- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.\n- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.\n\nTimeout and reporting rules:\n- A global helper report_best(value, x) is available.\n- Call report_best(best_value, best_x) whenever you improve the incumbent.\n- report_best does not replace returning (best_value, best_x).\n\nBefore producing the final response, internally verify the candidate:\n\n1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).\n2. The optimizer evaluates at least one feasible point before any expensive logic.\n3. Every func call is counted or guarded so total calls never exceed self.budget.\n4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.\n5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.\n6. seed controls stochastic behavior if randomness is used.\n7. Only allowed imports are used.\n8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.\n9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.\n\nReturn exactly one JSON object and nothing else.\n\nSchema:\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nStrict formatting rules:\n- Do not use Markdown.\n- Do not include ``` fences.\n- Do not include comments outside the JSON.\n- The code field must be a valid JSON string.\n- Escape newlines in code as \\n.\n- Escape inner double quotes as needed.\n- The code must define class Optimizer with the required methods.",
+  "raw_response": "",
+  "status": "invalid",
+  "strategy": "m6_diversify_search",
+  "thought": "Multi-start adaptive random search with independent walkers. Each walker maintains its own adaptive step size and restarts upon stagnation to maintain diversity. The best across all walkers is returned. Seed controls initial points and perturbations."
+}

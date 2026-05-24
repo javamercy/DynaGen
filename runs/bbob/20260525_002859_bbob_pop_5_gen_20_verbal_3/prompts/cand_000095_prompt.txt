@@ -1,0 +1,229 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000077: adaptive_de_localized_restart_cov
+Status: valid; mean AOCC score: 0.521159 (higher is better)
+Thought: Maintains adaptive mutation strategy (current-to-best/1 vs rand/1) and exponential smoothing from the parent, but replaces isotropic Gaussian restart with a covariance-adapted restart. On stagnation, the new population is sampled from a multivariate normal distribution centered at the current best point, with covariance estimated from the best 1/3 of the current population, scaled inversely with dimension (factor 0.2/dim * (ub-lb)). This focuses exploration on promising directions while reducing spread in high dimensions. The algorithm starts with random uniform initialization, uses one-to-one greedy selection, and respects the budget. Seed controls all randomness.
+Mean AOCC: 0.5211593568142647
+Mean final error: 0.8356387429219958
+AOCC by group: {'high_conditioning_unimodal': 0.6754173987857968, 'low_moderate_conditioning': 0.7463425198764378, 'multimodal_strong_global_structure': 0.3118198864427938, 'multimodal_weak_global_structure': 0.2807916989879769, 'separable': 0.636461912590753}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.best_value = None
+        self.best_x = None
+
+    def __call__(self, func):
+        rng = np.random.RandomState(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        evals = 0
+        popsize = min(budget, max(10, 5*dim))
+        pop = lb + (ub - lb) * rng.rand(popsize, dim)
+        pop_fitness = np.zeros(popsize)
+        for i in range(popsize):
+            pop_fitness[i] = func(pop[i])
+            evals += 1
+            if evals == 1 or pop_fitness[i] < self.best_value:
+                self.best_value = pop_fitness[i]
+                self.best_x = pop[i].copy()
+                report_best(self.best_value, self.best_x)
+        if evals >= budget:
+            return self.best_value, self.best_x
+
+        F1 = 0.8
+        F2 = 0.9
+        CR = 0.9
+        stagnation_counter = 0
+        max_stagnation = max(5, int(budget / (3 * popsize)))
+
+        smoothed_success = np.array([0.5, 0.5])
+        beta = 0.1
+        epsilon = 1e-6
+
+        while evals < budget:
+            improved_this_gen = False
+            num_improved = np.zeros(2, dtype=int)
+            num_attempts = np.zeros(2, dtype=int)
+
+            for i in range(popsize):
+                p = smoothed_success[0] / (smoothed_success[0] + smoothed_success[1] + epsilon)
+                if rng.rand() < p:
+                    strategy = 0
+                    candidates = list(range(popsize))
+                    candidates.remove(i)
+                    rng.shuffle(candidates)
+                    r1, r2 = candidates[0], candidates[1]
+                    mutant = pop[i] + F1 * (self.best_x - pop[i]) + F1 * (pop[r1] - pop[r2])
+                else:
+                    strategy = 1
+                    candidates = list(range(popsize))
+                    candidates.remove(i)
+                    rng.shuffle(candidates)
+                    r1, r2, r3 = candidates[0], candidates[1], candidates[2]
+                    mutant = pop[r1] + F2 * (pop[r2] - pop[r3])
+
+                trial = np.copy(pop[i])
+                j_rand = rng.randint(dim)
+                for j in range(dim):
+                    if rng.rand() < CR or j == j_rand:
+                        trial[j] = mutant[j]
+                trial = np.clip(trial, lb, ub)
+                trial_fitness = func(trial)
+                evals += 1
+                num_attempts[strategy] += 1
+                if trial_fitness <= pop_fitness[i]:
+                    pop_fitness[i] = trial_fitness
+                    pop[i] = trial
+                    num_improved[strategy] += 1
+                    if trial_fitness < self.best_value:
+                        self.best_value = trial_fitness
+                        self.best_x = trial.copy()
+                        report_best(self.best_value, self.best_x)
+                        improved_this_gen = True
+                if evals >= budget:
+                    break
+
+            if evals >= budget:
+                break
+
+            for s in range(2):
+                if num_attempts[s] > 0:
+                    current_rate = num_improved[s] / num_attempts[s]
+                    smoothed_success[s] = (1 - beta) * smoothed_success[s] + beta * current_rate
+            smoothed_success = np.maximum(smoothed_success, epsilon)
+
+            if improved_this_gen:
+                stagnation_counter = 0
+            else:
+                stagnation_counter += 1
+
+            if stagnation_counter >= max_stagnation and evals + popsize - 1 <= budget:
+                # Covariance-adapted restart
+                # Select best 1/3 individuals (excluding the best point itself)
+                n_best = max(2, int(popsize / 3))
+                sorted_indices = np.argsort(pop_fitness)
+                best_indices = sorted_indices[:n_best]
+                # If best point is not already included, include it (but we ensure the best_x is always best)
+                if self.best_x not in pop[best_indices]:
+                    # Actually, best_x might not be in pop if it was never replaced? best_x is always a point that has been evaluated, but it could be outside pop after restart? After restart, we set pop[0] to best_x, so it's there. So it's fine.
+                    pass
+                best_pop = pop[best_indices]
+                mean_best = np.mean(best_pop, axis=0)
+                if len(best_pop) >= 2:
+                    cov = np.cov(best_pop, rowvar=False)
+                else:
+                    cov = np.eye(dim) * 1e-6
+                # Regularize if needed
+                try:
+                    L = np.linalg.cholesky(cov)
+                except np.linalg.LinAlgError:
+                    cov += np.eye(dim) * 1e-6
+                    L = np.linalg.cholesky(cov)
+                # Scale inversely with dimension
+                scale = 0.2 / dim * (ub - lb)
+                new_pop = np.zeros((popsize, dim))
+                new_fitness = np.zeros(popsize)
+                # First point is the current best (already evaluated)
+                new_pop[0] = self.best_x
+                new_fitness[0] = self.best_value
+                for i in range(1, popsize):
+                    sample = self.best_x + scale * (L @ rng.randn(dim))
+                    sample = np.clip(sample, lb, ub)
+                    new_pop[i] = sample
+                    new_fitness[i] = func(sample)
+                    evals += 1
+                    if new_fitness[i] < self.best_value:
+                        self.best_value = new_fitness[i]
+                        self.best_x = new_pop[i].copy()
+                        report_best(self.best_value, self.best_x)
+                pop = new_pop
+                pop_fitness = new_fitness
+                stagnation_counter = 0
+                smoothed_success[:] = 0.5
+                if evals >= budget:
+                    break
+
+        return self.best_value, self.best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m2_parameter_schedule_mutation
+
+GOAL: Create a variant of one parent by changing its parameters, thresholds, rates, limits, or scheduling rules. Prefer meaningful adaptive or budget-aware schedules over arbitrary constant changes, while keeping the parent algorithm's structure.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

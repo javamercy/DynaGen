@@ -1,0 +1,125 @@
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        rng = self.rng
+        lb = np.asarray(func.bounds.lb)
+        ub = np.asarray(func.bounds.ub)
+        # Initial point
+        x0 = rng.uniform(lb, ub, size=dim)
+        best_x = x0.copy()
+        best_value = func(best_x)
+        evals = 1
+        report_best(best_value, best_x)
+        # CMA-ES parameters
+        lam = 4 + int(2 * np.log(dim))
+        lam = max(2, min(lam, budget - evals))
+        mu = lam // 2
+        mu_neg = lam - mu  # for active update
+        w = np.log(mu + 0.5) - np.log(np.arange(1, mu+1))
+        w = w / w.sum()
+        mueff = 1.0 / np.sum(w**2)
+        cc = 4.0 / (dim + 4.0)
+        cs = (mueff + 2.0) / (dim + mueff + 5.0)
+        damps = 1.0 + 2.0 * max(0.0, np.sqrt((mueff - 1.0) / (dim + 1.0)) - 1.0) + cs
+        ccov = 2.0 / ((dim + 1.3)**1.5)
+        ccov_neg = 0.5 * ccov
+        # Initialize mean and step-size
+        m = best_x.copy()
+        sigma = (ub - lb).mean() / 6.0
+        # Covariance matrix (full)
+        C = np.eye(dim)
+        # Evolution paths
+        p_c = np.zeros(dim)
+        p_s = np.zeros(dim)
+        # Restart parameters
+        no_improve_evals = 0
+        restart_threshold = int(0.3 * budget)
+        restart_count = 0
+        restart_sigma = (ub - lb).mean() / 3.0
+        while evals < budget:
+            if no_improve_evals >= restart_threshold:
+                # Restart with mix of best and random
+                mix = 0.5 + 0.5 * np.exp(-restart_count)
+                m = (1 - mix) * best_x + mix * rng.uniform(lb, ub, size=dim)
+                sigma = restart_sigma
+                restart_sigma *= 0.9
+                C = np.eye(dim)
+                p_c = np.zeros(dim)
+                p_s = np.zeros(dim)
+                no_improve_evals = 0
+                restart_count += 1
+            lam_gen = min(lam, budget - evals)
+            if lam_gen < 2:
+                break
+            # Cholesky decomposition
+            try:
+                B = np.linalg.cholesky(C)
+            except np.linalg.LinAlgError:
+                C = np.eye(dim) + 1e-10 * np.eye(dim)
+                B = np.linalg.cholesky(C)
+            # Sample population
+            pop = np.zeros((lam_gen, dim))
+            for i in range(lam_gen):
+                z = rng.randn(dim)
+                pop[i] = m + sigma * B @ z
+            np.clip(pop, lb, ub, out=pop)
+            # Evaluate
+            vals = np.array([func(p) for p in pop])
+            evals += lam_gen
+            # Update incumbent
+            for i in range(lam_gen):
+                if vals[i] < best_value:
+                    best_value = vals[i]
+                    best_x = pop[i].copy()
+                    no_improve_evals = 0
+                    report_best(best_value, best_x)
+                else:
+                    no_improve_evals += 1
+            # Sort
+            idx = np.argsort(vals)
+            # Rank-mixture weights for active update
+            w_positive = w.copy()
+            w_neg = np.ones(mu_neg) / mu_neg  # equal negative weights
+            w_combined = np.concatenate((w_positive, -w_neg))
+            # All individuals indexed by order
+            all_idx = idx[:mu] + idx[mu:lam_gen][:mu_neg]
+            # Mean update
+            x_old = m.copy()
+            m = w_positive @ pop[idx[:mu]]
+            # Compute delta
+            delta = (m - x_old) / sigma
+            # Cumulation for rank-one update
+            p_c = (1 - cc) * p_c + np.sqrt(cc * (2 - cc) * mueff) * delta
+            # Step-size control
+            inv_sqrt_C = np.linalg.solve(B, np.eye(dim)).T  # B^{-T}
+            p_s = (1 - cs) * p_s + np.sqrt(cs * (2 - cs) * mueff) * inv_sqrt_C @ delta
+            norm_p_s = np.linalg.norm(p_s)
+            sigma *= np.exp((cs / damps) * (norm_p_s / np.sqrt(dim) - 1.0))
+            sigma = max(sigma, 1e-10)
+            # Covariance matrix update
+            # Rank-one
+            C = (1 - ccov) * C + ccov * np.outer(p_c, p_c)
+            # Rank-mu positive
+            for i in range(mu):
+                diff = (pop[idx[i]] - x_old) / sigma
+                C += ccov * w_positive[i] * np.outer(diff, diff)
+            # Active update (rank-mu negative)
+            for i in range(mu_neg):
+                diff = (pop[idx[mu+i]] - x_old) / sigma
+                C += ccov_neg * w_neg[i] * np.outer(diff, diff)
+            # Enforce symmetry
+            C = (C + C.T) / 2
+            # Regularization
+            eigvals = np.linalg.eigvalsh(C)
+            if np.min(eigvals) < 1e-10:
+                C += 1e-10 * np.eye(dim)
+        return best_value, best_x

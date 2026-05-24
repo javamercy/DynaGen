@@ -1,0 +1,353 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000003: restarted_adaptive_random_search
+Status: valid; mean AOCC score: 0.096159 (higher is better)
+Thought: Adaptive random search with restart. Initializes with a random point, then samples candidates via Gaussian perturbations around best incumbent. The step size is scaled by the bounds range and adapts: it expands on improvement, shrinks on failure. After a stagnation period, restarts from a uniform random point. Uses numpy's RandomState with given seed for reproducibility.
+Mean AOCC: 0.09615897179812057
+Mean final error: 8975.230402613262
+AOCC by group: {'high_conditioning_unimodal': 0.053479895603447646, 'low_moderate_conditioning': 0.05804161685224166, 'multimodal_strong_global_structure': 0.12638406353898965, 'multimodal_weak_global_structure': 0.14795568705624185, 'separable': 0.08731012495050623}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        ranges = ub - lb
+
+        # initial random point
+        x = lb + self.rng.rand(self.dim) * ranges
+        y = func(x)
+        best_x = x.copy()
+        best_y = y
+        report_best(best_y, best_x)
+
+        calls = 1
+        center = best_x.copy()
+        sigma = 0.2  # initial fraction of range
+        max_patience = max(10, self.dim * 2)
+        patience = 0
+
+        while calls < self.budget:
+            if sigma > 0.5:
+                sigma = 0.5
+            if sigma < 1e-10:
+                sigma = 1e-10
+
+            # sample candidate
+            candidate = center + sigma * ranges * self.rng.randn(self.dim)
+            candidate = np.clip(candidate, lb, ub)
+            new_y = func(candidate)
+            calls += 1
+
+            if new_y < best_y:
+                best_y = new_y
+                best_x = candidate.copy()
+                report_best(best_y, best_x)
+                center = candidate.copy()
+                sigma *= 1.2  # expand
+                patience = 0
+            else:
+                patience += 1
+                sigma *= 0.95  # shrink
+                if patience >= max_patience:
+                    # restart
+                    x = lb + self.rng.rand(self.dim) * ranges
+                    if calls < self.budget:
+                        y = func(x)
+                        calls += 1
+                        if y < best_y:
+                            best_y = y
+                            best_x = x.copy()
+                            report_best(best_y, best_x)
+                        center = x.copy()
+                        sigma = 0.2
+                        patience = 0
+
+        return best_y, best_x
+```
+
+Candidate cand_000001: CMA_ES_Adaptive
+Status: valid; mean AOCC score: 0.479575 (higher is better)
+Thought: CMA-ES style optimizer with rank-one covariance adaptation and cumulative step-size control. Initial mean uniformly sampled within bounds, initial step size set to one-sixth of bounds range. Population size lambda=4+3*log(dim). Reports best value and point upon every improvement. Seed controls all randomness.
+Mean AOCC: 0.47957505597547073
+Mean final error: 3.119585271143418
+AOCC by group: {'high_conditioning_unimodal': 0.7536404623585895, 'low_moderate_conditioning': 0.6397664060282829, 'multimodal_strong_global_structure': 0.25089133398726704, 'multimodal_weak_global_structure': 0.20626482628335432, 'separable': 0.5793505212304224}
+History source: yes
+History bucket: bbob:group:high_conditioning_unimodal
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget, dim, seed):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        rng = self.rng
+        lb = np.asarray(func.bounds.lb)
+        ub = np.asarray(func.bounds.ub)
+        # Evaluate initial point
+        x0 = rng.uniform(lb, ub, size=dim)
+        best_x = x0.copy()
+        best_value = func(best_x)
+        evals = 1
+        report_best(best_value, best_x)
+        # CMA-ES parameters
+        lam = 4 + int(3 * np.log(dim))
+        lam = min(lam, budget - evals)
+        if lam < 2:
+            lam = 2
+        mu = lam // 2
+        # weights
+        w = np.log(mu + 0.5) - np.log(np.arange(1, mu+1))
+        w = w / w.sum()
+        mueff = 1.0 / np.sum(w**2)
+        # adaptation constants
+        cc = 4.0 / (dim + 4.0)
+        cs = (mueff + 2.0) / (dim + mueff + 5.0)
+        damps = 1.0 + 2.0 * max(0.0, np.sqrt((mueff - 1.0) / (dim + 1.0)) - 1.0) + cs
+        ccov = 2.0 / ((dim + 1.3)**2)
+        # initial state
+        m = best_x.copy()
+        sigma = (ub - lb).mean() / 6.0
+        C = np.eye(dim)
+        p_c = np.zeros(dim)
+        p_s = np.zeros(dim)
+        # main loop
+        while evals < budget:
+            lam_gen = min(lam, budget - evals)
+            if lam_gen < 2:
+                break
+            # sample
+            try:
+                L = np.linalg.cholesky(C)
+            except np.linalg.LinAlgError:
+                C = np.eye(dim)
+                L = np.eye(dim)
+            pop = np.zeros((lam_gen, dim))
+            for i in range(lam_gen):
+                z = rng.randn(dim)
+                pop[i] = m + sigma * L @ z
+            np.clip(pop, lb, ub, out=pop)
+            # evaluate
+            vals = np.array([func(p) for p in pop])
+            evals += lam_gen
+            # update best
+            for i in range(lam_gen):
+                if vals[i] < best_value:
+                    best_value = vals[i]
+                    best_x = pop[i].copy()
+                    report_best(best_value, best_x)
+            # sort
+            idx = np.argsort(vals)
+            # update mean
+            x_old = m.copy()
+            m = w @ pop[idx[:mu]]
+            delta = (m - x_old) / sigma
+            # update p_c
+            p_c = (1 - cc) * p_c + np.sqrt(cc * (2 - cc) * mueff) * delta
+            # update p_s
+            invL = np.linalg.solve(L, np.eye(dim))
+            delta_Cinv = invL @ delta
+            p_s = (1 - cs) * p_s + np.sqrt(cs * (2 - cs) * mueff) * delta_Cinv
+            # update sigma
+            norm_p_s = np.linalg.norm(p_s)
+            sigma *= np.exp((cs / damps) * (norm_p_s / np.sqrt(dim) - 1.0))
+            # update C
+            C = (1 - ccov) * C + ccov * np.outer(p_c, p_c)
+            C += 1e-10 * np.eye(dim)  # ensure positive definiteness
+        return best_value, best_x
+```
+
+Candidate cand_000005: DE_PatternSearch
+Status: valid; mean AOCC score: 0.399553 (higher is better)
+Thought: Combines Differential Evolution for global exploration with Hooke-Jeeves pattern search for local refinement. Initial population is uniform random within bounds. DE uses rand/1/bin with fixed parameters. After DE budget (approx 80%), pattern search starts from best point, exploring coordinate-wise steps with adaptive step size. Seed controls numpy random state. Budget strictly enforced via counting all func calls.
+Mean AOCC: 0.3995527432576822
+Mean final error: 2.1859780439303713
+AOCC by group: {'high_conditioning_unimodal': 0.45262176350323063, 'low_moderate_conditioning': 0.5312501910387266, 'multimodal_strong_global_structure': 0.22917490504016097, 'multimodal_weak_global_structure': 0.25687714253460703, 'separable': 0.5541792037278948}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget, dim, seed):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+    
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        calls = 0
+        best_val = np.inf
+        best_x = None
+
+        def clip(x):
+            return np.clip(x, lb, ub)
+
+        def evaluate(x):
+            nonlocal calls, best_val, best_x
+            x = clip(x)
+            val = func(x)
+            calls += 1
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            return val
+
+        # Differential Evolution
+        pop_size = max(10, min(50, dim * 5, self.budget // 10))
+        pop = lb + (ub - lb) * self.rng.rand(pop_size, dim)
+        pop_val = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            pop_val[i] = evaluate(pop[i])
+            if calls >= self.budget:
+                return best_val, best_x
+
+        F = 0.8
+        CR = 0.9
+        max_gen = (self.budget - calls) // pop_size
+        for gen in range(max_gen):
+            for i in range(pop_size):
+                if calls >= self.budget:
+                    return best_val, best_x
+                indices = list(range(pop_size))
+                indices.remove(i)
+                a, b, c = self.rng.choice(indices, 3, replace=False)
+                mutant = pop[a] + F * (pop[b] - pop[c])
+                mutant = clip(mutant)
+                trial = pop[i].copy()
+                cross_points = self.rng.rand(dim) < CR
+                if not np.any(cross_points):
+                    cross_points[self.rng.randint(dim)] = True
+                trial[cross_points] = mutant[cross_points]
+                trial = clip(trial)
+                trial_val = evaluate(trial)
+                if trial_val < pop_val[i]:
+                    pop[i] = trial
+                    pop_val[i] = trial_val
+                if calls >= self.budget:
+                    return best_val, best_x
+
+        # Pattern Search
+        step0 = (ub - lb) / 20.0
+        step_min = 1e-7 * np.max(ub - lb)
+        x0 = best_x.copy()
+        step = step0.copy()
+        while calls < self.budget:
+            improved = False
+            for d in range(dim):
+                if calls >= self.budget:
+                    break
+                x_new = x0.copy()
+                x_new[d] += step[d]
+                x_new = clip(x_new)
+                val_new = evaluate(x_new)
+                if val_new < best_val:
+                    best_val = val_new
+                    best_x = x_new.copy()
+                    x0 = x_new.copy()
+                    improved = True
+                else:
+                    x_new = x0.copy()
+                    x_new[d] -= step[d]
+                    x_new = clip(x_new)
+                    val_new = evaluate(x_new)
+                    if val_new < best_val:
+                        best_val = val_new
+                        best_x = x_new.copy()
+                        x0 = x_new.copy()
+                        improved = True
+            if not improved:
+                step = step * 0.5
+                if np.all(step < step_min):
+                    break
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e2_backbone_exploration
+
+GOAL: Identify the useful shared backbone among the provided parents, then create a new algorithm that preserves that core principle while changing the surrounding mechanism, structure, or execution strategy. The result should be motivated by the parents but clearly not a direct copy.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

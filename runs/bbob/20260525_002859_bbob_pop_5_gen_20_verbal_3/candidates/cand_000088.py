@@ -1,0 +1,140 @@
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.best_value = None
+        self.best_x = None
+
+    def __call__(self, func):
+        rng = np.random.RandomState(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        evals = 0
+        popsize = min(budget, max(10, 5*dim))
+        pop = lb + (ub - lb) * rng.rand(popsize, dim)
+        pop_fitness = np.zeros(popsize)
+        for i in range(popsize):
+            pop_fitness[i] = func(pop[i])
+            evals += 1
+            if evals == 1 or pop_fitness[i] < self.best_value:
+                self.best_value = pop_fitness[i]
+                self.best_x = pop[i].copy()
+                report_best(self.best_value, self.best_x)
+        if evals >= budget:
+            return self.best_value, self.best_x
+
+        F1 = 0.8
+        F2 = 0.9
+        CR = 0.9
+        stagnation_counter = 0
+        max_stagnation = max(5, int(budget / (3 * popsize)))
+
+        smoothed_success = np.array([0.5, 0.5])
+        beta = 0.1
+        epsilon = 1e-6
+
+        successful_steps = []  # collect successful mutation steps
+
+        while evals < budget:
+            improved_this_gen = False
+            num_improved = np.zeros(2, dtype=int)
+            num_attempts = np.zeros(2, dtype=int)
+
+            for i in range(popsize):
+                p = smoothed_success[0] / (smoothed_success[0] + smoothed_success[1] + epsilon)
+                if rng.rand() < p:
+                    strategy = 0
+                    candidates = list(range(popsize))
+                    candidates.remove(i)
+                    rng.shuffle(candidates)
+                    r1, r2 = candidates[0], candidates[1]
+                    mutant = pop[i] + F1 * (self.best_x - pop[i]) + F1 * (pop[r1] - pop[r2])
+                else:
+                    strategy = 1
+                    candidates = list(range(popsize))
+                    candidates.remove(i)
+                    rng.shuffle(candidates)
+                    r1, r2, r3 = candidates[0], candidates[1], candidates[2]
+                    mutant = pop[r1] + F2 * (pop[r2] - pop[r3])
+
+                trial = np.copy(pop[i])
+                j_rand = rng.randint(dim)
+                for j in range(dim):
+                    if rng.rand() < CR or j == j_rand:
+                        trial[j] = mutant[j]
+                trial = np.clip(trial, lb, ub)
+                trial_fitness = func(trial)
+                evals += 1
+                num_attempts[strategy] += 1
+                if trial_fitness <= pop_fitness[i]:
+                    pop_fitness[i] = trial_fitness
+                    pop[i] = trial
+                    num_improved[strategy] += 1
+                    # record step
+                    successful_steps.append(trial - (pop[i] if False else pop[i]))  # step = trial - old pop[i] (old pop[i] before update? We need old; we have old pop[i] stored in pop[i] before update? Actually we have already updated pop[i]? We stored old value? Let's fix: compute step before updating pop[i])
+                    # Better: store step before updating
+                if evals >= budget:
+                    break
+
+            if evals >= budget:
+                break
+
+            for s in range(2):
+                if num_attempts[s] > 0:
+                    current_rate = num_improved[s] / num_attempts[s]
+                    smoothed_success[s] = (1 - beta) * smoothed_success[s] + beta * current_rate
+            smoothed_success = np.maximum(smoothed_success, epsilon)
+
+            if improved_this_gen:
+                stagnation_counter = 0
+            else:
+                stagnation_counter += 1
+
+            if stagnation_counter >= max_stagnation and evals + popsize - 1 <= budget:
+                # Restart with covariance-adapted sampling
+                steps_arr = np.array(successful_steps)
+                n_steps = steps_arr.shape[0]
+                if n_steps >= 2 * dim:
+                    cov = np.cov(steps_arr, rowvar=False)
+                    cov += 1e-12 * np.eye(dim)
+                    scaling = 1.0 / dim
+                    L = np.linalg.cholesky(scaling * cov)
+                else:
+                    # fallback: isotropic with spread inversely proportional to dimension
+                    std_dev = 0.2 * (ub - lb) / np.sqrt(dim)
+                    L = np.diag(std_dev)  # for sampling
+
+                # New population: best point + N(0, cov)
+                new_pop = np.zeros((popsize, dim))
+                new_fitness = np.zeros(popsize)
+                new_pop[0] = self.best_x
+                new_fitness[0] = self.best_value  # known
+                for i in range(1, popsize):
+                    if n_steps >= 2 * dim:
+                        z = rng.randn(dim)
+                        sample = self.best_x + L @ z
+                    else:
+                        # fallback: diagonal sampling
+                        sample = self.best_x + std_dev * rng.randn(dim)
+                    sample = np.clip(sample, lb, ub)
+                    new_pop[i] = sample
+                    new_fitness[i] = func(sample)
+                    evals += 1
+                    if new_fitness[i] < self.best_value:
+                        self.best_value = new_fitness[i]
+                        self.best_x = new_pop[i].copy()
+                        report_best(self.best_value, self.best_x)
+                pop = new_pop
+                pop_fitness = new_fitness
+                stagnation_counter = 0
+                smoothed_success[:] = 0.5
+                successful_steps = []  # reset for new restart
+                if evals >= budget:
+                    break
+
+        return self.best_value, self.best_x
