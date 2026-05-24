@@ -1,0 +1,6 @@
+{
+     "algorithm": "Design a new algorithm that selects the next node based on the product of the distance between the current node and next node and the total distance left to travel, considering the current node, depot node, unvisited nodes, and distance matrix.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_product = np.inf\n    \n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            total_distance_left = distance_matrix[current_node, node] + distance_matrix[node, depot_node] + np.sum(distance_matrix[node, unvisited_nodes])\n            distance_current_next = distance_matrix[current_node, node]\n            product = distance_current_next * total_distance_left\n            \n            if product < min_product:\n                next_node = node\n                min_product = product\n    \n    return next_node",
+     "objective": 41.52623,
+     "other_inf": null
+}

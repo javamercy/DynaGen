@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm selects the next node by prioritizing customers based on a weighted combination of distance to the truck, inverse squared distance to the depot, and a dynamic density penalty that discourages visiting densely packed areas of trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    weights = []\n    for i, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        inverse_squared_distance_to_depot = 0.5 / (np.linalg.norm(customer - depot_pos) + 1)**2\n        density_penalty = 0.7 * sum([1 / (np.linalg.norm(customer - truck_pos) + 1) for truck_pos in all_truck_pos])\n\n        priority = distance + inverse_squared_distance_to_depot + density_penalty\n        weights.append((i, priority))\n\n    weights.sort(key=lambda x: x[1])\n    best_node = weights[0][0]\n    \n    return best_node",
+     "objective": 31.92642,
+     "other_inf": null
+}

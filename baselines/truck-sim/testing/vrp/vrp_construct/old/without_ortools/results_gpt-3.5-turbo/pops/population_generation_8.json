@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the node that has the shortest distance to the destination among the unvisited nodes, breaking ties randomly.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < shortest_distance:\n            shortest_distance = distance_matrix[current_node][node]\n            next_node = node\n        elif distance_matrix[current_node][node] == shortest_distance:\n            if np.random.randint(2) == 0:\n                next_node = node\n                \n    return next_node",
+          "objective": 3.25721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: At each step, select the next node by calculating the inverse of the Euclidean distance subtracted by the product of the squared distance from the current node to each unvisited node and the total distance from each unvisited node to the destination, then choose the node with the maximum value.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_value = -float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        dist_product = distance_matrix[current_node][node] * distance_matrix[node][destination_node]\n        value = 1 / euclidean_distance - dist_product\n        if value > max_value:\n            max_value = value\n            next_node = node\n    \n    return next_node",
+          "objective": 3.28498,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: At each step, select the next node by taking the average of the Euclidean distance and the square root of the distance from the current node to each unvisited node, and choose the node with the minimum average.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_avg = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        sum_sqrt_dist = np.sqrt(distance_matrix[current_node][node]) + np.sqrt(distance_matrix[node][destination_node])\n        avg_dist = (euclidean_distance + sum_sqrt_dist) / 2\n        if avg_dist < min_avg:\n            min_avg = avg_dist\n            next_node = node\n    \n    return next_node",
+          "objective": 3.30721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: At each step, select the next node by calculating the sum of the Euclidean distance and the square root of the distance from the current node to each unvisited node, and choose the node with the minimum sum.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_sum = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        sqrt_dist = np.sqrt(distance_matrix[current_node][node]) * np.sqrt(distance_matrix[node][destination_node])\n        sum_dist = euclidean_distance + sqrt_dist\n        if sum_dist < min_sum:\n            min_sum = sum_dist\n            next_node = node\n    \n    return next_node",
+          "objective": 3.32966,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the node with the maximum difference between Euclidean distance and Manhattan distance from the current node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_difference = -float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        manhattan_distance = np.sum(np.abs(distance_matrix[current_node] - distance_matrix[node]))\n        difference = euclidean_distance - manhattan_distance\n        \n        if difference > max_difference:\n            max_difference = difference\n            next_node = node\n            \n    return next_node",
+          "objective": 3.34432,
+          "other_inf": null
+     }
+]

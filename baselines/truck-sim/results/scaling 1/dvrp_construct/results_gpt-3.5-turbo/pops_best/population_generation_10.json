@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm will prioritize visiting customers based on a combination of the Euclidean distance from the current truck position to the customer and the ratio of unvisited customers to the total number of customers, while also considering the distance from the customer to the average position of all other trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur_truck_pos = np.array(cur_truck_pos)\n    depot_pos = np.array(depot_pos)\n    all_truck_pos = [np.array(pos) for pos in all_truck_pos]\n    \n    avg_truck_pos = np.mean(all_truck_pos, axis=0)\n    \n    min_distance = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.linalg.norm(cur_truck_pos - customer_pos) - np.linalg.norm(customer_pos - avg_truck_pos) + 0.1 * len(unvisited_customers) + len(unvisited_customers) / len(unvisited_customers + all_truck_pos)\n        \n        if total_distance < min_distance:\n            min_distance = total_distance\n            best_node = i\n    \n    return best_node",
+     "objective": 32.28174,
+     "other_inf": null
+}

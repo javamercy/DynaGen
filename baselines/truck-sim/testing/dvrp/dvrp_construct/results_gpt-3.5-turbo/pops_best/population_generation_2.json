@@ -1,0 +1,6 @@
+{
+     "algorithm": "\n    Your novel algorithm should first calculate the distances between the current truck position and all unvisited customers, then prioritize visiting the customer that minimizes the combined waiting time and travel time for the current truck while considering the positions of other trucks in the fleet.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_combined_time = np.inf\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos)\n        wait_time = 0\n        \n        for other_truck_pos in all_truck_pos:\n            if other_truck_pos is not cur_truck_pos:\n                other_travel_time = np.linalg.norm(other_truck_pos - customer_pos)\n                if other_travel_time < travel_time:\n                    wait_time = max(wait_time, travel_time - other_travel_time)\n        \n        combined_time = travel_time + wait_time\n        \n        if combined_time < min_combined_time:\n            min_combined_time = combined_time\n            best_node = i\n    \n    return best_node",
+     "objective": 43.87845,
+     "other_inf": null
+}

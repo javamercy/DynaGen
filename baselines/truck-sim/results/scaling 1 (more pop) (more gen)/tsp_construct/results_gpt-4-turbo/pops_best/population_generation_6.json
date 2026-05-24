@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm selects the next node based on angular deviation from the vector pointing towards the destination node, preferring nodes that align more closely with the straight path to the final destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Establish vectors\n    vectors_to_unvisited = np.array([np.arctan2(distance_matrix[current_node, node], distance_matrix[destination_node, node])\n                                     for node in unvisited_nodes])\n    destination_vector = np.zeros_like(vectors_to_unvisited)\n    \n    # Calculate angular deviation from the destination vector, minimal angle deviation preferred\n    angle_deviations = np.abs(vectors_to_unvisited - destination_vector)\n    \n    # Select the node with minimal angular deviation\n    min_deviation_index = np.argmin(angle_deviations)\n    next_node = unvisited_nodes[min_deviation_index]\n    \n    return next_node",
+     "objective": 9.9253,
+     "other_inf": null
+}

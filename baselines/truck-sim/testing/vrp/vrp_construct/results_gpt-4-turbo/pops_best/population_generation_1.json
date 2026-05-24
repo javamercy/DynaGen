@@ -1,0 +1,6 @@
+{
+     "algorithm": "The \"Dynamic Priority Queue Selection (DPQS)\" algorithm computes a score for each unvisited node primarily based on the differences between current distance and potential future savings by assessing a combined score influenced by surrounding truck movements, which discourages repeated visits to nodes already frequented and aims to minimize overall tour length.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    # Initialize scores\n    scores = np.zeros(len(unvisited_nodes))\n    \n    # Calculate scores for each unvisited node\n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node, node]\n        distance_from_node_to_depot = distance_matrix[node, depot_node]\n        truck_congestion = np.sum(truck_nodes == node)\n\n        # Adjusting the scores with different parameters\n        score = (2.0 * distance_to_node) + (1.5 * truck_congestion) - (0.5 * distance_from_node_to_depot)\n        scores[i] = score\n    \n    # The node with the lowest score is the next node to visit\n    next_node = unvisited_nodes[np.argmin(scores)]\n    \n    return next_node",
+     "objective": 39.98632,
+     "other_inf": null
+}

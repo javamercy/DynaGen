@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node by considering the shortest distance from the current node, the number of times each node has been visited, and the distance to the depot, adjusted by a factor of 0.3 and 0.7 respectively.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        score = (dist_to_node + 0.3 / (len(truck_nodes) + 1)) + 0.7 / (dist_to_depot + 1)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+     "objective": 27.92262,
+     "other_inf": null
+}

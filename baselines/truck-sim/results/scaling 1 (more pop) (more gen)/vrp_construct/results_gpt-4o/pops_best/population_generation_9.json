@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm optimizes the route by selecting the node based on a balance of shortest distance to the unvisited nodes and a congestion penalty, where the penalty is calculated using an inverse exponential function of nearby trucks\u2019 proximity, with preference towards nodes having lower congestion values.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \"\"\"\n    {The algorithm optimizes the route by selecting the node based on a balance of shortest distance to the unvisited nodes and a congestion penalty, where the penalty is calculated using an inverse exponential function of nearby trucks\u2019 proximity, with preference towards nodes having lower congestion values.}\n    \"\"\"\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    min_score = np.inf\n    next_node = depot_node\n    \n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        congestion_penalty = np.mean([np.exp(-distance_matrix[truck, node]) for truck in truck_nodes])\n        \n        score = distance_to_node + congestion_penalty\n\n        if score < min_score:\n            min_score = score\n            next_node = node\n\n    return next_node",
+     "objective": 18.51767,
+     "other_inf": null
+}

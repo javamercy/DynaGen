@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direct distances from the current node to each unvisited node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n\n    # Determine the potential trajectory inefficiency by measuring the deviation from direct path to destination node\n    deviation_score = np.abs(distance_matrix[unvisited_nodes, destination_node] - (direct_distances + distance_matrix[current_node, destination_node]))\n\n    # Combine direct distances and deviation scores, prioritizing shorter paths that align well towards destination\n    deviation_factor = 1.5\n    combined_scores = direct_distances + deviation_factor * deviation_score\n\n    # Choose the unvisited node with the lowest combined score\n    next_node_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+     "objective": 6.09359,
+     "other_inf": null
+}

@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "The new algorithm selects the next node by prioritizing customers based on a weighted combination of distance to the truck, inverse squared distance to the depot, and a dynamic density penalty that discourages visiting densely packed areas of trucks.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    weights = []\n    for i, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        inverse_squared_distance_to_depot = 0.5 / (np.linalg.norm(customer - depot_pos) + 1)**2\n        density_penalty = 0.7 * sum([1 / (np.linalg.norm(customer - truck_pos) + 1) for truck_pos in all_truck_pos])\n\n        priority = distance + inverse_squared_distance_to_depot + density_penalty\n        weights.append((i, priority))\n\n    weights.sort(key=lambda x: x[1])\n    best_node = weights[0][0]\n    \n    return best_node",
+          "objective": 31.92642,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm selects the next customer based on a dynamic reward function that combines a distance-to-customer factor, depot proximity bonus, and cluster dispersion encouragement to ensure efficient yet diverse route planning.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    rewards = []\n    for i, customer in enumerate(unvisited_customers):\n        \n        distance = np.linalg.norm(cur_truck_pos - customer)\n        depot_proximity_bonus = 0.2 * np.linalg.norm(customer - depot_pos)\n        dispersion_factor = -0.3 * sum([1 / (np.linalg.norm(customer - truck_pos) + 1) for truck_pos in all_truck_pos])\n\n        reward_score = 1 / (distance + 1) + depot_proximity_bonus + dispersion_factor\n        rewards.append((i, reward_score))\n\n    rewards.sort(key=lambda x: x[1], reverse=True)\n    best_node = rewards[0][0]\n    \n    return best_node",
+          "objective": 33.52,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This algorithm leverages a strategic blend of distance-based urgency with a local competitive advantage factor, emphasizing the uniqueness of each truck's position relative to both customers and other trucks.",
+          "code": "import numpy as np\n\n# {This algorithm leverages a strategic blend of distance-based urgency with a local competitive advantage factor, emphasizing the uniqueness of each truck's position relative to both customers and other trucks.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    competitive_advantage = []\n    \n    for i, customer in enumerate(unvisited_customers):\n        customer_distance = np.linalg.norm(cur_truck_pos - customer)\n        depot_distance = np.linalg.norm(depot_pos - customer)\n        unique_truck_factor = 0.7 / (1 + sum([np.linalg.norm(truck_pos - customer) for truck_pos in all_truck_pos if not np.array_equal(truck_pos, cur_truck_pos)]))\n        urgency_score = 0.3 * (customer_distance / (depot_distance + 1))\n        \n        combined_score = urgency_score + unique_truck_factor\n        competitive_advantage.append((i, combined_score))\n    \n    competitive_advantage.sort(key=lambda x: x[1])\n    best_node = competitive_advantage[0][0]\n    \n    return best_node",
+          "objective": 34.65901,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm uses a multi-faceted approach that prioritizes customers based on a balance of proximity, inverse depot distance, customer cluster density, and a dynamic time window cost that encourages the truck to visit newly added customers earlier.",
+          "code": "import numpy as np\n\n# {The new algorithm uses a multi-faceted approach that prioritizes customers based on a balance of proximity, inverse depot distance, customer cluster density, and a dynamic time window cost that encourages the truck to visit newly added customers earlier.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    priorities = []\n    \n    for i, customer in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(cur_truck_pos - customer)\n        inverse_depot_distance = 0.4 / (np.linalg.norm(customer - depot_pos) + 1)**2\n        density_factor = 0.6 * sum([1 / (np.linalg.norm(customer - truck_pos) + 1) for truck_pos in all_truck_pos])\n        time_window_cost = (np.linalg.norm(customer - depot_pos) / (distance_to_customer + 1)) * 0.5\n\n        priority = distance_to_customer + inverse_depot_distance + density_factor + time_window_cost\n        priorities.append((i, priority))\n\n    priorities.sort(key=lambda x: x[1])\n    best_node = priorities[0][0]\n\n    return best_node",
+          "objective": 34.89571,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm calculates a composite score for each unvisited customer by incorporating penalties for proximity to other trucks and prioritizes customers based not only on their distance but also on the number of trucks already nearby, favoring those with fewer nearby trucks to facilitate better distribution across the fleet.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    scores = []\n\n    for i, customer in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer)\n        nearby_trucks = sum([1 for truck_pos in all_truck_pos if np.linalg.norm(truck_pos - customer) < travel_time])\n        \n        proximity_penalty = nearby_trucks\n        travel_priority = travel_time * (1 + proximity_penalty)\n        \n        score = travel_priority\n        scores.append((i, score))\n    \n    scores.sort(key=lambda x: x[1])\n    best_node = scores[0][0]\n    \n    return best_node",
+          "objective": 35.0186,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    urgency_scores = []\n    \n    for i, customer in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer)\n        queue_size = len([truck_pos for truck_pos in all_truck_pos if np.array_equal(truck_pos, customer)])\n        \n        modified_demand_spike = min(1, np.linalg.norm(depot_pos - customer) / (travel_time + 1))\n        \n        urgency_score = 1.5 * travel_time + queue_size - modified_demand_spike\n        urgency_scores.append((i, urgency_score))\n    \n    urgency_scores.sort(key=lambda x: x[1])\n    best_node = urgency_scores[0][0]\n    \n    return best_node",
+          "objective": 35.21638,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm introduces a dynamic weight system where each unvisited customer is scored based on a combination of their distance, the number of nearby trucks, and their urgency which increases over time to encourage visiting customers that have been waiting longer.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    scores = []\n\n    for i, customer in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer)\n        nearby_trucks = sum([1 for truck_pos in all_truck_pos if np.linalg.norm(truck_pos - customer) < travel_time])\n        \n        time_waited = np.linalg.norm(depot_pos - customer)\n        urgency_factor = 1 + (0.1 * time_waited)\n\n        proximity_penalty = nearby_trucks\n        weighted_priority = (travel_time * (1 + proximity_penalty)) * urgency_factor\n        \n        score = weighted_priority\n        scores.append((i, score))\n    \n    scores.sort(key=lambda x: x[1])\n    best_node = scores[0][0]\n    \n    return best_node",
+          "objective": 35.27172,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm prioritizes customer visits based on a dynamic urgency score that incorporates a weighted sum of distance, the time delay from the depot, and a crowding factor penalizing densely visited regions, encouraging trucks to spread out and balance exploration with efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    weights = []\n    for i, customer in enumerate(unvisited_customers):\n        \n        distance = np.linalg.norm(cur_truck_pos - customer)\n        delay_factor = 0.1 * np.linalg.norm(customer - depot_pos)\n        crowding_penalty = 0.4 * sum([1 / (np.linalg.norm(customer - truck_pos) + 1) for truck_pos in all_truck_pos])\n\n        urgency_score = distance + delay_factor + crowding_penalty\n        weights.append((i, urgency_score))\n\n    weights.sort(key=lambda x: x[1])\n    best_node = weights[0][0]\n    \n    return best_node",
+          "objective": 36.11137,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by prioritizing customers based on a weighted combination of exponential distance to the truck, inverse linear distance to the depot, and a dynamic isolation reward that encourages visiting less densely packed areas of trucks.",
+          "code": "import numpy as np\n\n# {The new algorithm selects the next node by prioritizing customers based on a weighted combination of exponential distance to the truck, inverse linear distance to the depot, and a dynamic isolation reward that encourages visiting less densely packed areas of trucks.}\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    weights = []\n    for i, customer in enumerate(unvisited_customers):\n        distance = np.exp(np.linalg.norm(cur_truck_pos - customer))\n        inverse_linear_distance_to_depot = 0.5 / (np.linalg.norm(customer - depot_pos) + 1)\n        isolation_reward = 0.5 * sum([np.linalg.norm(customer - truck_pos) for truck_pos in all_truck_pos])\n\n        priority = distance + inverse_linear_distance_to_depot - isolation_reward\n        weights.append((i, priority))\n\n    weights.sort(key=lambda x: x[1])\n    best_node = weights[0][0]\n\n    return best_node",
+          "objective": 36.31423,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by combining a normalized time-to-customer metric with a penalty based on how many trucks are currently closer to the customer, prioritizing minimizing overlaps and maximizing distribution.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    def distance(point1, point2):\n        return np.linalg.norm(point1 - point2)\n    \n    num_customers = len(unvisited_customers)\n    if num_customers == 0:\n        return None\n    \n    best_node = None\n    min_priority_score = float('inf')\n    \n    for i, customer in enumerate(unvisited_customers):\n        customer_distance = distance(cur_truck_pos, customer)\n        depot_distance = distance(customer, depot_pos)\n        time_to_customer = customer_distance / (customer_distance + depot_distance)\n        closer_trucks_count = sum(distance(truck_pos, customer) < customer_distance for truck_pos in all_truck_pos)\n        penalty = 0.5 * closer_trucks_count\n        priority_score = 0.6 * time_to_customer + penalty\n        \n        if priority_score < min_priority_score:\n            min_priority_score = priority_score\n            best_node = i\n\n    return best_node",
+          "objective": 36.6649,
+          "other_inf": null
+     }
+]

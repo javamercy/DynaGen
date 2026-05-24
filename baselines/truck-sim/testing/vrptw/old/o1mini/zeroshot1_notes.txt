@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/koitu/git/truck-sim/prompts/vrptw/testing.py", line 11, in <module>
+    output = vrptw(**sample['input'])
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/koitu/git/truck-sim/prompts/vrptw/o1mini/zeroshot1_2.py", line 61, in vrptw
+    assert len(ServiceTime) == n + 1, "Length of ServiceTime must be equal to number of Customers plus Depot."
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Length of ServiceTime must be equal to number of Customers plus Depot.
+
+without knowledge of what the test data looks like it makes an assumption that does not hold

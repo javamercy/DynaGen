@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "Incrementally increase edge weights in the local optimal tour based on their frequencies of use from `edge_n_used`, encouraging exploration of less traveled routes.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    \n    # Updating edge weights using a factor based on the usage frequency\n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        usage_factor = edge_n_used[from_node, to_node]\n        \n        # Increase weight by a factor depending on its use frequency\n        # Add a simple inverse factor based approach, more usage less increase to push for less traversed paths\n        updated_edge_distance[from_node, to_node] += (1 / (1 + usage_factor))\n        updated_edge_distance[to_node, from_node] += (1 / (1 + usage_factor))  # assuming undirected graph scenario\n        \n    return updated_edge_distance",
+          "objective": -2.39419,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Increase the weights of edges used in the local optimal tour inversely proportional to their usage in the ensemble of tours to promote exploration of underutilized paths.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    n = len(local_opt_tour)\n    \n    for i in range(n):\n        src = local_opt_tour[i]\n        dest = local_opt_tour[(i+1) % n]\n\n        if edge_n_used[src, dest] > 0:\n            updated_edge_distance[src, dest] *= (1 + 1.0 / edge_n_used[src, dest])\n            updated_edge_distance[dest, src] *= (1 + 1.0 / edge_n_used[dest, src])  # assuming symmetry\n    \n    return updated_edge_distance",
+          "objective": -0.67657,
+          "other_inf": null
+     }
+]

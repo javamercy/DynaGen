@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the next node based on evaluating a potential detour score, which considers the benefit of visiting a node early due to clustering with nearby unvisited nodes, while balancing the overall journey toward the destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distance from the current node to all unvisited nodes\n    current_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distance from each unvisited node to the destination node\n    destination_distances = distance_matrix[unvisited_nodes, destination_node]\n\n    # Calculate inter-node distances among unvisited nodes\n    sub_matrix = distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]\n    inter_node_avg_distances = sub_matrix.mean(axis=1)\n    \n    # Calculate the detour score: proximity benefit among unvisited nodes with respect to the destination\n    detour_scores = current_distances + 0.5 * inter_node_avg_distances - 0.8 * destination_distances\n    \n    # Select the unvisited node with the minimum detour score\n    next_node_index = np.argmin(detour_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+     "objective": 25.79043,
+     "other_inf": null
+}

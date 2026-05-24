@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm description: A novel algorithm that selects the next node based on the highest weighted sum of the reduction in total distance when a truck visits that node, the number of trucks currently at the node, and the distance between the current node and the depot, with an added consideration for the average distance between the current node and the other unvisited nodes.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_score = distance_to_depot - (2 * distance_to_node)\n        num_trucks_current = np.sum(truck_nodes == current_node)\n        avg_distance_to_other_nodes = np.mean(distance_matrix[node][unvisited_nodes])\n\n        scores[i] = 0.6 * reduction_score + 0.2 * num_trucks_current + 0.2 * avg_distance_to_other_nodes\n    \n    next_node_idx = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+     "objective": 21.49802,
+     "other_inf": null
+}

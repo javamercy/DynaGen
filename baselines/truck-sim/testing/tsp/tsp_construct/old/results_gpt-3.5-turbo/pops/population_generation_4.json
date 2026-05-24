@@ -1,0 +1,26 @@
+[
+     {
+          "algorithm": "\nPropose an algorithm that selects the next node based on the following steps: \n1. Calculate the distance between the current node and all unvisited nodes.\n2. Exclude the destination node from the list of unvisited nodes.\n3. Select the next node as the one with the shortest distance from the current node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    distances = np.delete(distances, np.where(unvisited_nodes == destination_node)) if destination_node in unvisited_nodes else distances\n    next_node = unvisited_nodes[np.argmin(distances)]\n    return next_node",
+          "objective": 6.60788,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node by considering the Euclidean distance between the current node and the unvisited nodes, prioritizing nodes that are closer to the current node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = np.linalg.norm(distance_matrix[current_node] - distance_matrix[unvisited_nodes], axis=1)\n    next_node = unvisited_nodes[np.argmin(distances)]\n    return next_node",
+          "objective": 6.73716,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nSelect the next node by calculating a weighted combination of the Euclidean distance between the current node and unvisited nodes and the cosine similarity between the current node's direction vector and the vector pointing towards the unvisited nodes, biasing towards nodes that are closer in distance and direction to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direction vectors\n    current_direction = distance_matrix[destination_node] - distance_matrix[current_node]\n    unvisited_directions = distance_matrix[unvisited_nodes] - distance_matrix[current_node]\n    \n    # Calculate distances and cosine similarities\n    distances_to_current = np.linalg.norm(distance_matrix[current_node] - distance_matrix[unvisited_nodes], axis=1)\n    distances_to_destination = np.linalg.norm(distance_matrix[destination_node] - distance_matrix[unvisited_nodes], axis=1)\n    cosine_similarities = np.sum(current_direction * unvisited_directions, axis=1) / (np.linalg.norm(current_direction) * np.linalg.norm(unvisited_directions, axis=1))\n    \n    # Calculate weights\n    weights = distances_to_current + distances_to_destination + cosine_similarities\n    next_node = unvisited_nodes[np.argmin(weights)]\n    return next_node",
+          "objective": 7.02175,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nSelect the next node by calculating a weighted combination of the Manhattan distance between the current node and unvisited nodes and the dot product between the current node's direction vector and the vector pointing towards the unvisited nodes, favoring nodes that are closer in distance but are in a different direction from the current node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direction vectors\n    current_direction = distance_matrix[destination_node] - distance_matrix[current_node]\n    unvisited_directions = distance_matrix[unvisited_nodes] - distance_matrix[current_node]\n    \n    # Calculate distances and dot product\n    distances_to_current = np.abs(distance_matrix[current_node] - distance_matrix[unvisited_nodes]).sum(axis=1)\n    dot_products = np.sum(current_direction * unvisited_directions, axis=1)\n    \n    # Calculate weights\n    weights = distances_to_current - dot_products\n    next_node = unvisited_nodes[np.argmin(weights)]\n    return next_node",
+          "objective": 7.29708,
+          "other_inf": null
+     }
+]

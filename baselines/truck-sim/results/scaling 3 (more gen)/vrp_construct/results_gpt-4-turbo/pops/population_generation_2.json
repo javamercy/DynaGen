@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "My new algorithm adjusts the priority scoring by incorporating a decay factor that reduces the weight of the distance to far-off nodes, favoring closer nodes within a certain range.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n\n    decay_factor = 0.5\n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        mean_distance_to_trucks = np.mean(distance_matrix[node, truck_nodes])\n        priority_scores[i] = -(direct_distance ** decay_factor) + mean_distance_to_trucks\n\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 22.23341,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Calculate a priority score based on proximity to current node and average distance to other truck destinations\n    if not unvisited_nodes.size:\n        return depot_node\n\n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        priority_scores[i] = -distance_matrix[current_node, node] + np.mean(distance_matrix[node, truck_nodes])\n\n    # Select the node with the highest priority score\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 27.33842,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node  # No unvisited nodes, return to depot\n\n    # Calculate an exclusivity score rewarding nodes far from the nearest truck aim\n    exclusivity_scores = np.zeros(len(unvisited_nodes))\n\n    for i, node in enumerate(unvisited_nodes):\n        distances_to_this_node = distance_matrix[node, truck_nodes]\n        exclusivity_scores[i] = np.min(distances_to_this_node) - distance_matrix[current_node, node]\n\n    # Select the node with the highest exclusivity score\n    next_node = unvisited_nodes[np.argmax(exclusivity_scores)]\n\n    return next_node",
+          "objective": 35.83199,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: Prioritize nodes based on inverse demand urgency, which is inferred from distance and rarity of visits, using an exponential reduction factor and reduced centrality influence.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if unvisited_nodes.size == 0:\n        return depot_node  # All nodes visited, return to depot\n\n    scores = np.zeros_like(unvisited_nodes, dtype=float)\n    centrality_scores = np.sum(distance_matrix[unvisited_nodes], axis=1)\n\n    for i, node in enumerate(unvisited_nodes):\n        current_to_node_distance = distance_matrix[current_node][node]\n        \n        # Reverse the centrality impact with an exponential decay based on distance\n        centrality_factor = np.exp(-0.1 * centrality_scores[i])\n        \n        # Increase importance of nodes less frequented by trucks\n        visit_rarity = len(truck_nodes) - np.count_nonzero(truck_nodes == node)\n        \n        # Determine score from distance, adjusted centrality, and visit rarity\n        scores[i] = current_to_node_distance * 0.7 + centrality_factor * 0.2 + visit_rarity * 10\n\n    next_node = unvisited_nodes[np.argmin(scores)]\n    return next_node",
+          "objective": 37.25409,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Algorithm, named \"PriorityQueue Adaptive Selection\": Starts from the depot and uses priority queues, dynamically factors truck locations and modifies priority based on current node distance to unvisited nodes, ensuring distributed truck activity for optimal coverage.",
+          "code": "import numpy as np\nimport queue\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # If there are no unvisited nodes left\n    if len(unvisited_nodes) == 0:\n        return None  # or you may return depot_node to signify end of route\n\n    # Create a priority queue for nodes based on truck positions and distance\n    node_priority_queue = queue.PriorityQueue()\n\n    # Get current distances from the current node to all unvisited nodes\n    distances = distance_matrix[current_node, unvisited_nodes]\n\n    # Adjust priority based on closeness and the number of other trucks aiming for that node\n    for idx, node in enumerate(unvisited_nodes):\n        count_other_trucks = np.sum(truck_nodes == node)\n        priority = distances[idx] + count_other_trucks * 100  # Prioritize less crowded nodes\n        node_priority_queue.put((priority, node))\n\n    # Select the next node based on the lowest \"score\" in the priority queue\n    if not node_priority_queue.empty():\n        next_node = node_priority_queue.get()[1]\n        return next_node\n    else:\n        return next_node",
+          "objective": 42.14403,
+          "other_inf": null
+     }
+]

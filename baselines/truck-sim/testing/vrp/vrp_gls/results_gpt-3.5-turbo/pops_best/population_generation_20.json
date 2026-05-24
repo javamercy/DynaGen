@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm: Update the edge distance matrix by decreasing the distances of edges that are frequently used in the local optimal tours and increasing the distances of less frequently used edges to promote exploration and avoid local optima.",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    freq_threshold = np.percentile(edge_n_used, 75)\n    \n    frequently_used_edges = np.where(edge_n_used >= freq_threshold)[0]\n    infrequently_used_edges = np.where(edge_n_used < freq_threshold)[0]\n    \n    for edge_idx in frequently_used_edges:\n        decrease_amount = np.random.uniform(low=0.1, high=0.5)\n        updated_edge_distance[np.unravel_index(edge_idx, edge_distance.shape)] -= decrease_amount\n    \n    for edge_idx in infrequently_used_edges:\n        increase_amount = np.random.uniform(low=0.01, high=0.1)\n        updated_edge_distance[np.unravel_index(edge_idx, edge_distance.shape)] += increase_amount\n        \n    return updated_edge_distance",
+     "objective": 15.94088,
+     "other_inf": null
+}

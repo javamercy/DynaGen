@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm selects the next node based on maximizing the time each truck spends driving towards unvisited nodes, with a bias towards nodes that reduce the maximum time required by any truck to complete its task.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    max_time_reduction = -np.inf\n    best_node = None\n\n    for i, customer in enumerate(unvisited_customers):\n        distance_to_node = np.linalg.norm(cur_truck_pos - customer)\n        max_distance_truck = -np.inf\n\n        for truck_pos in all_truck_pos:\n            distance_from_truck = np.linalg.norm(truck_pos - customer)\n            max_distance_truck = max(max_distance_truck, distance_from_truck)\n\n        time_reduction = max_distance_truck - distance_to_node\n\n        if time_reduction > max_time_reduction:\n            max_time_reduction = time_reduction\n            best_node = i\n\n    return best_node",
+     "objective": 33.79112,
+     "other_inf": null
+}

@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "Introduce random perturbations to distances only for edges not in the local optimal tour, leveraging the inverse square of their usage frequency to encourage exploration without destabilizing established routes}\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n\n    # Create a set for easy lookup of edges in the local optimal tour\n    local_opt_edges = {(local_opt_tour[i], local_opt_tour[(i + 1) % len(local_opt_tour)]) for i in range(len(local_opt_tour))",
+          "code": "import numpy as np\n\n# {Introduce random perturbations to distances only for edges not in the local optimal tour, leveraging the inverse square of their usage frequency to encourage exploration without destabilizing established routes}\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n\n    # Create a set for easy lookup of edges in the local optimal tour\n    local_opt_edges = {(local_opt_tour[i], local_opt_tour[(i + 1) % len(local_opt_tour)]) for i in range(len(local_opt_tour))}\n    \n    for i in range(num_vertices):\n        for j in range(i + 1, num_vertices):\n            # If edge is not in the local optimal tour\n            if (i, j) not in local_opt_edges and (j, i) not in local_opt_edges:\n                frequency = edge_n_used[i, j]\n                perturbation_factor = 0.1 / (1 + frequency**2)\n                perturbation = np.random.normal(0, perturbation_factor)\n                updated_edge_distance[i, j] += perturbation\n                updated_edge_distance[j, i] += perturbation\n\n    return updated_edge_distance",
+          "objective": -2.39419,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm increases edge weights to encourage exploration by applying a squared penalty based on usage frequency and a sine-based perturbation factor.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n    base_adjustment_factor = 0.05\n\n    for i in range(len(local_opt_tour)):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % len(local_opt_tour)]\n        use_frequency = edge_n_used[start, end]\n        random_factor = np.sin(np.random.uniform(0, np.pi / 2))  # Sine-based perturbation factor\n        increase_amount = (base_adjustment_factor + random_factor) * (1 + use_frequency ** 2)\n        updated_edge_distance[start, end] *= (1 + increase_amount)\n        updated_edge_distance[end, start] *= (1 + increase_amount)\n\n    return updated_edge_distance",
+          "objective": -2.36899,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm adjusts edge weights by applying a variable penalty based on both usage frequency and a random perturbation factor to promote exploration beyond the local optimum.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n    base_adjustment_factor = 0.1\n\n    for i in range(len(local_opt_tour)):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % len(local_opt_tour)]\n        use_frequency = edge_n_used[start, end]\n        random_factor = np.random.uniform(0.05, 0.15)  # Random perturbation factor\n        increase_amount = (base_adjustment_factor + random_factor) * (1 + use_frequency)\n        updated_edge_distance[start, end] *= (1 + increase_amount)\n        updated_edge_distance[end, start] *= (1 + increase_amount)\n\n    return updated_edge_distance",
+          "objective": -2.29818,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Increase the distance of frequently used edges in the local optimal tour using a variable penalty factor that is inversely proportional to the mean usage of all edges, encouraging the exploration of alternative paths by dynamically adjusting penalties.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    mean_usage = edge_n_used.mean()\n    updated_edge_distance = edge_distance.copy()\n    n = len(local_opt_tour)\n    \n    # Iterate over each segment (edge) in the local optimal tour\n    for i in range(n):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % n]\n        # Calculate penalty factor inversely proportional to mean usage\n        penalty_factor = 1 + (1 / mean_usage) if mean_usage != 0 else 1.1\n        # Increase the distance based on the computed penalty factor\n        updated_edge_distance[start, end] *= penalty_factor\n        updated_edge_distance[end, start] *= penalty_factor\n    \n    return updated_edge_distance",
+          "objective": -2.26445,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Update the edge distance matrix by slightly increasing the weights of edges in the local optimal tour based on the frequency of their use, encouraging diversification in the search for a globally optimal tour.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n    adjustment_factor = 0.1\n\n    for i in range(len(local_opt_tour)):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % len(local_opt_tour)]\n        use_frequency = edge_n_used[start, end]\n        increase_amount = adjustment_factor * (1 + use_frequency)\n        updated_edge_distance[start, end] *= (1 + increase_amount)\n        updated_edge_distance[end, start] *= (1 + increase_amount)\n\n    return updated_edge_distance",
+          "objective": -2.12448,
+          "other_inf": null
+     }
+]

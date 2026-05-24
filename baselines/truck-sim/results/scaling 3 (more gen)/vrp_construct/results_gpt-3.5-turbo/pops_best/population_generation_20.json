@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nDesign a new algorithm that selects the next node for each truck based on the maximum ratio of (total distance left to travel including next node, depot node, and remaining unvisited nodes) to (time spent at current node plus distance between current node and next node).\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    max_ratio = -np.inf\n    \n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            total_distance_left = distance_matrix[current_node, node] + distance_matrix[node, depot_node] + np.sum(distance_matrix[node, unvisited_nodes])\n            time_spent = distance_matrix[current_node, node] + distance_matrix[current_node, depot_node]\n            ratio = total_distance_left / time_spent\n            \n            if ratio > max_ratio:\n                next_node = node\n                max_ratio = ratio\n    \n    return next_node",
+     "objective": 39.73017,
+     "other_inf": null
+}

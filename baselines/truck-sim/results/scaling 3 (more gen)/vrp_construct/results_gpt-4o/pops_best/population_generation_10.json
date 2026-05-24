@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm identifies the next node by maximizing the average distance to already visited nodes to encourage exploration while minimizing travel distance to focus on efficiency.",
+     "code": "import numpy as np\n\n# {This algorithm identifies the next node by maximizing the average distance to already visited nodes to encourage exploration while minimizing travel distance to focus on efficiency.}\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    available_nodes = set(unvisited_nodes) - set(truck_nodes)\n    if not available_nodes:\n        return None\n    \n    best_score = float('-inf')\n    next_node = None\n\n    for node in available_nodes:\n        distance_to_current = distance_matrix[current_node][node]\n\n        visited_nodes = [n for n in range(len(distance_matrix)) if n not in unvisited_nodes]\n        if visited_nodes:\n            average_distance_to_visited = np.mean([distance_matrix[node][v_node] for v_node in visited_nodes])\n        else:\n            average_distance_to_visited = 0\n\n        score = average_distance_to_visited - distance_to_current\n        \n        if score > best_score:\n            best_score = score\n            next_node = node\n    \n    return next_node",
+     "objective": 29.09594,
+     "other_inf": null
+}

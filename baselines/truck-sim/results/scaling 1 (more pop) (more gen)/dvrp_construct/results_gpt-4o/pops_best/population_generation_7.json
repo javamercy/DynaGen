@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm selects the next node by dynamically assigning a priority based on the weighted sum of proximity to the current truck, inverse of the squared average distance to other trucks, and adjusted demand variance, optimizing routes by giving precedence to customers balancing proximity and demand spread.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    priorities = []\n    for idx, customer in enumerate(unvisited_customers):\n        distance_to_current_truck = np.linalg.norm(cur_truck_pos - customer)\n        inverse_square_distance_to_other_trucks = 1 / (1 + np.mean([np.linalg.norm(truck_pos - customer)**2 for truck_pos in all_truck_pos]))\n        adjusted_demand_variance = np.var([np.linalg.norm(depot_pos - c) for c in unvisited_customers]) / len(unvisited_customers)\n        \n        priority_index = distance_to_current_truck + inverse_square_distance_to_other_trucks + adjusted_demand_variance\n        priorities.append(priority_index)\n    \n    best_node = np.argmin(priorities)\n    return best_node",
+     "objective": 41.22395,
+     "other_inf": null
+}

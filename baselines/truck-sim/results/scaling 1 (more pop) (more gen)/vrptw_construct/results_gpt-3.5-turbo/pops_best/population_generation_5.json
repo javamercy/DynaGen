@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next customer for the truck to visit by prioritizing customers with the closest time windows to the current time, minimizing distance to the customer, taking into account the number of available trucks to distribute the workload efficiently, and factoring in the remaining time windows of unvisited customers to ensure all time constraints are met.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    min_priority = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_customer = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = dist_to_customer / truck_speed\n        \n        closest_time_window = min([abs(current_time - tw) for tw in time_windows[i]])\n        \n        remaining_time_windows = np.max(time_windows[i]) - current_time\n        \n        priority = 0.4 * closest_time_window + dist_to_customer - 0.3 * (len(all_truck_pos) - len(unvisited_customers)) + 0.3 * remaining_time_windows\n        \n        if priority < min_priority:\n            best_node = i\n            min_priority = priority\n        \n    return best_node",
+     "objective": 113.7557,
+     "other_inf": null
+}

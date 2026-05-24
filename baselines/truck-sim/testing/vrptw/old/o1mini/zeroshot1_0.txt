@@ -1,0 +1,207 @@
+To solve the Vehicle Routing Problem with Time Windows (VRPTW), we'll formulate a Mixed-Integer Programming (MIP) model. Below is the explanation of the model followed by the implementation using the PuLP library in Python.
+
+### **MIP Model for VRPTW**
+
+**Variables:**
+
+1. **Binary Variables:**
+   - \( x_{i,j,k} \): Binary variable equal to 1 if vehicle \( k \) travels from customer \( i \) to customer \( j \), and 0 otherwise.
+
+2. **Continuous Variables:**
+   - \( t_i \): Arrival time at customer \( i \).
+
+**Parameters:**
+
+- **Sets:**
+  - \( C \): Set of all customers.
+  - \( V \): Set of all vehicles.
+
+- **Data:**
+  - \( Demand_i \): Demand of customer \( i \).
+  - \( LowerTimeWindow_i \): Lower bound of the time window for customer \( i \).
+  - \( UpperTimeWindow_i \): Upper bound of the time window for customer \( i \).
+  - \( Distance_{i,j} \): Travel time or distance from customer \( i \) to customer \( j \).
+  - \( ServiceTime_i \): Service time at customer \( i \).
+  - \( Capacity \): Capacity of each vehicle.
+  - \( M \): A sufficiently large constant used for linearization.
+
+**Objective:**
+
+Minimize the finish time, which is the maximum time taken by any vehicle to complete its route and return to the depot.
+
+\[
+\text{Minimize} \quad \text{FinishTime}
+\]
+
+**Constraints:**
+
+1. **Each customer is visited exactly once:**
+   \[
+   \sum_{k \in V} \sum_{j \in C \cup \{0\}} x_{j,i,k} = 1 \quad \forall i \in C
+   \]
+
+2. **Flow conservation for each vehicle:**
+   \[
+   \sum_{j \in C \cup \{0\}} x_{i,j,k} = \sum_{j \in C \cup \{0\}} x_{j,i,k} \quad \forall i \in C, \forall k \in V
+   \]
+
+3. **Depot constraints (each vehicle starts and ends at the depot):**
+   \[
+   \sum_{j \in C} x_{0,j,k} = 1 \quad \forall k \in V
+   \]
+   \[
+   \sum_{j \in C} x_{j,0,k} = 1 \quad \forall k \in V
+   \]
+
+4. **Time window constraints and precedence:**
+   \[
+   t_j \geq t_i + ServiceTime_i + Distance_{i,j} - M (1 - x_{i,j,k}) \quad \forall i, j \in C, \forall k \in V
+   \]
+
+5. **Time window limits:**
+   \[
+   LowerTimeWindow_i \leq t_i \leq UpperTimeWindow_i \quad \forall i \in C
+   \]
+
+6. **Vehicle capacity constraints:**
+   \[
+   \sum_{i \in C} Demand_i \cdot x_{0,i,k} \leq Capacity \quad \forall k \in V
+   \]
+
+### **Implementation**
+
+Below is the Python implementation of the above MIP model using the PuLP library. This implementation strictly follows the provided function signature and includes necessary explanations through comments.
+
+```Python
+import pulp
+from pulp import LpMinimize, LpProblem, LpVariable, LpBinary, LpContinuous, lpSum, value
+
+def vrptw(Customers: list[int],
+          Demand: list[int],
+          LowerTimeWindow: list[int],
+          UpperTimeWindow: list[int],
+          Distance: list[list[int]],
+          ServiceTime: list[int],
+          Capacity: int,
+          num_vehicles: int,
+          M: int):
+    """
+    Solves the Vehicle Routing Problem with Time Windows (VRPTW) using Mixed-Integer Programming.
+
+    Args:
+        Customers: List of customer identifiers.
+        Demand: List where Demand[i] is the demand of customer i.
+        LowerTimeWindow: List where LowerTimeWindow[i] is the earliest time customer i can be served.
+        UpperTimeWindow: List where UpperTimeWindow[i] is the latest time customer i can be served.
+        Distance: 2D list where Distance[i][j] is the travel time or distance from customer i to customer j.
+        ServiceTime: List where ServiceTime[i] is the service time at customer i.
+        Capacity: Capacity of each vehicle.
+        num_vehicles: Number of vehicles available.
+        M: A large constant used for linearization.
+
+    Returns:
+        FinishTime: The time when the last truck arrives back at the depot.
+    """
+    # Define depot as 0
+    depot = 0
+    all_customers = [depot] + Customers
+    customer_indices = {customer: idx+1 for idx, customer in enumerate(Customers)}
+    index_to_customer = {idx+1: customer for idx, customer in enumerate(Customers)}
+    all_indices = list(range(len(all_customers)))
+
+    # Number of nodes
+    n = len(all_customers)
+
+    # Initialize the problem
+    prob = LpProblem("VRPTW", LpMinimize)
+
+    # Decision variables
+    # x[i][j][k] = 1 if vehicle k travels from i to j
+    x = [[[LpVariable(f"x_{i}_{j}_{k}", cat=LpBinary)
+            for j in all_indices] for k in range(num_vehicles)] for i in all_indices]
+
+    # t[i] = arrival time at node i
+    t = [LpVariable(f"t_{i}", lowBound=0, cat=LpContinuous) for i in all_indices]
+
+    # FinishTime variable
+    FinishTime = LpVariable("FinishTime", lowBound=0, cat=LpContinuous)
+
+    # Objective: Minimize FinishTime
+    prob += FinishTime, "Minimize_Finish_Time"
+
+    # Constraint 1: Each customer is visited exactly once
+    for cust_idx in range(1, n):
+        prob += lpSum(x[i][cust_idx][k] for i in all_indices for k in range(num_vehicles)) == 1, f"VisitOnce_{cust_idx}"
+
+    # Constraint 2: Flow conservation for each vehicle
+    for k in range(num_vehicles):
+        for i in all_indices:
+            if i == depot:
+                continue
+            prob += lpSum(x[i][j][k] for j in all_indices) == lpSum(x[j][i][k] for j in all_indices), f"FlowConservation_{i}_Vehicle_{k}"
+
+    # Constraint 3: Each vehicle starts and ends at the depot
+    for k in range(num_vehicles):
+        # Out of depot
+        prob += lpSum(x[depot][j][k] for j in range(1, n)) == 1, f"StartDepot_Vehicle_{k}"
+        # Into depot
+        prob += lpSum(x[j][depot][k] for j in range(1, n)) == 1, f"EndDepot_Vehicle_{k}"
+
+    # Constraint 4: Time window and precedence constraints
+    for k in range(num_vehicles):
+        for i in all_indices:
+            for j in all_indices:
+                if i == j:
+                    continue
+                prob += t[j] >= t[i] + ServiceTime[i] + Distance[i][j] - M * (1 - x[i][j][k]), f"TimeWindow_{i}_{j}_Vehicle_{k}"
+
+    # Constraint 5: Time windows
+    for i in range(1, n):
+        prob += t[i] >= LowerTimeWindow[i], f"LowerTimeWindow_{i}"
+        prob += t[i] <= UpperTimeWindow[i], f"UpperTimeWindow_{i}"
+
+    # Constraint 6: FinishTime is the maximum return time to depot
+    for k in range(num_vehicles):
+        prob += t[depot] >= t[j] + Distance[j][depot] + ServiceTime[j] - M * (1 - x[j][depot][k]) for j in range(1, n)
+
+    prob += FinishTime >= t[depot], "SetFinishTime"
+
+    # Constraint 7: Vehicle capacity
+    for k in range(num_vehicles):
+        prob += lpSum(Demand[j-1] * x[depot][j][k] for j in range(1, n)) <= Capacity, f"Capacity_Vehicle_{k}"
+
+    # Solve the problem
+    prob.solve()
+
+    # Retrieve the FinishTime
+    FinishTime_val = value(FinishTime)
+
+    return FinishTime_val
+```
+
+### **Explanation of the Implementation**
+
+1. **Depot Representation:**
+   - The depot is represented as node `0`. All customers are indexed starting from `1`.
+
+2. **Decision Variables:**
+   - **`x[i][j][k]`**: Binary variables indicating whether vehicle `k` travels from node `i` to node `j`.
+   - **`t[i]`**: Continuous variables representing the arrival time at node `i`.
+   - **`FinishTime`**: Continuous variable representing the finish time of the last vehicle returning to the depot.
+
+3. **Objective Function:**
+   - The objective is to minimize `FinishTime`, ensuring that all vehicles complete their routes as quickly as possible.
+
+4. **Constraints:**
+   - **Each customer is visited exactly once:** Ensures that every customer is visited by exactly one vehicle.
+   - **Flow Conservation:** Ensures that for each vehicle, the number of vehicles entering a node equals the number leaving it, maintaining a continuous route.
+   - **Depot Constraints:** Each vehicle must start from and return to the depot exactly once.
+   - **Time Window and Precedence:** Ensures that arrival times respect the time windows and that precedence is maintained based on travel and service times.
+   - **Time Windows:** Enforces that arrival times at each customer fall within their specified time windows.
+   - **FinishTime Constraint:** Ensures that `FinishTime` captures the latest return time to the depot across all vehicles.
+   - **Vehicle Capacity:** Ensures that the total demand served by each vehicle does not exceed its capacity.
+
+5. **Solving the Problem:**
+   - The problem is solved using PuLP's default solver. After solving, the value of `FinishTime` is extracted and returned.
+
+**Note:** Ensure that the `Distance` matrix includes the depot as the first node (index `0`). The `Demand`, `LowerTimeWindow`, `UpperTimeWindow`, and `ServiceTime` lists should correspond to the customers only (excluding the depot). Adjust indexing accordingly if your data includes the depot.

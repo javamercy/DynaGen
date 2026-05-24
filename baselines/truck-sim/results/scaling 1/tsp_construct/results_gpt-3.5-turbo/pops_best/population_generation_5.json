@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm: Select the next node based on the node that maximizes the sum of the minimum distance to all other unvisited nodes and the direct distance to the destination node minus the Euclidean distance between the current node and the prospective node.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_sum_distance = float('-inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        min_distance = np.min(distance_matrix[node, unvisited_nodes])\n        direct_distance = np.linalg.norm(distance_matrix[node] - distance_matrix[destination_node])\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        \n        sum_distance = min_distance + direct_distance - euclidean_distance\n        \n        if sum_distance > max_sum_distance:\n            max_sum_distance = sum_distance\n            next_node = node\n            \n    return next_node",
+     "objective": 15.58301,
+     "other_inf": null
+}

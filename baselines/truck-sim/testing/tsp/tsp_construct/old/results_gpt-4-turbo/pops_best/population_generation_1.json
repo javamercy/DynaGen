@@ -1,0 +1,6 @@
+{
+     "algorithm": "Select the next node based on a score that combines the direct distance from the current node and an estimated path efficiency to the final destination through each candidate node, inversely weighted by the node's distance to the end destination.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculate efficiency score: current distance to a node multiplied by the inverse of the distance from that node to the destination\n    efficiency_scores = current_to_unvisited * (1 / (unvisited_to_destination + 1e-10))\n    \n    # Select the node with the minimal efficiency score\n    min_index = np.argmin(efficiency_scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+     "objective": 6.30341,
+     "other_inf": null
+}

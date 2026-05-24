@@ -1,0 +1,6 @@
+{
+     "algorithm": "```Algorithm: The new algorithm prefers nodes that are furthest away from other trucks and closest to the current node, promoting distribution and minimizing route overlap.```\n\n```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node  # Return to depot if all nodes are visited\n\n    # Calculate scores for each unvisited node based on distance from current node and distance from other trucks\n    scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        # Minimize distance to the current node while maximizing distance to other trucks\n        distance_to_current = distance_matrix[current_node, node]\n        average_distance_to_trucks = np.mean(distance_matrix[node, truck_nodes])\n        score = average_distance_to_trucks - distance_to_current  # Prioritize nodes further from other trucks but closer to current node\n        scores[i] = score\n\n    # Select the node with the highest score\n    next_node_index = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+     "objective": 27.33842,
+     "other_inf": null
+}

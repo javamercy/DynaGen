@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the node that has the shortest distance to the destination among the unvisited nodes, breaking ties randomly.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < shortest_distance:\n            shortest_distance = distance_matrix[current_node][node]\n            next_node = node\n        elif distance_matrix[current_node][node] == shortest_distance:\n            if np.random.randint(2) == 0:\n                next_node = node\n                \n    return next_node",
+          "objective": 3.25721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: At each step, select the next node by calculating the product of the distances from the current node to each unvisited node and choosing the node with the minimum product.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        product = distance_matrix[current_node][node] * distance_matrix[node][destination_node]\n        if product < min_product:\n            min_product = product\n            next_node = node\n    \n    return next_node",
+          "objective": 3.40566,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: At each step, select the next node by calculating the sum of the square root of the distances from the current node to each unvisited node and choosing the node with the minimum sum.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_sum = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        sum_sqrt_dist = np.sqrt(distance_matrix[current_node][node]) + np.sqrt(distance_matrix[node][destination_node])\n        if sum_sqrt_dist < min_sum:\n            min_sum = sum_sqrt_dist\n            next_node = node\n    \n    return next_node",
+          "objective": 3.40904,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nDesign an algorithm that selects the next node based on the node that is closest to the average of the current node and the destination node, and has not been visited yet, considering the distances between nodes in the distance matrix.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    average_node = (current_node + destination_node) // 2\n    next_node = -1\n    min_distance = np.inf\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] + distance_matrix[node][destination_node] < min_distance:\n            min_distance = distance_matrix[current_node][node] + distance_matrix[node][destination_node]\n            next_node = node\n    \n    return next_node",
+          "objective": 3.72757,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: Select the next node by calculating the sum of the squared distances from the current node to each unvisited node and choosing the node with the minimum sum.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_sum = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        sum_squares = (distance_matrix[current_node][node] ** 2) + (distance_matrix[node][destination_node] ** 2)\n        if sum_squares < min_sum:\n            min_sum = sum_squares\n            next_node = node\n    \n    return next_node",
+          "objective": 4.01842,
+          "other_inf": null
+     }
+]

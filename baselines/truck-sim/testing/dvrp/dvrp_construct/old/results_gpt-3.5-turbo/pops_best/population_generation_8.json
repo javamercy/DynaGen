@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThis new algorithm prioritizes visiting coordinates that are closest to the current position while also considering the average distance to the other trucks and the destination, by dividing the sum of distances from the other trucks to the coordinate by the sum of distances from all trucks to the coordinate and subtracting this value from the Euclidean distance to the coordinate.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    min_diff_dist = float('inf')\n    next_destination = None\n\n    for i, coord in enumerate(unvisited):\n        euclidean_dist = np.linalg.norm(current - coord)\n        other_trucks_dist = sum([np.linalg.norm(truck - coord) for truck in trucks])\n        diff_dist = euclidean_dist - (other_trucks_dist / (len(trucks) - 1 + 1))  # New scoring function\n\n        if diff_dist < min_diff_dist:\n            min_diff_dist = diff_dist\n            next_destination = i\n\n    return next_destination",
+     "objective": 27.57335,
+     "other_inf": null
+}

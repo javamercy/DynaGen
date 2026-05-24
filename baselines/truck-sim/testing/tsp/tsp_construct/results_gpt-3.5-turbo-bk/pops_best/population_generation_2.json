@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNovel algorithm: The algorithm selects the next node by prioritizing unvisited nodes that are closest to the current node but not the destination node, breaking ties by choosing the node with the smallest index.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = float('inf')\n    next_node = None\n    for node in unvisited_nodes:\n        if node != destination_node:\n            if distance_matrix[current_node][node] < min_distance:\n                min_distance = distance_matrix[current_node][node]\n                next_node = node\n            elif distance_matrix[current_node][node] == min_distance:\n                next_node = min(next_node, node)\n    \n    return next_node",
+     "objective": 16.56488,
+     "other_inf": null
+}

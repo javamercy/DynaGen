@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The new algorithm selects the next node by considering the ratio of the distance to the destination node and the distance from the current node to each unvisited node, then chooses the node with the minimum ratio as the next node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    ratios = np.array([\n        distance_matrix[current_node][node] / distance_matrix[node][destination_node] \n        for node in unvisited_nodes\n    ])\n    \n    next_node = unvisited_nodes[np.argmin(ratios)]\n    \n    return next_node",
+          "objective": 6.30341,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by calculating the cosine similarity between the current node and each unvisited node, and then choosing the node with the maximum similarity.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    similarities = np.zeros_like(unvisited_nodes, dtype=float)\n    current_node_vector = distance_matrix[current_node] / np.linalg.norm(distance_matrix[current_node])\n    \n    for i, node in enumerate(unvisited_nodes):\n        node_vector = distance_matrix[node] / np.linalg.norm(distance_matrix[node])\n        similarities[i] = np.dot(current_node_vector, node_vector)\n    \n    next_node = unvisited_nodes[np.argmax(similarities)]\n    \n    return next_node",
+          "objective": 6.41054,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe algorithm selects the next node by calculating the Euclidean distance between the current node and each unvisited node, then chooses the node with the shortest distance as the next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < min_distance:\n            min_distance = distance_matrix[current_node][node]\n            next_node = node\n    \n    return next_node",
+          "objective": 6.60788,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by calculating the Manhattan distance between the current node and each unvisited node, then chooses the node with the shortest distance as the next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        distance = np.sum(np.abs(distance_matrix[current_node] - distance_matrix[node]))\n        if distance < min_distance:\n            min_distance = distance\n            next_node = node\n    \n    return next_node",
+          "objective": 6.70792,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by calculating the Euclidean distance between the current node and each unvisited node, and then choosing the node with the minimum distance.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = np.zeros_like(unvisited_nodes, dtype=float)\n    for i, node in enumerate(unvisited_nodes):\n        distances[i] = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n    \n    next_node = unvisited_nodes[np.argmin(distances)]\n    \n    return next_node",
+          "objective": 6.73716,
+          "other_inf": null
+     }
+]

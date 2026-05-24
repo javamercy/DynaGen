@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "Select the next node by evaluating the product of the direct distance ratio and inverse average distance to other unvisited nodes, amplifying contrasts between promising and less promising paths.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    scores = {",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    scores = {}\n    \n    total_distance = np.sum([distance_matrix[current_node, node] for node in unvisited_nodes])\n    \n    for node in unvisited_nodes:\n        # Direct distance to node\n        direct_distance = distance_matrix[current_node, node]\n        \n        # Ratio of this node's distance to total distance\n        direct_distance_ratio = direct_distance / (total_distance + 1e-9)\n        \n        # Average distance to other unvisited nodes\n        if len(unvisited_nodes) > 1:\n            other_unvisited_nodes = [n for n in unvisited_nodes if n != node]\n            avg_distance_to_others = np.mean(distance_matrix[node, other_unvisited_nodes])\n        else:\n            avg_distance_to_others = 1e-9\n        \n        # Score as the product of the direct distance ratio and inverse of the average distance to others\n        score = direct_distance_ratio * (1 / (avg_distance_to_others + 1e-9))\n        \n        scores[node] = score\n\n    # Select next node with the lowest score\n    next_node = min(scores, key=scores.get)\n    return next_node",
+          "objective": 9.50204,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node based on the minimum ratio of the distance from the current node to the distance to the destination node, encouraging selections that lead more directly towards the end goal while still visiting all nodes.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    ratio_values = {",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    ratio_values = {}\n\n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n\n        # Calculate the ratio of the distance to node and the distance to destination\n        if distance_to_destination > 0:  # Avoid division by zero\n            ratio_value = distance_to_node / distance_to_destination\n        else:\n            ratio_value = np.inf\n\n        ratio_values[node] = ratio_value\n\n    # Select the node with the minimum ratio value\n    next_node = min(ratio_values, key=ratio_values.get)\n    return next_node",
+          "objective": 9.9253,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node based on the minimum product of the distance from the current node to the node and the reciprocal distance from the node to the destination, encouraging choices that balance short travel distance and alignment toward the destination.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    product_values = {",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    product_values = {}\n\n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n\n        # Calculate the product of the distance to node and the reciprocal of the distance to destination\n        if distance_to_destination > 0:  # Avoid division by zero\n            product_value = distance_to_node * (1 / distance_to_destination)\n        else:\n            product_value = np.inf\n\n        product_values[node] = product_value\n\n    # Select the node with the minimum product value\n    next_node = min(product_values, key=product_values.get)\n    return next_node",
+          "objective": 10.29482,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next node based on the maximum product of the inverse distance from the current node and the distance to the destination node, promoting exploration by favoring nodes that are balanced in proximity to others.}\n\n```python\nimport numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    product_values = {",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    product_values = {}\n\n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        distance_to_destination = distance_matrix[node, destination_node]\n\n        # Calculate the product of the inverse of the distance to node and the distance to destination\n        if distance_to_node > 0:  # Avoid division by zero\n            product_value = (1 / distance_to_node) * distance_to_destination\n        else:\n            product_value = np.inf\n\n        product_values[node] = product_value\n\n    # Select the node with the maximum product value\n    next_node = max(product_values, key=product_values.get)\n    return next_node",
+          "objective": 11.30828,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Choose the next node by integrating the minimum distance to the nearest unvisited node with a reward for proximity to the starting node, balancing immediate gains with potential cumulative savings.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    reward_factor = 0.5\n    heuristic_values = []\n\n    for node in unvisited_nodes:\n        distance_to_next = distance_matrix[current_node, node]\n        distance_from_start = distance_matrix[node, destination_node]\n        \n        heuristic_value = distance_to_next - reward_factor * distance_from_start\n        heuristic_values.append((node, heuristic_value))\n\n    next_node = min(heuristic_values, key=lambda x: x[1])[0]\n    return next_node",
+          "objective": 12.57356,
+          "other_inf": null
+     }
+]

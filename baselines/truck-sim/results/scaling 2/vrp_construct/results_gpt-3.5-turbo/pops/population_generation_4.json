@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "A novel algorithm that selects the next node based on a combination of the reduction in total distance when a truck visits that node, the distance to unvisited nodes, and the number of trucks already heading towards each unvisited node, using a different scoring system with parameters 0.5 * reduction_score + 0.2 * distance_to_node + 0.3 * num_trucks_heading",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_score = distance_to_depot - (2 * distance_to_node)\n        num_trucks_heading = np.sum(truck_nodes == node) \n        scores[i] = 0.5 * reduction_score + 0.2 * distance_to_node + 0.3 * num_trucks_heading\n    \n    next_node_idx = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 23.21714,
+          "other_inf": null
+     },
+     {
+          "algorithm": "A novel algorithm that selects the next node for a fleet of trucks based on the node that minimizes the ratio between the total distance from itself to the depot and the unvisited nodes, and the average distance between nodes, while also considering the square root of the product of the distance to the depot and the distance to the potential next node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \n    min_ratio = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        total_distance = current_to_depot + current_to_node\n        if len(truck_nodes) > 0:\n            average_distance = np.mean([distance_matrix[node][next_node] for next_node in truck_nodes])   \n            ratio = total_distance / average_distance\n        else:\n            ratio = total_distance\n        \n        product_sqrt = np.sqrt(current_to_depot * current_to_node)\n        score = ratio * product_sqrt\n        \n        if score < min_ratio:\n            min_ratio = score\n            next_node = node\n    \n    return next_node",
+          "objective": 23.43891,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the highest reduction in total distance to that node, the distance to unvisited nodes, and the inverse of the number of trucks already heading towards each unvisited node using a different scoring system.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_score = distance_to_depot - (2 * distance_to_node)\n        num_trucks_heading = np.sum(truck_nodes == node)\n        inverse_num_trucks = 1 / (num_trucks_heading + 1)  # Inverse of number of trucks heading towards the node\n        scores[i] = 0.5 * reduction_score + 0.3 * distance_to_node + 0.2 * inverse_num_trucks\n    \n    next_node_idx = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 28.02979,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nA new algorithm that selects the next node for a fleet of trucks based on a combination of the minimum distance to the depot, the ratio between the distance to the current node and the average distance to the unvisited nodes, and the square root of the sum of distances from the current node to the potential next node and from the potential next node to the depot.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        distance_to_depot_ratio = current_to_depot / np.mean([distance_matrix[node][next_node] for next_node in truck_nodes]) if len(truck_nodes) > 0 else current_to_depot\n        distance_to_avg_ratio = current_to_node / np.mean([distance_matrix[current_node][n] for n in unvisited_nodes])\n        sqrt_sum = np.sqrt(current_to_node + distance_matrix[node][depot_node])\n        \n        score = distance_to_depot_ratio + distance_to_avg_ratio + sqrt_sum\n        \n        if score < min_score:\n            min_score = score\n            next_node = node\n    \n    return next_node",
+          "objective": 28.55434,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nA novel algorithm that selects the next node for a fleet of trucks based on the maximum reduction in total distance when a truck visits that node, calculated by subtracting two times the distance to the current node from the distance to the depot and the distance to unvisited nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    reduction_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_scores[i] = distance_to_depot - (2 * distance_to_node)\n    \n    next_node_idx = np.argmax(reduction_scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 29.21889,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nDescription: A novel algorithm that selects the next node for a fleet of trucks based on the node that minimizes the ratio between the distance to the depot and the unvisited nodes, and the maximum distance between nodes, while also considering the cube root of the product of the distance to the depot and the distance to the potential next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \n    min_ratio = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        total_distance = current_to_depot + current_to_node\n        if len(truck_nodes) > 0:\n            max_distance = np.max([distance_matrix[node][next_node] for next_node in truck_nodes])   \n            ratio = total_distance / max_distance\n        else:\n            ratio = total_distance\n        \n        product_cuberoot = np.cbrt(current_to_depot * current_to_node)\n        score = ratio * product_cuberoot\n        \n        if score < min_ratio:\n            min_ratio = score\n            next_node = node\n    \n    return next_node",
+          "objective": 29.96629,
+          "other_inf": null
+     },
+     {
+          "algorithm": "A novel algorithm that selects the next node based on a combination of the reduction in total distance when a truck visits that node, the distance to unvisited nodes, and the number of trucks already heading towards each unvisited node, using a unique scoring system.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_score = distance_to_depot - (2 * distance_to_node)\n        num_trucks_heading = np.sum(truck_nodes == node) \n        scores[i] = 0.4 * reduction_score + 0.3 * distance_to_node + 0.3 * num_trucks_heading\n    \n    next_node_idx = np.argmax(scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 33.28959,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nA novel algorithm that selects the next node for a fleet of trucks based on the node that minimizes the ratio between the sum of the square root of the current-to-depot and current-to-node distances and the square root of the average distance from the current node to potential next nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \n    min_ratio = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        total_sqrt_distance = np.sqrt(current_to_depot) + np.sqrt(current_to_node)\n        \n        if len(truck_nodes) > 0:\n            average_sqrt_distance = np.mean([np.sqrt(distance_matrix[node][next_node]) for next_node in truck_nodes])   \n            ratio = total_sqrt_distance / average_sqrt_distance\n        else:\n            ratio = total_sqrt_distance\n        \n        score = ratio\n        \n        if score < min_ratio:\n            min_ratio = score\n            next_node = node\n    \n    return next_node",
+          "objective": 33.77604,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nA novel algorithm that selects the next node for a fleet of trucks based on the maximum reduction in total distance when a truck visits that node, calculated by subtracting the distance to the current node from the distance to the depot and the distance to unvisited nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    reduction_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_scores[i] = distance_to_depot - distance_to_node\n    \n    next_node_idx = np.argmax(reduction_scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 34.68184,
+          "other_inf": null
+     },
+     {
+          "algorithm": "A novel algorithm that selects the next node for a fleet of trucks based on the weighted sum of the distance to the depot, the average distance between nodes, and the maximum distance reduction when visiting that node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    weighted_sum_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        current_to_depot = distance_matrix[current_node][depot_node]\n        current_to_node = distance_matrix[current_node][node]\n        \n        total_distance = current_to_depot + current_to_node\n        if len(truck_nodes) > 0:\n            average_distance = np.mean([distance_matrix[node][next_node] for next_node in truck_nodes])\n        else:\n            average_distance = 0\n        \n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        weighted_sum_scores[i] = current_to_depot + average_distance + distance_to_depot - current_to_node\n    \n    next_node_idx = np.argmax(weighted_sum_scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+          "objective": 35.58397,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node if current_node != depot_node else None\n    \n    # Integrate clustering logic based on the distance to all other trucks\n    dist_to_trucks = np.array([\n        np.sum(distance_matrix[unvisited_node, truck_nodes]) for unvisited_node in unvisited_nodes\n    ])\n    \n    # Calculate distance from current to all unvisited nodes\n    dist_from_current = distance_matrix[current_node, unvisited_nodes]\n\n    # Scores are calculated by combining distance to other trucks (promotes distribution) and to the current node\n    scores = dist_from_current - 0.2 * dist_to_trucks\n\n    # Choose the node with the smallest score\n    next_node_index = np.argmin(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+     "objective": 22.5623,
+     "other_inf": null
+}

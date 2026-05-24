@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nThis algorithm prioritizes selecting the next node based on the closest unvisited customer to the current truck position, considering both x and y coordinates, while also minimizing the distance from other trucks to the customer, with an additional penalty for customers that are close to the depot.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_distance = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        min_dist_from_other_trucks = float('inf')\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < min_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                min_dist_from_other_trucks = dist\n        \n        dist_from_depot = np.linalg.norm(depot_pos - customer_pos)\n        \n        if distance - min_dist_from_other_trucks - dist_from_depot < best_distance:\n            best_distance = distance - min_dist_from_other_trucks - dist_from_depot\n            best_node = idx\n    \n    return best_node",
+          "objective": 27.61533,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis new algorithm prioritizes visiting customers based on the sum of x and y coordinate distances from the current truck position subtracted by the maximum of either the x or y coordinate distances from other trucks at each customer position.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        x_distance = abs(cur_truck_pos[0] - customer_pos[0])\n        y_distance = abs(cur_truck_pos[1] - customer_pos[1])\n        \n        max_dist_from_other_trucks = 0\n        for truck_pos in all_truck_pos:\n            dist_x = abs(truck_pos[0] - customer_pos[0])\n            dist_y = abs(truck_pos[1] - customer_pos[1])\n            max_dist = max(dist_x, dist_y)\n            if max_dist > max_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                max_dist_from_other_trucks = max_dist\n        \n        total_score = x_distance + y_distance - max_dist_from_other_trucks\n        \n        if total_score < best_score:\n            best_score = total_score\n            best_node = idx\n    \n    return best_node",
+          "objective": 34.58684,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm prioritizes visiting customers based on the ratio of the square of the direct distance to the average distance from other trucks, aiming to balance between proximity and load distribution.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_ratio = float('inf')\n    best_node = None\n    \n    average_dist_from_other_trucks = np.mean(\n        [np.linalg.norm(truck_pos - customer_pos) for truck_pos in all_truck_pos for customer_pos in unvisited_customers]\n    )\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        avg_dist_from_other_trucks = np.mean([np.linalg.norm(truck_pos - customer_pos) for truck_pos in all_truck_pos])\n        \n        ratio = (direct_distance ** 2) / avg_dist_from_other_trucks\n        \n        if ratio < best_ratio:\n            best_ratio = ratio\n            best_node = idx\n    \n    return best_node",
+          "objective": 36.58606,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm involves selecting the next customer to visit based on the minimum average distance ratio between the current truck and all trucks at the customer's location, excluding the current truck. \n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_avg_dist_ratio = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        dist_ratios = []\n        for truck_pos in all_truck_pos:\n            if not np.array_equal(truck_pos, cur_truck_pos):\n                dist = np.linalg.norm(truck_pos - customer_pos)\n                if dist != 0:\n                    ratio = direct_distance / dist\n                    dist_ratios.append(ratio)\n        \n        if len(dist_ratios) > 0:\n            avg_dist_ratio = sum(dist_ratios) / len(dist_ratios)\n        else:\n            avg_dist_ratio = 0\n        \n        if avg_dist_ratio < best_avg_dist_ratio:\n            best_avg_dist_ratio = avg_dist_ratio\n            best_node = idx\n    \n    return best_node",
+          "objective": 36.65364,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Based on the distance calculation and decision-making process in the existing algorithms, the new algorithm prioritizes visiting customers based on the ratio of direct distance to the minimum distance from other trucks, aiming to optimize overall efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_ratio = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        min_dist_from_other_trucks = float('inf')\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < min_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                min_dist_from_other_trucks = dist\n        \n        ratio = direct_distance / min_dist_from_other_trucks\n        \n        if ratio < best_ratio:\n            best_ratio = ratio\n            best_node = idx\n    \n    return best_node",
+          "objective": 38.00107,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis new algorithm prioritizes visiting customers based on the Euclidean distance from the current truck position to each customer position, while considering the average Euclidean distance from other trucks to each customer position in the unvisited list.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        cur_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        avg_dist_from_other_trucks = np.mean([np.linalg.norm(truck_pos - customer_pos) for truck_pos in all_truck_pos])\n        \n        total_score = cur_distance - avg_dist_from_other_trucks\n        \n        if total_score < best_score:\n            best_score = total_score\n            best_node = idx\n    \n    return best_node",
+          "objective": 39.4068,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis algorithm prioritizes selecting the next node based on the closest unvisited customer to the current truck position, considering both x and y coordinates, while also minimizing the distance from other trucks to the customer.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_distance = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        min_dist_from_other_trucks = float('inf')\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < min_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                min_dist_from_other_trucks = dist\n        \n        if distance - min_dist_from_other_trucks < best_distance:\n            best_distance = distance - min_dist_from_other_trucks\n            best_node = idx\n    \n    return best_node",
+          "objective": 39.87549,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm prioritizes visiting customers based on the ratio of direct distance to the average distance from other trucks, aiming to optimize overall efficiency.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_ratio = float('inf')\n    best_node = None\n    \n    average_dist_from_other_trucks = np.mean(\n        [np.linalg.norm(truck_pos - customer_pos) for truck_pos in all_truck_pos for customer_pos in unvisited_customers]\n    )\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        avg_dist_from_other_trucks = np.mean([np.linalg.norm(truck_pos - customer_pos) for truck_pos in all_truck_pos])\n        \n        ratio = direct_distance / avg_dist_from_other_trucks\n        \n        if ratio < best_ratio:\n            best_ratio = ratio\n            best_node = idx\n    \n    return best_node",
+          "objective": 39.97524,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm prioritizes visiting customers based on their y-coordinate proximity to the current truck position, while also considering the x-coordinate distance and proximity to other trucks, balancing out the decision-making process in a different way than the existing algorithms.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        y_distance = abs(cur_truck_pos[1] - customer_pos[1])\n        x_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        min_dist_from_other_trucks = float('inf')\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < min_dist_from_other_trucks and not np.array_equal(truck_pos, cur_truck_pos):\n                min_dist_from_other_trucks = dist\n        \n        total_score = y_distance + x_distance - min_dist_from_other_trucks\n        \n        if total_score < best_score:\n            best_score = total_score\n            best_node = idx\n    \n    return best_node",
+          "objective": 40.05386,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm involves assigning a weight to each customer based on the product of direct distance and the number of trucks closer to them than the current truck, then selecting the customer with the lowest weight to visit next.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_weight = float('inf')\n    best_node = None\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        num_closer_trucks = 0\n        for truck_pos in all_truck_pos:\n            dist = np.linalg.norm(truck_pos - customer_pos)\n            if dist < direct_distance:\n                num_closer_trucks += 1\n        \n        weight = direct_distance * num_closer_trucks\n        \n        if weight < best_weight:\n            best_weight = weight\n            best_node = idx\n    \n    return best_node",
+          "objective": 40.17778,
+          "other_inf": null
+     }
+]

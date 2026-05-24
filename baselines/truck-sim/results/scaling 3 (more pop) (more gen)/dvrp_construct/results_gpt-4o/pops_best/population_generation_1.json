@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm employs a dynamic priority-based system where unvisited customers are prioritized based on their proximity to the current truck position and possible future clusters indicated by newly emerging customers, aiding in efficient route navigation.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    # Calculate priority for each unvisited customer\n    priorities = []\n    for customer in unvisited_customers:\n        distance_to_truck = np.linalg.norm(cur_truck_pos - customer)\n        future_impact = np.linalg.norm(depot_pos - customer) / len(unvisited_customers)\n        priority = distance_to_truck - future_impact\n        priorities.append(priority)\n    \n    # Select the customer with the highest priority (i.e., lowest value)\n    best_node = np.argmin(priorities)\n    \n    return best_node",
+     "objective": 41.0526,
+     "other_inf": null
+}

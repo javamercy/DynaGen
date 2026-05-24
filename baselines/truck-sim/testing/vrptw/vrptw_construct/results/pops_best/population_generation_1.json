@@ -1,0 +1,6 @@
+{
+     "algorithm": "The common backbone idea in the provided algorithms is to calculate the time it takes for a truck to reach a node, considering distance, speed, penalties for missing deadlines, and the current state of other trucks.}\n\n{Based on the backbone idea, my new algorithm aims to select the next node for a truck to visit by prioritizing nodes with upcoming deadlines, while also considering the possibility of waiting at a node to optimize the overall route.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, deadlines):\n    best_node = None\n    min_distance = float('inf')\n    \n    for i, customer in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(cur_truck_pos - customer)\n        \n        if distance_to_customer < min_distance:\n            min_distance = distance_to_customer\n            best_node = i\n            \n    return best_node",
+     "objective": 50.07361,
+     "other_inf": null
+}

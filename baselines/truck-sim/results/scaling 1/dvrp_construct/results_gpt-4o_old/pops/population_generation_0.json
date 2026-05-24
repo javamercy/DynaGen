@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "Design a new algorithm called \"Dynamic Proximity and Density Balancer,\" which adjusts truck routes by balancing the proximity of unvisited nodes with their local density to minimize idle times and adapt to newly added nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    # Calculate distances to each unvisited customer\n    distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    \n    # Calculate density around each unvisited customer by counting neighbors within a certain radius\n    radius = 10  # Radius for counting nearby nodes\n    densities = np.array([\n        np.sum(np.linalg.norm(unvisited_customers - customer_pos, axis=1) < radius) \n        for customer_pos in unvisited_customers\n    ])\n    \n    # Prioritize nodes based on a combination of proximity and density\n    scores = distances - 0.5 * densities\n    \n    # Select the best node to visit next based on scores\n    best_node = np.argmin(scores)\n    \n    return best_node",
+          "objective": 42.56626,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Design an adaptive dynamic programming algorithm that selects the next node for a truck by evaluating the projected completion time for visiting each unvisited customer, incorporating real-time updates for new nodes and waiting strategies to minimize the total mission time.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    min_time = float('inf')\n    best_node = None\n\n    for i, customer in enumerate(unvisited_customers):\n        distances = np.linalg.norm(np.array(all_truck_pos) - customer, axis=1)\n        current_distance = np.linalg.norm(cur_truck_pos - customer)\n        projected_time = current_distance + np.min(distances)\n        \n        if projected_time < min_time:\n            min_time = projected_time\n            best_node = i\n    \n    return best_node",
+          "objective": 45.44511,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My novel algorithm selects the next node based on a balance between proximity to the current truck position and the potential for future workload balancing, considering newly added nodes by evaluating potential waiting times.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    best_score = float('inf')\n    best_node = None\n\n    for i, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        total_distance = 0\n        \n        for truck_pos in all_truck_pos:\n            total_distance += np.linalg.norm(truck_pos - customer)\n        \n        workload_balance_factor = total_distance / (len(all_truck_pos) + 1)\n        \n        score = distance + workload_balance_factor\n\n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+          "objective": 57.74688,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This algorithm selects the next node by choosing the unvisited customer that minimizes the weighted sum of the distance from the current truck position and the average distance from all trucks, prioritizing closer nodes to the truck for efficiency but considering global balance as well.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return 'None'\n    \n    min_distance = float('inf')\n    best_node = None\n\n    for idx, node in enumerate(unvisited_customers):\n        distance_to_cur_pos = np.linalg.norm(node - cur_truck_pos)\n        avg_distance_to_all_trucks = np.mean([np.linalg.norm(node - truck_pos) for truck_pos in all_truck_pos])\n        weighted_distance = distance_to_cur_pos + avg_distance_to_all_trucks\n        \n        if weighted_distance < min_distance:\n            min_distance = weighted_distance\n            best_node = idx\n    \n    return best_node",
+          "objective": 59.06342,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm, Dynamic Greedy-Collaborative Optimal Waiting (DG-COW), iteratively selects the next node for a truck by minimizing a cost function that considers the distance to unvisited nodes, distance to the depot, other trucks' positions, and potential waiting at the current node for incoming nodes, balancing exploration and opportunistic collaboration among trucks.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    num_unvisited = len(unvisited_customers)\n    customer_distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    depot_distance = np.linalg.norm(cur_truck_pos - depot_pos)\n    \n    other_trucks_penalty = np.zeros(num_unvisited)\n    for i in range(num_unvisited):\n        for truck_pos in all_truck_pos:\n            if np.array_equal(truck_pos, cur_truck_pos):\n                continue\n            other_trucks_penalty[i] += 1 / (np.linalg.norm(unvisited_customers[i] - truck_pos) + 1e-5)\n    \n    wait_penalty = np.zeros(num_unvisited)\n    if np.random.rand() < 0.1:  # Allow randomness for waiting if no nodes are preferable\n        wait_penalty = np.full(num_unvisited, -np.inf)\n    \n    cost = customer_distances - other_trucks_penalty + wait_penalty + depot_distance * 0.1\n    \n    best_node = np.argmin(cost)\n    return best_node",
+          "objective": 137.29684,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "``` \n#My novel algorithm selects the next node for a truck based on the closest unvisited customer and the number of other trucks heading to that customer, aiming to balance the workload and minimize total completion time.\n\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_dist = np.inf\n    for i, customer in enumerate(unvisited_customers):\n        dist = np.linalg.norm(np.array(cur_truck_pos) - np.array(customer))\n        num_trucks_heading_to_customer = sum([1 for pos in all_truck_pos if tuple(pos) == tuple(customer)])\n        if dist < min_dist and num_trucks_heading_to_customer < 2:\n            min_dist = dist\n            best_node = i\n    return best_node",
+     "objective": 44.92087,
+     "other_inf": null
+}

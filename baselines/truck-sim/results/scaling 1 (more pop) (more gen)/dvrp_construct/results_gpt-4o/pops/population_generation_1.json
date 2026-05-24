@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "The algorithm calculates a priority index using a balance of urgency factors like inverse square distance, \n# base centrality for network impact, and an adaptability factor tied to current traffic, aiming for dynamic adaptability.",
+          "code": "import numpy as np\n\n# Backbone idea: Evaluating potential next stops based on multiple dynamic criteria \n# (distance, demand, load, impact) to adaptively optimize routes.\n\n# {The algorithm calculates a priority index using a balance of urgency factors like inverse square distance, \n# base centrality for network impact, and an adaptability factor tied to current traffic, aiming for dynamic adaptability.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    priority_indices = []\n    for idx, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer) ** 2\n        centrality_impact = 1 / (1 + np.linalg.norm(depot_pos - customer))\n        adaptability_factor = np.std([np.linalg.norm(pos - customer) for pos in all_truck_pos])\n        priority_index = 1 / distance + centrality_impact + adaptability_factor\n        priority_indices.append(priority_index)\n    \n    best_node = np.argmax(priority_indices)\n    return best_node",
+          "objective": 44.08067,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm prioritizes selecting the nearest unvisited customer from the current truck position or returns 'None' to wait if a new customer is expected to be added soon, aiming to minimize the completion time for the entire fleet.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    distances = [np.linalg.norm(cur_truck_pos - customer_pos) for customer_pos in unvisited_customers]\n    best_node = np.argmin(distances)\n    \n    # Placeholder for anticipated dynamic conditions; currently selects closest unvisited customer\n    # if expected_new_customer and condition_met:\n    #     return None\n    \n    return best_node",
+          "objective": 44.92087,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm dynamically selects the next node by calculating a weighted combination of the distance to each customer and their current demand, aiming to optimize the overall route efficiency and adaptively responding to newly added customers.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    weights = []\n    for idx, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        demand_weight = 1 / (1 + np.linalg.norm(depot_pos - customer))\n        weights.append(distance * demand_weight)\n    \n    best_node = np.argmin(weights)\n    return best_node",
+          "objective": 45.65139,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next customer by prioritizing nodes with the shortest Euclidean distance adjusted by a factor that represents the number of trucks already close to that customer, encouraging even distribution of trucks across the customer nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    weights = []\n    for idx, customer in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer)\n        proximity_penalty = sum(np.linalg.norm(truck_pos - customer) < 1 for truck_pos in all_truck_pos)\n        weights.append(distance * (1 + proximity_penalty))\n    \n    best_node = np.argmin(weights)\n    return best_node",
+          "objective": 45.76593,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm prioritizes next stops by combining weighted metrics: direct distance, average proximity to current truck positions, and a dynamic penalty for crowdedness, focusing on dispersion and effective reach.",
+          "code": "import numpy as np\n\n# {The algorithm prioritizes next stops by combining weighted metrics: direct distance, average proximity to current truck positions, and a dynamic penalty for crowdedness, focusing on dispersion and effective reach.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    priority_indices = []\n    for idx, customer in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer)\n        avg_proximity = np.mean([np.linalg.norm(pos - customer) for pos in all_truck_pos])\n        crowdedness_penalty = np.sum([np.exp(-np.linalg.norm(pos - customer)) for pos in all_truck_pos])\n        priority_index = 1 / (direct_distance + 1e-5) + avg_proximity - crowdedness_penalty\n        priority_indices.append(priority_index)\n    \n    best_node = np.argmax(priority_indices)\n    return best_node",
+          "objective": 46.05292,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node based on a weighted combination of direct distance, median proximity to all truck positions, and a dynamic incentive for reaching less-visited areas, emphasizing distribution and coverage.",
+          "code": "import numpy as np\n\n# {The algorithm selects the next node based on a weighted combination of direct distance, median proximity to all truck positions, and a dynamic incentive for reaching less-visited areas, emphasizing distribution and coverage.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    priority_indices = []\n    for idx, customer in enumerate(unvisited_customers):\n        direct_distance = np.linalg.norm(cur_truck_pos - customer)\n        median_proximity = np.median([np.linalg.norm(pos - customer) for pos in all_truck_pos])\n        low_visit_incentive = np.sum([1 / (1 + np.linalg.norm(pos - customer)) for pos in all_truck_pos])\n        priority_index = 1 / (direct_distance + 1e-5) + median_proximity + low_visit_incentive\n        priority_indices.append(priority_index)\n    \n    best_node = np.argmax(priority_indices)\n    return best_node",
+          "objective": 48.09399,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm dynamically adjusts priority metrics by interleaving distance with an estimated completion impact for each customer based on the remaining customers' dispersion.",
+          "code": "import numpy as np\n\n# The common backbone idea in the provided algorithms is: evaluating the next node choice by combining different priority metrics, such as distance and time, to make a decision.\n# {The new algorithm dynamically adjusts priority metrics by interleaving distance with an estimated completion impact for each customer based on the remaining customers' dispersion.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    all_distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    all_dispersion_impacts = np.zeros(len(unvisited_customers))\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        subset_customers = np.delete(unvisited_customers, i, axis=0)\n        if len(subset_customers) > 0:\n            centroid = np.mean(subset_customers, axis=0)\n            dispersion = np.mean(np.linalg.norm(subset_customers - centroid, axis=1))\n            all_dispersion_impacts[i] = dispersion\n\n    combined_metric = all_distances - all_dispersion_impacts\n    best_node = int(np.argmin(combined_metric))\n\n    return best_node",
+          "objective": 49.32063,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next customer to visit by considering both the distance to each unvisited customer and the potential waiting time for new customer additions, thus balancing immediate proximity with anticipation of future nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n    \n    current_distances = [np.linalg.norm(cur_truck_pos - customer_pos) for customer_pos in unvisited_customers]\n    \n    # Simulating a placeholder function that would estimate waiting times for new customers\n    # Here we simply use a fraction of the distance as a proxy for potential waiting gain\n    estimated_waiting_gains = [0.1 * np.linalg.norm(depot_pos - customer_pos) for customer_pos in unvisited_customers]\n    \n    # Composite score by combining distance and waiting gain\n    scores = [distance - waiting_gain for distance, waiting_gain in zip(current_distances, estimated_waiting_gains)]\n    \n    best_node = np.argmin(scores)\n    \n    return best_node",
+          "objective": 49.82603,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This algorithm introduces an equal-weighted harmony index that considers path efficiency with a combination of straight-line desirability, load distribution, and congestion, enhancing route versatility.",
+          "code": "import numpy as np\n\n# {This algorithm introduces an equal-weighted harmony index that considers path efficiency with a combination of straight-line desirability, load distribution, and congestion, enhancing route versatility.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    harmony_indices = []\n    for idx, customer in enumerate(unvisited_customers):\n        straight_line_desirability = 1 / np.linalg.norm(cur_truck_pos - customer)\n        load_distribution = 1 / (1 + np.sum([np.linalg.norm(pos - customer) for pos in all_truck_pos]))\n        congestion_factor = np.mean([np.linalg.norm(depot_pos - pos) for pos in all_truck_pos])\n        harmony_index = (straight_line_desirability + load_distribution + congestion_factor) / 3\n        harmony_indices.append(harmony_index)\n    \n    best_node = np.argmax(harmony_indices)\n    return best_node",
+          "objective": 50.16696,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm calculates a priority index using inverse distance weighting combined with demand centrality and a congestion consideration based on proximity to other trucks for flexible route adaptation.",
+          "code": "import numpy as np\n\n# {The algorithm calculates a priority index using inverse distance weighting combined with demand centrality and a congestion consideration based on proximity to other trucks for flexible route adaptation.}\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    priority_indices = []\n    for idx, customer in enumerate(unvisited_customers):\n        inverse_distance = 1 / np.linalg.norm(cur_truck_pos - customer)\n        demand_centrality = 1 / (1 + np.linalg.norm(depot_pos - customer) ** 2)\n        congestion_factor = np.mean([1 / (np.linalg.norm(pos - customer) + 1e-5) for pos in all_truck_pos])\n        priority_index = inverse_distance + demand_centrality - congestion_factor\n        priority_indices.append(priority_index)\n    \n    best_node = np.argmax(priority_indices)\n    return best_node",
+          "objective": 50.59061,
+          "other_inf": null
+     }
+]

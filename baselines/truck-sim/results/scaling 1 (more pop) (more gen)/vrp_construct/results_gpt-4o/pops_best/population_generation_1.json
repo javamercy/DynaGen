@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm assigns a score focusing on a balance between the shortest distance to the unvisited nodes and the impact of nearby truck locations, penalizing nodes closer to other trucks, and selects the node with the highest adjusted score or returns to the depot if necessary.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    \"\"\"\n    {The algorithm assigns a score focusing on a balance between the shortest distance to the unvisited nodes and the impact of nearby truck locations, penalizing nodes closer to other trucks, and selects the node with the highest adjusted score or returns to the depot if necessary.}\n    \"\"\"\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    max_score = -np.inf\n    next_node = depot_node\n    \n    for node in unvisited_nodes:\n        distance_to_node = distance_matrix[current_node, node]\n        truck_proximity_penalty = np.mean([distance_matrix[truck, node] for truck in truck_nodes])\n        \n        score = -distance_to_node + truck_proximity_penalty\n\n        if score > max_score:\n            max_score = score\n            next_node = node\n\n    return next_node",
+     "objective": 25.01978,
+     "other_inf": null
+}

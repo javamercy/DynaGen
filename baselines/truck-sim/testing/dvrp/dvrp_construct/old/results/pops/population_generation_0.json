@@ -1,0 +1,8 @@
+[
+     {
+          "algorithm": "\nNovel algorithm: The algorithm selects the next node based on the closest unvisited node to the current node, factoring in the distance to the destination node and the time spent waiting at nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances = distance_matrix[current_node, unvisited_nodes]\n    time_to_destination = distance_matrix[current_node, destination_node]\n    wait_times = np.random.randint(0, 10, size=len(unvisited_nodes))  # generate random wait times for each unvisited node\n    total_times = distances + wait_times + time_to_destination\n    next_node = unvisited_nodes[np.argmin(total_times)]\n    \n    return next_node",
+          "objective": 151.74885,
+          "other_inf": null
+     }
+]

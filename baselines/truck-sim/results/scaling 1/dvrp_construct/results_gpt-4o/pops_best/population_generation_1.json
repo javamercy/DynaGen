@@ -1,0 +1,6 @@
+{
+     "algorithm": "The proposed algorithm uses a priority mechanism based on distance and truck workload to select the next customer, factoring in potential waiting when advantageous, aiming to minimize the overall completion time for all trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n\n    # Calculate distances to all unvisited customers\n    distances = np.linalg.norm(unvisited_customers - cur_truck_pos, axis=1)\n    \n    # Calculate the distance for each truck to return to the depot\n    return_distances = np.linalg.norm([truck - depot_pos for truck in all_truck_pos], axis=1)\n    \n    # Combine distance to customers and return to depot to prioritize unvisited customers\n    priorities = distances + 0.5 * return_distances.mean()\n    \n    # Select the index of the minimum priority\n    best_node = np.argmin(priorities)\n    \n    return best_node",
+     "objective": 44.92087,
+     "other_inf": null
+}

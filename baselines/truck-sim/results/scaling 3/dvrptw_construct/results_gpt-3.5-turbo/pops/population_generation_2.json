@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nIntroduce a new algorithm called \"Time-aware Fastest Next Node Selection Algorithm\" that considers time windows and minimizes the time for the last truck to finish by prioritizing the closest node that can be visited within its time window or waiting at a node if necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = -1\n    min_time_to_node = float('inf')\n\n    for i, customer in enumerate(unvisited_customers):\n        dist_to_node = np.linalg.norm(cur_truck_pos - customer)\n        travel_time = dist_to_node / truck_speed\n        \n        if current_time + travel_time <= time_windows[i][1]:\n            wait_time = max(0, time_windows[i][0] - (current_time + travel_time))\n            total_time_to_node = current_time + travel_time + wait_time\n            if total_time_to_node < min_time_to_node:\n                min_time_to_node = total_time_to_node\n                best_node = i\n\n    if best_node == -1:\n        for i, customer in enumerate(unvisited_customers):\n            dist_to_node = np.linalg.norm(cur_truck_pos - customer)\n            travel_time = dist_to_node / truck_speed\n            wait_time = max(0, time_windows[i][0] - (current_time + travel_time))\n            total_time_to_node = current_time + travel_time + wait_time\n            if total_time_to_node < min_time_to_node:\n                min_time_to_node = total_time_to_node\n                best_node = i\n\n    return best_node",
+          "objective": 59.67968,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm iteratively selects the next node for the truck to visit based on a combination of minimizing travel time, adhering to time windows, and considering waiting time at nodes when necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_time = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        travel_time = np.linalg.norm(cur_truck_pos - customer_pos) / truck_speed\n        wait_time = max(0, time_windows[i][0] - current_time) if current_time < time_windows[i][0] else 0\n        total_time = current_time + travel_time + wait_time\n\n        if total_time < min_time:\n            best_node = i\n            min_time = total_time\n    \n    return best_node",
+          "objective": 71.14741,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm iteratively calculates the time it takes to reach each unvisited customer and returns the index of the customer with the lowest total time, factoring in the penalty for missing time windows and the option to wait at a node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_time = float('inf')\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(customer_pos - cur_truck_pos)\n        arrival_time = current_time + distance_to_customer / truck_speed\n        \n        if time_windows[idx][0] <= arrival_time <= time_windows[idx][1]:\n            total_time = arrival_time\n        elif arrival_time < time_windows[idx][0]:\n            total_time = time_windows[idx][0] + (time_windows[idx][0] - arrival_time)\n        else:\n            wait_time = arrival_time - time_windows[idx][1]\n            total_time = arrival_time + wait_time\n        \n        if total_time < best_time:\n            best_time = total_time\n            best_node = idx\n    \n    return best_node",
+          "objective": 71.3661,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm aims to balance minimizing travel time and wait time by dynamically adjusting weights based on real-time data, considering the distance, speed of the truck, and time windows of customers.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    weighted_sum = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = dist_to_node / truck_speed\n        wait_time = max(0, time_windows[i][0] - (current_time + travel_time))\n        total_time = current_time + travel_time + wait_time\n        \n        # Adjust weights based on real-time data\n        weighted_total_time = 0.4 * travel_time + 0.5 * wait_time + 0.1 * (current_time - time_windows[i][0])\n\n        if weighted_total_time < weighted_sum:\n            best_node = i\n            weighted_sum = weighted_total_time\n    \n    return best_node",
+          "objective": 80.12826,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to prioritize minimizing travel time by adjusting weights based on real-time data, considering the distance, speed of the truck, and time windows of customers, with the score function parameters set as 0.6 for travel time, 0.3 for wait time, and 0.1 for deviation from the time window.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    weighted_sum = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        dist_to_node = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = dist_to_node / truck_speed\n        wait_time = max(0, time_windows[i][0] - (current_time + travel_time))\n        total_time = current_time + travel_time + wait_time\n        \n        # Adjust weights based on real-time data\n        weighted_total_time = 0.6 * travel_time + 0.3 * wait_time + 0.1 * abs(current_time - time_windows[i][0])\n\n        if weighted_total_time < weighted_sum:\n            best_node = i\n            weighted_sum = weighted_total_time\n    \n    return best_node",
+          "objective": 81.2387,
+          "other_inf": null
+     }
+]

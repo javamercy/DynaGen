@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nCreate a new algorithm that adjusts the penalty factor dynamically based on the number of times an edge has been used, increasing the penalty for more frequently used edges to promote exploration of alternative routes and also reducing the penalty if there are no alternative routes found, aiming to balance exploration and exploitation.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            edge_length = edge_distance[edge_id[0], edge_id[1]]\n            penalty_factor = 0.1 + 0.1 * edge_n_used[edge_id[0], edge_id[1]]\n            \n            if np.sum(edge_n_used) == 0 or np.max(edge_n_used) == 1:\n                penalty_factor *= 0.5\n            \n            edge_penalty = penalty_factor * edge_length\n            updated_edge_distance[edge_id[0], edge_id[1]] += edge_penalty\n            updated_edge_distance[edge_id[1], edge_id[0]] += edge_penalty\n    \n    return updated_edge_distance",
+          "objective": 16.08146,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nCreate a new algorithm that penalizes edges differently based on the product of their length and the number of times they have been used, with a higher penalty factor to encourage exploration of shorter routes and avoid local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    penalty_factor = 0.2\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            edge_length = edge_distance[edge_id[0], edge_id[1]]\n            edge_penalty = penalty_factor * edge_length * edge_n_used[edge_id[0], edge_id[1]]\n            updated_edge_distance[edge_id[0], edge_id[1]] += edge_penalty\n            updated_edge_distance[edge_id[1], edge_id[0]] += edge_penalty\n    \n    return updated_edge_distance",
+          "objective": 16.9938,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nUpdate the edge distance matrix by increasing the distances of edges that are commonly used in the local optimal tours and decreasing the distances of less frequently used edges based on a specified threshold to encourage diversity. \n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    threshold = 0.1 * np.max(edge_n_used)\n    \n    frequently_used_edges = np.where(edge_n_used >= threshold)[0]\n    infrequently_used_edges = np.where(edge_n_used < threshold)[0]\n    \n    for edge_idx in frequently_used_edges:\n        increase_amount = np.random.uniform(low=0.01, high=0.1)\n        updated_edge_distance[np.unravel_index(edge_idx, edge_distance.shape)] += increase_amount\n    \n    for edge_idx in infrequently_used_edges:\n        decrease_amount = np.random.uniform(low=0.1, high=0.5)\n        updated_edge_distance[np.unravel_index(edge_idx, edge_distance.shape)] -= decrease_amount\n        \n    return updated_edge_distance",
+          "objective": 17.15402,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by selecting a subset of edges used in the local optimal tours, decreasing their distances by a fixed amount proportional to the number of times they were used, and then increasing the distances of all other edges by a smaller random amount to encourage exploration and avoid local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.random.choice(np.arange(len(edge_distance)), size=int(len(edge_distance)*0.1), replace=False)\n    \n    for edge_idx in selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        times_used = edge_n_used[edge]\n        decrease_amount = 0.2 * times_used\n        updated_edge_distance[edge] -= decrease_amount\n        \n    for edge_idx in range(len(edge_distance)):\n        if edge_idx not in selected_edges:\n            edge = np.unravel_index(edge_idx, edge_distance.shape)\n            increase_amount = np.random.uniform(low=0.01, high=0.1)\n            updated_edge_distance[edge] += increase_amount\n        \n    return updated_edge_distance",
+          "objective": 18.30508,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by selecting a subset of edges used in the local optimal tours, decreasing their distances by a random amount proportional to the number of times they were used, and then increasing the distances of other edges by a larger random amount to encourage more exploration and avoid local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.random.choice(np.arange(len(edge_distance)), size=int(len(edge_distance)*0.1), replace=False)\n    \n    for edge_idx in selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        times_used = edge_n_used[edge]\n        decrease_amount = np.random.uniform(low=0.2, high=1.0) * times_used\n        updated_edge_distance[edge] -= decrease_amount\n        \n    non_selected_edges = np.setdiff1d(np.arange(len(edge_distance)), selected_edges)\n    for edge_idx in non_selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        increase_amount = np.random.uniform(low=0.1, high=0.5)\n        updated_edge_distance[edge] += increase_amount\n        \n    return updated_edge_distance",
+          "objective": 18.67934,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nDesign a new algorithm to update the edge distance matrix by selecting a subset of edges from local optimal tours and increasing their distances based on the sum of distances in those tours.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.unique([edge for tour in local_opt_tours for edge in tour])\n    \n    for edge in selected_edges:\n        total_distance = sum([edge_distance[edge] for tour in local_opt_tours if edge in tour])\n        increase_amount = np.random.uniform(low=0.1, high=0.5) * total_distance\n        updated_edge_distance[edge] += increase_amount\n    \n    return updated_edge_distance",
+          "objective": 19.08598,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by selecting a subset of edges used in the local optimal tours, decreasing their distances by a random amount proportional to the number of times they were used, and then increasing the distances of other edges by a smaller random amount to encourage exploration and avoid local optima, but with different random values and proportions.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.random.choice(np.arange(len(edge_distance)), size=int(len(edge_distance)*0.2), replace=False)\n    \n    for edge_idx in selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        times_used = edge_n_used[edge]\n        decrease_amount = np.random.uniform(low=0.2, high=0.6) * times_used\n        updated_edge_distance[edge] -= decrease_amount\n        \n    non_selected_edges = np.setdiff1d(np.arange(len(edge_distance)), selected_edges)\n    for edge_idx in non_selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        increase_amount = np.random.uniform(low=0.02, high=0.1)\n        updated_edge_distance[edge] += increase_amount\n        \n    return updated_edge_distance",
+          "objective": 19.63316,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nCreate a new edge distance matrix by adding a penalty to edges used in local optimal tours based on the number of times they were used, with the goal of discouraging the algorithm from revisiting the same edges too often and encouraging exploration of new routes.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    penalty_factor = 0.1\n    \n    for tour in local_opt_tours:\n        for i in range(len(tour)-1):\n            edge_id = (tour[i], tour[i+1])\n            updated_edge_distance[edge_id[0], edge_id[1]] += penalty_factor * edge_n_used[edge_id[0], edge_id[1]]\n            updated_edge_distance[edge_id[1], edge_id[0]] += penalty_factor * edge_n_used[edge_id[1], edge_id[0]]\n    \n    return updated_edge_distance",
+          "objective": 20.05385,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by randomly selecting a subset of edges used in the local optimal tours, decreasing their distances by a random amount proportional to the square of the number of times they were used, and then increasing the distances of other edges by a smaller random amount to encourage exploration and avoid local optima, with different random values and proportions.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.random.choice(np.arange(len(edge_distance)), size=int(len(edge_distance)*0.2), replace=False)\n    \n    for edge_idx in selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        times_used = edge_n_used[edge]\n        decrease_amount = np.random.uniform(low=0.2, high=0.6) * times_used**2\n        updated_edge_distance[edge] -= decrease_amount\n        \n    non_selected_edges = np.setdiff1d(np.arange(len(edge_distance)), selected_edges)\n    for edge_idx in non_selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        increase_amount = np.random.uniform(low=0.02, high=0.1)\n        updated_edge_distance[edge] += increase_amount\n        \n    return updated_edge_distance",
+          "objective": 20.64593,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by selecting a subset of edges used in the local optimal tours, decreasing their distances by a random amount inversely proportional to the number of times they were used, and then increasing the distances of other edges by a smaller random amount to encourage exploration and avoid local optima.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    selected_edges = np.random.choice(np.arange(len(edge_distance)), size=int(len(edge_distance)*0.1), replace=False)\n    \n    for edge_idx in selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        times_used = edge_n_used[edge]\n        decrease_amount = np.random.uniform(low=0.1, high=0.5) / times_used\n        updated_edge_distance[edge] -= decrease_amount\n        \n    non_selected_edges = np.setdiff1d(np.arange(len(edge_distance)), selected_edges)\n    for edge_idx in non_selected_edges:\n        edge = np.unravel_index(edge_idx, edge_distance.shape)\n        increase_amount = np.random.uniform(low=0.01, high=0.1)\n        updated_edge_distance[edge] += increase_amount\n        \n    return updated_edge_distance",
+          "objective": 20.74694,
+          "other_inf": null
+     }
+]

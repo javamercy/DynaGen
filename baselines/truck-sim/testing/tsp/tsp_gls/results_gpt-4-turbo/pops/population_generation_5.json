@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "Incrementally increase edge weights in the local optimal tour based on their frequencies of use from `edge_n_used`, encouraging exploration of less traveled routes.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    \n    # Updating edge weights using a factor based on the usage frequency\n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        usage_factor = edge_n_used[from_node, to_node]\n        \n        # Increase weight by a factor depending on its use frequency\n        # Add a simple inverse factor based approach, more usage less increase to push for less traversed paths\n        updated_edge_distance[from_node, to_node] += (1 / (1 + usage_factor))\n        updated_edge_distance[to_node, from_node] += (1 / (1 + usage_factor))  # assuming undirected graph scenario\n        \n    return updated_edge_distance",
+          "objective": -2.39419,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm applies a penalization to edges inversely related to their usage frequency, but unlike the original, it uses a quadratic rank discount factor and adjusts for global usage stiffness through a logarithmic mapping, aiming to smooth out extremes.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    usage_values = []\n    \n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        usage_values.append((edge_n_used[from_node, to_node], from_node, to_node))\n    \n    # Rank edges by usage frequency within local path\n    usage_values.sort()\n    rank_discount_factor = np.linspace(1, 0.1, n)**2  # Quadratic discount factor for diversity\n    \n    for idx, (_, from_node, to_node) in enumerate(usage_values):\n        discount_factor = rank_discount_factor[idx]\n        usage_count = edge_n_used[from_node, to_node]\n        inverse_usage_penalty = 1.0 / (usage_count + 1)\n        log_usage_adjustment = np.log(usage_count + 1)\n\n        # Apply quadratic penalty, discount based on rank, and logarithmic adjustment for extremes\n        penalty = inverse_usage_penalty * discount_factor / log_usage_adjustment\n        updated_edge_distance[from_node, to_node] += penalty\n        updated_edge_distance[to_node, from_node] += penalty  # Symmetric update\n\n    return updated_edge_distance",
+          "objective": -2.38052,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Increase the distance of edges based on their frequency in the local optimal tour, utilizing a feedback mechanism to enhance diversity by adding oscillatory penalties.",
+          "code": "import numpy as np\nimport math\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    \n    # Calculate frequency of each edge in the local tour\n    local_usage_freq = np.zeros_like(edge_distance)\n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        local_usage_freq[from_node, to_node] += 1\n        local_usage_freq[to_node, from_node] += 1  # Symmetric update for undirected graph assumption\n    \n    # Update weights: penalty proportional to usage, with oscillatory term\n    for i in range(n):\n        for j in range(n):\n            if local_usage_freq[i, j] > 0:  # Apply modifications only to edges used in the tour\n                oscillatory_penalty = math.sin(edge_n_used[i, j])  # Oscillatory feedback to penalize repeated edge usage uniquely\n                usage_penalty = local_usage_freq[i, j] / (edge_n_used[i, j] + 1)  # Traditional frequency-based usage penalty\n                updated_edge_distance[i, j] += usage_penalty + oscillatory_penalty\n                updated_edge_distance[j, i] += usage_penalty + oscillatory_penalty  # Symmetric update\n\n    return updated_edge_distance",
+          "objective": -2.35498,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm updates the distances by adding a penalty which is inversely proportional to the edge frequency, and it applies a randomness factor to diversify exploration.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    max_usage = np.max(edge_n_used) + 1  # To avoid zero division and ensure penalties even for the most used edge\n    \n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        \n        # Adding penalty inversely proportional to usage and add random factor to encourage exploration\n        penalty = 1 / (edge_n_used[from_node, to_node] + 1) + 0.01 * np.random.rand()\n        updated_edge_distance[from_node, to_node] += penalty\n        updated_edge_distance[to_node, from_node] += penalty  # assuming symmetry in the graph\n    \n    return updated_edge_distance",
+          "objective": -2.35106,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    n = len(local_opt_tour)\n    \n    for i in range(n):\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % n]\n        usage_count = edge_n_used[from_node, to_node]\n        \n        # Modify penalty to have a quadratic decay based on usage frequency, focusing more heavily on less traveled edges\n        penalty = 1 / (1 + usage_count**2)\n        updated_edge_distance[from_node, to_node] += penalty\n        updated_edge_distance[to_node, from_node] += penalty  # assuming symmetry in the graph\n\n    return updated_edge_distance",
+          "objective": -2.34664,
+          "other_inf": null
+     }
+]

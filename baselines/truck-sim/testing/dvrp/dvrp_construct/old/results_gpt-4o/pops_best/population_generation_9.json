@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm gives higher priority to nodes based on a weighted combination of inverse travel time and node isolation, while dynamically adjusting the importance of truck clustering over time.",
+     "code": "import numpy as np\n\n# {The new algorithm gives higher priority to nodes based on a weighted combination of inverse travel time and node isolation, while dynamically adjusting the importance of truck clustering over time.}\n\ndef select_next_node(current, destination, trucks, unvisited):\n    if not unvisited:\n        return None\n\n    best_score = float('-inf')\n    next_destination = None\n\n    current_position_array = np.array(current)\n    \n    # Calculate dynamic weight based on time\n    total_nodes = len(unvisited)\n    dynamic_weight = 1 - (total_nodes / (total_nodes + 1))\n\n    for idx, node in enumerate(unvisited):\n        node_array = np.array(node)\n        travel_time = np.linalg.norm(node_array - current_position_array)\n\n        isolation_score = np.sum([np.linalg.norm(node_array - np.array(truck)) for truck in trucks])\n\n        score = (1 / (travel_time + 1)) + dynamic_weight * isolation_score\n\n        if score > best_score:\n            best_score = score\n            next_destination = idx\n\n    return next_destination",
+     "objective": 29.18975,
+     "other_inf": null
+}

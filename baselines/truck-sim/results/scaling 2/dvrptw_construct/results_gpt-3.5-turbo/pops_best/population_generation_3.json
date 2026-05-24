@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm aims to prioritize visiting customers with the shortest distance from the current truck position while ensuring they are within their respective time windows, by calculating a combined score based on distance and time window constraints.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_combined_score = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = distance / truck_speed\n        \n        start_window, end_window = time_windows[i]\n        \n        if current_time + travel_time <= end_window and current_time + travel_time >= start_window:\n            combined_score = distance + (end_window - current_time)\n            \n            if combined_score < min_combined_score:\n                min_combined_score = combined_score\n                best_node = i\n    \n    return best_node",
+     "objective": 113.18311,
+     "other_inf": null
+}

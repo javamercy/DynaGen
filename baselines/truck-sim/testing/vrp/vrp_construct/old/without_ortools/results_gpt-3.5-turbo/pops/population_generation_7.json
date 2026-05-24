@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the node that has the shortest distance to the destination among the unvisited nodes, breaking ties randomly.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] < shortest_distance:\n            shortest_distance = distance_matrix[current_node][node]\n            next_node = node\n        elif distance_matrix[current_node][node] == shortest_distance:\n            if np.random.randint(2) == 0:\n                next_node = node\n                \n    return next_node",
+          "objective": 3.25721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: At each step, select the next node by taking the average of the Euclidean distance and the square root of the distance from the current node to each unvisited node, and choose the node with the minimum average.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_avg = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        sum_sqrt_dist = np.sqrt(distance_matrix[current_node][node]) + np.sqrt(distance_matrix[node][destination_node])\n        avg_dist = (euclidean_distance + sum_sqrt_dist) / 2\n        if avg_dist < min_avg:\n            min_avg = avg_dist\n            next_node = node\n    \n    return next_node",
+          "objective": 3.30721,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: At each step, select the next node by calculating the product of the Euclidean distance and the square root of the distance from the current node to each unvisited node, and choose the node with the minimum product.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        sqrt_dist = np.sqrt(distance_matrix[current_node][node]) * np.sqrt(distance_matrix[node][destination_node])\n        product_dist = euclidean_distance * sqrt_dist\n        if product_dist < min_product:\n            min_product = product_dist\n            next_node = node\n    \n    return next_node",
+          "objective": 3.35224,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: At each step, select the next node by choosing the node with the shortest Manhattan distance from the current node among the unvisited nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        manhattan_distance = np.sum(np.abs(distance_matrix[current_node] - distance_matrix[node]))\n        if manhattan_distance < shortest_distance:\n            shortest_distance = manhattan_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 3.36107,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Novel algorithm: At each step, select the next node by choosing the node with the shortest Euclidean distance from the current node among the unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    shortest_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        euclidean_distance = np.linalg.norm(distance_matrix[current_node] - distance_matrix[node])\n        if euclidean_distance < shortest_distance:\n            shortest_distance = euclidean_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 3.39339,
+          "other_inf": null
+     }
+]

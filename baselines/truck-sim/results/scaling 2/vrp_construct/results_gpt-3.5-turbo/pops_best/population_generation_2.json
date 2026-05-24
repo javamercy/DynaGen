@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nA novel algorithm that selects the next node for a fleet of trucks based on the maximum reduction in total distance when a truck visits that node, calculated by subtracting two times the distance to the current node from the distance to the depot and the distance to unvisited nodes.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    reduction_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        distance_to_node = distance_matrix[current_node][node]\n        distance_to_depot = distance_matrix[node][depot_node]\n        \n        reduction_scores[i] = distance_to_depot - (2 * distance_to_node)\n    \n    next_node_idx = np.argmax(reduction_scores)\n    next_node = unvisited_nodes[next_node_idx]\n    \n    return next_node",
+     "objective": 29.21889,
+     "other_inf": null
+}

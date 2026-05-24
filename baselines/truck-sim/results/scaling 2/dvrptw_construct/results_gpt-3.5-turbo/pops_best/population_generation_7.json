@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe common backbone idea in the provided algorithms is to calculate a score for each customer based on different factors such as distance, time windows, waiting time, and urgency, and then select the customer with the best score as the next node to visit.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_custom_score = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = distance / truck_speed\n        \n        start_window, end_window = time_windows[i]\n        waiting_time = max(0, start_window - current_time)\n        \n        urgency = (end_window - current_time) / (end_window - start_window)\n        custom_score = distance + 2*waiting_time + urgency\n        \n        if custom_score < min_custom_score:\n            min_custom_score = custom_score\n            best_node = i\n    \n    return best_node",
+     "objective": 84.18893,
+     "other_inf": null
+}

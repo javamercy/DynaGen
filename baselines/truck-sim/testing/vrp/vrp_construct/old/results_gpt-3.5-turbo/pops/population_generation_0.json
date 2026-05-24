@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the closest distance to the current node, the destination node, and the unvisited nodes with a lower weight given to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    available_nodes = np.copy(unvisited_nodes)\n    available_nodes = available_nodes[available_nodes != current_node]\n    \n    if len(available_nodes) == 1:\n        return available_nodes.item()\n    \n    current_dist = distance_matrix[current_node, available_nodes]\n    dest_dist = distance_matrix[destination_node, available_nodes]\n    \n    scores = current_dist - dest_dist * 0.5\n    \n    next_node = available_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 31.54531,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: The algorithm selects the next node based on a combination of the shortest distance to unvisited nodes and the number of times each node has been visited by other trucks, in order to balance the load on each truck.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    distances_to_unvisited_nodes = distance_matrix[current_node][unvisited_nodes]\n    min_distance_index = np.argmin(distances_to_unvisited_nodes)\n\n    times_visited = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        times_visited[i] = np.count_nonzero(destination_node == node)\n\n    balanced_distances = np.multiply(distances_to_unvisited_nodes, times_visited)\n\n    next_node = unvisited_nodes[np.argmin(balanced_distances)]\n\n    return next_node",
+          "objective": 40.1896,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe algorithm selects the next node based on the minimum distance to the destination node among the unvisited nodes, with a penalty added to nodes that have already been visited to encourage diversity in route selection.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    penalty = 1000\n    min_dist = np.inf\n    next_node = None\n\n    for node in unvisited_nodes:\n        if distance_matrix[current_node][node] + distance_matrix[node][destination_node] - penalty * (node not in unvisited_nodes) < min_dist:\n            min_dist = distance_matrix[current_node][node] + distance_matrix[node][destination_node] - penalty * (node not in unvisited_nodes)\n            next_node = node\n\n    return next_node",
+          "objective": 60.42945,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: At each step, select the next node with the smallest sum of distances to unvisited nodes and the destination node, with ties broken randomly.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_distance = np.inf\n\n    for node in unvisited_nodes:\n        dist_to_unvisited_nodes = np.sum(distance_matrix[node, unvisited_nodes])\n        dist_to_destination = distance_matrix[node, destination_node]\n        total_distance = dist_to_unvisited_nodes + dist_to_destination\n\n        if total_distance < min_distance:\n            min_distance = total_distance\n            next_node = node\n        elif total_distance == min_distance:\n            if np.random.random() > 0.5:\n                next_node = node\n\n    return next_node",
+          "objective": 283.94485,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the highest product of the distance from the current node to the unvisited node and the distance from the unvisited node to the destination node, normalized by the distance from the current node to the destination node, to balance exploring new nodes and moving towards the destination.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_product = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if node == current_node:\n            continue\n        \n        # Calculate the product of distances\n        product = distance_matrix[current_node, node] * distance_matrix[node, destination_node] / distance_matrix[current_node, destination_node]\n        \n        if product > max_product:\n            max_product = product\n            next_node = node\n    \n    return next_node",
+          "objective": 347.14022,
+          "other_inf": null
+     }
+]

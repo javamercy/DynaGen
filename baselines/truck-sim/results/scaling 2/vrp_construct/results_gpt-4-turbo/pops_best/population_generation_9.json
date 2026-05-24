@@ -1,0 +1,6 @@
+{
+     "algorithm": "Algorithm: \"Anticipatory Navigation with Sway (ANS)\": Selects the next node based on a calculated score from historical anticipation, proximity, and the repelling impact of nodes currently being visited by other trucks.\n\n```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if unvisited_nodes.size == 0:\n        return None\n\n    # Calculate historical anticipation factor\n    historical_factor = np.sum(distance_matrix[:, unvisited_nodes], axis=0) / distance_matrix.shape[0]\n\n    # Calculate proximity to current node\n    proximity = distance_matrix[current_node, unvisited_nodes]\n\n    # Repelling effect from other trucks' nodes\n    sway = np.isin(unvisited_nodes, truck_nodes).astype(int) * 100  # Large penalty to avoid chosen nodes\n\n    # Combine factors: proximity is better when smaller, historical larger is better\n    scores = proximity + historical_factor * -0.5 + sway\n\n    # Choose the node with the lowest score\n    next_node = unvisited_nodes[np.argmin(scores)]\n\n    return next_node",
+     "objective": 26.66619,
+     "other_inf": null
+}

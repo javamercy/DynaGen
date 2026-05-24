@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm aims to minimize the total distance traveled by all trucks by selecting the next node with the shortest distance from the current node, while also taking into account the waiting time at each node based on a weighted sum of the distances to unvisited nodes from the current node.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / dist for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        wait_time = len(unvisited_nodes) * 5  # 5 minutes wait time per unvisited node\n        total_score = weighted_distance_sum + wait_time\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+     "objective": 30.69309,
+     "other_inf": null
+}

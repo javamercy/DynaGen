@@ -1,0 +1,20 @@
+[
+     {
+          "algorithm": "The proposed algorithm prioritizes nodes based on a linear combination of the shortest distance and fewest subsequent options (lowest degree), dynamically updating the priority with each truck's movement.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    \n    # Calculate the distances from the current node to all unvisited nodes\n    distances = distance_matrix[current_node][unvisited_nodes]\n    \n    # Calculate degrees (number of remaining unvisited neighbors) for each unvisited node\n    degrees = np.sum(distance_matrix[unvisited_nodes][:, unvisited_nodes] > 0, axis=1)\n    \n    # Combine distances and degrees into a score, penalizing by higher degree and longer distance\n    scores = distances + 0.1 * degrees\n    \n    # Select the node with the minimum score\n    next_node = unvisited_nodes[np.argmin(scores)]\n    \n    return next_node",
+          "objective": 40.1896,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm is \"Adaptive Exploration with Weighted Decision Making,\" which dynamically selects the next node by weighting shortest distances with a decaying exploration factor that prioritizes lesser-visited and nearest nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    next_node = None\n    min_distance = float('inf')\n    # Weighting factor: encourages exploration of farther unvisited nodes as the unvisited list shrinks\n    exploration_factor = len(unvisited_nodes) / len(distance_matrix)\n    \n    for node in unvisited_nodes:\n        distance = distance_matrix[current_node][node]\n        # Weighted decision where closer nodes are privileged but with an exploration factor\n        weighted_score = distance - exploration_factor * np.random.random() * distance\n        if weighted_score < min_distance:\n            min_distance = weighted_score\n            next_node = node\n\n    return next_node",
+          "objective": 60.02342,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My algorithm, called \"Dynamic Collaboration Routing\" (DCR), assigns the next node based on minimizing a combined cost function that integrates shortest distance, load balancing among trucks, and dynamic adjustment for visited nodes; it calculates immediacy and feasibility weights for each unvisited node, chooses the best next node, or decides on waiting if all immediate nodes are inefficient.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n        \n    # Distances from the current node to all other nodes\n    distances = distance_matrix[current_node]\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if node == destination_node and len(unvisited_nodes) > 1:\n            continue\n        \n        # Calculating the immediacy weight: closer nodes are more immediate\n        immediacy = 1 / distances[node] if distances[node] != 0 else np.inf\n        \n        # Feasibility weight: preference not to end a route too soon if other nodes are available\n        feasibility = len(unvisited_nodes) - 1\n        \n        cost = immediacy * feasibility\n        \n        # Choosing the node with the maximum calculated cost (immediacy adjusted by feasibility)\n        if cost < min_distance:\n            min_distance = cost\n            next_node = node\n            \n    # If no viable next node is found, next_node will be None which signals to wait\n    return next_node",
+          "objective": 413.20453,
+          "other_inf": null
+     }
+]

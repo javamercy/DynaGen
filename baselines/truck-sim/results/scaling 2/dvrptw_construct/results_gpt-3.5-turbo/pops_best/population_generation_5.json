@@ -1,0 +1,6 @@
+{
+     "algorithm": "My new algorithm selects the next node for the truck to visit based on the combination of the shortest distance to the customer and the remaining time within the customer's time window.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_metric = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = distance / truck_speed\n        \n        start_window, end_window = time_windows[i]\n        \n        if current_time + travel_time <= end_window and current_time + travel_time >= start_window:\n            metric = distance * (end_window - current_time)\n            \n            if metric < min_metric:\n                min_metric = metric\n                best_node = i\n    \n    return best_node",
+     "objective": 103.63553,
+     "other_inf": null
+}

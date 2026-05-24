@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nNew algorithm: This algorithm selects the next node with the highest product of the sum of distances to all truck nodes and the inverse of the distance between the current node and the next node, while ensuring that there is at least one truck that can reach that node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    max_product = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance_to_trucks = np.sum([distance_matrix[truck_node][node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            if distance_to_next_node > 0:\n                product = total_distance_to_trucks * (1/distance_to_next_node)\n                if product > max_product:\n                    max_product = product\n                    next_node = node\n    \n    return next_node",
+          "objective": 21.28548,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: This algorithm selects the next node with the highest ratio of the total sum of distances to all truck nodes to the distance between the current node and the next node, while also ensuring that at least one truck can reach that node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    max_ratio = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance_to_trucks = np.sum([distance_matrix[truck_node][node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            if distance_to_next_node > 0:\n                ratio = total_distance_to_trucks / distance_to_next_node\n                if ratio > max_ratio:\n                    max_ratio = ratio\n                    next_node = node\n    \n    return next_node",
+          "objective": 25.10143,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: This algorithm selects the next node that maximizes the difference between the average distance to all truck nodes and the distance between the current node and the next node.\n\nSteps:\n1. Initialize max_difference to negative infinity and next_node to None.\n2. Iterate through unvisited_nodes:\n   a. Calculate the average_distance_to_trucks for each node.\n   b. Check if at least one truck can reach the node.\n   c. Calculate the distance_to_next_node from the current node to the node.\n   d. Calculate the difference as average_distance_to_trucks - distance_to_next_node.\n   e. If the difference is greater than max_difference, update max_difference and next_node.\n3. Return next_node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    max_difference = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        average_distance_to_trucks = np.mean([distance_matrix[truck_node][node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            difference = average_distance_to_trucks - distance_to_next_node\n            if difference > max_difference:\n                max_difference = difference\n                next_node = node\n    \n    return next_node",
+          "objective": 26.83097,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThis novel algorithm selects the next node based on the minimum ratio of the distance between the current node and the next node to the sum of distances from the next node to all truck nodes, while ensuring that the next node is reachable by at least one truck.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance_to_trucks = np.sum([distance_matrix[node][truck_node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[node][truck_node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            if distance_to_next_node > 0:\n                ratio = distance_to_next_node / total_distance_to_trucks\n                if ratio < min_ratio:\n                    min_ratio = ratio\n                    next_node = node\n    \n    return next_node",
+          "objective": 27.75807,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Algorithm that selects the next node based on the maximum difference between the minimum distance to all trucks and the distance from the current node to the next node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    max_difference = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        min_distance_to_trucks = min([distance_matrix[truck_node][node] for truck_node in truck_nodes])\n        is_reachable = any([distance_matrix[truck_node][node] < np.inf for truck_node in truck_nodes])\n        if is_reachable:\n            distance_to_next_node = distance_matrix[current_node][node]\n            difference = min_distance_to_trucks - distance_to_next_node\n            if difference > max_difference:\n                max_difference = difference\n                next_node = node\n    \n    return next_node",
+          "objective": 31.80371,
+          "other_inf": null
+     }
+]

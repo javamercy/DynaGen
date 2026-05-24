@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    updated_edge_distance = edge_distance.copy()\n    penalty_factor = 1.2  # Increased the penalty factor for more distinct modifications\n    reward_factor = 0.85  # Reduced reward factor for higher contrast to penalty\n    median_usage = np.median(edge_n_used)  # Using median for a more robust threshold definition\n\n    n = edge_distance.shape[0]\n    \n    # Increasing the penalty for edges in the local optimal tours\n    for tour in local_opt_tours:\n        for i in range(len(tour) - 1):\n            edge_from = tour[i]\n            edge_to = tour[i + 1]\n            updated_edge_distance[edge_from, edge_to] *= penalty_factor\n            updated_edge_distance[edge_to, edge_from] *= penalty_factor\n    \n    # Rewarding edges based on lower usage compared to the median usage\n    for i in range(n):\n        for j in range(n):\n            if edge_n_used[i, j] < median_usage:  # Reward edges used less than median times\n                updated_edge_distance[i, j] *= reward_factor\n                updated_edge_distance[j, i] *= reward_factor\n    \n    return updated_edge_distance",
+     "objective": 20.33962,
+     "other_inf": null
+}

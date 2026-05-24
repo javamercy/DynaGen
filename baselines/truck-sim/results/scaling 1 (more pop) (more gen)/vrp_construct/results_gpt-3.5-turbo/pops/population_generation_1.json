@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the shortest distance to any unvisited node, favoring nodes that are closer to the depot, with a bias towards nodes that have been unvisited for a longer duration.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        node_age = np.where(truck_nodes == node)[0] if node in truck_nodes else 0\n        \n        distance_score = dist_to_node + 0.1*dist_to_depot + 0.01*node_age\n        \n        if distance_score < min_distance:\n            min_distance = distance_score\n            next_node = node\n    \n    return next_node",
+          "objective": 31.73079,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to minimize the total distance traveled by all trucks by selecting the next node with the shortest distance from the current node, while also considering the waiting time at each node based on the distance between the current node and the depot node, taking into account the remaining unvisited nodes as well as the inverse of the distance to each unvisited node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        score = dist_to_node / (dist_to_depot + 1) + 1 / (len(unvisited_nodes) + 1)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+          "objective": 35.53287,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur algorithm selects the next node for each truck by considering the distance to unvisited nodes and the waiting time at each node, prioritizing shorter distances and nodes with shorter waiting times.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    \n    for node in unvisited_nodes:\n        if node not in truck_nodes:\n            if next_node is None:\n                next_node = node\n            elif distance_matrix[current_node][node] < distance_matrix[current_node][next_node]:\n                next_node = node\n    \n    return next_node",
+          "objective": 36.29146,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm aims to minimize the total distance traveled by all trucks by selecting the next node with the shortest distance from the current node, while also taking into account the waiting time at each node based on the number of unvisited nodes remaining, without exceeding the capacity of each truck.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        for truck_node in truck_nodes:\n            dist_from_truck = distance_matrix[truck_node][node]\n            wait_time = len(unvisited_nodes) * 5  # 5 minutes wait time per unvisited node\n            total_distance = dist_to_node + dist_from_truck + wait_time\n            \n            if total_distance < min_distance:\n                next_node = node\n                min_distance = total_distance\n    \n    return next_node",
+          "objective": 44.30242,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur algorithm selects the next node by finding the unvisited node with the shortest combined distance from the current node and the depot node, taking into account the distance the truck has to travel from the current node. If there are multiple options with the same shortest distance, the algorithm randomly selects one of them.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    shortest_distance = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_from_current = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        truck_dist = 0\n        \n        if node in truck_nodes:\n            truck_dist = distance_matrix[current_node][node]\n        \n        total_distance = dist_from_current + dist_to_depot + truck_dist\n        \n        if total_distance < shortest_distance:\n            shortest_distance = total_distance\n            next_node = node\n        elif total_distance == shortest_distance:\n            if np.random.randint(2) == 0:\n                next_node = node\n    \n    return next_node",
+          "objective": 53.34352,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew Algorithm Description: This algorithm selects the next node for each truck based on the shortest distance from the current node, taking into account the difference in distance for each truck to reach the target node.\n\nMain Steps:\n1. Initialize the minimum distance to infinity and the next node to None.\n2. Iterate over each unvisited node.\n3. For each unvisited node, calculate the total distance for each truck to reach that node, taking into account the difference in distance for each truck.\n4. If the total distance is less than the minimum distance, update the minimum distance and set the next node to the current node.\n5. Return the next node with the minimum total distance.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_combined_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance = 0\n        for i in range(len(truck_nodes)):\n            distance_to_current = distance_matrix[current_node, node]\n            distance_from_depot = distance_matrix[depot_node, node]\n            truck_distance_to_target = distance_matrix[truck_nodes[i], node]\n            difference_distance = abs(distance_to_current - truck_distance_to_target)\n            total_distance += distance_to_current + distance_from_depot + difference_distance\n            \n        if total_distance < min_combined_distance:\n            min_combined_distance = total_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 73.40768,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nDescription: This algorithm selects the next node based on the node that minimizes the total distance traveled by all trucks, taking into account the distances between all possible pairs of current nodes and unvisited nodes.\n\nMain Steps:\n1. Calculate the total distance for each truck if it were to visit each unvisited node next.\n2. Choose the next node that minimizes the total distance traveled by all trucks if that node were visited next.\n3. Return the selected next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_total_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        total_distance = 0\n        for truck_node in truck_nodes:\n            total_distance += distance_matrix[truck_node, node]\n        if total_distance < min_total_distance:\n            min_total_distance = total_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 96.37788,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nA novel algorithm that incorporates dynamic time windows in route planning by considering the wait time at each node before moving on to the next node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    wait_times = [0] * len(unvisited_nodes)\n    \n    for i, node in enumerate(unvisited_nodes):\n        if node == depot_node:\n            continue\n        \n        wait_times[i] = distance_matrix[current_node][node]\n        \n        for j, truck_node in enumerate(truck_nodes):\n            if truck_node != node and distance_matrix[truck_node][node] < wait_times[i]:\n                wait_times[i] += distance_matrix[truck_node][node] - wait_times[i]\n    \n    next_node = unvisited_nodes[np.argmin(wait_times)]\n    \n    return next_node",
+          "objective": 108.54205,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This algorithm selects the next node for each truck based on the combined distances from the current node, depot node, and unvisited nodes, while also considering the distance between each truck's current node and the target node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_combined_distance = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        combined_distance = 0\n        for i in range(len(truck_nodes)):\n            distance_to_current = distance_matrix[current_node, truck_nodes[i]]\n            distance_from_depot = distance_matrix[depot_node, node]\n            distance_to_target = distance_matrix[truck_nodes[i], node]\n            combined_distance += distance_to_current + distance_from_depot + distance_to_target\n            \n        if combined_distance < min_combined_distance:\n            min_combined_distance = combined_distance\n            next_node = node\n    \n    return next_node",
+          "objective": 118.64121,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My new algorithm prioritizes nodes based on the ratio of the distance from the current node to the depot to the total distance to unvisited nodes, with a preference for nodes that are closer to the depot relative to the total distance traveled.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    ratios = []\n    \n    for node in unvisited_nodes:\n        if node == depot_node:\n            ratios.append(0)\n            continue\n        \n        total_distance = np.sum(distance_matrix[current_node] + distance_matrix[node])\n        depot_distance = distance_matrix[depot_node][node]\n        ratio = depot_distance / total_distance\n        ratios.append(ratio)\n    \n    next_node = unvisited_nodes[np.argmax(ratios)]\n    \n    return next_node",
+          "objective": 150.06955,
+          "other_inf": null
+     }
+]

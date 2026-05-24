@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "The new algorithm will prioritize nodes based on their geometric centrality and direct distance, capturing nodes that strategically balance immediate travel reduction and overall path centrality without direct reference to the final destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances to the unvisited nodes from the current node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate the geometric mean of distances from each unvisited node to all other unvisited nodes\n    geometric_meandist = np.exp(np.mean(np.log(distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]+1e-9), axis=1))  # Adding a small epsilon to avoid log(0)\n\n    # Combine the direct distance with the inverse of geometric centrality\n    scores = direct_distances * (1 / geometric_meandist)\n\n    # Choose the node which minimizes this combined metric\n    next_node_index = np.argmin(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+          "objective": 8.69228,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This novel algorithm uses a modified inverse multiplier of average distance and a logarithmic penalization on the direct distance to emphasize both centrality and distance efficiency but gently balancing the two considerations via logarithmic and inverse transformations.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances to the unvisited nodes from the current node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate the average distance from each unvisited node to all other unvisited nodes\n    average_distances = np.mean(distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)], axis=1)\n    \n    # Logarithmic scaling of direct distances added with inverse of average distances\n    scores = np.log(direct_distances + 1) * (1 / average_distances)\n    \n    # Choose the node which minimizes this combined metric\n    next_node_index = np.argmin(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+          "objective": 8.82535,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This modified algorithm introduces a new factor called \"locality influence\", a calculated value depending on the relative distance between destination node and every unvisited node, which is then used to adjust the existing risk-reward score, effectively biasing the search towards nodes closer to the final destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Distance from current node to all unvisited nodes\n    distances_current = distance_matrix[current_node, unvisited_nodes]\n\n    # Calculating future potential path costs: sum of distances from each unvisited node to all other unvisited nodes\n    future_costs = np.array([np.sum(distance_matrix[node, unvisited_nodes]) for node in unvisited_nodes])\n\n    # Distance from each unvisited node to the destination node\n    distances_to_destination = distance_matrix[unvisited_nodes, destination_node]\n\n    # Compute locality influence which is inversely proportional to the distance to the destination\n    locality_influence = 1 / (distances_to_destination + 1)  # add 1 to avoid division by zero\n    \n    # Modified risk-reward score: Incorporate the locality influence\n    modified_risk_reward_scores = (distances_current / future_costs) * locality_influence\n    \n    # Select the node with the minimum modified risk-reward score\n    next_node_index = np.argmin(modified_risk_reward_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 9.35826,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm selects the next node by evaluating a risk-reward score that incorporates the ratio of distances between the current node to each unvisited node and the future potential path cost estimated by the sum of distances from each unvisited node to every other unvisited node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Distance from current node to all unvisited nodes\n    distances_current = distance_matrix[current_node, unvisited_nodes]\n\n    # Calculating future potential path costs: sum of distances from each unvisited node to all other unvisited nodes\n    future_costs = np.array([np.sum(distance_matrix[node, unvisited_nodes]) for node in unvisited_nodes])\n    \n    # Risk-Reward score: Ratio of the distance to future path cost\n    risk_reward_scores = distances_current / future_costs\n    \n    # Select the node with the minimum risk-reward score\n    next_node_index = np.argmin(risk_reward_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 9.50204,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node based on angular deviation from the vector pointing towards the destination node, preferring nodes that align more closely with the straight path to the final destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Establish vectors\n    vectors_to_unvisited = np.array([np.arctan2(distance_matrix[current_node, node], distance_matrix[destination_node, node])\n                                     for node in unvisited_nodes])\n    destination_vector = np.zeros_like(vectors_to_unvisited)\n    \n    # Calculate angular deviation from the destination vector, minimal angle deviation preferred\n    angle_deviations = np.abs(vectors_to_unvisited - destination_vector)\n    \n    # Select the node with minimal angular deviation\n    min_deviation_index = np.argmin(angle_deviations)\n    next_node = unvisited_nodes[min_deviation_index]\n    \n    return next_node",
+          "objective": 9.9253,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm calculates node scores by using inverse square of the geometric centrality combined with direct distance, increasing influence of central nodes while still factoring in travel economy.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances to the unvisited nodes from the current node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate the square of the geometric mean of distances from each unvisited node to all other unvisited nodes\n    geometric_meandist_squared = np.square(np.exp(np.mean(np.log(distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]+1e-9), axis=1)))\n    \n    # Combine the direct distance with the inverse square of geometric centrality\n    scores = direct_distances * (1 / geometric_meandist_squared)\n    \n    # Choose the node which minimizes this combined metric\n    next_node_index = np.argmin(scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+          "objective": 9.97584,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by evaluating a weighted score that profiles each unvisited node's next-to-current distance against its average distance to all other unvisited nodes, emphasizing smaller tour expansions.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Get direct distances from the current node to all unvisited nodes\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate average distances from each unvisited node to all other unvisited nodes\n    avg_other_distances = np.mean(distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)], axis=1)\n    \n    # Calculate score using direct distance penalized by the inverse of the average distance to other nodes\n    scores = direct_distances + (1 / (1 + avg_other_distances))\n    \n    # Select the node with the minimum score\n    min_index = np.argmin(scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 10.22725,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm selects the next node by evaluating an opportunity cost score that incorporates the distance from the current node to each unvisited node, penalized by the reciprocal of the sum of distances from each unvisited node to the destination node, favoring nodes closer to the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Distance from current node to all unvisited nodes\n    distances_current = distance_matrix[current_node, unvisited_nodes]\n\n    # Calculating opportunity cost: reciprocal of the sum of distances from each unvisited node to the destination\n    opportunity_costs = np.array([1 / np.sum(distance_matrix[node, destination_node]) for node in unvisited_nodes])\n    \n    # Opportunity cost score: Multiply distances by the reciprocal of opportunity costs\n    opportunity_cost_scores = distances_current * opportunity_costs\n    \n    # Select the node with the minimum opportunity cost score\n    next_node_index = np.argmin(opportunity_cost_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 10.29482,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New Algorithm Description: The updated algorithm determines the next node by balancing the direct distance from the current node with the node's geometric mean distance to all other unvisited nodes, emphasizing strategic positioning as well as proximity.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direct distances from the current node to all unvisited nodes\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate geometric mean of distances from each unvisited node to all other unvisited nodes\n    non_zero_distances = distance_matrix[np.ix_(unvisited_nodes, unvisited_nodes)]\n    geometric_means = np.exp(np.mean(np.log(non_zero_distances + 1e-10), axis=1))\n    \n    # Define the scoring function with a balance of direct distance and the inverse of geometric mean\n    scores = direct_distances + (1 / (1 + geometric_means))\n    \n    # Identify the node with the minimum score \n    min_index = np.argmin(scores)\n    next_node = unvisited_nodes[min_index]\n    \n    return next_node",
+          "objective": 10.43119,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This algorithm alters node selection by introducing an exponential decay bias related to the destination node's distance and a distance-weight multiplication strategy for node scoring, enhancing prioritization of closer and directionally strategic next nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate Euclidean distances to unvisited nodes\n    distances_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate exponential decay bias for the destination node for unvisited nodes\n    destination_biases = distance_matrix[destination_node, unvisited_nodes]\n    max_bias = np.max(destination_biases)\n    exp_biases = np.exp(-destination_biases / max_bias)  # Exponential decay of biases\n    \n    # Scoring by multiplying distances with biases\n    combined_scores = distances_to_unvisited * exp_biases\n    \n    # Select the node with the minimum combined score\n    min_score_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[min_score_index]\n    \n    return next_node",
+          "objective": 10.54582,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "Increase the distance of frequently used edges in the local optimal tour using a variable penalty factor that is inversely proportional to the mean usage of all edges, encouraging the exploration of alternative paths by dynamically adjusting penalties.",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    mean_usage = edge_n_used.mean()\n    updated_edge_distance = edge_distance.copy()\n    n = len(local_opt_tour)\n    \n    # Iterate over each segment (edge) in the local optimal tour\n    for i in range(n):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % n]\n        # Calculate penalty factor inversely proportional to mean usage\n        penalty_factor = 1 + (1 / mean_usage) if mean_usage != 0 else 1.1\n        # Increase the distance based on the computed penalty factor\n        updated_edge_distance[start, end] *= penalty_factor\n        updated_edge_distance[end, start] *= penalty_factor\n    \n    return updated_edge_distance",
+     "objective": -2.26445,
+     "other_inf": null
+}

@@ -1,0 +1,26 @@
+[
+     {
+          "algorithm": "Update the edge distance matrix by slightly increasing the weights of edges in the local optimal tour based on the frequency of their use, encouraging diversification in the search for a globally optimal tour.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_vertices = edge_distance.shape[0]\n    updated_edge_distance = edge_distance.copy()\n    adjustment_factor = 0.1\n\n    for i in range(len(local_opt_tour)):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % len(local_opt_tour)]\n        use_frequency = edge_n_used[start, end]\n        increase_amount = adjustment_factor * (1 + use_frequency)\n        updated_edge_distance[start, end] *= (1 + increase_amount)\n        updated_edge_distance[end, start] *= (1 + increase_amount)\n\n    return updated_edge_distance",
+          "objective": -2.12448,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My algorithm increases the distance of frequently used edges in the local optimal tour to encourage exploration of alternative paths by penalizing those edges.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    penalty_factor = 1.1  # This factor penalizes frequently used edges to push exploration\n    updated_edge_distance = edge_distance.copy()\n    n = len(local_opt_tour)\n    \n    # Iterate over each segment (edge) in the local optimal tour\n    for i in range(n):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % n]\n        # Increase the distance based on how frequently the edge has been used\n        updated_edge_distance[start, end] *= penalty_factor\n        updated_edge_distance[end, start] *= penalty_factor\n    \n    # Update based on edge usage\n    usage_penalty = np.maximum(1, edge_n_used / edge_n_used.mean())\n    updated_edge_distance *= usage_penalty\n\n    return updated_edge_distance",
+          "objective": -0.99581,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm seeks to diversify solutions by increasing the distances of edges used in the local optimal tour more frequently, encouraging exploration of less frequently used edges.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    penalty_factor = 0.1\n    num_cities = len(local_opt_tour)\n\n    updated_edge_distance = np.copy(edge_distance)\n\n    # Adjust distances based on usage in the local optimal tour\n    for i in range(num_cities):\n        # Determine edge by the two consecutive nodes in the local optimal tour path\n        from_node = local_opt_tour[i]\n        to_node = local_opt_tour[(i + 1) % num_cities]\n\n        # Increase distance for frequently used edges\n        updated_edge_distance[from_node, to_node] += penalty_factor * edge_n_used[from_node, to_node]\n        updated_edge_distance[to_node, from_node] += penalty_factor * edge_n_used[to_node, from_node]\n\n    return updated_edge_distance",
+          "objective": -0.67657,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm incrementally increases the weights of frequently used edges to encourage exploration of less frequently used paths by penalizing edges that appear in the local optimal tour.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    num_cities = len(local_opt_tour)\n    \n    # Increase the weight of edges in the local optimal tour\n    for i in range(num_cities):\n        start = local_opt_tour[i]\n        end = local_opt_tour[(i + 1) % num_cities]\n        edge_distance[start, end] += edge_n_used[start, end]\n        edge_distance[end, start] += edge_n_used[end, start]\n    \n    return updated_edge_distance",
+          "objective": 999999999900.0,
+          "other_inf": null
+     }
+]

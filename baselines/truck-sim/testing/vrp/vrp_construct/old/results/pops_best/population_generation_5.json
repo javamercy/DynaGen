@@ -1,0 +1,6 @@
+{
+     "algorithm": "\"Energy Efficiency Algorithm (EEA)\": This algorithm optimizes for fuel or energy efficiency by using a combined metric of node proximity and a penalty for 'backtracking', encouraging routes that progressively move outward or onward from the starting point without returning towards it prematurely.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return destination_node\n    \n    distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Penalty calculation for backtracking: higher cost if moving back towards the start\n    start_distances = distance_matrix[0, unvisited_nodes]\n    current_distance_to_start = distance_matrix[0, current_node]\n    backtracking_penalty = np.where(start_distances < current_distance_to_start, distances * 0.1, 0)\n    \n    # Efficiency score based on minimal distance with backtracking adjustment\n    efficiency_scores = distances + backtracking_penalty\n\n    # Select node with lowest efficiency score\n    best_index = np.argmin(efficiency_scores)\n    next_node = unvisited_nodes[best_index]\n    \n    return next_node",
+     "objective": 32.51849,
+     "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm: The algorithm selects the next customer to visit based on minimizing the Euclidean distance between the current truck's position and the customer's location, while considering the urgency of the time window and the remaining unvisited customers. The urgency of the time window is computed as the ratio of the remaining time in the time window to the total time window length.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    min_distance = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        time_window_left = max(0, time_windows[i][1] - current_time)\n        total_time_window = time_windows[i][1] - time_windows[i][0]\n        urgency = time_window_left / total_time_window\n        remaining_customers = len(unvisited_customers) - 1\n        \n        score = distance + urgency + remaining_customers\n        \n        if score < min_distance:\n            min_distance = score\n            best_node = i\n    \n    return best_node",
+     "objective": 143.29849,
+     "other_inf": null
+}

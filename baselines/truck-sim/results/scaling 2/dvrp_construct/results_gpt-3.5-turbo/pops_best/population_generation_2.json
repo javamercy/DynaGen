@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy algorithm involves finding the closest unvisited customer for the current truck and directing it to that customer\u2019s location, or to wait if there are no unvisited customers. The main steps include calculating the distance between the current truck position and each unvisited customer, then selecting the customer with the shortest distance as the next node for the truck to visit.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if len(unvisited_customers) == 0:\n        return None\n    \n    distances = []\n    for customer in unvisited_customers:\n        distance = np.linalg.norm(np.array(cur_truck_pos) - np.array(customer))\n        distances.append(distance)\n    \n    min_distance_idx = np.argmin(distances)\n    best_node = min_distance_idx\n    \n    return best_node",
+     "objective": 47.73971,
+     "other_inf": null
+}

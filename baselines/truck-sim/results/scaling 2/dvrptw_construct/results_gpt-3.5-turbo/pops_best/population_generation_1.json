@@ -1,0 +1,6 @@
+{
+     "algorithm": "\n    Our new algorithm involves calculating the optimal next node for a truck to visit by considering both the distance to the node and the penalty incurred if the node's time window is missed.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_time_penalty = float('inf')\n    \n    for i, node in enumerate(unvisited_customers):\n        distance_to_node = np.linalg.norm(cur_truck_pos - node)\n        travel_time = distance_to_node / truck_speed\n        arrival_time = current_time + travel_time\n        \n        if arrival_time <= time_windows[i][1]:\n            if arrival_time >= time_windows[i][0]:\n                time_penalty = 0\n            else:\n                time_penalty = time_windows[i][0] - arrival_time\n        else:\n            time_penalty = arrival_time - time_windows[i][1]\n        \n        if time_penalty < best_time_penalty:\n            best_time_penalty = time_penalty\n            best_node = i\n            \n    return best_node",
+     "objective": 136.89669,
+     "other_inf": null
+}

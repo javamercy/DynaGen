@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The new algorithm selects the next node based on a weighted score that subtracts the distance from the current node to the unvisited node from a fraction of the distance from each unvisited node to the destination, prioritizing closer unvisited nodes that are also closer to the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances from current node to all unvisited nodes\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distances from unvisited nodes to the destination node\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Create a weighted score considering both distances, emphasizing proximity to the current node\n    score = (0.5 * unvisited_to_destination) - current_to_unvisited\n    \n    # Choose the node with the maximal score value\n    idx_max = np.argmax(score)\n    \n    # Return the next node to visit\n    next_node = unvisited_nodes[idx_max]\n    \n    return next_node",
+          "objective": 6.07672,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direct distances from the current node to each unvisited node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n\n    # Determine the potential trajectory inefficiency by measuring the deviation from direct path to destination node\n    deviation_score = np.abs(distance_matrix[unvisited_nodes, destination_node] - (direct_distances + distance_matrix[current_node, destination_node]))\n\n    # Combine direct distances and deviation scores, prioritizing shorter paths that align well towards destination\n    deviation_factor = 1.5\n    combined_scores = direct_distances + deviation_factor * deviation_score\n\n    # Choose the unvisited node with the lowest combined score\n    next_node_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n\n    return next_node",
+          "objective": 6.09359,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: This algorithm factors the direct distance with a decreasing penalty on deviation as distance to the final destination decreases, aiming to make efficient choices early and more direct shortcuts later in the path.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direct distances from current to each unvisited node\n    direct_distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Get distance to destination for each unvisited node\n    distances_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Measure the distance from current node to destination\n    current_to_destination_dist = distance_matrix[current_node, destination_node]\n    \n    # Calculate the inefficiency of deviation\n    deviation_score = np.abs(distances_to_destination - (direct_distances + current_to_destination_dist))\n    \n    # Adjust the deviation influence by the progress towards destination\n    progress_factor = current_to_destination_dist / np.max(distance_matrix)  # normalizing by longest possible distance in matrix\n    collectiveness_factor = 2 - progress_factor  # Increased weight to direct path as progress towards destination increases\n    \n    # Scoring function with direct distances and adjusted deviation scores\n    combined_scores = direct_distances + (collectiveness_factor * deviation_score)\n    \n    # Select node with minimum score\n    next_node_index = np.argmin(combined_scores)\n    next_node = unvisited_nodes[next_node_index]\n    \n    return next_node",
+          "objective": 6.10149,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm modifies the score by incorporating an inverse square law decay along with linear distance, balancing local navigation precision and global approach towards the destination.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate direct distances from current node to all unvisited nodes\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate direct distances from unvisited nodes to the destination node\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Apply inverse square law decay on the distance to the destination node\n    weighted_destination = 1 / (unvisited_to_destination ** 2 + 1)  # Adding 1 to avoid division by zero\n    \n    # Calculate the weighted sum of direct distance and adjusted destination importance\n    scores = current_to_unvisited + weighted_destination\n    \n    # Select the node with the minimum score\n    idx_min = np.argmin(scores)\n    \n    # Return the next node to be visited\n    next_node = unvisited_nodes[idx_min]\n    \n    return next_node",
+          "objective": 6.1924,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm will select the next node based on maximizing the ratio between the shortest distance to the destination node and the distance to the next possible node, thus prioritizing nodes that are on or closer to the direct route towards the destination node but are still nearby the current node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    # Calculate distances from current node to all unvisited nodes\n    current_to_unvisited = distance_matrix[current_node, unvisited_nodes]\n    \n    # Calculate distances from unvisited nodes to the destination node\n    unvisited_to_destination = distance_matrix[unvisited_nodes, destination_node]\n    \n    # Calculate the ratio of distance to destination over distance to next node from current\n    ratio = unvisited_to_destination / current_to_unvisited\n    \n    # Choose the node with the maximal value of this ratio\n    idx_max = np.argmax(ratio)\n    \n    # Return the next node to visit\n    next_node = unvisited_nodes[idx_max]\n    \n    return next_node",
+          "objective": 6.30341,
+          "other_inf": null
+     }
+]

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm selects the next node based on the customer with the shortest path in terms of both distance and time by considering the combined metrics of distance, time, penalty for time window violation, and potential waiting time at the customer's location.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    best_combined_metric = float('inf')\n    \n    for idx, customer_pos in enumerate(unvisited_customers):\n        distance = np.linalg.norm(cur_truck_pos - customer_pos)\n        travel_time = distance / truck_speed\n        time_to_leave = max(current_time + travel_time, time_windows[idx][0])\n        wait_time = max(0, time_windows[idx][0] - current_time - travel_time)\n        penalty = max(0, current_time + travel_time - time_windows[idx][1])\n        \n        combined_metric = distance + travel_time + wait_time + penalty\n        \n        if combined_metric < best_combined_metric:\n            best_combined_metric = combined_metric\n            best_node = idx\n    \n    return best_node",
+     "objective": 92.81984,
+     "other_inf": null
+}

@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nMy novel algorithm selects the next node for a truck to visit based on a combination of nearest neighbor distance calculation, penalty for missing time windows, and potential wait time at a customer if needed.\n",
+          "code": "import numpy as np\n\ndef calculate_distance(pos1, pos2, truck_speed):\n    distance = np.linalg.norm(pos1 - pos2)\n    return distance / truck_speed\n\ndef calculate_penalty(arrival_time, time_window):\n    if arrival_time < time_window[0]:\n        return time_window[0] - arrival_time\n    elif arrival_time > time_window[1]:\n        return arrival_time - time_window[1]\n    else:\n        return 0\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    best_node = None\n    best_score = float('inf')\n\n    for i, customer in enumerate(unvisited_customers):\n        arrival_time = current_time + calculate_distance(cur_truck_pos, customer, truck_speed)\n        penalty = calculate_penalty(arrival_time, time_windows[i])\n\n        if penalty <= 0:\n            score = arrival_time\n        else:\n            wait_time = penalty / 2\n            score = arrival_time + wait_time\n\n        if score < best_score:\n            best_score = score\n            best_node = i\n\n    return best_node",
+          "objective": 54.54263,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm randomly selects a customer within the time window constraints that is closet to the current truck position.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    min_distance = np.inf\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(customer_pos - cur_truck_pos)\n        \n        if time_windows[i][0] <= current_time + distance_to_customer / truck_speed <= time_windows[i][1]:\n            if distance_to_customer < min_distance:\n                min_distance = distance_to_customer\n                best_node = i\n                \n    return best_node",
+          "objective": 86.48092,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm involves calculating a priority score for each unvisited customer based on their distance to the current truck position, time window constraints, and potential waiting time at each customer, and selecting the customer with the highest priority score to visit next.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    def calculate_distance(pos1, pos2):\n        return np.linalg.norm(pos1 - pos2)\n\n    def calculate_priority_score(customer_pos, customer_time_window, truck_pos, current_time, truck_speed):\n        distance = calculate_distance(truck_pos, customer_pos)\n        time_to_arrive = distance / truck_speed + current_time\n        if time_to_arrive > customer_time_window[1]:\n            return -1\n        waiting_time = max(0, customer_time_window[0] - time_to_arrive)\n        return 1 / (distance + waiting_time)\n\n    best_node = None\n    best_score = float('-inf')\n    for i, customer_pos in enumerate(unvisited_customers):\n        time_window = time_windows[i]\n        score = calculate_priority_score(customer_pos, time_window, cur_truck_pos, current_time, truck_speed)\n        if score > best_score:\n            best_score = score\n            best_node = i\n    return best_node",
+          "objective": 95.99394,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy novel algorithm selects the next customer for a truck based on the nearest customer within their time window and minimizes the waiting time at each customer by considering the travel time between customers and the remaining time in the time window, with the option to wait if necessary.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    def calculate_distance(pos1, pos2):\n        return np.linalg.norm(pos1 - pos2)\n\n    def calculate_travel_time(distance, speed):\n        return distance / speed\n\n    best_node = None\n    min_travel_time = float('inf')\n\n    for i, customer_pos in enumerate(unvisited_customers):\n        arrival_time = current_time + calculate_travel_time(calculate_distance(cur_truck_pos, customer_pos), truck_speed)\n        \n        if arrival_time > time_windows[i][1]:\n            continue\n\n        waiting_time = max(0, time_windows[i][0] - arrival_time)\n        travel_time = calculate_travel_time(calculate_distance(customer_pos, depot_pos), truck_speed)\n        \n        total_time = arrival_time + waiting_time + travel_time\n\n        if total_time < min_travel_time:\n            min_travel_time = total_time\n            best_node = i\n\n    return best_node",
+          "objective": 146.21991,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy new algorithm selects the next customer for a truck to visit based on the closest customer with a feasible time window, taking into account the current time, truck positions, and customer time windows.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers, current_time, truck_speed, time_windows):\n    \n    best_node = None\n    min_distance = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        if current_time + distance_to_customer / truck_speed <= time_windows[i][1]:\n            if distance_to_customer < min_distance:\n                best_node = i\n                min_distance = distance_to_customer\n    \n    return best_node",
+          "objective": 390.11452,
+          "other_inf": null
+     }
+]

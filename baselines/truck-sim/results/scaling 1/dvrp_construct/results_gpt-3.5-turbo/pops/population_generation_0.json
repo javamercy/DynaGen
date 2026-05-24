@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "``` \n#My novel algorithm selects the next node for a truck based on the closest unvisited customer and the number of other trucks heading to that customer, aiming to balance the workload and minimize total completion time.\n\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_dist = np.inf\n    for i, customer in enumerate(unvisited_customers):\n        dist = np.linalg.norm(np.array(cur_truck_pos) - np.array(customer))\n        num_trucks_heading_to_customer = sum([1 for pos in all_truck_pos if tuple(pos) == tuple(customer)])\n        if dist < min_dist and num_trucks_heading_to_customer < 2:\n            min_dist = dist\n            best_node = i\n    return best_node",
+          "objective": 44.92087,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm selects the next node for a truck to visit based on the Euclidean distance between the current truck position and each unvisited customer, taking into account the distance from the customer to the depot and the possible waiting time of the truck at the customer node, and choosing the node that minimizes the overall time for the last truck to finish.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_total_time = np.inf\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        customer_to_depot = np.linalg.norm(customer_pos - depot_pos)\n        truck_to_customer = np.linalg.norm(cur_truck_pos - customer_pos)\n        \n        total_time = truck_to_customer + customer_to_depot \n        \n        if total_time < min_total_time:\n            min_total_time = total_time\n            best_node = i\n        \n    return best_node",
+          "objective": 59.05596,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\n    My novel algorithm involves calculating the average distance between all unvisited customers from the current truck position, selecting the customer with the shortest average distance, and returning its index as the next node for the truck to visit.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_avg_dist = float('inf')\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_dist = 0\n        for truck_pos in all_truck_pos:\n            dist_to_customer = np.linalg.norm(customer_pos - truck_pos)\n            total_dist += dist_to_customer\n        avg_dist = total_dist / len(all_truck_pos)\n        \n        if avg_dist < min_avg_dist:\n            min_avg_dist = avg_dist\n            best_node = i\n    \n    return best_node",
+          "objective": 85.83171,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm will calculate the nearest unvisited customer for the current truck to visit based on the current truck position, depot position, positions of all other trucks, and the list of unvisited customers.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur_truck_pos = np.array(cur_truck_pos)\n    depot_pos = np.array(depot_pos)\n    all_truck_pos = [np.array(pos) for pos in all_truck_pos]\n    \n    min_distance = float('inf')\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        total_distance = np.linalg.norm(cur_truck_pos - customer_pos) + np.linalg.norm(customer_pos - depot_pos)\n        for truck_pos in all_truck_pos:\n            if np.array_equal(truck_pos, cur_truck_pos):\n                continue\n            distance_to_other_truck = np.linalg.norm(truck_pos - customer_pos)\n            total_distance += distance_to_other_truck\n        \n        if total_distance < min_distance:\n            min_distance = total_distance\n            best_node = i\n    \n    return best_node",
+          "objective": 96.51149,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: The algorithm selects the next node to visit by calculating the nearest unvisited customer for each truck and then choosing the next customer based on the truck's current position and the overall distance to the depot.\n",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    \n    def calculate_distance(pos1, pos2):\n        return np.linalg.norm(pos1 - pos2)\n    \n    best_node = None\n    best_distance = float('inf')\n    \n    for i, truck_pos in enumerate(all_truck_pos):\n        for j, customer_pos in enumerate(unvisited_customers):\n            distance_to_customer = calculate_distance(truck_pos, customer_pos)\n            distance_to_depot = calculate_distance(customer_pos, depot_pos)\n            total_distance = distance_to_customer + distance_to_depot\n            \n            if total_distance < best_distance:\n                best_distance = total_distance\n                best_node = j\n                \n    return best_node",
+          "objective": 112.19685,
+          "other_inf": null
+     }
+]

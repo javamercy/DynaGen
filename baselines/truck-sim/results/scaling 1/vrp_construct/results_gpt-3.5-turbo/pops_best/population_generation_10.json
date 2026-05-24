@@ -1,0 +1,6 @@
+{
+     "algorithm": "Select the next node based on the combination of the maximum distance to the depot, minimum time window to visiting the node, and minimum distance to current truck nodes, with consideration for waiting time if needed.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_distance = np.inf\n    min_time_window = np.inf\n    max_distance_to_depot = -np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        for truck_node in truck_nodes:\n            if distance_matrix[current_node][node] + distance_matrix[node][truck_node] < min_distance:\n                min_distance = distance_matrix[current_node][node] + distance_matrix[node][truck_node]\n                if node < min_time_window:\n                    min_time_window = node\n                    if distance_matrix[current_node][depot_node] + distance_matrix[depot_node][node] > max_distance_to_depot:\n                        max_distance_to_depot = distance_matrix[current_node][depot_node] + distance_matrix[depot_node][node]\n                        next_node = node\n    \n    if next_node is None:\n        next_node = depot_node\n    \n    return next_node",
+     "objective": 35.60264,
+     "other_inf": null
+}

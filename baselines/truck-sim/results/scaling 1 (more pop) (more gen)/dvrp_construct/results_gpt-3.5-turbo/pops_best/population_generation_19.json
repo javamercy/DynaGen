@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm prioritizes visiting nodes that are closest to the depot and have not been visited by any truck, while adjusting the penalty factor based on the ratio of the distance to the furthermost truck to the mean of distances from other trucks, and considering the ratio of the distance to the depot to the mean distance to other trucks.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = np.inf\n    best_node = None\n    \n    for i, customer_pos in enumerate(unvisited_customers):\n        distance_to_customer = np.linalg.norm(customer_pos - cur_truck_pos)\n        distance_to_depot = np.linalg.norm(customer_pos - depot_pos)\n        mean_distance_to_other_trucks = np.mean([np.linalg.norm(customer_pos - truck_pos) for truck_pos in all_truck_pos])\n        \n        ratio = distance_to_depot / mean_distance_to_other_trucks\n        penalty_factor = 0.3 if ratio > 1 else 0.5\n        \n        score = distance_to_customer - mean_distance_to_other_trucks + penalty_factor * (distance_to_customer - distance_to_depot)\n        \n        if score < best_score:\n            best_score = score\n            best_node = i\n    \n    return best_node",
+     "objective": 29.51573,
+     "other_inf": null
+}

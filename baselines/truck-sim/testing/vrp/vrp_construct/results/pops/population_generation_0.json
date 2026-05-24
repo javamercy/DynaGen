@@ -1,0 +1,14 @@
+[
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the closest unvisited node that minimizes the travel time for each truck, taking into account the distance matrix and the current locations of the trucks, with the option to wait at a node if it decreases overall travel time.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_time = np.inf\n    \n    for node in unvisited_nodes:\n        travel_time = distance_matrix[current_node, node]\n        \n        for truck_node in truck_nodes:\n            time_to_truck = distance_matrix[truck_node, node]\n            total_time = max(travel_time, time_to_truck)\n            \n            if total_time < min_time:\n                min_time = total_time\n                next_node = node\n    \n    return next_node",
+          "objective": 37.64581,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nMy algorithm selects the next node based on the sum of distances from the current node to each unvisited node, weighting the distances of nodes that are closer to the destination node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    weighted_distances = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_dest = distance_matrix[node][destination_node]\n        weighted_distances[i] = dist_to_node + dist_to_dest\n    \n    next_node = unvisited_nodes[np.argmin(weighted_distances)]\n    \n    return next_node",
+          "objective": 54.51195,
+          "other_inf": null
+     }
+]

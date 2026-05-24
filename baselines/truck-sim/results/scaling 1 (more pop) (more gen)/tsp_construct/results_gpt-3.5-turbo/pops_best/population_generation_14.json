@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node based on the product of distances from the current node to the destination node, weighting the distances differently for each unvisited node, and selects the node with the lowest product as the next node to visit.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_product = float('inf')\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_curr_dest = distance_matrix[current_node][destination_node]\n        dist_curr_next = distance_matrix[current_node][node]\n        dist_next_dest = distance_matrix[node][destination_node]\n        \n        product_distances = dist_curr_dest * (dist_curr_next * 1.8) / (dist_next_dest * 0.6)\n        \n        if product_distances < min_product:\n            min_product = product_distances\n            next_node = node\n    \n    return next_node",
+     "objective": 9.9253,
+     "other_inf": null
+}

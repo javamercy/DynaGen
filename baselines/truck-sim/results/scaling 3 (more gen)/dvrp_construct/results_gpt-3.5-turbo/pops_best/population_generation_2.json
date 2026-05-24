@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy new algorithm involves selecting the next node based on the minimum Manhattan distance from the current truck position to all unvisited customers without considering the depot position, with a penalty for already assigned trucks and considering that each customer can only be visited once.\n",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = None\n    min_distance = float('inf')\n    \n    for i, customer in enumerate(unvisited_customers):\n        min_dist_to_truck = min([np.linalg.norm(truck_pos - customer) for truck_pos in all_truck_pos])\n        total_distance = np.linalg.norm(cur_truck_pos - customer) - min_dist_to_truck\n        if total_distance < min_distance:\n            min_distance = total_distance\n            best_node = i\n    \n    return best_node",
+     "objective": 41.18296,
+     "other_inf": null
+}

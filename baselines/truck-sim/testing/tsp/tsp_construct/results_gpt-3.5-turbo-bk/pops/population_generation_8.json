@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nDesign a new algorithm that selects the next unvisited node based on the ratio of its distance to the current node and the square root of the distance to the destination node, with a preference for nodes closer to the destination node while also considering the sum of distances to other unvisited nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = np.inf\n    next_node = None\n    destination_distance = distance_matrix[current_node][destination_node]\n    \n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node][node]\n        distance_to_destination = distance_matrix[node][destination_node]\n        \n        distance_ratio = distance_to_current / ((np.sqrt(distance_to_destination) + 1) * np.sum(distance_matrix[node][unvisited_nodes]))\n        \n        if distance_ratio < min_ratio:\n            min_ratio = distance_ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 7.71672,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next unvisited node based on the ratio of its distance to the current node and the distance to the destination node, with a preference for nodes closer to the destination node while also considering the average distance to other unvisited nodes.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = np.inf\n    next_node = None\n    destination_distance = distance_matrix[current_node][destination_node]\n    \n    for node in unvisited_nodes:\n        distance_to_current = distance_matrix[current_node][node]\n        distance_to_destination = distance_matrix[node][destination_node]\n        \n        distance_ratio = distance_to_current / ((distance_to_destination + 1) * np.mean(distance_matrix[node][unvisited_nodes]))\n        \n        if distance_ratio < min_ratio:\n            min_ratio = distance_ratio\n            next_node = node\n            \n    return next_node",
+          "objective": 8.92972,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the next unvisited node based on the ratio of its distance to the current node and the average distance to other unvisited nodes, with a preference for nodes closer to the destination node.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_ratio = np.inf\n    next_node = None\n    for node in unvisited_nodes:\n        distance_ratio = distance_matrix[current_node][node] / np.mean(distance_matrix[node][unvisited_nodes])\n        if distance_ratio < min_ratio:\n            min_ratio = distance_ratio\n            next_node = node\n    return next_node",
+          "objective": 15.54274,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNovel algorithm: The algorithm selects the next node by prioritizing unvisited nodes that are closest to the current node but not the destination node, breaking ties by choosing the node with the smallest index.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    min_distance = float('inf')\n    next_node = None\n    for node in unvisited_nodes:\n        if node != destination_node:\n            if distance_matrix[current_node][node] < min_distance:\n                min_distance = distance_matrix[current_node][node]\n                next_node = node\n            elif distance_matrix[current_node][node] == min_distance:\n                next_node = min(next_node, node)\n    \n    return next_node",
+          "objective": 16.56488,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nOur algorithm selects the next node based on the maximum difference between the shortest distance from the current node to each unvisited node and the second shortest distance between them, ensuring a diverse exploration of the unvisited nodes.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, destination_node, unvisited_nodes, distance_matrix):\n    max_difference = -1\n    next_node = -1\n    \n    for node in unvisited_nodes:\n        cur_to_node = distance_matrix[current_node][node]\n        sorted_distances = np.sort(distance_matrix[node][unvisited_nodes])\n        if len(sorted_distances) > 1:\n            difference = sorted_distances[1] - cur_to_node\n            if difference > max_difference:\n                max_difference = difference\n                next_node = node\n                \n    return next_node",
+          "objective": 18.2187,
+          "other_inf": null
+     }
+]

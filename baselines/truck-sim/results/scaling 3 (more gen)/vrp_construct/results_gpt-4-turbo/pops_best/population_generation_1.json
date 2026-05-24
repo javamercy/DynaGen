@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm: Prioritize nodes based on inverse demand urgency, which is inferred from distance and rarity of visits, using an exponential reduction factor and reduced centrality influence.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if unvisited_nodes.size == 0:\n        return depot_node  # All nodes visited, return to depot\n\n    scores = np.zeros_like(unvisited_nodes, dtype=float)\n    centrality_scores = np.sum(distance_matrix[unvisited_nodes], axis=1)\n\n    for i, node in enumerate(unvisited_nodes):\n        current_to_node_distance = distance_matrix[current_node][node]\n        \n        # Reverse the centrality impact with an exponential decay based on distance\n        centrality_factor = np.exp(-0.1 * centrality_scores[i])\n        \n        # Increase importance of nodes less frequented by trucks\n        visit_rarity = len(truck_nodes) - np.count_nonzero(truck_nodes == node)\n        \n        # Determine score from distance, adjusted centrality, and visit rarity\n        scores[i] = current_to_node_distance * 0.7 + centrality_factor * 0.2 + visit_rarity * 10\n\n    next_node = unvisited_nodes[np.argmin(scores)]\n    return next_node",
+     "objective": 37.25409,
+     "other_inf": null
+}

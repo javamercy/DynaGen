@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(current, destination, trucks, unvisited):\n    \"\"\"\n    An environmental sensitivity algorithm that prioritizes routes based on local congestion and avoids areas where multiple trucks might converge by penalizing high-density truck areas.\n    \"\"\"\n    # Calculate distances from the current location to each unvisited node\n    distances = np.linalg.norm(unvisited - current, axis=1)\n    \n    # Determine density around each unvisited location\n    penalties = np.zeros(len(unvisited))\n    for idx, position in enumerate(unvisited):\n        local_density = np.linalg.norm(trucks - position, axis=1)\n        penalties[idx] = np.sum(1 / (1 + local_density))\n    \n    # Integrate distances and density penalties into a scoring system\n    scores = distances + 0.5 * penalties\n    \n    # Choose the unvisited node with the lowest score\n    next_destination = np.argmin(scores)\n\n    return next_destination",
+     "objective": 27.98465,
+     "other_inf": null
+}

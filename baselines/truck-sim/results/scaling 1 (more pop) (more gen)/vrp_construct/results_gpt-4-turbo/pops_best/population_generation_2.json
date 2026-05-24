@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm, \"Dynamic Opportunistic Routing\" (DOR), simplifies route complexity by making decisions based on minimizing expected travel time, adjusted dynamically by accounting for nearby truck positions, allowing trucks to cooperatively optimize path choices in real-time by potentially altering destinations to less congested nodes.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    # Calculate truck congestion around each unvisited node\n    unvisited_congestion = np.zeros(len(unvisited_nodes))\n    for i, unvis_node in enumerate(unvisited_nodes):\n        dists_to_unvis_node = distance_matrix[unvis_node, truck_nodes]\n        unvisited_congestion[i] = np.sum(np.exp(-dists_to_unvis_node))  # Closer trucks contribute to higher congestion\n    \n    # Adjusted distances by congestion factors (higher congestion increases effective distance)\n    adjusted_distances = distance_matrix[current_node, unvisited_nodes] * (1 + unvisited_congestion)\n    \n    # Select the next node with the minimum adjusted distance\n    min_idx = np.argmin(adjusted_distances)\n    next_node = unvisited_nodes[min_idx]\n    \n    return next_node",
+     "objective": 30.02491,
+     "other_inf": null
+}

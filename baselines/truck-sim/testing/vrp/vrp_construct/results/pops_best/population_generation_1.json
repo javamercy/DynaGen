@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nMy algorithm selects the next node based on the closest unvisited node that minimizes the travel time for each truck, taking into account the distance matrix and the current locations of the trucks, with the option to wait at a node if it decreases overall travel time.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, destination_node, unvisited_nodes, distance_matrix):\n    next_node = None\n    min_time = np.inf\n    \n    for node in unvisited_nodes:\n        travel_time = distance_matrix[current_node, node]\n        \n        for truck_node in truck_nodes:\n            time_to_truck = distance_matrix[truck_node, node]\n            total_time = max(travel_time, time_to_truck)\n            \n            if total_time < min_time:\n                min_time = total_time\n                next_node = node\n    \n    return next_node",
+     "objective": 37.64581,
+     "other_inf": null
+}

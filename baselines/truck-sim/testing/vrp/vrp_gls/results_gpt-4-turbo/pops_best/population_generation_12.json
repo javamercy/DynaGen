@@ -1,0 +1,6 @@
+{
+     "algorithm": "This algorithm decreases distances for less frequently used edges to encourage exploration of underutilized routes and adjusts the reduction factor dynamically based on the edge's relative infrequency.",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tours, edge_n_used):\n    # Deflation factors to promote new paths\n    base_deflation_factor = 0.95\n    \n    # Update usage count for edges in the tours\n    n = edge_distance.shape[0]\n    for tour in local_opt_tours:\n        for i in range(len(tour)):\n            if i == len(tour) - 1:\n                from_node, to_node = tour[i], tour[0]\n            else:\n                from_node, to_node = tour[i], tour[i+1]\n            edge_n_used[from_node, to_node] += 1\n            edge_n_used[to_node, from_node] += 1\n    \n    # Find the lower usage thresholds to promote less used edges\n    lower_usage_threshold = np.percentile(edge_n_used, 30)\n    \n    # Update distances based on usage\n    updated_edge_distance = np.copy(edge_distance)\n    for i in range(n):\n        for j in range(n):\n            if edge_n_used[i, j] <= lower_usage_threshold:\n                updated_edge_distance[i, j] *= base_deflation_factor\n    \n    return updated_edge_distance",
+     "objective": 18.81886,
+     "other_inf": null
+}

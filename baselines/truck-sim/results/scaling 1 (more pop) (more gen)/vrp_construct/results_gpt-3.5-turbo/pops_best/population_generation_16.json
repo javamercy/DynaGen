@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe new algorithm selects the next node by considering the shortest distance from the current node, the total number of nodes visited so far by all trucks, and the logarithm of the sum of the distances to the depot multiplied by a factor of 0.8 and 0.2 respectively.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    total_visited = len(truck_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        score = (dist_to_node + 0.8 / (total_visited + 1)) + 0.2 * np.log(np.sum(distance_matrix[node])) * np.exp(-dist_to_depot)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+     "objective": 25.17543,
+     "other_inf": null
+}

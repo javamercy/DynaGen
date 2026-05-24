@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\nAlgorithm: The algorithm updates the edge distance matrix by increasing the distances of the edges used in the local optimal tour based on their frequency of use to enhance exploring new paths and avoid local optima in search for a minimized distance tour.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for i in range(len(local_opt_tour)-1):\n        edge_index = edge_n_used[local_opt_tour[i], local_opt_tour[i+1]]\n        frequency = edge_n_used[edge_n_used == edge_index].shape[0]\n        updated_edge_distance[local_opt_tour[i], local_opt_tour[i+1]] += frequency\n        updated_edge_distance[local_opt_tour[i+1], local_opt_tour[i]] += frequency\n    \n    return updated_edge_distance",
+          "objective": -2.39419,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm updates the edge distance matrix by penalizing the distances of the edges not used in the local optimal tour based on the number of times they are not included in the tour.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for i in range(len(edge_distance)):\n        for j in range(len(edge_distance)):\n            if edge_n_used[i, j] == 0 and i != j:\n                frequency = np.sum(edge_n_used[i] == 0) + np.sum(edge_n_used[j] == 0)\n                updated_edge_distance[i, j] += frequency * 2\n                updated_edge_distance[j, i] += frequency * 2\n    \n    return updated_edge_distance",
+          "objective": -2.39304,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nNew algorithm: Update the edge distance matrix by penalizing edges not used in the local optimal tour based on the number of common unused edges adjacent to each edge, considering both incoming and outgoing edges.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for i in range(len(edge_distance)):\n        for j in range(len(edge_distance)):\n            if edge_n_used[i, j] == 0 and i != j:\n                unused_edges_i = np.where(edge_n_used[i] == 0)[0]\n                unused_edges_j = np.where(edge_n_used[j] == 0)[0]\n                common_unused_edges = len(set(unused_edges_i).intersection(unused_edges_j))\n                updated_edge_distance[i, j] += common_unused_edges\n                \n    return updated_edge_distance",
+          "objective": -2.38936,
+          "other_inf": null
+     },
+     {
+          "algorithm": "New algorithm: Update the edge distance matrix by penalizing the distances of edges not used in the local optimal tour based on the ratio of unused edges adjacent to each edge not in the local optimal tour.",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    for i in range(len(edge_distance)):\n        for j in range(len(edge_distance)):\n            if edge_n_used[i, j] == 0 and i != j:\n                ratio_i = np.sum(edge_n_used[i] == 0) / len(edge_distance)\n                ratio_j = np.sum(edge_n_used[j] == 0) / len(edge_distance)\n                updated_edge_distance[i, j] += ratio_i\n                updated_edge_distance[j, i] += ratio_j\n    \n    return updated_edge_distance",
+          "objective": -2.38052,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm updates the edge distance matrix by randomly selecting a subset of edges not used in the local optimal tour and increasing their distances to encourage exploration of new paths and avoid local optima in the search for a minimized distance tour.\n",
+          "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    \n    non_used_edges = np.argwhere(edge_n_used == 0)\n    np.random.shuffle(non_used_edges)\n    \n    for i in range(min(len(non_used_edges), len(local_opt_tour)-1)):\n        edge_i, edge_j = non_used_edges[i]\n        updated_edge_distance[edge_i, edge_j] += 5\n        updated_edge_distance[edge_j, edge_i] += 5\n    \n    return updated_edge_distance",
+          "objective": -2.37826,
+          "other_inf": null
+     }
+]

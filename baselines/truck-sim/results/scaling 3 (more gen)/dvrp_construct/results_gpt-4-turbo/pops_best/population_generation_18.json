@@ -1,0 +1,6 @@
+{
+     "algorithm": "This new algorithm introduces queue density optimization by weighting customer priority based on the number of nearby trucks and the distance from the current truck position, aiming to reduce overall wait times and improve route efficiency by actively adjusting to dynamic truck distributions.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    def distance(point1, point2):\n        return np.linalg.norm(point1 - point2)\n\n    if len(unvisited_customers) == 0:\n        return None\n\n    distances = np.array([distance(cur_truck_pos, customer) for customer in unvisited_customers])\n\n    proximity_scores = []\n    for customer in unvisited_customers:\n        truck_proximities = np.array([distance(truck_pos, customer) for truck_pos in all_truck_pos])\n        proximity_scores.append(np.sum(np.exp(-truck_proximities)))  # Using exponential decay to score proximity influence\n\n    # Adjusted scoring function considering proximity influence more heavily\n    beta = 0.5  # Influence from other trucks' proximity\n    combined_scores = distances + beta * np.array(proximity_scores)\n\n    best_node = np.argmin(combined_scores)\n    \n    return best_node",
+     "objective": 31.23176,
+     "other_inf": null
+}

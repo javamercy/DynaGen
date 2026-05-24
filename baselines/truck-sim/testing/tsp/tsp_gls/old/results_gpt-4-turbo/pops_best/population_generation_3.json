@@ -1,0 +1,6 @@
+{
+     "algorithm": "Algorithm description: Adjust edge weights by applying variable penalties based on edge usage frequency, inversely related to the frequency, to discourage repeated traversal of frequently used paths and promote exploring less traveled ones.",
+     "code": "import numpy as np\n\ndef update_edge_distance(edge_distance, local_opt_tour, edge_n_used):\n    updated_edge_distance = np.copy(edge_distance)\n    tour_length = len(local_opt_tour)\n    max_usage = np.max(edge_n_used)\n    \n    for i in range(tour_length):\n        current_node = local_opt_tour[i]\n        next_node = local_opt_tour[(i + 1) % tour_length]\n        \n        # Inverse usage frequency as penalty factor\n        if edge_n_used[current_node, next_node] != 0:\n            penalty = max_usage / edge_n_used[current_node, next_node]\n        else:\n            penalty = max_usage  # Maximum penalty if an edge has never been used\n            \n        updated_edge_distance[current_node, next_node] += penalty\n        updated_edge_distance[next_node, current_node] += penalty  # bidirectional symmetry\n\n    return updated_edge_distance",
+     "objective": -0.0,
+     "other_inf": null
+}

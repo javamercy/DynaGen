@@ -1,0 +1,62 @@
+[
+     {
+          "algorithm": "\nThe new algorithm randomly selects the next node by considering the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, and the squared root of the number of times each node has been visited by all trucks in the score function.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    random.shuffle(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node) ** 0.5  # Updated appearance frequency\n        \n        total_score = weighted_distance_sum + 0.5 * appearance_freq  # Updated score function\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 24.13415,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm randomly selects the next node by considering the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, and the exponential of the number of times each node has been visited by all trucks in the score function.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    random.shuffle(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        appearance_freq = np.exp(np.count_nonzero(np.array(truck_nodes) == node))  # Updated appearance frequency\n        \n        total_score = weighted_distance_sum + 0.5 * appearance_freq  # Updated score function\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 24.55695,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by considering the shortest distance from the current node, the total number of nodes visited so far by all trucks, and the logarithm of the sum of the distances to the depot multiplied by a factor of 0.8 and 0.2 respectively.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    total_visited = len(truck_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        score = (dist_to_node + 0.8 / (total_visited + 1)) + 0.2 * np.log(np.sum(distance_matrix[node])) * np.exp(-dist_to_depot)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+          "objective": 25.17543,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm aims to prioritize visiting unvisited nodes that are closer to the depot node by minimizing the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, while also considering the waiting time at each node.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        wait_time = len(unvisited_nodes) * 5  # 5 minutes wait time per unvisited node\n        total_score = weighted_distance_sum + wait_time\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 25.21167,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node based on the sum of the distance to the current node, a weight factor for the number of times the node has been visited by trucks, and a penalty term for the distance to the depot with an inverse square relationship.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    total_visited = len(truck_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        score = dist_to_node + 0.5 * appearance_freq + 1 / ((dist_to_depot + 1) ** 2)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+          "objective": 25.72759,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm randomly selects the next node by considering the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, and the number of times each node has been visited by all trucks, with the appearance frequency parameter set to be squared in the score function.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    random.shuffle(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        \n        total_score = weighted_distance_sum + 0.5 * (appearance_freq ** 2)  # Updated score function\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 25.95814,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by considering the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, and the number of times each node has been visited by all trucks, with the appearance frequency parameter set to be cubed in the score function.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    random.shuffle(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        \n        total_score = weighted_distance_sum + 0.5 * (appearance_freq ** 3)  # Updated score function with cubed appearance frequency\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 26.01834,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by considering the shortest distance from the current node, the total number of nodes visited so far by all trucks, and the exponential of the distance to the depot, adjusted by a factor of 0.5 and 0.5 respectively.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    total_visited = len(truck_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        score = (dist_to_node + 0.5 / (total_visited + 1)) + 0.5 * np.exp(-dist_to_depot)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+          "objective": 26.11283,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by considering the shortest distance from the current node, the number of times each node has been visited, and the distance to the depot, adjusted by a factor of 0.3 and 0.7 respectively.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[node][depot_node]\n        \n        score = (dist_to_node + 0.3 / (len(truck_nodes) + 1)) + 0.7 / (dist_to_depot + 1)\n        \n        if score < min_score:\n            next_node = node\n            min_score = score\n    \n    return next_node",
+          "objective": 27.92262,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe new algorithm selects the next node by randomizing the order of unvisited nodes, then considering the sum of distances from the current node to unvisited nodes, weighted by the distances from the depot node to these unvisited nodes, and the number of times each node has been visited by all trucks.\n",
+          "code": "import numpy as np\nimport random\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    min_score = np.inf\n    next_node = None\n    \n    random.shuffle(unvisited_nodes)\n    \n    for node in unvisited_nodes:\n        dist_to_node = distance_matrix[current_node][node]\n        dist_to_depot = distance_matrix[depot_node][node]\n        \n        dist_truck_nodes = [distance_matrix[tnode][node] for tnode in truck_nodes]\n        weighted_distance_sum = np.sum([dist_to_node / (dist + dist_to_depot) for dist in dist_truck_nodes])  # Weighted sum of distances\n        \n        appearance_freq = np.count_nonzero(np.array(truck_nodes) == node)\n        \n        total_score = weighted_distance_sum + 0.5 * appearance_freq\n        \n        if total_score < min_score:\n            next_node = node\n            min_score = total_score\n    \n    return next_node",
+          "objective": 28.28093,
+          "other_inf": null
+     }
+]

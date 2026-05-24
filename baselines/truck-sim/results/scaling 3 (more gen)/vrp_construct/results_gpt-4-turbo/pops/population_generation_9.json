@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "My new algorithm adjusts the priority scoring by incorporating both time optimization and space awareness, evaluating nodes based on a combination of their closeness, average distance to the fleet, and a progressive decay factor to prevent circling in immediate proximity.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n\n    decay_factor = 0.65\n    influence_radius = 0.75\n    direct_weight = 2\n    mean_truck_weight = 3\n    \n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        mean_distance_to_trucks = np.mean(distance_matrix[node, truck_nodes])\n        decayed_distance = (direct_distance + 1) ** -decay_factor\n        weighted_score = (direct_weight * decayed_distance) + (mean_truck_weight * mean_distance_to_trucks / (direct_distance + 1))\n\n        priority_scores[i] = weighted_score\n\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 20.81589,
+          "other_inf": null
+     },
+     {
+          "algorithm": "My new algorithm adjusts the priority scoring by incorporating a decay factor that reduces the weight of the distance to far-off nodes, favoring closer nodes within a certain range.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n\n    decay_factor = 0.5\n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        mean_distance_to_trucks = np.mean(distance_matrix[node, truck_nodes])\n        priority_scores[i] = -(direct_distance ** decay_factor) + mean_distance_to_trucks\n\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 22.23341,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm uses an adaptive focus mechanism, which dynamically adjusts focus between the mean aggregate distance of all trucks to unvisited nodes and the direct distance from the current node to unvisited nodes, thus providing a balance between group-based navigation and individual shortest path exploration.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n    \n    focus_param = np.log(len(unvisited_nodes) + 1)  # Adaptive focus based on the number of unvisited nodes\n    priority_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        aggregate_distance = np.sum(distance_matrix[node, truck_nodes])\n        priority_score = -direct_distance + (aggregate_distance / focus_param)\n        priority_scores[i] = priority_score\n        \n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 25.67918,
+          "other_inf": null
+     },
+     {
+          "algorithm": "This new algorithm prioritizes nearby nodes but with a penalty for nodes that are closer to other trucks to encourage dispersion, using a factor that decreases the influence of nearby trucks as the number of unvisited nodes decreases.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if not unvisited_nodes.size:\n        return depot_node\n    \n    dispersion_factor = np.sqrt(len(unvisited_nodes))  # Dispersion factor based on the square root of the number of unvisited nodes\n    penalty_scores = np.zeros(len(unvisited_nodes))\n    \n    for i, node in enumerate(unvisited_nodes):\n        direct_distance = distance_matrix[current_node, node]\n        truck_proximity_penalty = np.sum(np.exp(-distance_matrix[node, truck_nodes] / dispersion_factor))\n        penalty_score = direct_distance + truck_proximity_penalty\n        penalty_scores[i] = penalty_score\n        \n    next_node = unvisited_nodes[np.argmin(penalty_scores)]\n    return next_node",
+          "objective": 27.1486,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Calculate a priority score based on proximity to current node and average distance to other truck destinations\n    if not unvisited_nodes.size:\n        return depot_node\n\n    priority_scores = np.zeros(len(unvisited_nodes))\n    for i, node in enumerate(unvisited_nodes):\n        priority_scores[i] = -distance_matrix[current_node, node] + np.mean(distance_matrix[node, truck_nodes])\n\n    # Select the node with the highest priority score\n    next_node = unvisited_nodes[np.argmax(priority_scores)]\n    return next_node",
+          "objective": 27.33842,
+          "other_inf": null
+     }
+]
