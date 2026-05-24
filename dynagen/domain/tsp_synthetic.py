@@ -1,73 +1,72 @@
-import random
-
 import numpy as np
 
 from dynagen.domain.tsp_instance import TSPInstance
 
 
-def generate_llamea_tsp_instance(*, seed: int = 69, size: int = 32) -> TSPInstance:
-    """Build the synthetic TSP instance used by LLaMEA's TSP example."""
-    rng = random.Random(seed)
-    coordinates = [(50.0, 50.0)]
-    for _ in range(size):
-        coordinates.append((float(rng.randint(0, 100)), float(rng.randint(0, 100))))
-        rng.randint(10, 35)
+def generate_tsp_construct_instances(
+        *,
+        n_instance: int = 20,
+        n_cities: int = 500,
+        seed: int = 2024,
+) -> list[TSPInstance]:
+    n_instance = int(n_instance)
+    n_cities = int(n_cities)
+    seed = int(seed)
+    if n_instance < 1:
+        raise ValueError("n_instance must be at least 1")
+    if n_cities < 2:
+        raise ValueError("n_cities must be at least 2")
 
-    coordinates_arr = np.asarray(coordinates, dtype=float)
-    diff = coordinates_arr[:, np.newaxis, :] - coordinates_arr[np.newaxis, :, :]
-    distances = np.sqrt(np.sum(diff * diff, axis=-1))
-    np.fill_diagonal(distances, 0.0)
+    rng = np.random.RandomState(seed)
+    instances: list[TSPInstance] = []
+    source = f"synthetic:tsp_construct:n_instance={n_instance}:n_cities={n_cities}:seed={seed}"
 
-    return TSPInstance(
-        name=f"llamea_seed{seed}_size{size}",
-        dimension=size + 1,
-        coordinates=coordinates_arr,
-        distance_matrix=distances,
-        optimal_length=None,
-        metadata={
-            "source": f"synthetic:llamea:{seed}:{size}",
-            "generator": "generate_tsp_test",
-            "seed": int(seed),
-            "customer_count": int(size),
-            "depot": [50.0, 50.0],
-        },
-    )
+    for index in range(n_instance):
+        coordinates = rng.rand(n_cities, 2)
+        diff = coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+        np.fill_diagonal(distances, 0.0)
+        instances.append(TSPInstance(
+            name=f"tsp_construct_{n_cities}_seed{seed}_{index:03d}",
+            dimension=n_cities,
+            coordinates=coordinates,
+            distance_matrix=distances,
+            optimal_length=None,
+            metadata={
+                "source": source,
+                "generator": "generate_tsp_construct_instances",
+                "seed": seed,
+                "n_instance": n_instance,
+                "n_cities": n_cities,
+                "instance_index": index,
+            },
+        ))
 
-
-def parse_llamea_tsp_spec(spec: str) -> tuple[int, int] | None:
-    specs = parse_llamea_tsp_specs(spec)
-    if specs is None:
-        return None
-    if len(specs) != 1:
-        raise ValueError(
-            "Expected one synthetic LLaMEA TSP instance. "
-            "Use parse_llamea_tsp_specs for multi-instance specs."
-        )
-    return specs[0]
+    return instances
 
 
-def parse_llamea_tsp_specs(spec: str) -> list[tuple[int, int]] | None:
+def parse_tsp_construct_spec(spec: str) -> tuple[int, int, int] | None:
     parts = spec.split(":")
-    if len(parts) != 4 or parts[:2] != ["synthetic", "llamea"]:
+    if len(parts) != 5 or parts[:2] != ["synthetic", "tsp_construct"]:
         return None
 
-    seeds = _parse_int_axis(parts[2], names=("seed", "seeds"))
-    sizes = _parse_int_axis(parts[3], names=("size", "sizes"))
-    return [(seed, size) for seed in seeds for size in sizes]
+    n_instance = _parse_int_field(parts[2], names=("n_instance", "count", "instances"))
+    n_cities = _parse_int_field(parts[3], names=("n_cities", "size", "problem_size"))
+    seed = _parse_int_field(parts[4], names=("seed",))
+    return n_instance, n_cities, seed
 
 
-def _parse_int_axis(value: str, *, names: tuple[str, ...]) -> list[int]:
+def _parse_int_field(value: str, *, names: tuple[str, ...]) -> int:
     value = value.strip()
     if "=" in value:
-        key, raw_values = value.split("=", 1)
+        key, raw_value = value.split("=", 1)
         if key.strip() not in names:
             expected = " or ".join(names)
-            raise ValueError(f"Expected {expected}=... in synthetic LLaMEA TSP spec, got {key!r}")
-        value = raw_values
+            raise ValueError(f"Expected {expected}=... in synthetic tsp_construct spec, got {key!r}")
+        value = raw_value
 
-    values = [item.strip() for item in value.split(",") if item.strip()]
-    if not values:
+    value = value.strip()
+    if not value:
         expected = " or ".join(names)
-        raise ValueError(f"Expected at least one integer for {expected} in synthetic LLaMEA TSP spec")
-
-    return [int(item) for item in values]
+        raise ValueError(f"Expected a value for {expected} in synthetic tsp_construct spec")
+    return int(value)

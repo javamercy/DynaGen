@@ -1,4 +1,6 @@
+import logging
 import math
+import os
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -27,6 +29,9 @@ from dynagen.persistence.run_store import RunStore
 from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
 from dynagen.reporting.summary import build_final_report, generation_summary
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -103,7 +108,16 @@ class EvolutionEngine:
             search_best.id,
             population_ids={candidate.id for candidate in population.candidates},
         )
+        problem_tag = self._problem_tag()
+        logger.info("[%s] testing best candidate %s", problem_tag, search_best.id)
         test_result = self.test_evaluator.evaluate_code(search_best.code)
+        logger.info(
+            "[%s] test complete | candidate=%s | status=%s | score=%s",
+            problem_tag,
+            search_best.id,
+            test_result.status,
+            test_result.score,
+        )
         self.store.save_test_result(search_best.id, test_result)
         llm_calls = self._llm_call_summary()
         self.store.save_llm_calls(llm_calls)
@@ -156,6 +170,11 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def _initial_population(self) -> Population:
+        logger.info(
+            "[%s] initializing population | size=%d",
+            self._problem_tag(),
+            self.config.evolution.population_size,
+        )
         roles = self.problem.initial_roles(self.config.evolution.population_size)
         tasks = self._build_initial_tasks(roles)
         candidates = self._execute_tasks_parallel(tasks)
@@ -196,12 +215,16 @@ class EvolutionEngine:
             population: Population,
     ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
-        for strategy in self.config.evolution.strategies:
+        available_strategies = self.config.evolution.strategies
+        num_to_select = min(self.config.evolution.population_size, len(available_strategies))
+        selected_strategies = self.rng.sample(available_strategies, num_to_select)
+        
+        for strategy in selected_strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
                 parents = self._select_strategy_parents(strategy, population.candidates)
                 self._ensure_parent_verbal_gradients(parents, generation)
-                feedback_context = self._feedback_context(strategy, parents)
+                feedback_context = self._feedback_context(parents)
                 messages = self.problem.build_evolution_prompt(
                     strategy,
                     parents,
@@ -227,7 +250,7 @@ class EvolutionEngine:
         if not tasks:
             return []
 
-        max_workers = min(len(tasks), 8)
+        max_workers = min(len(tasks), os.cpu_count() or 1)
         results: list[Candidate] = [None] * len(tasks)  # type: ignore[list-item]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -245,6 +268,14 @@ class EvolutionEngine:
         """Run LLM call + evaluation for a single candidate. Always returns a Candidate."""
         candidate: Candidate | None = None
         try:
+            problem_tag = self._problem_tag()
+            logger.info(
+                "[%s] llm call | candidate=%s | generation=%d | strategy=%s",
+                problem_tag,
+                task.candidate_id,
+                task.generation,
+                task.strategy,
+            )
             response = self.provider.complete(
                 task.messages,
                 temperature=self.config.llm.temperature,
@@ -259,6 +290,13 @@ class EvolutionEngine:
                 metrics=self._empty_metrics(),
             )
             self.search_evaluator.evaluate_candidate(candidate)
+            logger.info(
+                "[%s] evaluation | candidate=%s | status=%s | score=%s",
+                problem_tag,
+                candidate.id,
+                candidate.status,
+                candidate.score_value,
+            )
         except Exception as exc:
             error_details = _exception_details(exc)
             if candidate is None:
@@ -287,7 +325,7 @@ class EvolutionEngine:
         selected_ids: set[str] = set()
         archive_min = (
             self.config.evolution.archive.s3_archive_parent_min
-            if strategy == Strategy.S3
+            if strategy == Strategy.E3_HYBRID_RECOMBINATION
             else 0
         )
         archive_min = min(archive_min, count)
@@ -311,7 +349,7 @@ class EvolutionEngine:
                     rng=self.rng,
                     candidate_index=self._candidate_index,
                     exclude_ids=selected_ids,
-                    diversify_buckets=strategy == Strategy.S3,
+                    diversify_buckets=strategy == Strategy.E3_HYBRID_RECOMBINATION,
                 )
             if not next_parent:
                 pool = [candidate for candidate in candidates if candidate.id not in selected_ids]
@@ -324,7 +362,7 @@ class EvolutionEngine:
                     rng=self.rng,
                     candidate_index=self._candidate_index,
                     exclude_ids=selected_ids,
-                    diversify_buckets=strategy == Strategy.S3,
+                    diversify_buckets=strategy == Strategy.E3_HYBRID_RECOMBINATION,
                 )
             if not next_parent:
                 break
@@ -353,12 +391,19 @@ class EvolutionEngine:
             or generation % gradient_config.llm_every_n_generations != 0
         ):
             return
+        problem_tag = self._problem_tag()
         for parent in parents:
             parent_parents = self._resolve_parents(parent)
             if candidate_has_llm_gradient(parent):
                 continue
             if self._llm_gradient_calls_by_generation.get(generation, 0) >= gradient_config.max_llm_calls_per_generation:
                 continue
+            logger.info(
+                "[%s] reflection llm call | parent=%s | generation=%d",
+                problem_tag,
+                parent.id,
+                generation,
+            )
             self._generate_llm_verbal_gradient(
                 candidate=parent,
                 parents=parent_parents,
@@ -451,14 +496,11 @@ class EvolutionEngine:
                 continue
         return None if not values else sum(values)
 
-    def _feedback_context(self, strategy: Strategy, parents: list[Candidate]) -> str:
+    def _feedback_context(self, parents: list[Candidate]) -> str:
         gradient_config = self.config.evolution.verbal_gradients
         if not gradient_config.enabled:
             return ""
-        return format_parent_verbal_gradients(
-            parents,
-            strategy=strategy,
-        )
+        return format_parent_verbal_gradients(parents)
 
     def _provider_summaries(self) -> list[dict[str, object]]:
         providers: list[LLMProvider] = [self.provider]
@@ -510,12 +552,16 @@ class EvolutionEngine:
         for candidate in candidates:
             self._candidate_index[candidate.id] = candidate
 
+    def _problem_tag(self) -> str:
+        return self.config.problem.type.upper()
+
 
 def scheduled_llm_calls(config: RunConfig) -> int:
+    num_selected_strategies = min(config.evolution.population_size, len(config.evolution.strategies))
     return (
             config.evolution.population_size
             + config.evolution.generations
-            * len(config.evolution.strategies)
+            * num_selected_strategies
             * config.evolution.offspring_per_strategy
     )
 

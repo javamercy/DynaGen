@@ -1,23 +1,11 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.prompts.parent_awareness import render_parent_awareness
+from dynagen.evolution.strategies import Strategy, STRATEGIES_METADATA
 from dynagen.prompts.tsp_templates import (
     TSP_INTERNAL_CHECKLIST,
     TSP_RESPONSE_FORMAT,
     TSP_SOLVER_CONTRACT,
-    render_tsp_candidates,
+    render_tsp_candidates, tsp_system_prompt,
 )
-
-# S1:explore, S2:refine, S3:recombine.
-TSP_STRATEGY_INSTRUCTIONS = {
-    "S1": """Explore: create a complete solver with materially different search behavior from the parent.
-Change a core decision rule or search dynamic, not names or constants. Keep validity, budget use, and early reporting.""",
-
-    "S2": """Refine: use parent metrics and LLM reflections to make one or two targeted fixes.
-Preserve what works, address measured weakness, and avoid unrelated rewrites.""",
-
-    "S3": """Recombine: build one coherent solver from complementary parent strengths.
-Do not concatenate parents or run them sequentially. Resolve conflicts and keep the child simpler than the sum."""
-}
 
 
 def build_tsp_evolution_prompt(
@@ -26,31 +14,35 @@ def build_tsp_evolution_prompt(
         *,
         feedback_context: str = "",
 ) -> list[dict[str, str]]:
-    if strategy not in TSP_STRATEGY_INSTRUCTIONS:
-        raise ValueError(f"Unknown strategy: {strategy}")
+    strategy_enum = Strategy(strategy)
+    meta = STRATEGIES_METADATA[strategy_enum]
     candidates_context = render_tsp_candidates(parents)
-    parent_awareness = render_parent_awareness(
-        parents,
-        strategy=strategy,
-        problem="tsp",
-        score_label="distance",
-    )
-    blocks = [
-        f"STRATEGY {strategy}: {TSP_STRATEGY_INSTRUCTIONS[strategy]}",
-        "Distance is the search objective for TSP; lower distance is better.",
-    ]
+
     if feedback_context:
-        blocks.append(feedback_context)
-    if parent_awareness:
-        blocks.append(parent_awareness)
+        blocks = [
+            "VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.",
+            "Use the supplied parents as supporting evidence only.",
+            feedback_context,
+            "Distance is the search objective for TSP; lower distance is better.",
+        ]
+    else:
+        blocks = [
+            f"STRATEGY: {strategy}",
+            f"GOAL: {meta['description']}",
+            "Use the provided parent(s) as the primary source of design changes.",
+            "Distance is the search objective for TSP; lower distance is better.",
+        ]
+
     blocks.extend([
         f"PARENTS:\n{candidates_context}",
         TSP_SOLVER_CONTRACT.strip(),
         TSP_INTERNAL_CHECKLIST.strip(),
         TSP_RESPONSE_FORMAT.strip(),
     ])
+
     user = "\n\n".join(blocks)
+
     return [
-        {"role": "system", "content": "You generate executable, reliable full TSP solvers for evolutionary search."},
+        {"role": "system", "content": tsp_system_prompt()},
         {"role": "user", "content": user},
     ]

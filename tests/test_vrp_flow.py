@@ -76,7 +76,7 @@ class VRPFlowTests(unittest.TestCase):
                 "population_size": 1,
                 "generations": 0,
                 "offspring_per_strategy": 1,
-                "strategies": ["S1"],
+                "strategies": ["e1_radical_exploration"],
             },
             "evaluation": {
                 "budget": 10,

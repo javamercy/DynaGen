@@ -45,7 +45,7 @@ class ArchiveTests(unittest.TestCase):
                 "timeout_fraction": 0.0,
                 "mean_runtime": 0.1,
                 "score_by_instance_size": {"33": 80.0, "201": 140.0},
-                "score_by_instance_source": {"synthetic:llamea:11:32": 80.0},
+                "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": 80.0},
             },
         )
 
@@ -175,7 +175,7 @@ class ArchiveTests(unittest.TestCase):
     def test_engine_samples_archive_parent_and_persists_summary(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
-        config = _run_config(population_size=1, generations=1, strategies=["S1"])
+        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -203,7 +203,7 @@ class ArchiveTests(unittest.TestCase):
     def test_archive_disabled_omits_archive_parent_context(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
-        config = _run_config(population_size=1, generations=1, strategies=["S1"], archive_enabled=False)
+        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"], archive_enabled=False)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -242,7 +242,7 @@ def _candidate(candidate_id: str, *, score: float, code: str) -> Candidate:
             "timeout_fraction": 0.0,
             "mean_runtime": 0.1,
             "score_by_instance_size": {"33": score},
-            "score_by_instance_source": {"synthetic:llamea:11:32": score},
+            "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score},
         },
     )
 
@@ -309,7 +309,7 @@ class _FakeEvaluator:
             "timeout_fraction": 0.0,
             "mean_runtime": 0.1,
             "score_by_instance_size": {"33": score},
-            "score_by_instance_source": {"synthetic:llamea:11:32": score},
+            "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score},
         }
         return EvaluationResult("valid", score, metrics, score_name="distance")
 
@@ -332,7 +332,7 @@ def _run_config(
             "population_size": population_size,
             "generations": generations,
             "offspring_per_strategy": 1,
-            "strategies": strategies or ["S1"],
+            "strategies": strategies or ["e1_radical_exploration"],
             "archive": {
                 "enabled": archive_enabled,
                 "max_size": 8,

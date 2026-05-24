@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -5,7 +6,7 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.domain.tsp_synthetic import generate_llamea_tsp_instance, parse_llamea_tsp_specs
+from dynagen.domain.tsp_synthetic import generate_tsp_construct_instances, parse_tsp_construct_spec
 from dynagen.evaluation.tsp_archive import build_tsp_archive_profile
 from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
 from dynagen.evaluation.tsp_evaluator import TSPCandidateEvaluator
@@ -13,13 +14,19 @@ from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
 from dynagen.prompts.tsp_initial import TSP_INITIAL_ROLES, TSPInitialRole, build_tsp_initial_prompt
 
 
+logger = logging.getLogger(__name__)
+
+
 class TSPProblem:
     type = "tsp"
 
     def build_evaluator(self, config: RunConfig, *, pool_name: str) -> TSPCandidateEvaluator:
         path = config.data.search_instances if pool_name == "search_instances" else config.data.test_instances
+        logger.info("[%s] initializing %s pool from %s", self.type.upper(), pool_name, path)
+        instances = load_tsp_instances(path)
+        logger.info("[%s] loaded %d instances for %s", self.type.upper(), len(instances), pool_name)
         return TSPCandidateEvaluator(
-            load_tsp_instances(path),
+            instances,
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
@@ -75,12 +82,14 @@ def load_tsp_instances(path: str | Path | None) -> list[TSPInstance]:
     if not path:
         raise ValueError("TSP data.search_instances and data.test_instances must be specified")
 
-    synthetic_specs = parse_llamea_tsp_specs(str(path))
-    if synthetic_specs is not None:
-        return [
-            generate_llamea_tsp_instance(seed=seed, size=size)
-            for seed, size in synthetic_specs
-        ]
+    synthetic_spec = parse_tsp_construct_spec(str(path))
+    if synthetic_spec is not None:
+        n_instance, n_cities, seed = synthetic_spec
+        return generate_tsp_construct_instances(
+            n_instance=n_instance,
+            n_cities=n_cities,
+            seed=seed,
+        )
 
     path = Path(path)
     if path.is_dir():

@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from dynagen.candidates.candidate import Candidate
@@ -9,20 +10,25 @@ from dynagen.evaluation.vrp_gradient import build_vrp_llm_verbal_gradient_prompt
 from dynagen.prompts.vrp_evolution import build_vrp_evolution_prompt
 from dynagen.prompts.vrp_initial import VRP_INITIAL_ROLES, VRPInitialRole, build_vrp_initial_prompt
 
+logger = logging.getLogger(__name__)
+
 
 class VRPProblem:
     type = "vrp"
 
     def build_evaluator(self, config: RunConfig, *, pool_name: str) -> VRPCandidateEvaluator:
         path = config.data.search_instances if pool_name == "search_instances" else config.data.test_instances
+        logger.info("[%s] initializing %s pool from %s", self.type.upper(), pool_name, path)
+        instances = load_vrp_instances(
+            path,
+            pool_name=pool_name,
+            search_limit=config.problem.vrp_search_limit,
+            test_sizes=config.problem.vrp_test_sizes,
+            test_limit_per_size=config.problem.vrp_test_limit_per_size,
+        )
+        logger.info("[%s] loaded %d instances for %s", self.type.upper(), len(instances), pool_name)
         return VRPCandidateEvaluator(
-            load_vrp_instances(
-                path,
-                pool_name=pool_name,
-                search_limit=config.problem.vrp_search_limit,
-                test_sizes=config.problem.vrp_test_sizes,
-                test_limit_per_size=config.problem.vrp_test_limit_per_size,
-            ),
+            instances,
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,

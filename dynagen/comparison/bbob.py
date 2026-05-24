@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -58,7 +59,7 @@ def _evaluate_algorithms_parallel(
     if not tasks:
         return []
 
-    max_workers = min(len(tasks), 4)
+    max_workers = min(len(tasks), os.cpu_count() or 1)
     results: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

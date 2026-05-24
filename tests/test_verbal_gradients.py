@@ -44,7 +44,7 @@ class VerbalGradientTests(unittest.TestCase):
         candidate = Candidate(
             id="cand_1",
             generation=1,
-            strategy="S1",
+            strategy="e1_radical_exploration",
             name="timeout_solver",
             thought="",
             code="",
@@ -96,10 +96,11 @@ class VerbalGradientTests(unittest.TestCase):
             status=CandidateStatus.VALID,
         )
 
-        text = format_parent_verbal_gradients([candidate], strategy="S2")
+        text = format_parent_verbal_gradients([candidate])
 
         self.assertIn("PARENT-SPECIFIC LLM REFLECTIONS", text)
-        self.assertIn("Change for S2", text)
+        self.assertIn("Change:", text)
+        self.assertNotIn("Change for", text)
         self.assertIn("guarded late-budget", text)
 
     def test_s3_parent_gradient_formatting_is_unlimited_and_keeps_all_parents(self) -> None:
@@ -127,14 +128,14 @@ class VerbalGradientTests(unittest.TestCase):
             for index in range(1, 4)
         ]
 
-        text = format_parent_verbal_gradients(parents, strategy="S3")
+        text = format_parent_verbal_gradients(parents)
 
         self.assertIn("Parent cand_1 LLM reflection", text)
         self.assertIn("Parent cand_2 LLM reflection", text)
         self.assertIn("Parent cand_3 LLM reflection", text)
         self.assertIn(" ".join(["long summary about large instances and timeout risk"] * 6), text)
 
-    def test_evolution_prompts_include_parent_awareness_for_all_problems(self) -> None:
+    def test_evolution_prompts_do_not_include_parent_awareness_anymore(self) -> None:
         parent = Candidate(
             id="cand_1",
             generation=0,
@@ -161,26 +162,24 @@ class VerbalGradientTests(unittest.TestCase):
             status=CandidateStatus.VALID,
         )
 
-        feedback_context = format_parent_verbal_gradients([parent], strategy="S2")
+        feedback_context = format_parent_verbal_gradients([parent])
         for messages in (
-            build_tsp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
-            build_bbob_evolution_prompt("S2", [parent], feedback_context=feedback_context),
-            build_dvrp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
-            build_vrp_evolution_prompt("S2", [parent], feedback_context=feedback_context),
+            build_tsp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+            build_bbob_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+            build_dvrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+            build_vrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
         ):
             user = messages[1]["content"]
-            self.assertIn("PARENT AWARENESS", user)
-            self.assertIn("Best available parent", user)
-            self.assertIn("cand_1", user)
-            self.assertIn("reflection=llm", user)
-            self.assertIn("Keep the useful incumbent behavior.", user)
+            self.assertNotIn("PARENT AWARENESS", user)
+            self.assertNotIn("STRATEGY", user)
+            self.assertIn("VERBAL GRADIENT MODE", user)
 
     def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
         full_code = "def solve_tsp(distance_matrix, seed, budget):\n    " + "x = 1\n    " * 600 + "return []\n"
         candidate = Candidate(
             id="cand_full",
             generation=1,
-            strategy="S2",
+            strategy="e1_radical_exploration",
             name="solver",
             thought="candidate thought",
             code=full_code,
@@ -389,7 +388,7 @@ def _run_config(*, llm_every_n_generations: int = 1, llm_model: str = "feedback-
             "population_size": 1,
             "generations": 1,
             "offspring_per_strategy": 1,
-            "strategies": ["S1"],
+            "strategies": ["e1_radical_exploration"],
             "verbal_gradients": {
                 "enabled": True,
                 "llm_every_n_generations": llm_every_n_generations,

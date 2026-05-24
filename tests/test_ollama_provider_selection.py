@@ -10,9 +10,9 @@ class OllamaProviderSelectionTests(unittest.TestCase):
     def test_load_config_preserves_ollama_model_suffix(self) -> None:
         config = load_config(Path("configs/tsp/tsp_calls_20.yaml"))
 
-        self.assertEqual(config.llm.provider, "ollama")
-        self.assertEqual(config.llm.model, "gemma4:31-cloud")
-        self.assertEqual(config.evolution.verbal_gradients.llm_model, "gemma4:31-cloud")
+        self.assertEqual(config.llm.provider, "deepseek")
+        self.assertEqual(config.llm.model, "deepseek-v4-flash")
+        self.assertEqual(config.evolution.verbal_gradients.llm_model, "deepseek-v4-flash")
 
     def test_provider_from_config_supports_ollama(self) -> None:
         config = RunConfig.from_dict({
@@ -26,7 +26,7 @@ class OllamaProviderSelectionTests(unittest.TestCase):
                 "population_size": 1,
                 "generations": 1,
                 "offspring_per_strategy": 1,
-                "strategies": ["S1"],
+                "strategies": ["e1_radical_exploration"],
             },
             "evaluation": {
                 "budget": 10,

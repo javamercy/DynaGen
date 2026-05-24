@@ -1,5 +1,5 @@
 from dynagen.candidates.candidate import Candidate
-from dynagen.prompts.parent_awareness import render_parent_awareness
+from dynagen.evolution.strategies import Strategy, STRATEGIES_METADATA
 from dynagen.prompts.dvrp_templates import (
     DVRP_INTERNAL_CHECKLIST,
     DVRP_POLICY_CONTRACT,
@@ -7,47 +7,30 @@ from dynagen.prompts.dvrp_templates import (
     render_dvrp_candidates,
 )
 
-DVRP_STRATEGY_INSTRUCTIONS = {
-    "S1": """Explore: produce a dispatch policy whose decision mechanism differs fundamentally from the parent.
-First, identify the parent's core decision mechanism in one short phrase — for example scoring, multi-step lookahead, regret comparison, clustering, or fleet-aware coordination.
-Then, choose a different mechanism class and design the new policy around it.
-Keep validity, deterministic seed handling, and budget-bounded per-call work.""",
-
-    "S2": """Refine: improve the parent through targeted fixes grounded in its measured behavior.
-First, identify the parent's weakest measured case from its metrics (mean_ttt, mean_gap, TTT/gap by instance size) and its prior thought.
-Then, propose one or two focused changes that directly address that weakness.
-Preserve what works; avoid unrelated rewrites.""",
-
-    "S3": """Recombine: produce a single coherent policy that captures the common principle behind the parents and introduces new mechanism.
-First, identify the common idea or principle the parents share — the underlying mechanism, not their surface features.
-Then, describe in one sentence a new policy built on that principle, with components not present in any parent.
-Finally, implement it as one decision pass; do not concatenate parents, run them sequentially, vote between them, or branch by instance condition.
-Keep the child simpler than the sum.""",
-}
-
-
 def build_dvrp_evolution_prompt(
     strategy: str,
     parents: list[Candidate],
     *,
     feedback_context: str = "",
 ) -> list[dict[str, str]]:
-    if strategy not in DVRP_STRATEGY_INSTRUCTIONS:
-        raise ValueError(f"Unknown strategy: {strategy}")
-    parent_awareness = render_parent_awareness(
-        parents,
-        strategy=strategy,
-        problem="dvrp",
-        score_label="TTT",
-    )
-    blocks = [
-        DVRP_POLICY_CONTRACT.strip(),
-        f"STRATEGY {strategy}: {DVRP_STRATEGY_INSTRUCTIONS[strategy]}",
-    ]
+    strategy_enum = Strategy(strategy)
+    strategy_description = STRATEGIES_METADATA[strategy_enum]["description"]
+
     if feedback_context:
-        blocks.append(f"REFLECTION FROM RECENT PARENT/CHILD COMPARISON:\n{feedback_context}")
-    if parent_awareness:
-        blocks.append(parent_awareness)
+        blocks = [
+            DVRP_POLICY_CONTRACT.strip(),
+            "VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.",
+            "Use the supplied parents as supporting evidence only.",
+            feedback_context,
+        ]
+    else:
+        blocks = [
+            DVRP_POLICY_CONTRACT.strip(),
+            f"STRATEGY {strategy}: {strategy_description}",
+            "Use the provided parents as the primary source of design changes.",
+            "Incorporate, adapt, recombine, repair, or refine the listed parents.",
+            "Do not ignore the parents or generate an unrelated policy from scratch.",
+        ]
     blocks.extend([
         f"PARENTS:\n{render_dvrp_candidates(parents)}",
         "Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.",

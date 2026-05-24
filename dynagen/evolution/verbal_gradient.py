@@ -76,12 +76,10 @@ def set_candidate_gradient(candidate: Candidate, gradient: dict[str, Any]) -> No
 
 def format_parent_verbal_gradients(
         parents: list[Candidate],
-        *,
-        strategy: str,
 ) -> str:
     blocks = []
     for parent in parents:
-        block = format_candidate_verbal_gradient(parent, strategy=strategy)
+        block = format_candidate_verbal_gradient(parent)
         if block:
             blocks.append(block)
     if not blocks:
@@ -91,8 +89,6 @@ def format_parent_verbal_gradients(
 
 def format_candidate_verbal_gradient(
         candidate: Candidate,
-        *,
-        strategy: str | None = None,
 ) -> str:
     gradient = get_candidate_gradient(candidate)
     if not gradient or str(gradient.get("source")) != "llm":
@@ -109,8 +105,7 @@ def format_candidate_verbal_gradient(
         lines.append(f"- Preserve: {'; '.join(preserve)}")
     change = _clean_list(gradient.get("change"))
     if change:
-        label = f"Change for {strategy}" if strategy else "Change"
-        lines.append(f"- {label}: {'; '.join(change)}")
+        lines.append(f"- Change: {'; '.join(change)}")
     avoid = _clean_list(gradient.get("avoid"))
     if avoid:
         lines.append(f"- Avoid: {'; '.join(avoid)}")
@@ -205,7 +200,6 @@ def _candidate_snapshot(candidate: Candidate) -> dict[str, Any]:
     return {
         "id": candidate.id,
         "generation": candidate.generation,
-        "strategy": candidate.strategy,
         "status": str(getattr(candidate.status, "value", candidate.status)),
         "score_name": candidate.score_name,
         "score_value": _finite_or_none(candidate.score_value),

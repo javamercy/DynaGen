@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -74,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.command == "init-run":
         config = load_config(args.config)
         store = RunStore.create(config.output_dir, config.name, config.to_dict())

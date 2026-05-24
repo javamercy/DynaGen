@@ -129,7 +129,7 @@ def _tsp_candidate(
             "timeout_fraction": timeout_fraction,
             "mean_runtime": runtime,
             "score_by_instance_size": {"33": score, "201": worst_size},
-            "score_by_instance_source": {"synthetic:llamea:11:200": worst_size},
+            "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=200:seed=11": worst_size},
         },
     )
 

@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from dynagen.candidates.candidate import Candidate
@@ -9,13 +10,18 @@ from dynagen.evaluation.bbob_gradient import build_bbob_llm_verbal_gradient_prom
 from dynagen.prompts.bbob_evolution import build_bbob_evolution_prompt
 from dynagen.prompts.bbob_initial import BBOB_INITIAL_ROLES, BBOBInitialRole, build_bbob_initial_prompt
 
+logger = logging.getLogger(__name__)
+
 
 class BBOBProblem:
     type = "bbob"
 
     def build_evaluator(self, config: RunConfig, *, pool_name: str) -> BBOBCandidateEvaluator:
+        logger.info("[%s] initializing %s pool", self.type.upper(), pool_name)
+        instances = load_bbob_instances(config, pool_name=pool_name)
+        logger.info("[%s] loaded %d instances for %s", self.type.upper(), len(instances), pool_name)
         return BBOBCandidateEvaluator(
-            load_bbob_instances(config, pool_name=pool_name),
+            instances,
             seeds=config.evaluation.seeds,
             budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,

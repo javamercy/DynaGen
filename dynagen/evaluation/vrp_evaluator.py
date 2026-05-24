@@ -1,4 +1,5 @@
 import math
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -72,7 +73,7 @@ class VRPCandidateEvaluator:
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
         tasks = [(instance, seed) for instance in self.instances for seed in self.seeds]
         records: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
-        with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as executor:
+        with ThreadPoolExecutor(max_workers=min(len(tasks), os.cpu_count() or 1)) as executor:
             future_to_index = {
                 executor.submit(self._run_single_instance, code, instance, seed): index
                 for index, (instance, seed) in enumerate(tasks)
