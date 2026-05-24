@@ -234,5 +234,6 @@ if __name__ == "__main__":
             HPO=True,
             budget=n_gens,
             eval_timeout=180,
+            parallel_backend="threading",
         )
         print(es.run())
