@@ -80,7 +80,7 @@ if __name__ == "__main__":
         np.random.shuffle(train_instances)
         inst_feats = {str(arg): [arg[0]] for idx, arg in enumerate(train_instances)}
 
-        if "_configspace" not in solution.keys():
+        if solution.configspace is None:
             incumbent = {}
         else:
             configuration_space = solution.configspace
@@ -90,9 +90,10 @@ if __name__ == "__main__":
                 deterministic=False,
                 min_budget=12,
                 max_budget=200,
-                n_trials=2000,
+                n_trials=100,
                 instances=train_instances,
                 instance_features=inst_feats,
+                n_workers=10,
                 output_directory="smac3_output"
                 if explogger is None
                 else explogger.dirname + "/smac"

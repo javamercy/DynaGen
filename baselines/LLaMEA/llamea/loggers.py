@@ -139,10 +139,13 @@ class ExperimentLogger:
             )
             return
         with open(
-                f"{self.dirname}/configspace/try-{attempt}-{algorithm_name}.py", "w"
+            f"{self.dirname}/configspace/try-{attempt}-{algorithm_name}.py", "w"
         ) as file:
             if config_space is not None:
-                file.write(cs_json.write(config_space))
+                try:
+                    file.write(cs_json.write(config_space))
+                except Exception:
+                    file.write(str(config_space))
             else:
                 file.write("Failed to extract config space")
         self.attempt = attempt
