@@ -1213,6 +1213,15 @@ Feedback:
 
             ## Archive progress.
             self.pickle_archive()
+
+        # Log final best solution(s) to solutions.jsonl
+        if self.logger:
+            if self.multi_objective:
+                for sol in self.best_so_far.get_best():
+                    self.logger.log_solution(sol, sol.fitness)
+            else:
+                self.logger.log_solution(self.best_so_far, self.best_so_far.fitness)
+
         if self.multi_objective:
             return self.best_so_far.get_best()
         return self.best_so_far

@@ -7,30 +7,31 @@
 import os
 import pickle
 import textwrap
+from datetime import datetime
 
 import numpy as np
 from ioh import get_problem, logger
 
-from llamea import Gemini_LLM, LLaMEA
+from llamea import LLaMEA
+from llamea.llm import DeepSeek_LLM
 from llamea.utils import prepare_namespace, clean_local_namespace
 from misc import OverBudgetException, aoc_logger, correct_aoc
 
 if __name__ == "__main__":
     # Execution code starts here
-    api_key = os.getenv("GOOGLE_API_KEY")
-    ai_model = "gemini-2.5-flash"
-    experiment_name = "pop1-5"
-    llm = Gemini_LLM(api_key, ai_model)
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    ai_model = "deepseek-v4-flash"
+    llm = DeepSeek_LLM(api_key, model=ai_model)
+    n_gens = 5
+    experiment_name = f"bbob-{n_gens}_gens"
+
 
     # We define the evaluation function that executes the generated algorithm (solution.code) on the BBOB test suite.
-    # It should set the scores and feedback of the solution based on the performance metric, in this case we use mean AOCC.
+    # It evaluates on train instances [1,2,3] for feedback to LLM, and on test instances [4,5] for held-out evaluation.
     def evaluateBBOB(solution, explogger=None):
-        auc_mean = 0
-        auc_std = 0
-
         code = solution.code
         algorithm_name = solution.name
-        feedback=""
+        feedback = ""
         possible_issue = None
         local_ns = {}
         try:
@@ -44,14 +45,16 @@ if __name__ == "__main__":
             solution.set_scores(float("-inf"), feedback, e)
             return solution
 
-        aucs = []
+        train_aucs = []
+        test_aucs = []
 
         algorithm = None
         for dim in [5]:
             budget = 2000 * dim
             l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
             for fid in np.arange(1, 25):
-                for iid in [1, 2, 3]:  # , 4, 5]
+                # Train instances (used for LLM feedback)
+                for iid in [1, 2, 3]:
                     problem = get_problem(fid, iid, dim)
                     problem.attach_logger(l2)
 
@@ -66,19 +69,46 @@ if __name__ == "__main__":
                             pass
 
                         auc = correct_aoc(problem, l2, budget)
-                        aucs.append(auc)
+                        train_aucs.append(auc)
                         l2.reset(problem)
                         problem.reset()
-        auc_mean = np.mean(aucs)
-        auc_std = np.std(aucs)
 
-        feedback = f"The algorithm {algorithm_name} got an average Area over the convergence curve (AOCC, 1.0 is the best) score of {auc_mean:0.4f} with standard deviation {auc_std:0.4f}."
+                # Test instances (held-out evaluation)
+                for iid in [4, 5]:
+                    problem = get_problem(fid, iid, dim)
+                    problem.attach_logger(l2)
 
-        print(algorithm_name, algorithm, auc_mean, auc_std)
-        solution.add_metadata("aucs", aucs)
-        solution.set_scores(auc_mean, feedback)
+                    for rep in range(3):
+                        np.random.seed(rep)
+                        try:
+                            algorithm = local_ns[algorithm_name](
+                                budget=budget, dim=dim
+                            )
+                            algorithm(problem)
+                        except OverBudgetException:
+                            pass
+
+                        auc = correct_aoc(problem, l2, budget)
+                        test_aucs.append(auc)
+                        l2.reset(problem)
+                        problem.reset()
+
+        train_auc_mean = np.mean(train_aucs)
+        train_auc_std = np.std(train_aucs)
+        test_auc_mean = np.mean(test_aucs)
+        test_auc_std = np.std(test_aucs)
+
+        feedback = f"The algorithm {algorithm_name} got an average AOCC score of {train_auc_mean:0.4f} (train) / {test_auc_mean:0.4f} (test)."
+
+        print(algorithm_name, algorithm, train_auc_mean, test_auc_mean)
+        solution.add_metadata("train_aucs", train_aucs)
+        solution.add_metadata("test_aucs", test_aucs)
+        solution.add_metadata("train_fitness", train_auc_mean)
+        solution.add_metadata("test_fitness", test_auc_mean)
+        solution.set_scores(train_auc_mean, feedback)
 
         return solution
+
 
     # The task prompt describes the problem to be solved by the LLaMEA algorithm.
     task_prompt = textwrap.dedent("""
@@ -98,6 +128,7 @@ if __name__ == "__main__":
             experiment_name=experiment_name,
             elitism=True,
             HPO=False,
-            budget=100
+            budget=n_gens,
+            eval_timeout=180
         )
         print(es.run())

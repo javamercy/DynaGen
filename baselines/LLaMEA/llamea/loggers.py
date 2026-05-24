@@ -118,7 +118,7 @@ class ExperimentLogger:
             code (str): The source code to be logged.
         """
         with open(
-            f"{self.dirname}/code/try-{attempt}-{algorithm_name}.py", "w"
+                f"{self.dirname}/code/try-{attempt}-{algorithm_name}.py", "w"
         ) as file:
             file.write(code)
         self.attempt = attempt
@@ -139,7 +139,7 @@ class ExperimentLogger:
             )
             return
         with open(
-            f"{self.dirname}/configspace/try-{attempt}-{algorithm_name}.py", "w"
+                f"{self.dirname}/configspace/try-{attempt}-{algorithm_name}.py", "w"
         ) as file:
             if config_space is not None:
                 file.write(cs_json.write(config_space))
@@ -156,7 +156,7 @@ class ExperimentLogger:
         """
 
         with jsonlines.open(
-            os.path.join(self.dirname, "import_failures.jsonl"), "a"
+                os.path.join(self.dirname, "import_failures.jsonl"), "a"
         ) as writer:
             writer.write({"import_misses": import_fails})
 
@@ -171,9 +171,14 @@ class ExperimentLogger:
         """
 
         with jsonlines.open(
-            os.path.join(self.dirname, "solutions.jsonl"), "a"
+                os.path.join(self.dirname, "solutions.jsonl"), "a"
         ) as writer:
             if solution.code and not math.isnan(solution.fitness) and sol_data:
-                writer.write(
-                    {"id": solution.id, "fitness": solution.fitness, "output": sol_data}
-                )
+                entry = {
+                    "id": solution.id,
+                    "fitness": solution.fitness,
+                    "train_fitness": solution.get_metadata("train_fitness"),
+                    "test_fitness": solution.get_metadata("test_fitness"),
+                    "output": sol_data,
+                }
+                writer.write(convert_to_serializable(entry))

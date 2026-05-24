@@ -10,6 +10,7 @@ import os
 import re
 import textwrap
 import time
+from datetime import datetime
 from itertools import product
 
 import numpy as np
@@ -17,64 +18,34 @@ from ConfigSpace import Configuration, ConfigurationSpace
 from ioh import get_problem, logger
 from smac import AlgorithmConfigurationFacade, Scenario
 
-from llamea import Gemini_LLM, LLaMEA
+from llamea import DeepSeek_LLM, LLaMEA
 from misc import OverBudgetException, aoc_logger, correct_aoc
 
 if __name__ == "__main__":
     # Execution code starts here
-    api_key = os.getenv("GEMINI_API_KEY")
-    ai_model = "gemini-1.5-flash"
-    experiment_name = "pop1-5-HPO"
-    llm = Gemini_LLM(api_key, ai_model)
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    ai_model = "deepseek-v4-flash"
+    llm = DeepSeek_LLM(api_key, model=ai_model)
+
+    n_gens = 5
+    experiment_name = f"bbob-hpo-{n_gens}_gens"
+
 
     def evaluateBBOBWithHPO(solution, explogger=None):
         """
-        Evaluates an optimization algorithm on the BBOB (Black-Box Optimization Benchmarking) suite and computes
-        the Area Over the Convergence Curve (AOCC) to measure performance. In addddition, if a configuration space is provided, it
-        applies Hyper-parameter optimization with SMAC first.
-
-        Parameters:
-        -----------
-        solution : dict
-            A dictionary containing "_solution" (the code to evaluate), "_name", "_description" and "_configspace"
-
-        explogger : logger
-            A class to log additional stuff for the experiment.
-
-        Returns:
-        --------
-        solution : dict
-            Updated solution with "_fitness", "_feedback", "incumbent" and optional "_error"
-
-        Functionality:
-        --------------
-        - Executes the provided `code` string in the global context, allowing for dynamic inclusion of necessary components.
-        - Iterates over a predefined set of dimensions (currently only 5), function IDs (1 to 24), and instance IDs (1 to 3).
-        - For each problem, the specified algorithm is instantiated and executed with a defined budget.
-        - AOCC is computed for each run, and the results are aggregated across all runs, problems, and repetitions.
-        - The function handles cases where the algorithm exceeds its budget using an `OverBudgetException`.
-        - Logs the results if an `explogger` is provided.
-        - The function returns a feedback string, the mean AOCC score, and an error placeholder.
-
-        Notes:
-        ------
-        - The budget for each algorithm run is set to 10,000.
-        - The function currently only evaluates a single dimension (5), but this can be extended.
-        - Hyperparameter Optimization (HPO) with SMAC is mentioned but not implemented.
-        - The AOCC score is a metric where 1.0 is the best possible outcome, indicating optimal convergence.
-
+        Evaluates an optimization algorithm on the BBOB suite.
+        - Uses SMAC for HPO on train instances [1,2,3].
+        - Evaluates train fitness on [1,2,3] and test fitness on [4,5].
+        - Returns train fitness to LLM, logs test fitness separately.
         """
-        auc_mean = 0
-        auc_std = 0
         code = solution.code
         algorithm_name = solution.name
         exec(code, globals())
         dim = 5
         budget = 2000 * dim
-        error = ""
         algorithm = None
 
-        # perform a small run to check for any code errors
+        # Small run to check for code errors
         l2_temp = aoc_logger(100, upper=1e2, triggers=[logger.trigger.ALWAYS])
         problem = get_problem(11, 1, dim)
         problem.attach_logger(l2_temp)
@@ -84,7 +55,6 @@ if __name__ == "__main__":
         except OverBudgetException:
             pass
 
-        # now optimize the hyper-parameters
         def get_bbob_performance(config: Configuration, instance: str, seed: int = 0):
             np.random.seed(seed)
             fid, iid = instance.split(",")
@@ -105,16 +75,13 @@ if __name__ == "__main__":
             auc = correct_aoc(problem, l2, budget)
             return 1 - auc
 
-        args = list(product(range(1, 25), range(1, 4)))
-        np.random.shuffle(args)
-        inst_feats = {str(arg): [arg[0]] for idx, arg in enumerate(args)}
-        # inst_feats = {str(arg): [idx] for idx, arg in enumerate(args)}
-        error = ""
+        # SMAC HPO on train instances [1,2,3]
+        train_instances = list(product(range(1, 25), range(1, 4)))
+        np.random.shuffle(train_instances)
+        inst_feats = {str(arg): [arg[0]] for idx, arg in enumerate(train_instances)}
 
         if "_configspace" not in solution.keys():
-            # No HPO possible, evaluate only the default
             incumbent = {}
-            error = "The configuration space was not properly formatted or not present in your answer. The evaluation was done on the default configuration."
         else:
             configuration_space = solution.configspace
             scenario = Scenario(
@@ -124,24 +91,22 @@ if __name__ == "__main__":
                 min_budget=12,
                 max_budget=200,
                 n_trials=2000,
-                instances=args,
+                instances=train_instances,
                 instance_features=inst_feats,
                 output_directory="smac3_output"
                 if explogger is None
                 else explogger.dirname + "/smac"
-                # n_workers=10
             )
             smac = AlgorithmConfigurationFacade(
                 scenario, get_bbob_performance, logging_level=30
             )
             incumbent = smac.optimize()
 
-        # last but not least, perform the final validation
-
+        # Evaluate train fitness on [1,2,3]
         l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
-        aucs = []
+        train_aucs = []
         for fid in np.arange(1, 25):
-            for iid in [1, 2, 3]:  # , 4, 5]
+            for iid in [1, 2, 3]:
                 problem = get_problem(fid, iid, dim)
                 problem.attach_logger(l2)
                 for rep in range(3):
@@ -154,21 +119,50 @@ if __name__ == "__main__":
                     except OverBudgetException:
                         pass
                     auc = correct_aoc(problem, l2, budget)
-                    aucs.append(auc)
+                    train_aucs.append(auc)
                     l2.reset(problem)
                     problem.reset()
 
-        auc_mean = np.mean(aucs)
-        auc_std = np.std(aucs)
-        dict_hyperparams = dict(incumbent)
-        feedback = f"The algorithm {algorithm_name} got an average Area over the convergence curve (AOCC, 1.0 is the best) score of {auc_mean:0.2f} with optimal hyperparameters {dict_hyperparams}."
-        print(algorithm_name, algorithm, auc_mean, auc_std)
+        train_auc_mean = np.mean(train_aucs)
+        train_auc_std = np.std(train_aucs)
 
-        solution.add_metadata("aucs", aucs)
+        # Evaluate test fitness on [4,5]
+        l2 = aoc_logger(budget, upper=1e2, triggers=[logger.trigger.ALWAYS])
+        test_aucs = []
+        for fid in np.arange(1, 25):
+            for iid in [4, 5]:
+                problem = get_problem(fid, iid, dim)
+                problem.attach_logger(l2)
+                for rep in range(3):
+                    np.random.seed(rep)
+                    try:
+                        algorithm = globals()[algorithm_name](
+                            budget=budget, dim=dim, **dict(incumbent)
+                        )
+                        algorithm(problem)
+                    except OverBudgetException:
+                        pass
+                    auc = correct_aoc(problem, l2, budget)
+                    test_aucs.append(auc)
+                    l2.reset(problem)
+                    problem.reset()
+
+        test_auc_mean = np.mean(test_aucs)
+        test_auc_std = np.std(test_aucs)
+
+        dict_hyperparams = dict(incumbent)
+        feedback = f"The algorithm {algorithm_name} got an average AOCC score of {train_auc_mean:0.4f} (train) / {test_auc_mean:0.4f} (test) with optimal hyperparameters {dict_hyperparams}."
+        print(algorithm_name, algorithm, train_auc_mean, test_auc_mean)
+
+        solution.add_metadata("train_aucs", train_aucs)
+        solution.add_metadata("test_aucs", test_aucs)
+        solution.add_metadata("train_fitness", train_auc_mean)
+        solution.add_metadata("test_fitness", test_auc_mean)
         solution.add_metadata("incumbent", dict_hyperparams)
-        solution.set_scores(auc_mean, feedback)
+        solution.set_scores(train_auc_mean, feedback)
 
         return solution
+
 
     role_prompt = "You are a highly skilled computer scientist in the field of natural computing. Your task is to design novel metaheuristic algorithms to solve black box optimization problems."
     task_prompt = textwrap.dedent("""
@@ -237,5 +231,7 @@ if __name__ == "__main__":
             experiment_name=experiment_name,
             elitism=True,
             HPO=True,
+            budget=n_gens,
+            eval_timeout=180,
         )
         print(es.run())
