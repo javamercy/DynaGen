@@ -10,8 +10,8 @@ llm:
   api_key_env: DEEPSEEK_API_KEY
 
 evolution:
-  population_size: 3
-  generations: 3
+  population_size: 5
+  generations: 20
   offspring_per_strategy: 1
   archive:
     enabled: false
@@ -26,9 +26,9 @@ evolution:
     recency_weight: 0.05
     robustness_weight: 0.35
   verbal_gradients:
-    enabled: false
+    enabled: true
     llm_every_n_generations: 2
-    max_llm_calls_per_generation: 2
+    max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
     temperature: 0.3
 

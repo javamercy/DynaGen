@@ -225,9 +225,10 @@ class EvolutionEngine:
                 parents = self._select_strategy_parents(strategy, population.candidates)
                 self._ensure_parent_verbal_gradients(parents, generation)
                 feedback_context = self._feedback_context(parents)
+                prompt_parents = parents[:1] if feedback_context else parents
                 messages = self.problem.build_evolution_prompt(
                     strategy,
-                    parents,
+                    prompt_parents,
                     feedback_context=feedback_context,
                 )
                 prompt = _format_messages(messages)
