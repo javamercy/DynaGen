@@ -117,6 +117,7 @@ def _numeric_group(value: object) -> dict[str, float]:
 
 def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
     keys = [
+        "gap",
         "distance",
         "mean_gap",
         "penalized_mean_gap",

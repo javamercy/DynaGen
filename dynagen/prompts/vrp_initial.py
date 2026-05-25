@@ -15,45 +15,75 @@ class VRPInitialRole:
     intended_bias: str
 
 
-VRP_INITIAL_ROLES = (
+VRP_INITIAL_ROLES = [
     VRPInitialRole(
-        1,
-        "a fleet-balance constructive metaheuristic designer",
-        "Build routes by assigning the next customer to the truck where it least increases the current maximum route distance.",
+        slot=1,
+        role="Savings-based constructive solver",
+        intended_bias=(
+            "Build routes using a Clarke-Wright-style savings principle: start with simple "
+            "customer-to-depot routes, then merge routes when the merge reduces travel cost "
+            "and preserves depot, customer coverage, and vehicle-count constraints."
+        ),
     ),
     VRPInitialRole(
-        2,
-        "a cluster-first route-second strategist",
-        "Partition customers into truck-sized regions, route each cluster, then rebalance border customers.",
+        slot=2,
+        role="Greedy insertion constraint-aware solver",
+        intended_bias=(
+            "Construct routes by inserting unrouted customers into the cheapest feasible "
+            "position. Prioritize feasibility first, then minimize marginal cost increase. "
+            "Use deterministic repair or fallback logic for difficult customers."
+        ),
     ),
     VRPInitialRole(
-        3,
-        "a savings-and-repair optimizer",
-        "Use merge savings to form routes, then repair overload in max-route distance with relocations and swaps.",
+        slot=3,
+        role="Regret-insertion solver",
+        intended_bias=(
+            "Insert customers whose best feasible insertion is much better than their next-best "
+            "alternatives. Make hard placement decisions early to avoid leaving expensive or "
+            "constraint-sensitive customers until the end."
+        ),
     ),
     VRPInitialRole(
-        4,
-        "a local-search intensive route improver",
-        "Start from a feasible split and spend budget on 2-opt, relocate, exchange, and max-route balancing moves.",
+        slot=4,
+        role="Cluster-first route-second solver",
+        intended_bias=(
+            "Group geographically or cost-similar customers into feasible route clusters first, "
+            "then order each route internally. Bias toward compact routes, balanced vehicle usage, "
+            "and reduced cross-route overlap."
+        ),
     ),
     VRPInitialRole(
-        5,
-        "a restart-based anytime search designer",
-        "Generate diverse feasible route sets under seed control and keep the best minimax incumbent via report_best_vrp.",
+        slot=5,
+        role="Construct-and-improve local-search solver",
+        intended_bias=(
+            "Create a feasible initial solution using a simple robust construction method, then "
+            "improve it with local moves such as relocate, swap, 2-opt within routes, and limited "
+            "cross-route exchanges while preserving feasibility."
+        ),
     ),
-)
+]
 
 
 def build_vrp_initial_prompt(role: VRPInitialRole) -> list[dict[str, str]]:
+    system = vrp_system_prompt()
+
     user = "\n\n".join([
-        f"Initial slot {role.slot}",
-        f"Perspective: {role.role}\nBias: {role.intended_bias}",
-        VRP_SOLVER_CONTRACT.strip(),
-        "Optimization goal: minimize the longest truck route, not only total distance.",
+        "# Initial Candidate Identity",
+        f"Candidate ID: {role.slot}",
+        f"Role: {role.role}",
+        f"Intended bias: {role.intended_bias}",
+
+        "# Internal Quality Checklist",
         VRP_INTERNAL_CHECKLIST.strip(),
+
+        "# Solver Contract",
+        VRP_SOLVER_CONTRACT.strip(),
+
+        "# Response Format",
         VRP_RESPONSE_FORMAT.strip(),
     ])
+
     return [
-        {"role": "system", "content": vrp_system_prompt(role.role)},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]

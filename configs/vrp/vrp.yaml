@@ -10,21 +10,20 @@ problem:
   vrp_test_limit_per_size: 64
 
 llm:
-  provider: ollama
-  model: gemma4:31b-cloud
+  provider: deepseek
+  model: deepseek-v4-flash
   temperature: 0.7
-  api_key_env: OLLAMA_API_KEY
+  api_key_env: DEEPSEEK_API_KEY
 
 evolution:
   population_size: 3
-  generations: 8
+  generations: 5
   offspring_per_strategy: 1
-  strategies: [ S1, S2, S3 ]
   verbal_gradients:
-    enabled: true
-    llm_model: gemma4:31b-cloud
+    enabled: false
+    llm_model: deepseek-v4-flash
     llm_every_n_generations: 2
-    max_llm_calls_per_generation: 2
+    max_llm_calls_per_generation: 5
     temperature: 0.2
   history:
     enabled: false

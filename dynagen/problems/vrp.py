@@ -29,8 +29,6 @@ class VRPProblem:
         logger.info("[%s] loaded %d instances for %s", self.type.upper(), len(instances), pool_name)
         return VRPCandidateEvaluator(
             instances,
-            seeds=config.evaluation.seeds,
-            budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
             timeout_penalty=config.evaluation.timeout_penalty,
             pool_name=pool_name,

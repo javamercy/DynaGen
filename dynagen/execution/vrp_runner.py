@@ -38,15 +38,11 @@ def run_vrp_solver(
         code: str,
         instance: VRPInstance,
         *,
-        seed: int,
-        budget: int,
         timeout_seconds: float,
 ) -> VRPSolverRunResult:
     execution = execute_vrp_solver_code(
         code,
         instance,
-        seed=seed,
-        budget=budget,
         timeout_seconds=timeout_seconds,
     )
     if execution.status == "timeout":
@@ -73,8 +69,6 @@ def execute_vrp_solver_code(
         code: str,
         instance: VRPInstance,
         *,
-        seed: int,
-        budget: int,
         timeout_seconds: float,
 ) -> VRPSolverExecutionResult:
     context = _multiprocessing_context()
@@ -82,7 +76,7 @@ def execute_vrp_solver_code(
     best_routes_queue = context.Queue(maxsize=1)
     process = context.Process(
         target=_worker,
-        args=(code, instance, int(seed), int(budget), result_queue, best_routes_queue),
+        args=(code, instance, result_queue, best_routes_queue),
     )
     timeout_limit = float(timeout_seconds)
     start = time.perf_counter()
@@ -207,7 +201,7 @@ def _execution_result_from_payload(
     )
 
 
-def _worker(code: str, instance: VRPInstance, seed: int, budget: int, result_queue, best_routes_queue) -> None:
+def _worker(code: str, instance: VRPInstance, result_queue, best_routes_queue) -> None:
     from dynagen.execution.sandbox import load_vrp_solver
 
     def report_best_routes(routes: object) -> None:
@@ -225,7 +219,7 @@ def _worker(code: str, instance: VRPInstance, seed: int, budget: int, result_que
     start = time.perf_counter()
     try:
         solver = load_vrp_solver(code, best_routes_reporter=report_best_routes)
-        routes = solver(instance.distance_matrix.copy(), int(instance.truck_count), int(seed), int(budget))
+        routes = solver(instance.distance_matrix.copy(), int(instance.truck_count))
         runtime = time.perf_counter() - start
         result_queue.put(("ok", _plain_routes(routes), runtime, None))
     except Exception as exc:

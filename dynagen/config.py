@@ -127,30 +127,26 @@ class EvolutionConfig:
 
 @dataclass
 class EvaluationConfig:
-    budget: int
     timeout_seconds: float
-    seeds: list[int]
     metric: str
+    budget: int | None = None
+    seeds: list[int] = field(default_factory=list)
     timeout_penalty: float = 10.0
 
     def __post_init__(self) -> None:
-        if not self.seeds:
-            raise ValueError("At least one seed must be specified")
-
         if not self.metric:
             raise ValueError("metric must be specified")
-
-        if not self.budget:
-            raise ValueError("budget must be specified")
 
         if not self.timeout_seconds:
             raise ValueError("timeout_seconds must be specified")
 
-        self.budget = int(self.budget)
         self.timeout_seconds = float(self.timeout_seconds)
         self.timeout_penalty = float(self.timeout_penalty)
+        self.seeds = [] if self.seeds is None else [int(seed) for seed in self.seeds]
+        if self.budget is not None:
+            self.budget = int(self.budget)
 
-        if self.budget < 1:
+        if self.budget is not None and self.budget < 1:
             raise ValueError("budget must be at least 1")
 
         if self.timeout_seconds <= 0:
@@ -254,6 +250,15 @@ def _validate_vrp_problem_config(config: ProblemConfig) -> None:
         raise ValueError("problem.vrp_test_limit_per_size must be at least 1")
 
 
+def _validate_evaluation_config_for_problem(config: EvaluationConfig, problem_type: str) -> None:
+    if problem_type == "vrp":
+        return
+    if not config.seeds:
+        raise ValueError("At least one seed must be specified")
+    if config.budget is None:
+        raise ValueError("budget must be specified")
+
+
 @dataclass
 class RunConfig:
     name: str
@@ -271,8 +276,9 @@ class RunConfig:
         run = dict(data.pop("run", {}))
         llm = LLMConfig(**data.pop("llm", {}))
         evolution = EvolutionConfig(**data.pop("evolution", {}))
-        evaluation = EvaluationConfig(**data.pop("evaluation", {}))
         problem = ProblemConfig(**data.pop("problem", {}))
+        evaluation = EvaluationConfig(**data.pop("evaluation", {}))
+        _validate_evaluation_config_for_problem(evaluation, problem.type)
         data_cfg = DataConfig(**data.pop("data", {}))
         if data:
             raise ValueError(f"Unknown config keys: {sorted(data)}")

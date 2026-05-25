@@ -168,11 +168,11 @@ def _validate_dvrp_policy_signature_ast(node: ast.FunctionDef) -> ValidationResu
 def _validate_vrp_solver_signature_ast(node: ast.FunctionDef) -> ValidationResult:
     args = node.args
     positional = list(args.posonlyargs) + list(args.args)
-    expected = ["distance_matrix", "truck_count", "seed", "budget"]
+    expected = ["distance_matrix", "truck_count"]
     if len(positional) != len(expected) or args.vararg or args.kwonlyargs or args.kwarg:
-        return ValidationResult(False, "solve_vrp must accept exactly four parameters")
+        return ValidationResult(False, "solve_vrp must accept exactly two parameters")
     if [arg.arg for arg in positional] != expected:
-        return ValidationResult(False, "solve_vrp parameters must be distance_matrix, truck_count, seed, budget")
+        return ValidationResult(False, "solve_vrp parameters must be distance_matrix, truck_count")
     return ValidationResult(True)
 
 

@@ -154,7 +154,7 @@ def _problem_candidate(
     timeout_fraction = 0.5 if status == CandidateStatus.TIMEOUT else 0.0
     valid_count = 2 if status == CandidateStatus.TIMEOUT else 4
     if problem in {"tsp", "dvrp", "vrp"}:
-        score_name = "ttt" if problem == "dvrp" else "distance"
+        score_name = {"dvrp": "ttt", "vrp": "gap"}.get(problem, "distance")
         metrics = {
             "problem": problem,
             "score_name": score_name,

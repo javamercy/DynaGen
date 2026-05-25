@@ -79,9 +79,7 @@ class VRPFlowTests(unittest.TestCase):
                 "strategies": ["e1_radical_exploration"],
             },
             "evaluation": {
-                "budget": 10,
                 "timeout_seconds": 1,
-                "seeds": [1],
                 "metric": "mean_gap",
             },
             "data": {
@@ -103,8 +101,6 @@ class VRPFlowTests(unittest.TestCase):
         )
         evaluator = VRPCandidateEvaluator(
             instances,
-            seeds=[1],
-            budget=100,
             timeout_seconds=5,
             timeout_penalty=0.0,
             pool_name="test_instances",
@@ -122,16 +118,21 @@ class VRPFlowTests(unittest.TestCase):
 
         self.assertEqual(result.status, "valid")
         self.assertEqual(candidate.status, CandidateStatus.VALID)
-        self.assertEqual(result.score_name, "distance")
+        self.assertEqual(result.score_name, "gap")
+        self.assertEqual(candidate.metrics["score_name"], "gap")
         self.assertTrue(result.score < float("inf"))
         self.assertEqual(candidate.metrics["problem"], "vrp")
 
     def test_vrp_validation_requires_metaheuristic_signature(self) -> None:
         valid = validate_vrp_generated_code(_SIMPLE_VRP_SOLVER)
         invalid = validate_vrp_generated_code("def select_next_node(current_node):\n    return 0")
+        old_signature = validate_vrp_generated_code(
+            "def solve_vrp(distance_matrix, truck_count, seed, budget):\n    return []"
+        )
 
         self.assertTrue(valid.valid)
         self.assertFalse(invalid.valid)
+        self.assertFalse(old_signature.valid)
 
     def test_vrp_metrics_aggregate_route_records(self) -> None:
         metrics = aggregate_vrp_records([
@@ -165,7 +166,7 @@ class VRPFlowTests(unittest.TestCase):
 
 
 _SIMPLE_VRP_SOLVER = r'''
-def solve_vrp(distance_matrix, truck_count, seed, budget):
+def solve_vrp(distance_matrix, truck_count):
     n = len(distance_matrix)
     routes = [[0, 0] for _ in range(int(truck_count))]
     current = [0 for _ in range(int(truck_count))]

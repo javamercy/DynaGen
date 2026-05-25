@@ -118,7 +118,7 @@ def build_final_report(
                     "",
                     f"- Problem: VRP",
                     f"- Status: {test_result.status}",
-                    f"- Test distance: {test_result.score}",
+                    f"- Test gap: {test_result.score}",
                     f"- Instances evaluated: {instances_evaluated}",
                     f"- Valid runs: {metrics.get('valid_count')} / {metrics.get('runs')}",
                     f"- Scored runs: {metrics.get('scored_count')} / {metrics.get('runs')}",
@@ -131,8 +131,8 @@ def build_final_report(
                     f"- Median gap: {metrics.get('median_gap')}",
                     f"- Worst gap: {metrics.get('worst_gap')}",
                     f"- Best gap: {metrics.get('best_gap')}",
-                    f"- Score by instance size: {metrics.get('score_by_instance_size')}",
-                    f"- Score by truck count: {metrics.get('score_by_truck_count')}",
+                    f"- Gap by instance size: {metrics.get('gap_by_instance_size')}",
+                    f"- Gap by truck count: {metrics.get('gap_by_truck_count')}",
                 ]
             )
         else:
@@ -220,6 +220,8 @@ def _population_score_name(candidates: list[Candidate]) -> str:
 def _score_title(score_name: str) -> str:
     if score_name == "distance":
         return "Distance"
+    if score_name == "gap":
+        return "Gap"
     if score_name == "ttt":
         return "TTT"
     if score_name == "mean_aocc":

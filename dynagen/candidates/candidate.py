@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-MINIMIZED_SCORE_NAMES = {"distance", "ttt"}
+MINIMIZED_SCORE_NAMES = {"distance", "gap", "ttt"}
 MAXIMIZED_SCORE_NAMES = {"mean_aocc"}
 NAMED_SCORE_NAMES = MINIMIZED_SCORE_NAMES | MAXIMIZED_SCORE_NAMES
 
@@ -44,6 +44,7 @@ class Candidate:
             if self.distance is None:
                 self.distance = _first_float_or_none(
                     self.metrics.get(score_name),
+                    self.metrics.get("gap"),
                     self.metrics.get("ttt"),
                     self.metrics.get("distance"),
                     self.fitness,
@@ -66,6 +67,7 @@ class Candidate:
             return _first_float_or_none(
                 self.metrics.get(score_name),
                 self.distance,
+                self.metrics.get("gap"),
                 self.metrics.get("ttt"),
                 self.metrics.get("distance"),
             )
@@ -112,8 +114,12 @@ class Candidate:
             return "mean_aocc"
         if problem == "dvrp":
             return "ttt"
-        if problem in {"tsp", "vrp"}:
+        if problem == "vrp":
+            return "gap"
+        if problem == "tsp":
             return "distance"
+        if "gap" in self.metrics:
+            return "gap"
         if "ttt" in self.metrics:
             return "ttt"
         if "distance" in self.metrics or self.distance is not None:
@@ -135,6 +141,15 @@ class Candidate:
             metrics = dict(candidate_dict.get("metrics") or {})
             metrics.setdefault("score_name", "ttt")
             metrics.setdefault("ttt", ttt)
+            candidate_dict["metrics"] = metrics
+
+        gap = candidate_dict.pop("gap", None)
+        if gap is not None:
+            candidate_dict.setdefault("distance", gap)
+            metrics = dict(candidate_dict.get("metrics") or {})
+            metrics.setdefault("problem", "vrp")
+            metrics.setdefault("score_name", "gap")
+            metrics.setdefault("gap", gap)
             candidate_dict["metrics"] = metrics
 
         mean_aocc = candidate_dict.pop("mean_aocc", None)

@@ -2,11 +2,11 @@
 
 ## Final Population
 
-| Rank | Candidate | Status | Search Distance | Name |
-|---:|---|---|---:|---|
-| 1 | `cand_000010` | valid | 11.4529 | m6_swap_perturb |
-| 2 | `cand_000017` | valid | 11.9673 | adaptive_regret_perturb |
-| 3 | `cand_000018` | valid | 13.5679 | m4_contract_repair |
+| Rank | Candidate     | Status | Search Distance | Name                    |
+|-----:|---------------|--------|----------------:|-------------------------|
+|    1 | `cand_000010` | valid  |         11.4529 | m6_swap_perturb         |
+|    2 | `cand_000017` | valid  |         11.9673 | adaptive_regret_perturb |
+|    3 | `cand_000018` | valid  |         13.5679 | m4_contract_repair      |
 
 ## Search Best Candidate
 
@@ -14,7 +14,9 @@
 - Name: m6_swap_perturb
 - Status: valid
 - Search Distance: 11.45288823534332
-- Thought: Modified m6_diversify_search: replaced relocation perturbation (move customers from longest route) with random inter-route swap perturbation (1-3 swaps) while preserving stochastic regret construction and deterministic local search.
+- Thought: Modified m6_diversify_search: replaced relocation perturbation (move customers from longest route) with
+  random inter-route swap perturbation (1-3 swaps) while preserving stochastic regret construction and deterministic
+  local search.
 
 ## Test Evaluation
 
@@ -33,8 +35,10 @@
 - Median gap: 4.21928620508348
 - Worst gap: 27.997596949178046
 - Best gap: -50.47584974155735
-- Score by instance size: {'10': -0.019724468521927208, '100': 12.64661094926188, '20': -0.041077779559690886, '200': 9.650670826325733, '50': 5.451814794037613}
-- Score by truck count: {'1': -0.030401124040809045, '3': 5.451814794037613, '5': 12.64661094926188, '9': 9.650670826325733}
+- Score by instance size: {'10': -0.019724468521927208, '100': 12.64661094926188, '20': -0.041077779559690886, '200':
+  9.650670826325733, '50': 5.451814794037613}
+- Score by truck count: {'1': -0.030401124040809045, '3': 5.451814794037613, '5': 12.64661094926188, '9':
+  9.650670826325733}
 
 ## LLM Calls
 

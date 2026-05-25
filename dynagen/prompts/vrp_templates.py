@@ -1,15 +1,12 @@
 from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.history import format_history_parent_context
 
-
 VRP_SOLVER_CONTRACT = """
 Implement exactly this interface:
 
 def solve_vrp(
     distance_matrix: np.ndarray,  # (n, n), depot is node 0
     truck_count: int,
-    seed: int,
-    budget: int,
 ) -> list[list[int]]:
 
 Rules:
@@ -19,8 +16,7 @@ Rules:
 - Every customer node 1..n-1 must appear exactly once across all routes.
 - An unused truck route must be [0, 0].
 - Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
-- budget bounds total solver work. Use it to limit construction candidates, local search moves, restarts, or population iterations.
-- Use seed for all randomness; ties must be deterministic.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
 - Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
 - Do not read/write files, use network, spawn subprocesses, or call external solvers.
 - Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
@@ -30,8 +26,8 @@ Rules:
 VRP_INTERNAL_CHECKLIST = """
 Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
 every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
-budget bounds loops, deterministic seed handling, report_best_vrp used for incumbents, allowed
-imports only, no I/O/network/subprocesses.
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
 """
 
 VRP_RESPONSE_FORMAT = """
@@ -47,11 +43,10 @@ No Markdown, fences, or text outside JSON. The code string must define solve_vrp
 """
 
 
-def vrp_system_prompt(role: str) -> str:
+def vrp_system_prompt() -> str:
     return (
-        f"You are {role}. Generate a compact VRP metaheuristic that builds complete "
-        "multi-truck routes and minimizes the maximum route distance. Prioritize feasibility, "
-        "budget correctness, fleet balance, and robust anytime improvement."
+        f"You generate a compact VRP metaheuristic that builds complete "
+        "multi-truck routes and minimizes the maximum route distance"
     )
 
 
@@ -60,19 +55,18 @@ def render_vrp_candidates(candidates: list[Candidate]) -> str:
 
 
 def _render_vrp_candidate(candidate: Candidate) -> str:
-    distance = candidate.score_value
-    distance_str = "unknown" if distance is None else f"{float(distance):.6g}"
+    gap = candidate.score_value
+    gap_str = "unknown" if gap is None else f"{float(gap):.6g}"
     metrics = candidate.metrics or {}
     parts = [
         f"Candidate {candidate.id}: {candidate.name}",
-        f"Status: {candidate.status}; distance: {distance_str}",
+        f"Status: {candidate.status}; gap: {gap_str}",
         f"Thought: {candidate.thought}",
         f"Mean gap: {metrics.get('mean_gap')}",
         f"Mean max route distance: {metrics.get('mean_max_route_distance')}",
         f"Mean total route distance: {metrics.get('mean_total_route_distance')}",
-        f"Score by instance size: {metrics.get('score_by_instance_size')}",
-        f"Score by truck count: {metrics.get('score_by_truck_count')}",
         f"Gap by instance size: {metrics.get('gap_by_instance_size')}",
+        f"Gap by truck count: {metrics.get('gap_by_truck_count')}",
     ]
     if candidate.error_details:
         parts.append(f"Error details: {candidate.error_details}")
