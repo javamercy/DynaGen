@@ -9,6 +9,7 @@ import resource
 import platform
 import argparse
 import warnings
+from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -110,7 +111,7 @@ VRP_TRAIN_INSTANCES = 20
 VRP_TEST_SIZES = [10, 20, 50, 100, 200]
 VRP_TEST_INSTANCES = 64
 VRP_POP_SIZE = 5
-VRP_GENS = 2
+VRP_GENS = 20
 VRP_TIMEOUT = 180
 VRP_LLM_ENDPOINT = "api.deepseek.com"
 VRP_LLM_MODEL = "deepseek-v4-flash"
@@ -208,7 +209,8 @@ if __name__ == "__main__":
     print("-  parameters loaded -")
 
     # Check if the results folder already exists
-    run_name = f"results_{VRP_LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_name = f"results_{timestamp}_{VRP_LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}"
     results = os.path.join("./testing", short_name, long_name, run_name)
     if not os.path.exists(results):
         os.makedirs(results)

@@ -1,0 +1,6 @@
+{
+     "algorithm": "Select the unvisited node that minimizes the ratio of its distance from the current node to its distance from the depot, with random tie-breaking, and wait if all unvisited nodes are targeted.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    # Identify unvisited nodes not already targeted by any truck\n    untargeted = [node for node in unvisited_nodes if node not in truck_nodes]\n    if len(untargeted) == 0:\n        return None  # wait\n\n    # Compute distances from current node and depot\n    dist_current = distance_matrix[current_node, untargeted]\n    dist_depot = distance_matrix[depot_node, untargeted]\n\n    # Compute ratio (avoid division by zero)\n    ratio = dist_current / (dist_depot + 1e-12)\n\n    # Find minimum ratio (with random tie-breaking)\n    min_val = np.min(ratio)\n    candidates = [untargeted[i] for i in range(len(untargeted)) if ratio[i] == min_val]\n    next_node = np.random.choice(candidates)\n    return next_node",
+     "objective": 53.19835,
+     "other_inf": null
+}

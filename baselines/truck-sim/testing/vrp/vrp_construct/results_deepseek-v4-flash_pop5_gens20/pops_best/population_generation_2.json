@@ -1,0 +1,6 @@
+{
+     "algorithm": "Select the unvisited node that maximizes the savings (distance from current node to depot plus distance from depot to node minus distance from current node to node), with random tie-breaking, and wait if all unvisited nodes are already targeted.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    # Identify unvisited nodes not already targeted by any truck\n    untargeted = [node for node in unvisited_nodes if node not in truck_nodes]\n    if len(untargeted) == 0:\n        return None  # wait\n\n    # Distances from current node to depot and to each untargeted node\n    dist_current_depot = distance_matrix[current_node, depot_node]\n    dist_current = distance_matrix[current_node, untargeted]\n    dist_depot = distance_matrix[depot_node, untargeted]\n\n    # Savings = dist(current,depot) + dist(depot, node) - dist(current, node)\n    savings = dist_current_depot + dist_depot - dist_current\n\n    # Find maximum savings (with random tie-breaking)\n    max_val = np.max(savings)\n    candidates = [untargeted[i] for i in range(len(untargeted)) if savings[i] == max_val]\n    next_node = np.random.choice(candidates)\n    return next_node",
+     "objective": 49.6857,
+     "other_inf": null
+}
