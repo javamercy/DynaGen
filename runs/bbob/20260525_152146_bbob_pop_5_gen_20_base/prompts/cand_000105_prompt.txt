@@ -1,0 +1,411 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000093: exponential_diversify_de_rand_to_best_restart
+Status: valid; mean AOCC score: 0.556854 (higher is better)
+Thought: This optimizer implements DE/rand-to-best/1 mutation with random F per individual and exponential crossover, combined with restart on stagnation. Population size is min(25, max(5, budget//2)). Mutation F is uniform from [0.5,1.0]. Exponential crossover uses CR=0.9 starting from a random dimension. Stagnation limit is max(1, budget // (4 * pop_size)). On restart, best point is kept, a perturbed version (std=0.03*(ub-lb)) is added, and the rest random. Seed controls all randomness. Budget is tracked precisely; report_best is called on initial best and every improvement.
+Mean AOCC: 0.5568537737256205
+Mean final error: 0.7443591842049463
+AOCC by group: {'high_conditioning_unimodal': 0.7013560207450887, 'low_moderate_conditioning': 0.7578772245205528, 'multimodal_strong_global_structure': 0.3717418546727264, 'multimodal_weak_global_structure': 0.269322029487954, 'separable': 0.724176429360767}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        rng = self.rng
+
+        # Population size: exploration-focused but capped at 25
+        pop_size = min(25, max(5, budget // 2))
+        if budget < pop_size:
+            pop_size = max(1, budget)
+
+        if budget <= 0:
+            best_x = np.zeros(dim)
+            best_f = float('inf')
+            report_best(best_f, best_x)
+            return best_f, best_x
+
+        # Initialize uniform population
+        pop = rng.uniform(lb, ub, size=(pop_size, dim))
+        pop_f = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            if budget <= 0:
+                break
+            pop_f[i] = func(pop[i])
+            budget -= 1
+            if budget <= 0:
+                best_idx = np.argmin(pop_f[:i+1])
+                best_x = pop[best_idx].copy()
+                best_f = pop_f[best_idx]
+                report_best(best_f, best_x)
+                return best_f, best_x
+
+        best_idx = np.argmin(pop_f)
+        best_x = pop[best_idx].copy()
+        best_f = pop_f[best_idx]
+        report_best(best_f, best_x)
+
+        CR = 0.9
+        stagnation_limit = max(1, budget // (4 * pop_size))
+        stagnation_counter = 0
+
+        while budget > 0:
+            improved = False
+            for i in range(pop_size):
+                if budget <= 0:
+                    break
+                # Select two distinct random indices different from i
+                indices = [j for j in range(pop_size) if j != i]
+                r1, r2 = rng.choice(indices, 2, replace=False)
+                # Sample F uniformly per individual
+                F = rng.uniform(0.5, 1.0)
+                # Mutation: rand-to-best
+                mut = pop[i] + F * (pop[r1] - pop[r2]) + F * (best_x - pop[i])
+                # Exponential crossover
+                trial = pop[i].copy()
+                j0 = rng.randint(dim)
+                j = j0
+                L = 0
+                while True:
+                    trial[j] = mut[j]
+                    j = (j + 1) % dim
+                    L += 1
+                    if L == dim or rng.rand() > CR:
+                        break
+                trial = np.clip(trial, lb, ub)
+                trial_f = func(trial)
+                budget -= 1
+                if trial_f < pop_f[i]:
+                    pop[i] = trial
+                    pop_f[i] = trial_f
+                    if trial_f < best_f:
+                        best_x = trial.copy()
+                        best_f = trial_f
+                        report_best(best_f, best_x)
+                        improved = True
+            if not improved:
+                stagnation_counter += 1
+                if stagnation_counter >= stagnation_limit and budget >= pop_size:
+                    # Restart: keep best, add perturbed best, and random
+                    pert_std = 0.03 * (ub - lb)
+                    best_perturbed = np.clip(best_x + rng.randn(dim) * pert_std, lb, ub)
+                    new_size = pop_size - 2
+                    new_pop = rng.uniform(lb, ub, size=(new_size, dim))
+                    # Evaluate perturbed best
+                    if budget > 0:
+                        f_pert = func(best_perturbed)
+                        budget -= 1
+                    else:
+                        f_pert = np.inf
+                    # Evaluate random individuals
+                    new_pop_f = np.full(new_size, np.inf)
+                    for k in range(new_size):
+                        if budget <= 0:
+                            break
+                        new_pop_f[k] = func(new_pop[k])
+                        budget -= 1
+                    # Combine: best, perturbed, random
+                    pop = np.vstack((best_x.reshape(1, -1), best_perturbed.reshape(1, -1), new_pop))
+                    pop_f = np.concatenate(([best_f], [f_pert], new_pop_f))
+                    stagnation_counter = 0
+            else:
+                stagnation_counter = 0
+
+        return best_f, best_x
+```
+
+Candidate cand_000088: e3_hybrid_recombination
+Status: valid; mean AOCC score: 0.548961 (higher is better)
+Thought: Based on DE/rand-to-best/1 with per-individual F in [0.5,1.0], binomial crossover, and restart triggered by stagnation. Population size adapted to budget. Restart keeps best and a perturbed version to maintain diversity. Seed controls randomness. Budget usage is tracked.
+Mean AOCC: 0.5489608691001862
+Mean final error: 0.6859076542138335
+AOCC by group: {'high_conditioning_unimodal': 0.7228906984523643, 'low_moderate_conditioning': 0.8165946733302104, 'multimodal_strong_global_structure': 0.38544888718436876, 'multimodal_weak_global_structure': 0.2309047552168886, 'separable': 0.6424920921631035}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        rng = self.rng
+
+        pop_size = min(30, max(5, budget // 2))
+        if budget < pop_size:
+            pop_size = max(1, budget)
+
+        if budget <= 0:
+            best_x = np.zeros(dim)
+            best_f = float('inf')
+            report_best(best_f, best_x)
+            return best_f, best_x
+
+        pop = rng.uniform(lb, ub, size=(pop_size, dim))
+        pop_f = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            pop_f[i] = func(pop[i])
+            budget -= 1
+            if budget <= 0:
+                best_idx = np.argmin(pop_f[:i+1])
+                best_x = pop[best_idx].copy()
+                best_f = pop_f[best_idx]
+                report_best(best_f, best_x)
+                return best_f, best_x
+
+        best_idx = np.argmin(pop_f)
+        best_x = pop[best_idx].copy()
+        best_f = pop_f[best_idx]
+        report_best(best_f, best_x)
+
+        CR = 0.9
+        stagnation_limit = max(1, budget // (3 * pop_size))
+        stagnation_counter = 0
+
+        while budget > 0:
+            improved = False
+            for i in range(pop_size):
+                if budget <= 0:
+                    break
+                indices = [j for j in range(pop_size) if j != i]
+                r1, r2 = rng.choice(indices, 2, replace=False)
+                F = rng.uniform(0.5, 1.0)
+                mut = pop[i] + F * (pop[r1] - pop[r2]) + F * (best_x - pop[i])
+                trial = pop[i].copy()
+                j_rand = rng.randint(dim)
+                for j in range(dim):
+                    if rng.rand() < CR or j == j_rand:
+                        trial[j] = mut[j]
+                trial = np.clip(trial, lb, ub)
+                trial_f = func(trial)
+                budget -= 1
+                if trial_f < pop_f[i]:
+                    pop[i] = trial
+                    pop_f[i] = trial_f
+                    if trial_f < best_f:
+                        best_x = trial.copy()
+                        best_f = trial_f
+                        report_best(best_f, best_x)
+                        improved = True
+            if not improved:
+                stagnation_counter += 1
+                if stagnation_counter >= stagnation_limit and budget >= pop_size:
+                    pert_std = 0.05 * (ub - lb)
+                    best_perturbed = np.clip(best_x + rng.randn(dim) * pert_std, lb, ub)
+                    new_size = max(0, pop_size - 2)
+                    new_pop = rng.uniform(lb, ub, size=(new_size, dim))
+                    if budget > 0:
+                        f_pert = func(best_perturbed)
+                        budget -= 1
+                    else:
+                        f_pert = np.inf
+                    new_pop_f = np.full(new_size, np.inf)
+                    for k in range(new_size):
+                        if budget <= 0:
+                            break
+                        new_pop_f[k] = func(new_pop[k])
+                        budget -= 1
+                    pop = np.vstack((best_x.reshape(1, -1), best_perturbed.reshape(1, -1), new_pop))
+                    pop_f = np.concatenate(([best_f], [f_pert], new_pop_f))
+                    stagnation_counter = 0
+            else:
+                stagnation_counter = 0
+
+        return best_f, best_x
+```
+
+Candidate cand_000099: binomial_crossover_de_rand_to_best_restart
+Status: valid; mean AOCC score: 0.560226 (higher is better)
+Thought: This optimizer modifies the parent by replacing exponential crossover with binomial crossover, which is the classic DE crossover. Mutation is DE/rand-to-best/1 with random F per individual. Restart mechanism preserved. Population size min(25, max(5, budget//2)). Stagnation limit max(1, budget//(4*pop_size)). Seed controls all randomness. Budget tracked precisely; report_best called on initial best and every improvement.
+Mean AOCC: 0.5602259732656504
+Mean final error: 0.8422192977330856
+AOCC by group: {'high_conditioning_unimodal': 0.7746045996285768, 'low_moderate_conditioning': 0.7558024736767606, 'multimodal_strong_global_structure': 0.35691242666580425, 'multimodal_weak_global_structure': 0.31821673555749863, 'separable': 0.6347089308818336}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        rng = self.rng
+
+        pop_size = min(25, max(5, budget // 2))
+        if budget < pop_size:
+            pop_size = max(1, budget)
+
+        if budget <= 0:
+            best_x = np.zeros(dim)
+            best_f = float('inf')
+            report_best(best_f, best_x)
+            return best_f, best_x
+
+        pop = rng.uniform(lb, ub, size=(pop_size, dim))
+        pop_f = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            pop_f[i] = func(pop[i])
+            budget -= 1
+            if budget <= 0:
+                best_idx = np.argmin(pop_f[:i+1])
+                best_x = pop[best_idx].copy()
+                best_f = pop_f[best_idx]
+                report_best(best_f, best_x)
+                return best_f, best_x
+
+        best_idx = np.argmin(pop_f)
+        best_x = pop[best_idx].copy()
+        best_f = pop_f[best_idx]
+        report_best(best_f, best_x)
+
+        CR = 0.9
+        stagnation_limit = max(1, budget // (4 * pop_size))
+        stagnation_counter = 0
+
+        while budget > 0:
+            improved = False
+            for i in range(pop_size):
+                if budget <= 0:
+                    break
+                indices = [j for j in range(pop_size) if j != i]
+                r1, r2 = rng.choice(indices, 2, replace=False)
+                F = rng.uniform(0.5, 1.0)
+                mut = pop[i] + F * (pop[r1] - pop[r2]) + F * (best_x - pop[i])
+                # Binomial crossover
+                trial = pop[i].copy()
+                j_rand = rng.randint(dim)
+                for j in range(dim):
+                    if rng.rand() < CR or j == j_rand:
+                        trial[j] = mut[j]
+                trial = np.clip(trial, lb, ub)
+                trial_f = func(trial)
+                budget -= 1
+                if trial_f < pop_f[i]:
+                    pop[i] = trial
+                    pop_f[i] = trial_f
+                    if trial_f < best_f:
+                        best_x = trial.copy()
+                        best_f = trial_f
+                        report_best(best_f, best_x)
+                        improved = True
+            if not improved:
+                stagnation_counter += 1
+                if stagnation_counter >= stagnation_limit and budget >= pop_size:
+                    pert_std = 0.03 * (ub - lb)
+                    best_perturbed = np.clip(best_x + rng.randn(dim) * pert_std, lb, ub)
+                    new_size = pop_size - 2
+                    new_pop = rng.uniform(lb, ub, size=(new_size, dim))
+                    if budget > 0:
+                        f_pert = func(best_perturbed)
+                        budget -= 1
+                    else:
+                        f_pert = np.inf
+                    new_pop_f = np.full(new_size, np.inf)
+                    for k in range(new_size):
+                        if budget <= 0:
+                            break
+                        new_pop_f[k] = func(new_pop[k])
+                        budget -= 1
+                    pop = np.vstack((best_x.reshape(1, -1), best_perturbed.reshape(1, -1), new_pop))
+                    pop_f = np.concatenate(([best_f], [f_pert], new_pop_f))
+                    stagnation_counter = 0
+            else:
+                stagnation_counter = 0
+
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

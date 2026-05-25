@@ -1,0 +1,122 @@
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+        self.pop_size = max(4, min(10*dim, budget // 2))
+        if self.pop_size > budget:
+            self.pop_size = budget
+        self.F_l = 0.1
+        self.F_u = 0.9
+        self.CR_l = 0.0
+        self.CR_u = 1.0
+        self.tau1 = 0.1
+        self.tau2 = 0.1
+        self.no_improve_limit = 50
+
+    def __call__(self, func):
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop_size = self.pop_size
+        rng = self.rng
+        budget = self.budget
+
+        # Initialize population uniformly
+        pop = lb + rng.rand(pop_size, dim) * (ub - lb)
+        fitness = np.full(pop_size, np.inf)
+        F = rng.uniform(self.F_l, self.F_u, pop_size)
+        CR = rng.uniform(self.CR_l, self.CR_u, pop_size)
+
+        best_x = None
+        best_val = np.inf
+        evals = 0
+        no_improve_count = 0
+
+        # Evaluate initial population
+        for i in range(pop_size):
+            if evals >= budget:
+                break
+            val = func(pop[i])
+            evals += 1
+            fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = pop[i].copy()
+                report_best(best_val, best_x)
+                no_improve_count = 0
+
+        # Main loop
+        while evals < budget:
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                # Generate new F and CR for this individual
+                F_new = F[i]
+                CR_new = CR[i]
+                if rng.rand() < self.tau1:
+                    F_new = rng.uniform(self.F_l, self.F_u)
+                if rng.rand() < self.tau2:
+                    CR_new = rng.uniform(self.CR_l, self.CR_u)
+
+                # Select two distinct random indices
+                candidates = list(range(pop_size))
+                candidates.remove(i)
+                rng.shuffle(candidates)
+                a, b = candidates[:2]
+
+                # Diversified mutation: random choice between rand/1 and current-to-best/1
+                if rng.rand() < 0.5:
+                    # DE/rand/1
+                    mutant = pop[a] + F_new * (pop[b] - pop[candidates[2]])
+                else:
+                    # DE/current-to-best/1
+                    mutant = pop[i] + F_new * (best_x - pop[i]) + F_new * (pop[a] - pop[b])
+                mutant = np.clip(mutant, lb, ub)
+
+                # Exponential crossover
+                j_start = rng.randint(dim)
+                L = 1
+                while rng.rand() < CR_new and L < dim:
+                    L += 1
+                trial = pop[i].copy()
+                for k in range(L):
+                    j = (j_start + k) % dim
+                    trial[j] = mutant[j]
+
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    F[i] = F_new
+                    CR[i] = CR_new
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+                        no_improve_count = 0
+                    else:
+                        no_improve_count += 1
+                else:
+                    no_improve_count += 1
+
+            # Restart if no improvement for a while
+            if no_improve_count >= self.no_improve_limit and evals < budget:
+                # Reinitialize 50% of population (excluding best)
+                num_reinit = pop_size // 2
+                indices = rng.choice(pop_size, num_reinit, replace=False)
+                for idx in indices:
+                    if idx == 0:
+                        continue
+                    pop[idx] = lb + rng.rand(dim) * (ub - lb)
+                    fitness[idx] = np.inf
+                    F[idx] = rng.uniform(self.F_l, self.F_u)
+                    CR[idx] = rng.uniform(self.CR_l, self.CR_u)
+                no_improve_count = 0
+
+        return best_val, best_x

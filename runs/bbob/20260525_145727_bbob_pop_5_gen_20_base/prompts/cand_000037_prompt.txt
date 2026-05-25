@@ -1,0 +1,211 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000022: hybrid_self_adaptive_de_local
+Status: valid; mean AOCC score: 0.415586 (higher is better)
+Thought: Hybrid optimizer combining self-adaptive differential evolution with exponential crossover (DE/current-to-best/1) for global exploration and a decreasing-step Gaussian perturbation local search for refinement. Population initialized uniformly. 70% of budget after initial evaluation allocated to adaptive DE, 30% to local search from current best. Self-adaptation of F and CR per individual. Strict budget counting, clipping to bounds, seed for reproducibility.
+Mean AOCC: 0.41558570155454294
+Mean final error: 1.0098155967941418
+AOCC by group: {'high_conditioning_unimodal': 0.3187637192469287, 'low_moderate_conditioning': 0.5843300397822278, 'multimodal_strong_global_structure': 0.23641033711662066, 'multimodal_weak_global_structure': 0.2555321797298224, 'separable': 0.7166410995426523}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+        self.pop_size = max(4, min(20, budget // 2, 2 * dim))
+        if self.pop_size > budget:
+            self.pop_size = budget
+        self.F_l = 0.1
+        self.F_u = 0.9
+        self.CR_l = 0.0
+        self.CR_u = 1.0
+        self.tau1 = 0.1
+        self.tau2 = 0.1
+
+    def __call__(self, func):
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop_size = self.pop_size
+        rng = self.rng
+        budget = self.budget
+
+        # Initialize population
+        pop = lb + rng.rand(pop_size, dim) * (ub - lb)
+        fitness = np.full(pop_size, np.inf)
+        F = rng.uniform(self.F_l, self.F_u, pop_size)
+        CR = rng.uniform(self.CR_l, self.CR_u, pop_size)
+
+        best_x = None
+        best_val = np.inf
+        evals = 0
+
+        # Evaluate initial population
+        for i in range(pop_size):
+            if evals >= budget:
+                break
+            val = func(pop[i])
+            evals += 1
+            fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = pop[i].copy()
+                report_best(best_val, best_x)
+
+        if evals >= budget:
+            return best_val, best_x
+
+        # Compute budget splits
+        remaining = budget - evals
+        if remaining > 0:
+            DE_budget = int(0.7 * remaining)
+            local_budget = remaining - DE_budget
+        else:
+            DE_budget = 0
+            local_budget = 0
+
+        # Self-adaptive DE phase
+        while evals < budget and evals < evals + DE_budget:
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                # Generate new F and CR
+                F_new = F[i]
+                CR_new = CR[i]
+                if rng.rand() < self.tau1:
+                    F_new = rng.uniform(self.F_l, self.F_u)
+                if rng.rand() < self.tau2:
+                    CR_new = rng.uniform(self.CR_l, self.CR_u)
+
+                # Select two distinct random indices
+                candidates = list(range(pop_size))
+                candidates.remove(i)
+                rng.shuffle(candidates)
+                a, b = candidates[:2]
+
+                # Mutation: DE/current-to-best/1
+                mutant = pop[i] + F_new * (best_x - pop[i]) + F_new * (pop[a] - pop[b])
+                mutant = np.clip(mutant, lb, ub)
+
+                # Exponential crossover
+                j_start = rng.randint(dim)
+                L = 1
+                while rng.rand() < CR_new and L < dim:
+                    L += 1
+                trial = pop[i].copy()
+                for k in range(L):
+                    j = (j_start + k) % dim
+                    trial[j] = mutant[j]
+
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    F[i] = F_new
+                    CR[i] = CR_new
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+
+        # Local search phase from best
+        if local_budget > 0:
+            step_init = 0.1 * (ub - lb)
+            for i in range(local_budget):
+                if evals >= budget:
+                    break
+                progress = i / max(1, local_budget)
+                step = step_init * (1 - progress)
+                trial = best_x + rng.randn(dim) * step
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = trial.copy()
+                    report_best(best_val, best_x)
+                    # Optionally update population: replace worst
+                    worst_idx = np.argmax(fitness)
+                    if val < fitness[worst_idx]:
+                        pop[worst_idx] = trial
+                        fitness[worst_idx] = val
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m2_parameter_schedule_mutation
+
+GOAL: Create a variant of one parent by changing its parameters, thresholds, rates, limits, or scheduling rules. Prefer meaningful adaptive or budget-aware schedules over arbitrary constant changes, while keeping the parent algorithm's structure.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

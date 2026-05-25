@@ -1,5 +1,5 @@
 run:
-  name: bbob_pop_5_gen_30_verbal_2
+  name: bbob_pop_5_gen_20_base
   output_dir: runs/bbob
   seed: 100
 
@@ -23,10 +23,10 @@ llm:
 
 evolution:
   population_size: 5
-  generations: 30
+  generations: 20
   offspring_per_strategy: 1
   history:
-    enabled: true
+    enabled: false
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -38,7 +38,7 @@ evolution:
     recency_weight: 0.05
     robustness_weight: 0.35
   verbal_gradients:
-    enabled: true
+    enabled: false
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
