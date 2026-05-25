@@ -1,0 +1,116 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000004 LLM reflection:
+- Summary: NN construction and random 2-opt search achieved valid tours with moderate quality on 500-city instances.
+- Aim: Improve tour quality by adding a restart or diversification mechanism to escape local optima within budget.
+- Preserve: nearest neighbor initialization; delta-based 2-opt move evaluation; report_best_tour usage
+- Change: add a restart/perturbation step after local optimum; or replace 2-opt with 3-opt for stronger moves
+- Avoid: breaking valid permutation guarantee; removing budget tracking; adding moves that waste budget without potential improvement
+
+Distance is the search objective for TSP; lower distance is better.
+
+PARENTS:
+Candidate cand_000004: lk_improver
+
+Status: valid; distance: 17.7717
+
+Thought: Construct initial tour via nearest neighbor from node 0, then repeatedly apply random 2-opt moves to reduce cost. Stop when budget exhausted or no improvement found. Report best tour found.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    n = len(distance_matrix)
+    # nearest neighbor construction from node 0
+    tour = [0]
+    visited = {0}
+    cur = 0
+    for _ in range(n - 1):
+        next = min((j for j in range(n) if j not in visited), key=lambda j: distance_matrix[cur, j])
+        tour.append(next)
+        visited.add(next)
+        cur = next
+    tour = np.array(tour, dtype=np.int64)
+    best_tour = tour.copy()
+    best_cost = distance_matrix[tour[-1], tour[0]] + sum(distance_matrix[tour[i], tour[i+1]] for i in range(n-1))
+    report_best_tour(best_tour)
+    
+    def compute_cost(t):
+        return distance_matrix[t[-1], t[0]] + sum(distance_matrix[t[i], t[i+1]] for i in range(n-1))
+    
+    cost = best_cost
+    iter_count = 0
+    improved = True
+    while iter_count < budget and improved:
+        improved = False
+        # generate random pairs for 2-opt
+        pairs = [(i, j) for i in range(n) for j in range(i+2, n)]
+        rng.shuffle(pairs)
+        for i, j in pairs:
+            # compute delta
+            a, b, c, d = tour[i], tour[(i+1)%n], tour[j], tour[(j+1)%n]
+            delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]
+            if delta < -1e-9:
+                # apply 2-opt reversal
+                if i+1 < j:
+                    tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                else:
+                    # wrap-around case not handled by simple reversal; skip for simplicity
+                    continue
+                cost += delta
+                improved = True
+                iter_count += 1
+                if cost < best_cost:
+                    best_cost = cost
+                    best_tour = tour.copy()
+                    report_best_tour(best_tour)
+                if iter_count >= budget:
+                    break
+        # if no improvement in full loop, improved remains False and while ends
+    return best_tour
+
+```
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

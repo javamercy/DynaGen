@@ -1,0 +1,49 @@
+{
+  "candidate_id": "cand_000005",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve construction heuristic to produce higher-quality starting tours, reducing tour length without exceeding budget.",
+    "avoid": [
+      "introducing invalid tours",
+      "increasing runtime beyond budget tolerance",
+      "unnecessary complexity that does not reduce tour length",
+      "breaking the 2-opt core correctness"
+    ],
+    "candidate_id": "cand_000005",
+    "change": [
+      "replace randomized greedy with nearest insertion or regret-based construction",
+      "add a simple perturbation restart if time allows within budget"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "budget-aware 2-opt loop",
+      "valid permutation guarantee",
+      "report_best_tour mechanism",
+      "fast runtime profile"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 32.8364103925865,
+    "source": "llm",
+    "summary": "Randomized greedy + 2-opt achieved good 500-city results; mean distance 32.84 with fast runtime and no invalid tours.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation under a strict budget\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, budget use, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\nimport random\\n\\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\\n    random.seed(seed)\\n    n = distance_matrix.shape[0]\\n    if n <= 2:\\n        tour = np.arange(n, dtype=np.int32)\\n        return tour\\n    # Randomized greedy construction\\n    unvisited = set(range(n))\\n    start = random.randrange(n)\\n    tour = [start]\\n    unvisited.remove(start)\\n    while unvisited:\\n        current = tour[-1]\\n        # Get distances to unvisited\\n        cand = list(unvisited)\\n        dists = [(distance_matrix[current, c], c) for c in cand]\\n        dists.sort()\\n        # Choose among the 3 nearest (or less if fewer)\\n        k = min(3, len(dists))\\n        choice = random.randrange(k)\\n        next_city = dists[choice][1]\\n        tour.append(next_city)\\n        unvisited.remove(next_city)\\n    tour = np.array(tour, dtype=np.int32)\\n    best_tour = tour.copy()\\n    best_dist = sum(distance_matrix[tour[i], tour[(i+1)%n]] for i in range(n))\\n    # 2-opt improvement\\n    iteration = 0\\n    improved = True\\n    while improved and iteration < budget:\\n        improved = False\\n        for i in range(n-2):\\n            for j in range(i+2, n):\\n                iteration += 1\\n                if iteration >= budget:\\n                    break\\n                # Check if reversing segment (i+1..j) reduces distance\\n                a, b, c, d = tour[i], tour[i+1], tour[j], tour[(j+1)%n]\\n                delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\\n                if delta < -1e-12:\\n                    # Apply 2-opt move\\n                    tour[i+1:j+1] = tour[i+1:j+1][::-1]\\n                    best_tour = tour.copy()\\n                    # Update best_dist (not necessary but for potential use)\\n                    best_dist = best_dist + delta\\n                    improved = True\\n                    report_best_tour(best_tour)\\n                    break\\n            if improved or iteration >= budget:\\n                break\\n    return best_tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000005\",\"metrics\":{\"best_gap\":null,\"budget\":10000,\"distance\":32.8364103925865,\"gap_by_instance_size\":{\"500\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:500\",\"tsp:source:synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"diversity_score\":1.0,\"history_score\":1.608362917249577,\"in_history\":true,\"primary_bucket\":\"tsp:size:500\",\"quality_score\":0.9682075398754532,\"robustness_score\":0.9718725067832109},\"history_selection\":{\"bucket_score\":0.9682075398754532,\"buckets\":[\"global\",\"tsp:size:500\",\"tsp:source:synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"history_score\":1.558362917249577,\"primary_bucket\":\"tsp:size:500\",\"role\":\"regime specialist\"},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.16037396470010207,\"mean_tour_length\":32.8364103925865,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":20,\"runtime_error_count\":0,\"score_by_instance_size\":{\"500\":32.8364103925865},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":32.8364103925865},\"score_name\":\"distance\",\"scored_count\":0,\"seeds\":[100],\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"tour_length_by_instance_size\":{\"500\":32.8364103925865},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":32.8364103925865},\"unscored_timeout_count\":0,\"valid_count\":20,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":32.8364103925865,\"status\":\"valid\",\"thought\":\"Construct initial tour using randomized greedy that selects from nearest 3 unvisited cities. Then apply 2-opt improvement until convergence or budget exhausted.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize TSP tour length while always returning a valid permutation under a strict budget\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Randomized greedy + 2-opt achieved good 500-city results; mean distance 32.84 with fast runtime and no invalid tours.\",\n  \"aim\": \"Improve construction heuristic to produce higher-quality starting tours, reducing tour length without exceeding budget.\",\n  \"preserve\": [\"budget-aware 2-opt loop\", \"valid permutation guarantee\", \"report_best_tour mechanism\", \"fast runtime profile\"],\n  \"change\": [\"replace randomized greedy with nearest insertion or regret-based construction\", \"add a simple perturbation restart if time allows within budget\"],\n  \"avoid\": [\"introducing invalid tours\", \"increasing runtime beyond budget tolerance\", \"unnecessary complexity that does not reduce tour length\", \"breaking the 2-opt core correctness\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

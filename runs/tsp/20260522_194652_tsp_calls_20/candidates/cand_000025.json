@@ -1,0 +1,125 @@
+{
+  "created_at": "2026-05-22T16:54:51.485769+00:00",
+  "distance": 1741.244132900365,
+  "error_details": null,
+  "generation": 8,
+  "id": "cand_000025",
+  "metrics": {
+    "best_gap": null,
+    "budget": 10000,
+    "distance": 1741.244132900365,
+    "gap_by_instance_size": {
+      "201": null,
+      "501": null,
+      "801": null
+    },
+    "gap_by_instance_source": {
+      "synthetic:llamea:100:200": null,
+      "synthetic:llamea:100:500": null,
+      "synthetic:llamea:100:800": null
+    },
+    "invalid_tour_count": 0,
+    "mean_gap": null,
+    "mean_runtime": 4.226500402665503,
+    "mean_tour_length": 1741.244132900365,
+    "median_gap": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_gap": null,
+    "pool": "search_instances",
+    "problem": "tsp",
+    "records": [
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed100_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.18362524999247398,
+        "seed": 100,
+        "source": "synthetic:llamea:100:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1139.0063783020457
+      },
+      {
+        "dimension": 501,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed100_size500",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 2.507526500005042,
+        "seed": 100,
+        "source": "synthetic:llamea:100:500",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1807.7746756548959
+      },
+      {
+        "dimension": 801,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed100_size800",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 9.988349457998993,
+        "seed": 100,
+        "source": "synthetic:llamea:100:800",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 2276.951344744153
+      }
+    ],
+    "runs": 3,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "201": 1139.0063783020457,
+      "501": 1807.7746756548959,
+      "801": 2276.951344744153
+    },
+    "score_by_instance_source": {
+      "synthetic:llamea:100:200": 1139.0063783020457,
+      "synthetic:llamea:100:500": 1807.7746756548959,
+      "synthetic:llamea:100:800": 2276.951344744153
+    },
+    "score_name": "distance",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_distance": null,
+    "timeout_fraction": 0.0,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "tour_length_by_instance_size": {
+      "201": 1139.0063783020457,
+      "501": 1807.7746756548959,
+      "801": 2276.951344744153
+    },
+    "tour_length_by_instance_source": {
+      "synthetic:llamea:100:200": 1139.0063783020457,
+      "synthetic:llamea:100:500": 1807.7746756548959,
+      "synthetic:llamea:100:800": 2276.951344744153
+    },
+    "unscored_timeout_count": 0,
+    "valid_count": 3,
+    "worst_gap": null
+  },
+  "name": "farthest_insertion_2opt_candidate_list",
+  "parents": [
+    "cand_000022"
+  ],
+  "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S1: Explore: create a complete solver with materially different search behavior from the parent.\nChange a core decision rule or search dynamic, not names or constants. Keep validity, budget use, and early reporting.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT-SPECIFIC LLM REFLECTIONS:\n\nParent cand_000022 LLM reflection:\n- Summary: Farthest insertion + random swap search improved tour length over parent, but runtime increased significantly due to many random evaluations without candidate lists.\n- Aim: Adopt 2-opt neighborhood with candidate lists to achieve higher quality improvements per budget unit.\n- Preserve: farthest insertion construction; first-improvement strategy; restart on plateau; correct budget decrements\n- Change for S1: replace random swap with 2-opt neighborhood; add candidate lists to focus evaluations on promising moves\n- Avoid: changing construction method; removing restart mechanism; altering budget accounting logic; introducing complex tie-breaking that wastes budget\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Best available parent by current scalar score: cand_000022 (distance=1745.82, status=valid, generation=7, strategy=S1).\n- Strategy-aware parent use for S1: depart from the selected parent's core mechanism, but keep any proven validity, reporting, budget, or incumbent-handling behavior.\nPARENT SNAPSHOT:\n- cand_000022; gen=7; strategy=S1; status=valid; distance=1745.82; relative_score=best; reflection=llm; metrics=timeout_fraction=0.0, mean_tour_length=1745.8220603386974\n\nPARENTS:\nCandidate cand_000022: randomized_farthest_insertion_swap\nStatus: valid; distance: 1745.82\nThought: Replace random insertion with randomized farthest insertion construction, and replace first-improvement 2-opt with iterative random swap local search. Budget counts each swap evaluation and each restart. This creates materially different search behavior: construction is more deliberate, local search uses a different neighborhood (swap vs 2-opt) without candidate lists.\nCode:\n```python\nimport numpy as np\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.arange(n, dtype=np.int32)\n        report_best_tour(tour)\n        return tour\n\n    rng = np.random.default_rng(seed)\n\n    def tour_length(t):\n        total = 0.0\n        for i in range(n):\n            total += distance_matrix[t[i], t[(i+1)%n]]\n        return total\n\n    def farthest_insertion():\n        start = rng.integers(n)\n        tour = [start]\n        unvisited = set(range(n))\n        unvisited.remove(start)\n        while unvisited:\n            # find farthest city from current tour\n            max_dist = -1\n            farthest_candidates = []\n            for city in unvisited:\n                # distance to nearest tour city\n                min_dist = min(distance_matrix[city, t] for t in tour)\n                if min_dist > max_dist:\n                    max_dist = min_dist\n                    farthest_candidates = [city]\n                elif min_dist == max_dist:\n                    farthest_candidates.append(city)\n            # random tie-breaking\n            next_city = rng.choice(farthest_candidates)\n            unvisited.remove(next_city)\n            # best insertion\n            best_pos = -1\n            best_increase = float('inf')\n            for i in range(len(tour)):\n                j = (i+1) % len(tour)\n                increase = distance_matrix[tour[i], next_city] + distance_matrix[next_city, tour[j]] - distance_matrix[tour[i], tour[j]]\n                if increase < best_increase:\n                    best_increase = increase\n                    best_pos = i+1\n            tour.insert(best_pos, next_city)\n        return np.array(tour, dtype=np.int32)\n\n    # initial tour\n    tour = farthest_insertion()\n    best_tour = tour.copy()\n    best_len = tour_length(tour)\n    report_best_tour(best_tour.copy())\n\n    eps = 1e-12\n    no_improve_streak = 0\n    max_attempts = n * 10  # attempts before restart\n\n    while budget > 0:\n        # random swap local search\n        improved = False\n        for _ in range(max_attempts):\n            if budget <= 0:\n                break\n            # pick two distinct random indices\n            i = rng.integers(n)\n            j = rng.integers(n)\n            while j == i:\n                j = rng.integers(n)\n            if i > j:\n                i, j = j, i\n            # compute delta\n            # edges removed: (i-1,i), (i,i+1), (j-1,j), (j,j+1)\n            # edges added: (i-1,j), (j,i+1), (j-1,i), (i,j+1)\n            # careful with wrap-around\n            i_minus = (i-1) % n\n            i_plus = (i+1) % n\n            j_minus = (j-1) % n\n            j_plus = (j+1) % n\n            # if positions are adjacent, special cases\n            if j == i+1 or (i == n-1 and j == 0):\n                # adjacent swap: i and i+1\n                delta = distance_matrix[tour[i_minus], tour[j]] + distance_matrix[tour[j], tour[i]] + distance_matrix[tour[i], tour[j_plus]] - \\\n                        (distance_matrix[tour[i_minus], tour[i]] + distance_matrix[tour[i], tour[j]] + distance_matrix[tour[j], tour[j_plus]])\n            else:\n                delta = distance_matrix[tour[i_minus], tour[j]] + distance_matrix[tour[j], tour[i_plus]] + \\\n                        distance_matrix[tour[j_minus], tour[i]] + distance_matrix[tour[i], tour[j_plus]] - \\\n                        (distance_matrix[tour[i_minus], tour[i]] + distance_matrix[tour[i], tour[i_plus]] + \\\n                         distance_matrix[tour[j_minus], tour[j]] + distance_matrix[tour[j], tour[j_plus]])\n            budget -= 1\n            if delta < -eps:\n                # swap\n                tour[i], tour[j] = tour[j], tour[i]\n                improved = True\n                new_len = tour_length(tour)\n                if new_len < best_len - eps:\n                    best_len = new_len\n                    best_tour = tour.copy()\n                    report_best_tour(best_tour.copy())\n                break  # first improvement\n        if not improved and budget > 0:\n            # restart\n            budget -= 1\n            tour = farthest_insertion()\n            new_len = tour_length(tour)\n            if new_len < best_len - eps:\n                best_len = new_len\n                best_tour = tour.copy()\n                report_best_tour(best_tour.copy())\n            no_improve_streak = 0\n        elif not improved:\n            break\n    return best_tour\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+  "raw_response": "",
+  "status": "valid",
+  "strategy": "S1",
+  "thought": "Replace random swap with 2-opt neighborhood using candidate lists of nearest neighbors to focus evaluations. Keep farthest insertion construction, first-improvement, and restart on plateau. Each delta evaluation costs 1 budget; each restart costs 1 budget."
+}

@@ -1,0 +1,212 @@
+{
+  "created_at": "2026-05-22T12:23:48.254979+00:00",
+  "distance": 880.4745313950415,
+  "error_details": null,
+  "generation": 2,
+  "id": "cand_000007",
+  "metrics": {
+    "best_gap": null,
+    "budget": 10000,
+    "distance": 880.4745313950415,
+    "gap_by_instance_size": {
+      "101": null,
+      "201": null,
+      "51": null
+    },
+    "gap_by_instance_source": {
+      "synthetic:llamea:11:100": null,
+      "synthetic:llamea:11:200": null,
+      "synthetic:llamea:11:50": null,
+      "synthetic:llamea:23:100": null,
+      "synthetic:llamea:23:200": null,
+      "synthetic:llamea:23:50": null
+    },
+    "invalid_tour_count": 0,
+    "mean_gap": null,
+    "mean_runtime": 0.03159074999469643,
+    "mean_tour_length": 880.4745313950415,
+    "median_gap": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_gap": null,
+    "pool": "search_instances",
+    "problem": "tsp",
+    "records": [
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.030529582989402115,
+        "seed": 100,
+        "source": "synthetic:llamea:11:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 645.8599988838993
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.031010833001346327,
+        "seed": 100,
+        "source": "synthetic:llamea:11:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 835.6184737004287
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.034135541995055974,
+        "seed": 100,
+        "source": "synthetic:llamea:11:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1223.3175513326942
+      },
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.030338749988004565,
+        "seed": 100,
+        "source": "synthetic:llamea:23:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 605.7817963010954
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.030621792000602,
+        "seed": 100,
+        "source": "synthetic:llamea:23:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 833.4821884800715
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.03290799999376759,
+        "seed": 100,
+        "source": "synthetic:llamea:23:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1138.7871796720597
+      }
+    ],
+    "runs": 6,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "101": 834.5503310902501,
+      "201": 1181.052365502377,
+      "51": 625.8208975924973
+    },
+    "score_by_instance_source": {
+      "synthetic:llamea:11:100": 835.6184737004287,
+      "synthetic:llamea:11:200": 1223.3175513326942,
+      "synthetic:llamea:11:50": 645.8599988838993,
+      "synthetic:llamea:23:100": 833.4821884800715,
+      "synthetic:llamea:23:200": 1138.7871796720597,
+      "synthetic:llamea:23:50": 605.7817963010954
+    },
+    "score_name": "distance",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_distance": null,
+    "timeout_fraction": 0.0,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "tour_length_by_instance_size": {
+      "101": 834.5503310902501,
+      "201": 1181.052365502377,
+      "51": 625.8208975924973
+    },
+    "tour_length_by_instance_source": {
+      "synthetic:llamea:11:100": 835.6184737004287,
+      "synthetic:llamea:11:200": 1223.3175513326942,
+      "synthetic:llamea:11:50": 645.8599988838993,
+      "synthetic:llamea:23:100": 833.4821884800715,
+      "synthetic:llamea:23:200": 1138.7871796720597,
+      "synthetic:llamea:23:50": 605.7817963010954
+    },
+    "unscored_timeout_count": 0,
+    "valid_count": 6,
+    "verbal_gradient": {
+      "aim": "Implement a robust 2-opt reversal that handles wrap-around cases to ensure all potential edge swaps are considered.",
+      "avoid": [
+        "Reverting to random node selection",
+        "Adding computationally expensive relocation moves that bypass the candidate list"
+      ],
+      "candidate_id": "cand_000007",
+      "change": [
+        "Replace the 'pass' in the wrap-around case with a correct slice-based reversal for edges crossing the array boundary",
+        "Ensure the 2-opt reversal logic correctly handles all index pairs (i, j) regardless of order"
+      ],
+      "delta_vs_best_parent": -16.542406108377463,
+      "evidence": {},
+      "generation": 4,
+      "parent_ids": [
+        "cand_000001"
+      ],
+      "preserve": [
+        "Greedy initial construction",
+        "K-nearest neighbor candidate lists",
+        "Systematic node-indexed iteration",
+        "Budget-bounded iteration counting"
+      ],
+      "problem": "tsp",
+      "score_name": "distance",
+      "score_value": 880.4745313950415,
+      "source": "llm",
+      "summary": "The candidate improved tour length by replacing random search with a systematic candidate-list-driven 2-opt scan, though it currently ignores wrap-around swaps.",
+      "version": 1
+    },
+    "worst_gap": null
+  },
+  "name": "iterative_candidate_2opt",
+  "parents": [
+    "cand_000001"
+  ],
+  "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S1: Explore: create a complete solver with materially different search behavior from the parent.\nChange a core decision rule or search dynamic, not names or constants. Keep validity, budget use, and early reporting.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT-SPECIFIC LLM REFLECTIONS:\n\nParent cand_000001 LLM reflection:\n- Summary: The candidate produces valid tours using a greedy start and budget-bounded 2-opt/relocation, but the random move selection is inefficient for large n.\n- Aim: Improve the local search efficiency by replacing random edge selection with a more targeted 2-opt search or a structured neighborhood scan.\n- Preserve: Greedy initial construction; Candidate list for scaling; Budget-bounded iteration loop; Valid permutation handling\n- Change for S1: Replace random 2-opt indices with a systematic scan of the candidate list; Optimize the relocation move to avoid full tour distance recalculation\n- Avoid: Removing the budget constraint; Implementing O(n^3) search patterns that would cause timeouts on n=200\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Best available parent by current scalar score: cand_000001 (distance=897.017, status=valid, generation=0, strategy=initial:1).\n- Strategy-aware parent use for S1: depart from the selected parent's core mechanism, but keep any proven validity, reporting, budget, or incumbent-handling behavior.\nPARENT SNAPSHOT:\n- cand_000001; gen=0; strategy=initial:1; status=valid; distance=897.017; relative_score=best; reflection=llm; metrics=timeout_fraction=0.0, mean_tour_length=897.016937503419\n\nPARENTS:\nCandidate cand_000001: adaptive_candidate_2opt\nStatus: valid; distance: 897.017\nThought: Implements a greedy initial tour followed by budget-bounded local search. For n >= 80, it uses a restricted candidate list of nearest neighbors to avoid O(n^2) scanning per iteration. It employs 2-opt and node relocation moves, exiting on first improvement to maximize search throughput within the budget.\nCode:\n```python\nimport numpy as np\nimport random\nimport heapq\n\ndef report_best_tour(tour):\n    # This is a placeholder for the internal tracking required by the prompt\n    pass\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = len(distance_matrix)\n    if n <= 1:\n        return np.arange(n)\n    if n == 2:\n        return np.array([0, 1])\n\n    random.seed(seed)\n    np.random.seed(seed)\n\n    # 1. Initial Greedy Incumbent\n    unvisited = set(range(1, n))\n    tour = [0]\n    curr = 0\n    while unvisited:\n        next_node = min(unvisited, key=lambda x: distance_matrix[curr, x])\n        tour.append(next_node)\n        unvisited.remove(next_node)\n        curr = next_node\n    \n    tour = np.array(tour)\n    report_best_tour(tour)\n    \n    def get_dist(t):\n        d = 0\n        for i in range(n - 1):\n            d += distance_matrix[t[i], t[i+1]]\n        d += distance_matrix[t[-1], t[0]]\n        return d\n\n    best_dist = get_dist(tour)\n    \n    # 2. Candidate List Construction for scaling\n    # For large n, we only consider the k nearest neighbors for each node\n    k_neighbors = 20 if n >= 80 else n - 1\n    candidates = []\n    for i in range(n):\n        dists = distance_matrix[i]\n        # Get indices of k smallest distances\n        idx = np.argsort(dists)[:k_neighbors + 1]\n        candidates.append(set(idx))\n\n    # 3. Budget-bounded Local Search\n    iterations = 0\n    while iterations < budget:\n        iterations += 1\n        improved = False\n        \n        # Try 2-opt (edge swap)\n        # To keep it fast, we pick a random edge and try swapping with its candidate neighbors\n        i = random.randint(0, n - 2)\n        j = random.randint(i + 1, n - 1)\n        \n        # Strict delta calculation for 2-opt: (i, i+1) and (j, j+1) -> (i, j) and (i+1, j+1)\n        # Handle wrap-around for the last edge\n        node_i = tour[i]\n        node_ip1 = tour[(i + 1) % n]\n        node_j = tour[j]\n        node_jp1 = tour[(j + 1) % n]\n        \n        # Candidate check: only attempt if nodes are in each others' neighborhood or n is small\n        if n < 80 or (node_i in candidates[node_j] or node_ip1 in candidates[node_jp1]):\n            current_edges = distance_matrix[node_i, node_ip1] + distance_matrix[node_j, node_jp1]\n            new_edges = distance_matrix[node_i, node_j] + distance_matrix[node_ip1, node_jp1]\n            \n            if new_edges < current_edges:\n                # Perform 2-opt reverse\n                tour[i+1 : j+1] = tour[i+1 : j+1][::-1]\n                best_dist -= (current_edges - new_edges)\n                report_best_tour(tour)\n                improved = True\n        \n        if not improved:\n            # Try Relocation move: move node i to position j\n            i = random.randint(0, n - 1)\n            j = random.randint(0, n - 1)\n            if i == j: continue\n            \n            # Extract node\n            node = tour[i]\n            temp_tour = np.delete(tour, i)\n            temp_tour = np.insert(temp_tour, j, node)\n            \n            new_d = get_dist(temp_tour)\n            if new_d < best_dist:\n                tour = temp_tour\n                best_dist = new_d\n                report_best_tour(tour)\n                improved = True\n\n    return tour\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+  "raw_response": "",
+  "status": "valid",
+  "strategy": "S1",
+  "thought": "Shift from random search to a systematic, candidate-list-driven 2-opt scan. Instead of random pairs, it iterates through nodes and their nearest neighbors to identify improving 2-opt swaps, significantly reducing the search space while increasing hit rate. Budget is managed by counting each candidate edge check as an iteration."
+}

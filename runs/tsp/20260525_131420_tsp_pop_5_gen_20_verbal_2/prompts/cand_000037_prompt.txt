@@ -1,0 +1,186 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000022: regret_2opt_doublebridge
+
+Status: valid; distance: 17.522
+
+Thought: Initialize with 5 restarts of regret-insertion to get best tour. Then iterative 2-opt with random shuffle and break on first improvement. After a full pass without improvement, apply double-bridge perturbation to escape local optima, but only if it yields a distinct tour. Budget counts each attempted swap. Report best tour on every improvement.
+
+History source: yes
+History bucket: tsp:size:500
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n, dtype=np.int32)
+        report_best_tour(tour.copy())
+        return tour
+    rng = np.random.RandomState(seed)
+    best_tour = None
+    best_length = np.inf
+    # Multiple restarts for construction
+    for restart in range(5):
+        start = rng.randint(n)
+        # nearest neighbor for second city
+        dists = distance_matrix[start].copy()
+        dists[start] = np.inf
+        second = np.argmin(dists)
+        tour = [start, second]
+        remaining = set(range(n)) - {start, second}
+        while remaining:
+            best_regret = -1e100
+            best_city = None
+            best_pos = None
+            best_cost = None
+            for city in remaining:
+                costs = []
+                L = len(tour)
+                for p in range(L):
+                    left = tour[p]
+                    right = tour[(p+1)%L]
+                    cost = distance_matrix[left, city] + distance_matrix[city, right] - distance_matrix[left, right]
+                    costs.append(cost)
+                sorted_costs = sorted(costs)
+                best = sorted_costs[0]
+                second_best = sorted_costs[1] if len(sorted_costs) > 1 else best
+                regret = second_best - best
+                if regret > best_regret or (regret == best_regret and (best_cost is None or best < best_cost)):
+                    best_regret = regret
+                    best_city = city
+                    best_pos = np.argmin(costs)
+                    best_cost = best
+            insert_idx = best_pos + 1
+            tour = tour[:insert_idx] + [best_city] + tour[insert_idx:]
+            remaining.remove(best_city)
+        curr_tour = np.array(tour, dtype=np.int32)
+        curr_length = sum(distance_matrix[curr_tour[i], curr_tour[(i+1)%n]] for i in range(n))
+        if curr_length < best_length:
+            best_length = curr_length
+            best_tour = curr_tour.copy()
+    report_best_tour(best_tour.copy())
+    # 2-opt improvement with budget per swap and double-bridge perturbation
+    current_tour = best_tour.copy()
+    current_length = best_length
+    attempts = 0
+    improved = True
+    visited_tours = set()
+    visited_tours.add(tuple(current_tour))
+    while attempts < budget and improved:
+        improved = False
+        indices = list(range(n))
+        rng.shuffle(indices)
+        for i_idx in range(n-1):
+            i = indices[i_idx]
+            if attempts >= budget:
+                break
+            for j_idx in range(i_idx+2, n):
+                j = indices[j_idx]
+                if i > j:
+                    i, j = j, i
+                if j == i+1 or (i == 0 and j == n-1):
+                    continue
+                a = current_tour[i]
+                b = current_tour[(i+1)%n]
+                c = current_tour[j]
+                d = current_tour[(j+1)%n]
+                old = distance_matrix[a,b] + distance_matrix[c,d]
+                new = distance_matrix[a,c] + distance_matrix[b,d]
+                attempts += 1
+                if new < old:
+                    current_tour[i+1:j+1] = current_tour[i+1:j+1][::-1]
+                    current_length += new - old
+                    report_best_tour(current_tour.copy())
+                    improved = True
+                    if current_length < best_length:
+                        best_length = current_length
+                        best_tour = current_tour.copy()
+                    break
+            if improved:
+                break
+        if not improved and attempts < budget:
+            # double-bridge perturbation, only if yields distinct tour
+            for _ in range(5):  # try up to 5 random perturbations
+                cut1 = rng.randint(1, n//2)
+                cut2 = rng.randint(cut1+1, 3*n//4)
+                cut3 = rng.randint(cut2+1, n-1)
+                if cut1 < cut2 < cut3:
+                    new_tour = np.concatenate([current_tour[:cut1], current_tour[cut3:], current_tour[cut2:cut3], current_tour[cut1:cut2]])
+                    if new_tour.shape[0] == n:
+                        tup = tuple(new_tour)
+                        if tup not in visited_tours:
+                            current_tour = new_tour
+                            current_length = sum(distance_matrix[current_tour[i], current_tour[(i+1)%n]] for i in range(n))
+                            visited_tours.add(tup)
+                            attempts += 1
+                            improved = True  # continue search
+                            break
+            # if still no improvement after perturbation attempts, break out of while
+            if not improved:
+                break
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000019 LLM reflection:
+- Summary: Nearest neighbor construction slightly improved tour quality over regret insertion while using 2-opt improvement.
+- Aim: Enhance 2-opt budget efficiency and explore occasional restart or perturbation to escape local optima.
+- Preserve: Nearest neighbor construction; 2-opt improvement loop; report_best_tour usage
+- Change: Add random perturbation or multi-start restart mechanism to avoid shallow local minima
+- Avoid: Adding complex heuristics that may exceed budget or disrupt validity; Unnecessary memory overhead
+
+Parent cand_000015 LLM reflection:
+- Summary: Candidate improved tour length by 1.2% over best parent using 5 restarts and double-bridge perturbation with regret-insertion+2-opt.
+- Aim: Enhance diversification effectiveness by applying double-bridge only after full 2-opt convergence and verifying it yields a distinct tour to prevent budget waste.
+- Preserve: Multiple restarts for construction; Regret-insertion heuristic; 2-opt with random shuffle and break on improvement; Double-bridge perturbation as escape mechanism; Reporting best tour after each improvement; Budget counting per swap attempt
+- Change: Apply double-bridge only after a complete 2-opt pass with no improvement; Check that perturbed tour differs from previously visited tours before continuing
+- Avoid: Removing report_best_tour calls; Wasting budget on ineffective perturbations; Generating invalid tours; Increasing runtime risk of timeout
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

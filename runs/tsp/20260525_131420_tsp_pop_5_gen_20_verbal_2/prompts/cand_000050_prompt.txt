@@ -1,0 +1,181 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000039: regret_2opt_fast
+
+Status: valid; distance: 17.46
+
+Thought: Regret-based construction with random start and random tie-breaking, then 2-opt with limited nearest-neighbor candidates (k=30). Restart on stagnation with adaptive threshold to diversify. Uses incremental tour updates for efficiency.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    np.random.seed(seed)
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        return np.arange(n, dtype=np.int32)
+
+    k = min(n-1, 30)
+    nn_list = []
+    for i in range(n):
+        order = np.argsort(distance_matrix[i])
+        nn_list.append(order[1:k+1] if n > 1 else [])
+
+    def build_pos(tour):
+        pos = np.empty(n, dtype=int)
+        for idx, city in enumerate(tour):
+            pos[city] = idx
+        return pos
+
+    def regret_insertion(start=None):
+        if start is None:
+            start = np.random.randint(n)
+        tour = [start]
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        while unvisited:
+            best_costs = []
+            for city in unvisited:
+                min_cost = float('inf')
+                min_pos = -1
+                second_min_cost = float('inf')
+                for i in range(len(tour)):
+                    a = tour[i]
+                    b = tour[(i+1) % len(tour)]
+                    cost = distance_matrix[a, city] + distance_matrix[city, b] - distance_matrix[a, b]
+                    if cost < min_cost:
+                        second_min_cost = min_cost
+                        min_cost = cost
+                        min_pos = i+1
+                    elif cost < second_min_cost:
+                        second_min_cost = cost
+                regret = second_min_cost - min_cost
+                best_costs.append((city, min_cost, min_pos, regret))
+            max_regret = max(c[3] for c in best_costs)
+            candidates = [c for c in best_costs if c[3] == max_regret]
+            city, cost, pos, _ = candidates[np.random.randint(len(candidates))]
+            tour.insert(pos, city)
+            unvisited.remove(city)
+        return np.array(tour, dtype=np.int32)
+
+    def compute_dist(t):
+        return sum(distance_matrix[t[i], t[(i+1)%n]] for i in range(n))
+
+    def two_opt(tour, pos, iteration, last_improvement):
+        n_cities = len(tour)
+        local_best = tour.copy()
+        local_best_dist = compute_dist(tour)
+        improved = True
+        while improved and iteration < budget:
+            improved = False
+            for i in range(n_cities-2):
+                a = tour[i]
+                b = tour[i+1]
+                for c in nn_list[b]:
+                    j = pos[c]
+                    if j <= i+1 or j >= n_cities-1:
+                        continue
+                    d = tour[(j+1) % n_cities]
+                    delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]
+                    if delta < -1e-12:
+                        tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                        for idx in range(i+1, j+1):
+                            pos[tour[idx]] = idx
+                        local_dist = compute_dist(tour)
+                        if local_dist < local_best_dist - 1e-12:
+                            local_best = tour.copy()
+                            local_best_dist = local_dist
+                            report_best_tour(local_best)
+                            last_improvement = iteration
+                        improved = True
+                        break
+                if improved:
+                    break
+                iteration += 1
+                if iteration >= budget:
+                    return local_best, local_best_dist, iteration, last_improvement
+            if iteration >= budget:
+                break
+        return local_best, local_best_dist, iteration, last_improvement
+
+    tour = regret_insertion()
+    pos = build_pos(tour)
+    best_tour = tour.copy()
+    best_dist = compute_dist(tour)
+    report_best_tour(best_tour)
+
+    iteration = 0
+    last_improvement = 0
+    restart_threshold = max(10, budget // 15)
+
+    while iteration < budget:
+        tour, cur_dist, iteration, last_improvement = two_opt(tour, pos, iteration, last_improvement)
+        if cur_dist < best_dist - 1e-12:
+            best_dist = cur_dist
+            best_tour = tour.copy()
+            report_best_tour(best_tour)
+        if iteration - last_improvement > restart_threshold and iteration < budget:
+            tour = regret_insertion(start=np.random.randint(n))
+            pos = build_pos(tour)
+            cur_dist = compute_dist(tour)
+            if cur_dist < best_dist - 1e-12:
+                best_dist = cur_dist
+                best_tour = tour.copy()
+                report_best_tour(best_tour)
+            last_improvement = iteration
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000039 LLM reflection:
+- Summary: Candidate improved tour quality slightly over best parent but incurred higher runtime due to repeated O(n) distance recomputations.
+- Aim: Reduce runtime by maintaining an incremental total distance variable, updating it directly from the delta in each 2-opt move, to allow more efficient use of the budget.
+- Preserve: Regret insertion with random start and tie-breaking; Nearest neighbor candidate list (k=30); Adaptive restart threshold (budget//15); Two-opt with incremental position updates
+- Change: Track current total distance incrementally, update using delta after each move; Remove compute_dist calls in two_opt and restart blocks
+- Avoid: Changing construction heuristic; Reducing k below 30; Increasing restart frequency; Adding random perturbations to insertion
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

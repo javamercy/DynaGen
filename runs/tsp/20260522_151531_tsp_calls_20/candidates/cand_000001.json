@@ -1,0 +1,208 @@
+{
+  "created_at": "2026-05-22T12:15:59.580187+00:00",
+  "distance": 897.016937503419,
+  "error_details": null,
+  "generation": 0,
+  "id": "cand_000001",
+  "metrics": {
+    "best_gap": null,
+    "budget": 10000,
+    "distance": 897.016937503419,
+    "gap_by_instance_size": {
+      "101": null,
+      "201": null,
+      "51": null
+    },
+    "gap_by_instance_source": {
+      "synthetic:llamea:11:100": null,
+      "synthetic:llamea:11:200": null,
+      "synthetic:llamea:11:50": null,
+      "synthetic:llamea:23:100": null,
+      "synthetic:llamea:23:200": null,
+      "synthetic:llamea:23:50": null
+    },
+    "invalid_tour_count": 0,
+    "mean_gap": null,
+    "mean_runtime": 0.4666168890010643,
+    "mean_tour_length": 897.016937503419,
+    "median_gap": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_gap": null,
+    "pool": "search_instances",
+    "problem": "tsp",
+    "records": [
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.326330791998771,
+        "seed": 100,
+        "source": "synthetic:llamea:11:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 628.5288076489019
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.4563574170024367,
+        "seed": 100,
+        "source": "synthetic:llamea:11:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 839.052209929001
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.6368292500119423,
+        "seed": 100,
+        "source": "synthetic:llamea:11:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1251.2693551913799
+      },
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.30135845800396055,
+        "seed": 100,
+        "source": "synthetic:llamea:23:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 639.3794572981985
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.42389233299763873,
+        "seed": 100,
+        "source": "synthetic:llamea:23:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 861.2010646610737
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.6549330839916365,
+        "seed": 100,
+        "source": "synthetic:llamea:23:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1162.6707302919585
+      }
+    ],
+    "runs": 6,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "101": 850.1266372950374,
+      "201": 1206.9700427416692,
+      "51": 633.9541324735502
+    },
+    "score_by_instance_source": {
+      "synthetic:llamea:11:100": 839.052209929001,
+      "synthetic:llamea:11:200": 1251.2693551913799,
+      "synthetic:llamea:11:50": 628.5288076489019,
+      "synthetic:llamea:23:100": 861.2010646610737,
+      "synthetic:llamea:23:200": 1162.6707302919585,
+      "synthetic:llamea:23:50": 639.3794572981985
+    },
+    "score_name": "distance",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_distance": null,
+    "timeout_fraction": 0.0,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "tour_length_by_instance_size": {
+      "101": 850.1266372950374,
+      "201": 1206.9700427416692,
+      "51": 633.9541324735502
+    },
+    "tour_length_by_instance_source": {
+      "synthetic:llamea:11:100": 839.052209929001,
+      "synthetic:llamea:11:200": 1251.2693551913799,
+      "synthetic:llamea:11:50": 628.5288076489019,
+      "synthetic:llamea:23:100": 861.2010646610737,
+      "synthetic:llamea:23:200": 1162.6707302919585,
+      "synthetic:llamea:23:50": 639.3794572981985
+    },
+    "unscored_timeout_count": 0,
+    "valid_count": 6,
+    "verbal_gradient": {
+      "aim": "Improve the local search efficiency by replacing random edge selection with a more targeted 2-opt search or a structured neighborhood scan.",
+      "avoid": [
+        "Removing the budget constraint",
+        "Implementing O(n^3) search patterns that would cause timeouts on n=200"
+      ],
+      "candidate_id": "cand_000001",
+      "change": [
+        "Replace random 2-opt indices with a systematic scan of the candidate list",
+        "Optimize the relocation move to avoid full tour distance recalculation"
+      ],
+      "delta_vs_best_parent": null,
+      "evidence": {},
+      "generation": 2,
+      "parent_ids": [],
+      "preserve": [
+        "Greedy initial construction",
+        "Candidate list for scaling",
+        "Budget-bounded iteration loop",
+        "Valid permutation handling"
+      ],
+      "problem": "tsp",
+      "score_name": "distance",
+      "score_value": 897.016937503419,
+      "source": "llm",
+      "summary": "The candidate produces valid tours using a greedy start and budget-bounded 2-opt/relocation, but the random move selection is inefficient for large n.",
+      "version": 1
+    },
+    "worst_gap": null
+  },
+  "name": "adaptive_candidate_2opt",
+  "parents": [],
+  "prompt": "[system]\nYou are a size-adaptive candidate-list local-search engineer. Generate compact TSP solver code that follows the contract.\n\n[user]\nInitial slot 1\n\nPerspective: a size-adaptive candidate-list local-search engineer\nBias: Build the strongest all-round anytime solver first: create a valid greedy or insertion incumbent immediately,\nthen improve it with budget-bounded candidate-neighbor 2-opt and relocation moves. Use small nearest-neighbor candidate\nlists for n >= 80, deeper scans only for small n, strict delta calculations, first-improvement exits, and report only\nstrict improvements. The solver should scale across the synthetic search sizes 33, 51, 101, and 201 without exhaustive\nall-pairs loops on large instances.\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+  "raw_response": "",
+  "status": "valid",
+  "strategy": "initial:1",
+  "thought": "Implements a greedy initial tour followed by budget-bounded local search. For n >= 80, it uses a restricted candidate list of nearest neighbors to avoid O(n^2) scanning per iteration. It employs 2-opt and node relocation moves, exiting on first improvement to maximize search throughput within the budget."
+}

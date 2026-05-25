@@ -1,0 +1,212 @@
+{
+  "created_at": "2026-05-22T12:19:20.476189+00:00",
+  "distance": 866.614649930911,
+  "error_details": null,
+  "generation": 1,
+  "id": "cand_000005",
+  "metrics": {
+    "best_gap": null,
+    "budget": 10000,
+    "distance": 866.614649930911,
+    "gap_by_instance_size": {
+      "101": null,
+      "201": null,
+      "51": null
+    },
+    "gap_by_instance_source": {
+      "synthetic:llamea:11:100": null,
+      "synthetic:llamea:11:200": null,
+      "synthetic:llamea:11:50": null,
+      "synthetic:llamea:23:100": null,
+      "synthetic:llamea:23:200": null,
+      "synthetic:llamea:23:50": null
+    },
+    "invalid_tour_count": 0,
+    "mean_gap": null,
+    "mean_runtime": 0.21189694466496198,
+    "mean_tour_length": 866.614649930911,
+    "median_gap": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_gap": null,
+    "pool": "search_instances",
+    "problem": "tsp",
+    "records": [
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.032782416994450614,
+        "seed": 100,
+        "source": "synthetic:llamea:11:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 683.5271708018082
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.11877287499373779,
+        "seed": 100,
+        "source": "synthetic:llamea:11:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 808.7824136858794
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.49094150000019,
+        "seed": 100,
+        "source": "synthetic:llamea:11:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1140.4397318697074
+      },
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.05012374999932945,
+        "seed": 100,
+        "source": "synthetic:llamea:23:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 602.9348882207266
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.1461858340044273,
+        "seed": 100,
+        "source": "synthetic:llamea:23:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 849.4152784554184
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.43257529199763667,
+        "seed": 100,
+        "source": "synthetic:llamea:23:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1114.5884165519255
+      }
+    ],
+    "runs": 6,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "101": 829.098846070649,
+      "201": 1127.5140742108165,
+      "51": 643.2310295112675
+    },
+    "score_by_instance_source": {
+      "synthetic:llamea:11:100": 808.7824136858794,
+      "synthetic:llamea:11:200": 1140.4397318697074,
+      "synthetic:llamea:11:50": 683.5271708018082,
+      "synthetic:llamea:23:100": 849.4152784554184,
+      "synthetic:llamea:23:200": 1114.5884165519255,
+      "synthetic:llamea:23:50": 602.9348882207266
+    },
+    "score_name": "distance",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_distance": null,
+    "timeout_fraction": 0.0,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "tour_length_by_instance_size": {
+      "101": 829.098846070649,
+      "201": 1127.5140742108165,
+      "51": 643.2310295112675
+    },
+    "tour_length_by_instance_source": {
+      "synthetic:llamea:11:100": 808.7824136858794,
+      "synthetic:llamea:11:200": 1140.4397318697074,
+      "synthetic:llamea:11:50": 683.5271708018082,
+      "synthetic:llamea:23:100": 849.4152784554184,
+      "synthetic:llamea:23:200": 1114.5884165519255,
+      "synthetic:llamea:23:50": 602.9348882207266
+    },
+    "unscored_timeout_count": 0,
+    "valid_count": 6,
+    "verbal_gradient": {
+      "aim": "Further reduce tour length by implementing a more efficient 2-opt neighborhood search or adding a 3-opt move within the budget.",
+      "avoid": [
+        "Increasing the Regret-2 candidate sample size beyond 60 (to avoid construction bottlenecks)",
+        "Removing the budget check inside the nested 2-opt loops"
+      ],
+      "candidate_id": "cand_000005",
+      "change": [
+        "Replace the aggressive 2-opt restart (break) with a more systematic search or a limited-neighbor search to explore more edges per budget unit.",
+        "Implement a simple 3-opt or a randomized 2-opt restart to escape local optima."
+      ],
+      "delta_vs_best_parent": -605.3422358881977,
+      "evidence": {},
+      "generation": 4,
+      "parent_ids": [
+        "cand_000002"
+      ],
+      "preserve": [
+        "Regret-2 insertion construction",
+        "Budget-bounded 2-opt loop",
+        "Valid permutation handling",
+        "report_best_tour integration"
+      ],
+      "problem": "tsp",
+      "score_name": "distance",
+      "score_value": 866.614649930911,
+      "source": "llm",
+      "summary": "The candidate significantly reduced tour length (866.61 vs 1471.96) by improving the Regret-2 construction initialization and 2-opt restart logic.",
+      "version": 1
+    },
+    "worst_gap": null
+  },
+  "name": "regret_2opt_refined",
+  "parents": [
+    "cand_000002"
+  ],
+  "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S2: Refine: use parent metrics and LLM reflections to make one or two targeted fixes.\nPreserve what works, address measured weakness, and avoid unrelated rewrites.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Best available parent by current scalar score: cand_000002 (distance=1471.96, status=valid, generation=0, strategy=initial:2).\n- Strategy-aware parent use for S2: use the strongest valid parent as the backbone and make one or two measured fixes from its LLM reflection aim and change guidance.\nPARENT SNAPSHOT:\n- cand_000002; gen=0; strategy=initial:2; status=valid; distance=1471.96; relative_score=best; metrics=timeout_fraction=0.0, mean_tour_length=1471.9568858191087\n\nPARENTS:\nCandidate cand_000002: regret_insertion_tsp\nStatus: valid; distance: 1471.96\nThought: Combines a seeded nearest-neighbor start with a regret-k insertion strategy to build a high-quality initial tour. Uses a budget-aware 2-opt pass with candidate edge pruning to refine the tour while ensuring validity via a simple array representation.\nCode:\n```python\nimport numpy as np\nimport random\nimport heapq\n\ndef report_best_tour(tour):\n    pass # Placeholder as per interface requirements\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.arange(n)\n        report_best_tour(tour)\n        return tour\n\n    random.seed(seed)\n    np.random.seed(seed)\n\n    # 1. Seeded Construction (Regret-2 Insertion)\n    # Start with a random node\n    start_node = random.randint(0, n - 1)\n    unvisited = set(range(n))\n    unvisited.remove(start_node)\n    \n    tour = [start_node]\n    \n    while unvisited:\n        best_regret = -1\n        best_node = -1\n        best_pos = -1\n        \n        # To keep it compact and fast, we sample a subset of unvisited if n is huge\n        candidates = list(unvisited)\n        if len(candidates) > 50:\n            candidates = random.sample(candidates, 50)\n\n        for node in candidates:\n            # Find two cheapest insertion points in current tour\n            costs = []\n            for i in range(len(tour)):\n                u = tour[i]\n                v = tour[(i + 1) % len(tour)]\n                cost = distance_matrix[u, node] + distance_matrix[node, v] - distance_matrix[u, v]\n                costs.append(cost)\n            \n            costs.sort()\n            regret = costs[1] - costs[0] if len(costs) > 1 else costs[0]\n            \n            if regret > best_regret:\n                best_regret = regret\n                best_node = node\n                best_pos = np.argmin(costs)\n        \n        # If no clear regret winner, pick a random unvisited\n        if best_node == -1:\n            best_node = random.choice(list(unvisited))\n            best_pos = random.randint(0, len(tour))\n            \n        tour.insert(best_pos if best_pos < len(tour) else len(tour)-1, best_node)\n        unvisited.remove(best_node)\n\n    current_tour = np.array(tour)\n    report_best_tour(current_tour)\n\n    # 2. Local Search (Budget-bounded 2-opt)\n    def get_tour_dist(t):\n        d = 0\n        for i in range(n):\n            d += distance_matrix[t[i], t[(i+1)%n]]\n        return d\n\n    best_dist = get_tour_dist(current_tour)\n    \n    # Limit iterations by budget\n    iters = 0\n    improved = True\n    while improved and iters < budget:\n        improved = False\n        # Heuristic: only check nodes that are relatively close (Candidate edges)\n        for i in range(n - 1):\n            for j in range(i + 2, n):\n                # 2-opt swap: reverse segment [i+1, j]\n                # Change in distance: dist(i, i+1) + dist(j, j+1) -> dist(i, j) + dist(i+1, j+1)\n                u, v = current_tour[i], current_tour[i+1]\n                w, z = current_tour[j], current_tour[(j+1)%n]\n                \n                delta = (distance_matrix[u, w] + distance_matrix[v, z]) - \\\n                        (distance_matrix[u, v] + distance_matrix[w, z])\n                \n                if delta < -1e-9:\n                    current_tour[i+1:j+1] = current_tour[i+1:j+1][::-1]\n                    best_dist += delta\n                    improved = True\n                    report_best_tour(current_tour)\n                    break\n            if improved: break\n            iters += 1\n        iters += 1\n\n    return current_tour\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+  "raw_response": "",
+  "status": "valid",
+  "strategy": "S2",
+  "thought": "The parent (cand_000002) provides a strong foundation with Regret-2 insertion and 2-opt. To refine it, I will improve the 2-opt efficiency by removing the inner loop 'break' that resets the search too aggressively and instead use a more systematic pass. I will also fix the Regret-2 insertion logic to properly handle the circular nature of the tour for the first few nodes and ensure the budget is used more effectively by tracking total 2-opt iterations more accurately."
+}

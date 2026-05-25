@@ -1,0 +1,135 @@
+{
+  "data": {
+    "search_instances": "synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024",
+    "test_instances": "data/tsp/test_instances"
+  },
+  "evaluation": {
+    "budget": 7000,
+    "metric": "average_gap",
+    "seeds": [
+      100
+    ],
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0
+  },
+  "evolution": {
+    "archive": {
+      "add_statuses": [
+        "valid",
+        "evaluated",
+        "timeout"
+      ],
+      "deduplicate_code": true,
+      "diversity_weight": 0.25,
+      "enabled": false,
+      "final_selection_uses_archive": true,
+      "max_per_bucket": 4,
+      "max_size": 64,
+      "parent_sample_probability": 0.35,
+      "recency_weight": 0.05,
+      "robustness_weight": 0.35,
+      "s3_archive_parent_min": 1
+    },
+    "generations": 20,
+    "offspring_per_strategy": 1,
+    "population_size": 5,
+    "strategies": [
+      "e1_radical_exploration",
+      "e2_backbone_exploration",
+      "e3_hybrid_recombination",
+      "m1_component_replacement",
+      "m2_parameter_schedule_mutation",
+      "m3_simplify_generalize",
+      "m4_contract_repair",
+      "m5_intensify_search",
+      "m6_diversify_search"
+    ],
+    "verbal_gradients": {
+      "enabled": true,
+      "llm_every_n_generations": 2,
+      "llm_model": "deepseek-v4-flash",
+      "max_llm_calls_per_generation": 2,
+      "temperature": 0.3
+    }
+  },
+  "llm": {
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "temperature": 0.7
+  },
+  "name": "tsp_calls_20",
+  "output_dir": "runs/tsp",
+  "problem": {
+    "aocc_lower_bound": 1e-08,
+    "aocc_upper_bound": 100.0,
+    "bounds": [
+      -5.0,
+      5.0
+    ],
+    "comparison_baselines": [
+      "random_search",
+      "differential_evolution"
+    ],
+    "dimension": 5,
+    "dvrp_search_limit": 8,
+    "dvrp_test_limit_per_size": 64,
+    "dvrp_test_sizes": [
+      10,
+      20,
+      50,
+      100,
+      200
+    ],
+    "function_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "search_instances": [
+      1,
+      2,
+      3
+    ],
+    "test_dimensions": [
+      5
+    ],
+    "test_instances": [
+      1,
+      2,
+      3
+    ],
+    "type": "tsp",
+    "vrp_search_limit": 8,
+    "vrp_test_limit_per_size": 64,
+    "vrp_test_sizes": [
+      10,
+      20,
+      50,
+      100,
+      200
+    ]
+  },
+  "seed": 100
+}

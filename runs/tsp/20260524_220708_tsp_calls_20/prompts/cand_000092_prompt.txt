@@ -1,0 +1,215 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000078 LLM reflection:
+- Summary: Candidate matched the best parent's tour length (17.58) on n=500, but did not improve; diversity mechanisms are similar across successful variants.
+- Aim: Improve solution quality by accelerating convergence or enabling escape from local optima, e.g., by increasing diversification intensity or adjusting acceptance criteria to accept more promising worse solutions early.
+- Preserve: regret construction with random tie-breaking; first-improvement 2-opt with delta updates; immediate best-tour reporting; segment removal + regret reinsertion diversification; simulated annealing acceptance
+- Change: reduce stagnation thresholds to trigger diversification sooner; add occasional random swap moves for broader neighborhood exploration
+- Avoid: removing regret construction; unnecessary complexity that wastes budget; always accepting worse solutions
+
+Distance is the search objective for TSP; lower distance is better.
+
+PARENTS:
+Candidate cand_000078: regret_diversify_2opt_hybrid
+
+Status: valid; distance: 17.5833
+
+Thought: Regret-based construction with random tie-breaking for initial tour. First-improvement 2-opt with delta updates. Stagnation detection based on passes without improvement (threshold: max(10, n//5) passes) triggers diversification: with 50% probability, remove a random segment (size n/4 to n/2) and regret-insert; else perform a random 2-opt move. Acceptance: always accept if new best, else accept if better than current or with simulated annealing probability. If stagnation persists for 2*threshold passes, full restart from new regret construction. Reports best tour immediately. Simplified acceptance and increased stall threshold for efficiency.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 3:
+        tour = np.arange(n, dtype=np.int64)
+        np.random.default_rng(seed).shuffle(tour)
+        return tour
+    rng = np.random.default_rng(seed)
+    dist = distance_matrix
+
+    def regret_construction(start):
+        tour = [start]
+        unvisited = set(range(n)) - {start}
+        while unvisited:
+            best_data = {}
+            for city in unvisited:
+                best_cost = np.inf
+                second_best = np.inf
+                best_pos = -1
+                m = len(tour)
+                for i in range(m):
+                    prev = tour[i]
+                    nxt = tour[(i+1) % m]
+                    inc = dist[prev, city] + dist[city, nxt] - dist[prev, nxt]
+                    if inc < best_cost:
+                        second_best = best_cost
+                        best_cost = inc
+                        best_pos = i+1
+                    elif inc < second_best:
+                        second_best = inc
+                regret = second_best - best_cost if second_best != np.inf else best_cost
+                best_data[city] = (regret, best_cost, best_pos)
+            max_regret = max(v[0] for v in best_data.values())
+            candidates = [c for c, v in best_data.items() if v[0] == max_regret]
+            chosen = candidates[rng.integers(len(candidates))]
+            pos = best_data[chosen][2]
+            tour.insert(pos, chosen)
+            unvisited.remove(chosen)
+        return np.array(tour, dtype=np.int64)
+
+    start = rng.integers(n)
+    tour = regret_construction(start)
+    best_tour = tour.copy()
+    best_dist = 0.0
+    for i in range(n):
+        best_dist += dist[tour[i], tour[(i+1)%n]]
+    report_best_tour(best_tour)
+    cur_tour = tour.copy()
+    cur_dist = best_dist
+    ops = 0
+    no_improve_passes = 0
+    stall_passes = max(10, n // 5)
+    max_stall_passes = 2 * stall_passes
+
+    while ops < budget:
+        improved = False
+        for i in range(n-1):
+            if ops >= budget:
+                break
+            for j in range(i+2, n):
+                if ops >= budget:
+                    break
+                ops += 1
+                a, b = cur_tour[i], cur_tour[(i+1)%n]
+                c, d = cur_tour[j], cur_tour[(j+1)%n]
+                old = dist[a,b] + dist[c,d]
+                new = dist[a,c] + dist[b,d]
+                if new < old - 1e-12:
+                    cur_tour[i+1:j+1] = cur_tour[i+1:j+1][::-1]
+                    cur_dist += new - old
+                    if cur_dist < best_dist:
+                        best_dist = cur_dist
+                        best_tour = cur_tour.copy()
+                        report_best_tour(best_tour)
+                    improved = True
+                    no_improve_passes = 0
+                    break
+            if improved:
+                break
+        if ops >= budget:
+            break
+        if not improved:
+            no_improve_passes += 1
+            if no_improve_passes >= stall_passes:
+                if ops >= budget:
+                    break
+                # Diversification
+                if rng.random() < 0.5:
+                    # Segment removal + regret reinsertion
+                    L = rng.integers(n//4, n//2 + 1)
+                    start_idx = rng.integers(0, n - L + 1)
+                    segment = set(cur_tour[start_idx:start_idx+L])
+                    base = [c for c in cur_tour if c not in segment]
+                    for city in segment:
+                        best_cost = np.inf
+                        best_pos = -1
+                        m = len(base)
+                        for i in range(m):
+                            prev = base[i]
+                            nxt = base[(i+1)%m]
+                            inc = dist[prev, city] + dist[city, nxt] - dist[prev, nxt]
+                            if inc < best_cost:
+                                best_cost = inc
+                                best_pos = i+1
+                        base.insert(best_pos, city)
+                    new_tour = np.array(base, dtype=np.int64)
+                    new_dist = 0.0
+                    for k in range(n):
+                        new_dist += dist[new_tour[k], new_tour[(k+1)%n]]
+                else:
+                    # Random 2-opt move
+                    i = rng.integers(0, n-1)
+                    j = rng.integers(i+2, n)
+                    new_tour = cur_tour.copy()
+                    new_tour[i+1:j+1] = new_tour[i+1:j+1][::-1]
+                    # delta update
+                    a, b = cur_tour[i], cur_tour[(i+1)%n]
+                    c, d = cur_tour[j], cur_tour[(j+1)%n]
+                    old = dist[a,b] + dist[c,d]
+                    new = dist[a,c] + dist[b,d]
+                    new_dist = cur_dist + new - old
+                ops += 1  # count perturbation
+                if new_dist < best_dist:
+                    best_dist = new_dist
+                    best_tour = new_tour.copy()
+                    report_best_tour(best_tour)
+                # Acceptance
+                if new_dist <= cur_dist:
+                    cur_tour = new_tour
+                    cur_dist = new_dist
+                else:
+                    accept_prob = np.exp(-(new_dist - cur_dist) / max(1e-6, best_dist * 0.1))
+                    if rng.random() < accept_prob:
+                        cur_tour = new_tour
+                        cur_dist = new_dist
+                no_improve_passes = 0
+            if no_improve_passes >= max_stall_passes:
+                if ops >= budget:
+                    break
+                new_start = rng.integers(n)
+                cur_tour = regret_construction(new_start)
+                cur_dist = 0.0
+                for i in range(n):
+                    cur_dist += dist[cur_tour[i], cur_tour[(i+1)%n]]
+                if cur_dist < best_dist:
+                    best_dist = cur_dist
+                    best_tour = cur_tour.copy()
+                    report_best_tour(best_tour)
+                no_improve_passes = 0
+    return best_tour
+
+```
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

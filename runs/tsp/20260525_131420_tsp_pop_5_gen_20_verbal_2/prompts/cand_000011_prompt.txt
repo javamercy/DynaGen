@@ -1,0 +1,157 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000007: regret_2opt_search
+
+Status: valid; distance: 17.7911
+
+Thought: Construct initial tour using regret-insertion heuristic with tie-breaking by smaller best insertion cost. Then refine with 2-opt local search until budget runs out or no improvement. Each 2-opt move is a single step. Reports best tour found at construction and after each improvement.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = list(range(n))
+        report_best_tour(tour)
+        return np.array(tour)
+    rng = np.random.RandomState(seed)
+    if budget < n:
+        tour = list(range(n))
+        rng.shuffle(tour)
+        report_best_tour(tour)
+        return np.array(tour)
+    # Construction: regret-insertion
+    start = rng.randint(n)
+    dists = distance_matrix[start]
+    second = np.argmin(dists)
+    if second == start:
+        second = (start + 1) % n
+    tour = [start, second]
+    remaining = set(range(n)) - {start, second}
+    # Regret insertion (no budget limit here, we'll account after)
+    while remaining:
+        best_regret = -1
+        best_city = None
+        best_pos = None
+        best_cost = None
+        for city in remaining:
+            costs = []
+            cur_len = len(tour)
+            for p in range(cur_len + 1):
+                left = tour[p-1] if p > 0 else tour[-1]
+                right = tour[p] if p < cur_len else tour[0]
+                cost = (distance_matrix[left, city] + distance_matrix[city, right] -
+                        distance_matrix[left, right])
+                costs.append(cost)
+            sorted_costs = sorted(costs)
+            best = sorted_costs[0]
+            second_best = sorted_costs[1] if len(sorted_costs) > 1 else best
+            regret = second_best - best
+            if regret > best_regret or (regret == best_regret and best < best_cost):
+                best_regret = regret
+                best_city = city
+                best_pos = costs.index(best)
+                best_cost = best
+        tour = tour[:best_pos] + [best_city] + tour[best_pos:]
+        remaining.remove(best_city)
+    # Report initial tour
+    report_best_tour(tour)
+    best_tour = tour[:]
+    best_dist = distance_matrix[tour[-1], tour[0]]
+    for i in range(len(tour)-1):
+        best_dist += distance_matrix[tour[i], tour[i+1]]
+    current_tour = tour[:]
+    current_dist = best_dist
+    # Improvement: 2-opt with remaining budget
+    steps_construction = n - 2  # number of insertions performed
+    remaining_steps = budget - steps_construction
+    if remaining_steps < 0:
+        remaining_steps = 0
+    improved = True
+    while remaining_steps > 0 and improved:
+        improved = False
+        n_tour = len(current_tour)
+        # Generate list of all valid 2-opt pairs (i, j) with i < j-1
+        pairs = []
+        for i in range(n_tour):
+            for j in range(i+2, n_tour):  # ensure segment length >= 2
+                pairs.append((i, j))
+        rng.shuffle(pairs)
+        for i, j in pairs:
+            if remaining_steps <= 0:
+                break
+            remaining_steps -= 1
+            a = current_tour[i]
+            b = current_tour[(i+1) % n_tour]
+            c = current_tour[j]
+            d = current_tour[(j+1) % n_tour]
+            # delta = new edges - old edges
+            delta = (distance_matrix[a, c] + distance_matrix[b, d]) - (distance_matrix[a, b] + distance_matrix[c, d])
+            if delta < 0:
+                # Apply 2-opt move
+                current_tour = current_tour[:i+1] + current_tour[i+1:j+1][::-1] + current_tour[j+1:]
+                current_dist += delta
+                improved = True
+                if current_dist < best_dist:
+                    best_dist = current_dist
+                    best_tour = current_tour[:]
+                    report_best_tour(best_tour)
+                break  # restart shuffle after each improvement to avoid edge interactions
+    # Return best tour found
+    return np.array(best_tour)
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000007 LLM reflection:
+- Summary: Regret-insertion construction plus 2-opt local search achieved minimal improvement over parent, but remains prone to local optima without a restart mechanism.
+- Aim: Add a diversification trigger that applies a random perturbation (e.g., double-bridge move) to the current tour when a full 2-opt pass yields no improvement, then continue local search with remaining budget.
+- Preserve: regret-insertion construction with tie-breaking; 2-opt neighborhood exploration with shuffled pairs; budget step counting per insertion and 2-opt evaluation; report_best_tour on improvement and initial tour
+- Change: In the 2-opt loop, if a full pass completes with no improvement and remaining_steps > 0, apply a random double-bridge perturbation to current_tour and reset improved = True to continue.; Optionally reduce the number of pairs per pass to limit step cost of non-improving passes.
+- Avoid: invalid tour creation via perturbation; excessive step consumption on non-improving phases; removing the budget step counting discipline; introducing complex or poorly calibrated hyperparameters
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

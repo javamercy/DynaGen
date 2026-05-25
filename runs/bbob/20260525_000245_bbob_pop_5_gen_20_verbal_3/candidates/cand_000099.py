@@ -1,0 +1,139 @@
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        np.random.seed(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        n = self.dim
+        budget = self.budget
+
+        # Initial feasible point
+        mean = np.random.uniform(lb, ub, n)
+        best_x = mean.copy()
+        best_val = func(best_x)
+        calls = 1
+        report_best(best_val, best_x)
+
+        if budget < 4:
+            for _ in range(budget - calls):
+                x = np.random.uniform(lb, ub, n)
+                val = func(x)
+                calls += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = x
+                    report_best(best_val, best_x)
+            return best_val, best_x
+
+        # Initial population size (max possible)
+        lambda_max = min(budget - calls, 4 + int(3 * np.log(n)))
+        lambda_max = max(2, lambda_max)
+
+        sigma = 0.2 * np.mean(ub - lb)
+        C = np.eye(n)
+        pc = np.zeros(n)
+        ps = np.zeros(n)
+
+        # Stagnation tracking for moderate restart
+        best_val_at_restart = best_val
+        stall_count = 0
+        stall_limit = max(1, int(budget / (3 * lambda_max)))
+        min_rel_improvement = 1e-8
+
+        while calls < budget:
+            lambda_actual = min(lambda_max, budget - calls)
+            if lambda_actual < 1:
+                break
+
+            mu = lambda_actual // 2 if lambda_actual >= 2 else 1
+            if mu < 1:
+                mu = 1
+            w = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+            w = w / w.sum()
+            mu_eff = 1 / np.sum(w ** 2)
+
+            c_s = (mu_eff + 2) / (n + mu_eff + 5)
+            d_s = 1 + 2 * max(0, np.sqrt((mu_eff - 1) / (n + 1)) - 1) + c_s
+            c_c = (4 + mu_eff / n) / (n + 4 + 2 * mu_eff / n)
+            c_1 = 2 / ((n + 1.3) ** 2 + mu_eff)
+            c_mu = min(1 - c_1, 2 * (mu_eff - 2 + 1 / mu_eff) / ((n + 2) ** 2 + mu_eff))
+            if mu == 1:
+                c_mu = 0.0
+
+            try:
+                samples = np.random.multivariate_normal(mean, sigma ** 2 * C, size=lambda_actual)
+            except:
+                samples = mean + sigma * np.random.randn(lambda_actual, n) * np.sqrt(np.diag(C))
+            samples = np.clip(samples, lb, ub)
+
+            vals = np.array([func(s) for s in samples])
+            calls += lambda_actual
+
+            idx = np.argsort(vals)
+            vals_sorted = vals[idx]
+            samples_sorted = samples[idx]
+
+            if vals_sorted[0] < best_val:
+                best_val = vals_sorted[0]
+                best_x = samples_sorted[0]
+                report_best(best_val, best_x)
+
+            # Check for relative stagnation
+            rel_improvement = (best_val_at_restart - best_val) / (abs(best_val_at_restart) + 1e-12)
+            if rel_improvement > min_rel_improvement:
+                best_val_at_restart = best_val
+                stall_count = 0
+            else:
+                stall_count += 1
+
+            old_mean = mean.copy()
+            mean = np.dot(w, samples_sorted[:mu])
+
+            try:
+                eigvals, eigvecs = np.linalg.eigh(C)
+                eigvals = np.maximum(eigvals, 1e-20)
+                invsqrtC = np.dot(eigvecs, np.dot(np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T))
+            except:
+                invsqrtC = np.eye(n)
+
+            ps = (1 - c_s) * ps + np.sqrt(c_s * (2 - c_s) * mu_eff) * np.dot(invsqrtC, (mean - old_mean) / sigma)
+            norm_ps = np.linalg.norm(ps)
+            expected_norm = np.sqrt(n) * (1 - 1/(4*n) + 1/(21*n**2))
+            sigma = sigma * np.exp((c_s / d_s) * (norm_ps / expected_norm - 1))
+            sigma = max(sigma, 1e-12 * np.mean(ub - lb))
+
+            pc = (1 - c_c) * pc + np.sqrt(c_c * (2 - c_c) * mu_eff) * (mean - old_mean) / sigma
+
+            diffs = (samples_sorted[:mu] - old_mean) / sigma
+            C_mu = np.zeros((n, n))
+            for i in range(mu):
+                C_mu += w[i] * np.outer(diffs[i], diffs[i])
+            C = (1 - c_1 - c_mu) * C + c_1 * np.outer(pc, pc) + c_mu * C_mu
+            C = (C + C.T) / 2
+            eigvals = np.linalg.eigvalsh(C)
+            if np.min(eigvals) < 1e-12:
+                C += (1e-12 - np.min(eigvals)) * np.eye(n)
+
+            # Moderate restart: only on stagnation (relative improvement)
+            restart = False
+            if stall_count >= stall_limit:
+                restart = True
+
+            if restart and calls < budget:
+                sigma = 0.8 * np.mean(ub - lb) * (1 - calls / budget)
+                sigma = max(sigma, 0.2 * np.mean(ub - lb))
+                mean = np.random.uniform(lb, ub, n)
+                C = np.eye(n)
+                pc = np.zeros(n)
+                ps = np.zeros(n)
+                best_val_at_restart = best_val
+                stall_count = 0
+                stall_limit = max(1, int(budget / (3 * lambda_max)))
+
+        return best_val, best_x

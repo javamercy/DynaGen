@@ -1,0 +1,273 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000065: cma_es_with_local_refinement
+Status: valid; mean AOCC score: 0.568003 (higher is better)
+Thought: CMA-ES with rank-one/rank-mu update, cumulative step size adaptation, aggressive restart, and local refinement phase. Initializes at random feasible point. Population size adapts to remaining budget. Restart triggers on stagnation (no improvement, low fitness diversity, or small sigma). When no improvement persists, performs a few local perturbations around the current best with step size decaying over budget. All points clipped to bounds. Seed controls all randomness.
+Mean AOCC: 0.568003363812175
+Mean final error: 0.7568447821290969
+AOCC by group: {'high_conditioning_unimodal': 0.7902784717396444, 'low_moderate_conditioning': 0.8190394163236748, 'multimodal_strong_global_structure': 0.3480966773624215, 'multimodal_weak_global_structure': 0.3238652245949188, 'separable': 0.6089442395425152}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        np.random.seed(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        n = self.dim
+        budget = self.budget
+
+        # Initial feasible point
+        mean = np.random.uniform(lb, ub, n)
+        best_x = mean.copy()
+        best_val = func(best_x)
+        calls = 1
+        report_best(best_val, best_x)
+
+        if budget < 4:
+            for _ in range(budget - calls):
+                x = np.random.uniform(lb, ub, n)
+                val = func(x)
+                calls += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = x
+                    report_best(best_val, best_x)
+            return best_val, best_x
+
+        # CMA-ES parameters
+        lambda_ = min(budget - calls, 4 + int(3 * np.log(n)))
+        lambda_ = max(2, lambda_)
+        mu = lambda_ // 2
+        if mu < 1:
+            mu = 1
+        w = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+        w = w / w.sum()
+        mu_eff = 1 / np.sum(w ** 2)
+
+        c_s = (mu_eff + 2) / (n + mu_eff + 5)
+        d_s = 1 + 2 * max(0, np.sqrt((mu_eff - 1) / (n + 1)) - 1) + c_s
+        c_c = (4 + mu_eff / n) / (n + 4 + 2 * mu_eff / n)
+        c_1 = 2 / ((n + 1.3) ** 2 + mu_eff)
+        c_mu = min(1 - c_1, 2 * (mu_eff - 2 + 1 / mu_eff) / ((n + 2) ** 2 + mu_eff))
+        if mu == 1:
+            c_mu = 0.0
+
+        sigma = 0.2 * np.mean(ub - lb)
+        C = np.eye(n)
+        pc = np.zeros(n)
+        ps = np.zeros(n)
+
+        no_improve_iter = 0
+        max_no_improve = max(2, int(budget / (lambda_ * 3)))
+        local_refine_counter = 0
+        local_refine_threshold = max(3, int(budget / (2 * lambda_)))
+
+        while calls < budget:
+            if calls + lambda_ > budget:
+                lambda_actual = budget - calls
+            else:
+                lambda_actual = lambda_
+            if lambda_actual < 1:
+                break
+
+            # Local refinement phase
+            if no_improve_iter >= local_refine_threshold and local_refine_counter < 2:
+                # Perform a few local perturbations around best_x
+                local_evals = min(3, budget - calls)
+                for _ in range(local_evals):
+                    step_size = sigma * 0.1 * (1 - calls / budget)
+                    x = best_x + step_size * np.random.randn(n)
+                    x = np.clip(x, lb, ub)
+                    val = func(x)
+                    calls += 1
+                    if val < best_val:
+                        best_val = val
+                        best_x = x
+                        report_best(best_val, best_x)
+                        no_improve_iter = 0
+                        break
+                local_refine_counter += 1
+                if calls >= budget:
+                    break
+                # Reset sigma for CMA-ES
+                sigma = 0.2 * np.mean(ub - lb) * (1 - calls / budget)
+                # Reset distribution mean to best_x
+                mean = best_x.copy()
+                C = np.eye(n)
+                pc = np.zeros(n)
+                ps = np.zeros(n)
+                continue
+
+            # Generate offspring
+            try:
+                samples = np.random.multivariate_normal(mean, sigma ** 2 * C, size=lambda_actual)
+            except:
+                samples = mean + sigma * np.random.randn(lambda_actual, n) * np.sqrt(np.diag(C))
+            samples = np.clip(samples, lb, ub)
+
+            vals = np.array([func(s) for s in samples])
+            calls += lambda_actual
+
+            idx = np.argsort(vals)
+            vals_sorted = vals[idx]
+            samples_sorted = samples[idx]
+
+            if vals_sorted[0] < best_val:
+                best_val = vals_sorted[0]
+                best_x = samples_sorted[0]
+                report_best(best_val, best_x)
+                no_improve_iter = 0
+            else:
+                no_improve_iter += 1
+
+            old_mean = mean.copy()
+            mean = np.dot(w, samples_sorted[:mu])
+
+            try:
+                eigvals, eigvecs = np.linalg.eigh(C)
+                eigvals = np.maximum(eigvals, 1e-20)
+                invsqrtC = np.dot(eigvecs, np.dot(np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T))
+            except:
+                invsqrtC = np.eye(n)
+
+            ps = (1 - c_s) * ps + np.sqrt(c_s * (2 - c_s) * mu_eff) * np.dot(invsqrtC, (mean - old_mean) / sigma)
+            norm_ps = np.linalg.norm(ps)
+            expected_norm = np.sqrt(n) * (1 - 1/(4*n) + 1/(21*n**2))
+            sigma = sigma * np.exp((c_s / d_s) * (norm_ps / expected_norm - 1))
+
+            pc = (1 - c_c) * pc + np.sqrt(c_c * (2 - c_c) * mu_eff) * (mean - old_mean) / sigma
+
+            diffs = (samples_sorted[:mu] - old_mean) / sigma
+            C_mu = np.zeros((n, n))
+            for i in range(mu):
+                C_mu += w[i] * np.outer(diffs[i], diffs[i])
+            C = (1 - c_1 - c_mu) * C + c_1 * np.outer(pc, pc) + c_mu * C_mu
+            C = (C + C.T) / 2
+
+            # Restart conditions
+            restart = False
+            if lambda_actual > 1:
+                distances = np.linalg.norm(samples - old_mean, axis=1)
+                avg_dist = np.mean(distances)
+                if avg_dist < 1e-6 * np.mean(ub - lb):
+                    restart = True
+            if sigma < 1e-12 * np.mean(ub - lb):
+                restart = True
+            # Fitness diversity: range of top half fitness
+            top_vals = vals_sorted[:mu]
+            if np.max(top_vals) - np.min(top_vals) < 1e-12 * (np.max(np.abs(top_vals)) + 1e-12):
+                restart = True
+            if no_improve_iter >= max_no_improve:
+                restart = True
+
+            if restart and calls < budget:
+                sigma = 0.5 * np.mean(ub - lb) * (1 - calls / budget)
+                mean = best_x + sigma * np.random.randn(n)
+                mean = np.clip(mean, lb, ub)
+                C = np.eye(n)
+                pc = np.zeros(n)
+                ps = np.zeros(n)
+                no_improve_iter = 0
+                local_refine_counter = 0
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000065 LLM reflection:
+- Summary: Added local refinement and fitness diversity restart improved mean AOCC from 0.551 to 0.568, driven by gains on low_moderate_conditioning group, but multimodal weak global structure slightly declined.
+- Aim: Enhance multimodal diversification without harming low_moderate_conditioning gains by making local refinement phase conditional on function landscape or using a more global restart when stuck.
+- Preserve: Local refinement phase for low_moderate_conditioning functions; Fitness diversity restart condition; Budget-aware population sizing; Cumulative step-size adaptation
+- Change: Replace local perturbations with a diversity-oriented restart (larger sigma, wider sampling) for multimodal functions; Adjust fitness diversity restart threshold to reduce false triggers
+- Avoid: Removing core CMA-ES update; Increasing lambda_ prematurely; Adding complex tuning that overfits to specific functions
+
+Parent cand_000029 LLM reflection:
+- Summary: Candidate with restarts and stagnation detection uses only 1490 avg evaluations vs 10000 budget, causing AOCC drop from parent's 0.487 to 0.294.
+- Aim: Improve budget utilization and final AOCC by relaxing restart triggers to avoid premature termination before sufficient budget is spent.
+- Preserve: restart mechanism with population increase; rank-one covariance update; cumulative step-size adaptation; bounded sampling
+- Change: Raise sigma lower bound to 1e-6 * range instead of 1e-8 to prevent premature restart from tiny step-size; Increase stagnation_limit from max(10,n) to max(50, 2*n) to allow more iterations without improvement
+- Avoid: removing restart logic entirely; altering core CMA-ES parameter updates; adding unnecessary complexity like extra adaptive components
+
+Parent cand_000040 LLM reflection:
+- Summary: CMA-ES with restart averages 0.551 AOCC but underperforms on multimodal weak-structure and separable functions.
+- Aim: Improve mean AOCC by enhancing multimodal escape and separable function refinement without increasing budget waste.
+- Preserve: Cumulative step-size adaptation; Rank-one and rank-mu covariance update; Boundary clipping and random initial feasible point
+- Change: Add a local refinement phase when no improvement persists, using a small number of evaluations for gradient-free step; Modify restart trigger to detect stagnation on multimodal functions earlier, e.g., using fitness diversity measure
+- Avoid: Overcomplicating the core CMA-ES update; Removing budget-aware population sizing; Introducing numerically unstable operations or extra evaluations without clear benefit
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

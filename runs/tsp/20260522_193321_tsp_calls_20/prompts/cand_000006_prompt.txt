@@ -1,0 +1,390 @@
+[system]
+You generate executable, reliable full TSP solvers for evolutionary search.
+
+[user]
+STRATEGY S3: Recombine: build one coherent solver from complementary parent strengths.
+Do not concatenate parents or run them sequentially. Resolve conflicts and keep the child simpler than the sum.
+
+Distance is the search objective for TSP; lower distance is better.
+
+PARENT AWARENESS:
+- Treat selected parents as evaluated evidence, not templates to copy blindly.
+- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.
+- Best available parent by current scalar score: cand_000002 (distance=863.445, status=valid, generation=0, strategy=initial:2).
+- Strategy-aware parent use for S3: assign each parent a role such as backbone, complementary mechanism, specialist, or cautionary example; produce one coherent child rather than a sequential ensemble.
+PARENT SNAPSHOT:
+- cand_000003; gen=0; strategy=initial:3; status=valid; distance=3804.15; relative_score=delta=2940.71; metrics=timeout_fraction=0.0, mean_tour_length=3804.15346793081
+- cand_000001; gen=0; strategy=initial:1; status=valid; distance=879.056; relative_score=delta=15.6109; metrics=timeout_fraction=0.0, mean_tour_length=879.0555270155461
+- cand_000002; gen=0; strategy=initial:2; status=valid; distance=863.445; relative_score=best; metrics=timeout_fraction=0.0, mean_tour_length=863.4445898032445
+
+PARENTS:
+Candidate cand_000003: ILS_simple
+Status: valid; distance: 3804.15
+Thought: Iterated Local Search with 2-opt improvement and double-bridge perturbation. Uses random initial tour, runs improvement until no gain or budget exhausted, then perturbs. Keeps best tour. Budget counts distance evaluations. Seed for reproducibility.
+Code:
+```python
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n, dtype=int)
+        # report initial tour
+        report_best_tour(tour)
+        return tour
+
+    rng = random.Random(seed)
+    # initial random tour
+    tour = list(range(n))
+    rng.shuffle(tour)
+    tour = np.array(tour, dtype=int)
+
+    def tour_distance(t):
+        d = 0.0
+        for i in range(n-1):
+            d += distance_matrix[t[i], t[i+1]]
+        d += distance_matrix[t[-1], t[0]]
+        return d
+
+    best_tour = tour.copy()
+    best_dist = tour_distance(tour)
+    report_best_tour(tour)
+
+    # local improvement: 2-opt
+    def improve(t):
+        nonlocal budget, best_tour, best_dist
+        improved = True
+        while improved and budget > 0:
+            improved = False
+            for i in range(n-2):
+                if budget <= 0:
+                    break
+                for j in range(i+2, n-1):
+                    if budget <= 0:
+                        break
+                    # reverse segment [i+1, j]
+                    new_t = t.copy()
+                    new_t[i+1:j+1] = t[i+1:j+1][::-1]
+                    new_d = tour_distance(new_t)
+                    budget -= 1
+                    if new_d < best_dist:
+                        best_tour = new_t.copy()
+                        best_dist = new_d
+                        t = new_t
+                        improved = True
+                        report_best_tour(best_tour)
+                        break
+                if improved:
+                    break
+        return t
+
+    # perturbation: double-bridge
+    def perturb(t):
+        a = rng.randint(1, n//3)
+        b = rng.randint(a+1, 2*n//3)
+        c = rng.randint(b+1, n-1)
+        seg1 = t[:a]
+        seg2 = t[a:b]
+        seg3 = t[b:c]
+        seg4 = t[c:]
+        return np.concatenate([seg1, seg3, seg2, seg4])
+
+    # main ILS loop
+    while budget > 0:
+        tour = improve(tour)
+        if budget <= 0:
+            break
+        tour = perturb(tour)
+        # budget not consumed by perturbation itself
+
+    return best_tour
+```
+
+Candidate cand_000001: size_adaptive_candidate_ls
+Status: valid; distance: 879.056
+Thought: Greedy nearest neighbor initial tour, then first-improvement local search with 2-opt and relocation using static candidate lists. For n>=80, candidates limited to 20 nearest neighbors. Budget caps total move evaluations (delta calculations). Uses seed for reproducibility. Calls report_best_tour initially and on improvements.
+Code:
+```python
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n, dtype=np.int32)
+        if n == 2:
+            report_best_tour(tour)
+        return tour
+    rng = random.Random(seed)
+    # Candidate list: for each node, sorted indices by distance (excluding self)
+    candidate_size = 30 if n < 80 else 20
+    candidates = []
+    for i in range(n):
+        dists = distance_matrix[i]
+        # Exclude self (distance 0), argsort gives ascending order
+        order = np.argsort(dists)
+        order = order[order != i]  # remove self
+        if len(order) > candidate_size:
+            order = order[:candidate_size]
+        candidates.append(list(order))
+    
+    # Greedy nearest neighbor with random start
+    def greedy_tour():
+        start = rng.randint(0, n-1)
+        visited = set([start])
+        tour = [start]
+        current = start
+        while len(visited) < n:
+            # Find nearest unvisited neighbor
+            dists = distance_matrix[current]
+            best = None
+            best_dist = float('inf')
+            for j in range(n):
+                if j not in visited and dists[j] < best_dist:
+                    best = j
+                    best_dist = dists[j]
+            visited.add(best)
+            tour.append(best)
+            current = best
+        return np.array(tour, dtype=np.int32)
+    
+    tour = greedy_tour()
+    report_best_tour(tour)
+    
+    # Helper functions
+    def get_pos(tour):
+        pos = np.empty(n, dtype=np.int32)
+        for idx, node in enumerate(tour):
+            pos[node] = idx
+        return pos
+    
+    def tour_length(tour):
+        total = 0
+        for i in range(n):
+            total += distance_matrix[tour[i]][tour[(i+1)%n]]
+        return total
+    
+    current_dist = tour_length(tour)
+    pos = get_pos(tour)
+    
+    # Precompute all 2-opt candidate pairs (i, j) where j > i and candidate of tour[i]
+    def generate_2opt_pairs(tour, pos):
+        pairs = []
+        for i in range(n):
+            node = tour[i]
+            for cand in candidates[node]:
+                j = pos[cand]
+                if j <= i:
+                    continue
+                # Avoid adjacent edges: i+1 should not be j, and j+1 should not be i (mod n)
+                if (i+1)%n == j or (j+1)%n == i:
+                    continue
+                pairs.append((i, j))
+        return pairs
+    
+    # Generate relocation pairs (u, v) where v is candidate of u and v != u, and moving u after v is non-trivial
+    def generate_reloc_pairs(tour, pos):
+        pairs = []
+        for u in range(n):
+            i = pos[u]
+            for v in candidates[u]:
+                if v == u:
+                    continue
+                k = pos[v]
+                # Cannot move to same position or adjacent (mod n) to avoid degenerate
+                # Actually moving to after v is fine even if adjacent, but we skip if k==i or (k+1)%n == i?
+                # We'll allow all, the delta calculation handles
+                pairs.append((u, v))
+        return pairs
+    
+    evals = 0
+    improved = True
+    while evals < budget and improved:
+        improved = False
+        # First 2-opt phase
+        pairs = generate_2opt_pairs(tour, pos)
+        rng.shuffle(pairs)
+        for (i, j) in pairs:
+            if evals >= budget:
+                break
+            a = tour[i]
+            b = tour[(i+1)%n]
+            c = tour[j]
+            d = tour[(j+1)%n]
+            old = distance_matrix[a][b] + distance_matrix[c][d]
+            new = distance_matrix[a][c] + distance_matrix[b][d]
+            delta = new - old
+            evals += 1
+            if delta < -1e-12:
+                # apply 2-opt
+                if i < j:
+                    tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                else: # wrap around: reverse from i+1 to end and from start to j
+                    segment = np.concatenate((tour[i+1:], tour[:j+1]))
+                    segment = segment[::-1]
+                    tour[i+1:] = segment[:n-i-1]
+                    tour[:j+1] = segment[n-i-1:]
+                pos = get_pos(tour)
+                current_dist += delta
+                report_best_tour(tour)
+                improved = True
+                break
+        if improved:
+            continue
+        # Relocation phase
+        pairs = generate_reloc_pairs(tour, pos)
+        rng.shuffle(pairs)
+        for (u, v) in pairs:
+            if evals >= budget:
+                break
+            i = pos[u]
+            k = pos[v]
+            if i == k:
+                continue
+            prev_u = tour[(i-1)%n]
+            next_u = tour[(i+1)%n]
+            prev_v = tour[k]
+            next_v = tour[(k+1)%n]
+            old_edges = distance_matrix[prev_u][u] + distance_matrix[u][next_u] + distance_matrix[prev_v][next_v]
+            new_edges = distance_matrix[prev_u][next_u] + distance_matrix[prev_v][u] + distance_matrix[u][next_v]
+            delta = new_edges - old_edges
+            evals += 1
+            if delta < -1e-12:
+                # apply relocation: remove u from its position and insert after v
+                # Build new tour list
+                new_tour = []
+                for idx in range(n):
+                    if idx == i:
+                        continue
+                    new_tour.append(tour[idx])
+                # Now insert u after v in new list; find new index of v
+                # Since removal shifted indices, we need to find where v is now
+                # Using the original indices, we can compute new index
+                # Simpler: construct full list manually
+                tour_list = tour.tolist()
+                # remove u
+                tour_list.remove(u)
+                # get index of v (since u removed, indices shifted)
+                idx_v = tour_list.index(v)
+                # insert u after v
+                tour_list.insert(idx_v+1, u)
+                tour = np.array(tour_list, dtype=np.int32)
+                pos = get_pos(tour)
+                current_dist += delta
+                report_best_tour(tour)
+                improved = True
+                break
+    return tour
+```
+
+Candidate cand_000002: regret_insertion_2opt
+Status: valid; distance: 863.445
+Thought: Construct tour using regret-2 insertion (maximizes difference between best and second-best insertion cost) from a random start. Then apply limited 2-opt improvement passed by budget (each 2-opt pass counts as one iteration). Use seed to initialize random. For n<=2 return trivial tour. Report initial and improved tours via report_best_tour.
+Code:
+```python
+import numpy as np, random, math, heapq, itertools, collections, time
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = list(range(n))
+        try:
+            report_best_tour(tour)
+        except:
+            pass
+        return np.array(tour)
+    random.seed(seed)
+    # Construction: regret-2 insertion
+    start = random.randrange(n)
+    tour = [start]
+    unvisited = set(range(n))
+    unvisited.remove(start)
+    while unvisited:
+        best_city = None
+        best_regret = -1
+        best_pos = None
+        best_cost = None
+        for city in unvisited:
+            min_cost = float('inf')
+            second_min = float('inf')
+            best_idx = -1
+            for idx in range(len(tour)):
+                if idx == len(tour)-1:
+                    cost = distance_matrix[tour[idx]][city] + distance_matrix[city][tour[0]] - distance_matrix[tour[idx]][tour[0]]
+                else:
+                    cost = distance_matrix[tour[idx]][city] + distance_matrix[city][tour[idx+1]] - distance_matrix[tour[idx]][tour[idx+1]]
+                if cost < min_cost:
+                    second_min = min_cost
+                    min_cost = cost
+                    best_idx = idx
+                elif cost < second_min:
+                    second_min = cost
+            regret = second_min - min_cost
+            if regret > best_regret:
+                best_regret = regret
+                best_city = city
+                best_pos = best_idx
+                best_cost = min_cost
+        tour.insert(best_pos+1, best_city)
+        unvisited.remove(best_city)
+    try:
+        report_best_tour(np.array(tour))
+    except:
+        pass
+    # Improvement: 2-opt with budget-limited iterations
+    max_iter = budget // 10
+    if max_iter > 1000:
+        max_iter = 1000
+    improvement = True
+    iteration = 0
+    while improvement and iteration < max_iter:
+        improvement = False
+        nc = len(tour)
+        for i in range(nc-1):
+            for j in range(i+2, nc):
+                if j - i == 1:
+                    continue
+                a = tour[i]
+                b = tour[(i+1)%nc]
+                c = tour[j]
+                d = tour[(j+1)%nc]
+                if distance_matrix[a][c] + distance_matrix[b][d] < distance_matrix[a][b] + distance_matrix[c][d]:
+                    tour[i+1:j+1] = reversed(tour[i+1:j+1])
+                    improvement = True
+                    try:
+                        report_best_tour(np.array(tour))
+                    except:
+                        pass
+        iteration += 1
+    return np.array(tour)
+```
+
+Implement exactly this interface:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Rules:
+- Distance is the search objective for TSP; lower distance is better.
+- Return a 1D tour with each node exactly once; do not repeat the start node.
+- Handle all n; for n <= 2 return the trivial valid tour.
+- Always return a valid tour, even with tiny budget.
+- Use only distance_matrix; do not assume coordinates or hard-code instances.
+- Use seed for randomness and budget as a hard cap on search effort.
+- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.
+
+Internal check before final JSON: correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the idea, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

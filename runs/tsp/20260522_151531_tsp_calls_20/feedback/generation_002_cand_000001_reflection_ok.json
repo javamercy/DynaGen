@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000001",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve the local search efficiency by replacing random edge selection with a more targeted 2-opt search or a structured neighborhood scan.",
+    "avoid": [
+      "Removing the budget constraint",
+      "Implementing O(n^3) search patterns that would cause timeouts on n=200"
+    ],
+    "candidate_id": "cand_000001",
+    "change": [
+      "Replace random 2-opt indices with a systematic scan of the candidate list",
+      "Optimize the relocation move to avoid full tour distance recalculation"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Greedy initial construction",
+      "Candidate list for scaling",
+      "Budget-bounded iteration loop",
+      "Valid permutation handling"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 897.016937503419,
+    "source": "llm",
+    "summary": "The candidate produces valid tours using a greedy start and budget-bounded 2-opt/relocation, but the random move selection is inefficient for large n.",
+    "version": 1
+  },
+  "model": "gemma4:31b-cloud",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation under a strict budget\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, budget use, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\nimport random\\nimport heapq\\n\\ndef report_best_tour(tour):\\n    # This is a placeholder for the internal tracking required by the prompt\\n    pass\\n\\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n <= 1:\\n        return np.arange(n)\\n    if n == 2:\\n        return np.array([0, 1])\\n\\n    random.seed(seed)\\n    np.random.seed(seed)\\n\\n    # 1. Initial Greedy Incumbent\\n    unvisited = set(range(1, n))\\n    tour = [0]\\n    curr = 0\\n    while unvisited:\\n        next_node = min(unvisited, key=lambda x: distance_matrix[curr, x])\\n        tour.append(next_node)\\n        unvisited.remove(next_node)\\n        curr = next_node\\n    \\n    tour = np.array(tour)\\n    report_best_tour(tour)\\n    \\n    def get_dist(t):\\n        d = 0\\n        for i in range(n - 1):\\n            d += distance_matrix[t[i], t[i+1]]\\n        d += distance_matrix[t[-1], t[0]]\\n        return d\\n\\n    best_dist = get_dist(tour)\\n    \\n    # 2. Candidate List Construction for scaling\\n    # For large n, we only consider the k nearest neighbors for each node\\n    k_neighbors = 20 if n >= 80 else n - 1\\n    candidates = []\\n    for i in range(n):\\n        dists = distance_matrix[i]\\n        # Get indices of k smallest distances\\n        idx = np.argsort(dists)[:k_neighbors + 1]\\n        candidates.append(set(idx))\\n\\n    # 3. Budget-bounded Local Search\\n    iterations = 0\\n    while iterations < budget:\\n        iterations += 1\\n        improved = False\\n        \\n        # Try 2-opt (edge swap)\\n        # To keep it fast, we pick a random edge and try swapping with its candidate neighbors\\n        i = random.randint(0, n - 2)\\n        j = random.randint(i + 1, n - 1)\\n        \\n        # Strict delta calculation for 2-opt: (i, i+1) and (j, j+1) -> (i, j) and (i+1, j+1)\\n        # Handle wrap-around for the last edge\\n        node_i = tour[i]\\n        node_ip1 = tour[(i + 1) % n]\\n        node_j = tour[j]\\n        node_jp1 = tour[(j + 1) % n]\\n        \\n        # Candidate check: only attempt if nodes are in each others' neighborhood or n is small\\n        if n < 80 or (node_i in candidates[node_j] or node_ip1 in candidates[node_jp1]):\\n            current_edges = distance_matrix[node_i, node_ip1] + distance_matrix[node_j, node_jp1]\\n            new_edges = distance_matrix[node_i, node_j] + distance_matrix[node_ip1, node_jp1]\\n            \\n            if new_edges < current_edges:\\n                # Perform 2-opt reverse\\n                tour[i+1 : j+1] = tour[i+1 : j+1][::-1]\\n                best_dist -= (current_edges - new_edges)\\n                report_best_tour(tour)\\n                improved = True\\n        \\n        if not improved:\\n            # Try Relocation move: move node i to position j\\n            i = random.randint(0, n - 1)\\n            j = random.randint(0, n - 1)\\n            if i == j: continue\\n            \\n            # Extract node\\n            node = tour[i]\\n            temp_tour = np.delete(tour, i)\\n            temp_tour = np.insert(temp_tour, j, node)\\n            \\n            new_d = get_dist(temp_tour)\\n            if new_d < best_dist:\\n                tour = temp_tour\\n                best_dist = new_d\\n                report_best_tour(tour)\\n                improved = True\\n\\n    return tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000001\",\"metrics\":{\"best_gap\":null,\"budget\":10000,\"distance\":897.016937503419,\"gap_by_instance_size\":{\"101\":null,\"201\":null,\"51\":null},\"gap_by_instance_source\":{\"synthetic:llamea:11:100\":null,\"synthetic:llamea:11:200\":null,\"synthetic:llamea:11:50\":null,\"synthetic:llamea:23:100\":null,\"synthetic:llamea:23:200\":null,\"synthetic:llamea:23:50\":null},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.4666168890010643,\"mean_tour_length\":897.016937503419,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":6,\"runtime_error_count\":0,\"score_by_instance_size\":{\"101\":850.1266372950374,\"201\":1206.9700427416692,\"51\":633.9541324735502},\"score_by_instance_source\":{\"synthetic:llamea:11:100\":839.052209929001,\"synthetic:llamea:11:200\":1251.2693551913799,\"synthetic:llamea:11:50\":628.5288076489019,\"synthetic:llamea:23:100\":861.2010646610737,\"synthetic:llamea:23:200\":1162.6707302919585,\"synthetic:llamea:23:50\":639.3794572981985},\"score_name\":\"distance\",\"scored_count\":0,\"seeds\":[100],\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"tour_length_by_instance_size\":{\"101\":850.1266372950374,\"201\":1206.9700427416692,\"51\":633.9541324735502},\"tour_length_by_instance_source\":{\"synthetic:llamea:11:100\":839.052209929001,\"synthetic:llamea:11:200\":1251.2693551913799,\"synthetic:llamea:11:50\":628.5288076489019,\"synthetic:llamea:23:100\":861.2010646610737,\"synthetic:llamea:23:200\":1162.6707302919585,\"synthetic:llamea:23:50\":639.3794572981985},\"unscored_timeout_count\":0,\"valid_count\":6,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":897.016937503419,\"status\":\"valid\",\"strategy\":\"initial:1\",\"thought\":\"Implements a greedy initial tour followed by budget-bounded local search. For n >= 80, it uses a restricted candidate list of nearest neighbors to avoid O(n^2) scanning per iteration. It employs 2-opt and node relocation moves, exiting on first improvement to maximize search throughput within the budget.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize TSP tour length while always returning a valid permutation under a strict budget\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "```json\n{\n  \"summary\": \"The candidate produces valid tours using a greedy start and budget-bounded 2-opt/relocation, but the random move selection is inefficient for large n.\",\n  \"aim\": \"Improve the local search efficiency by replacing random edge selection with a more targeted 2-opt search or a structured neighborhood scan.\",\n  \"preserve\": [\n    \"Greedy initial construction\",\n    \"Candidate list for scaling\",\n    \"Budget-bounded iteration loop\",\n    \"Valid permutation handling\"\n  ],\n  \"change\": [\n    \"Replace random 2-opt indices with a systematic scan of the candidate list\",\n    \"Optimize the relocation move to avoid full tour distance recalculation\"\n  ],\n  \"avoid\": [\n    \"Removing the budget constraint\",\n    \"Implementing O(n^3) search patterns that would cause timeouts on n=200\"\n  ]\n}\n```",
+  "status": "ok",
+  "type": "reflection"
+}

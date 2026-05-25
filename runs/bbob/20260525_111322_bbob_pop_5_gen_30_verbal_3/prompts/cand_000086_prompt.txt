@@ -1,0 +1,258 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000029: diversified_pattern_search
+Status: valid; mean AOCC score: 0.335483 (higher is better)
+Thought: Builds on Latin hypercube initialization and adaptive pattern search with covariance-guided random directions, but increases exploration via: larger initial step (0.2*range), an exploration probability (20%) of trying a uniformly random point, more random directions per iteration (min(3,dim)), and adding a purely random point to the restart set. These changes promote diverse search trajectories and help escape local optima.
+Mean AOCC: 0.33548342732861053
+Mean final error: 18.418927155629547
+AOCC by group: {'high_conditioning_unimodal': 0.19788969941945178, 'low_moderate_conditioning': 0.3973491679979932, 'multimodal_strong_global_structure': 0.15858375333022992, 'multimodal_weak_global_structure': 0.19168919098085704, 'separable': 0.7442784730483972}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        rng = self.rng
+        budget = self.budget
+
+        # Latin hypercube initialization
+        n_init = min(budget, max(2 * dim, 1))
+        best_x = None
+        best_f = np.inf
+        evals = 0
+        points = np.zeros((n_init, dim))
+        for i in range(dim):
+            perm = rng.permutation(n_init)
+            u = rng.rand(n_init)
+            points[:, i] = (perm + u) / n_init
+        points = lb + points * (ub - lb)
+        for i in range(n_init):
+            if evals >= budget:
+                break
+            x = points[i]
+            f = func(x)
+            evals += 1
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+
+        # Parameters
+        initial_step = 0.2 * np.mean(ub - lb)  # larger initial step
+        step = initial_step
+        # Coordinate directions
+        directions = []
+        for i in range(dim):
+            e = np.zeros(dim)
+            e[i] = 1.0
+            directions.append(e)
+            directions.append(-e)
+        # Covariance matrix for random directions
+        C = np.eye(dim)
+        decay = 0.1
+        success_steps = []
+        # Exploration probability
+        explore_prob = 0.2
+        # Random restart threshold
+        min_step = 1e-12 * initial_step
+
+        while evals < budget:
+            # Occasionally try a random point for exploration
+            if rng.rand() < explore_prob and evals < budget:
+                candidate = lb + rng.rand(dim) * (ub - lb)
+                f_val = func(candidate)
+                evals += 1
+                if f_val < best_f:
+                    best_f = f_val
+                    best_x = candidate.copy()
+                    report_best(best_f, best_x)
+                    # Record step for covariance
+                    s = candidate - best_x
+                    success_steps.append(s)
+                    if len(success_steps) > 2 * dim:
+                        success_steps.pop(0)
+                    C = (1 - decay) * C + decay * np.outer(s, s)
+                    step *= 1.2  # increase step after improvement
+                    continue
+
+            improved = False
+            # Poll coordinate directions
+            for d in directions:
+                if evals >= budget:
+                    break
+                candidate = best_x + step * d
+                candidate = np.clip(candidate, lb, ub)
+                f_val = func(candidate)
+                evals += 1
+                if f_val < best_f:
+                    best_f = f_val
+                    best_x = candidate.copy()
+                    improved = True
+                    report_best(best_f, best_x)
+                    s = step * d
+                    success_steps.append(s)
+                    if len(success_steps) > 2 * dim:
+                        success_steps.pop(0)
+                    C = (1 - decay) * C + decay * np.outer(s, s)
+                    break
+            if improved:
+                step *= 1.2
+                continue
+            # If no improvement from coordinates, try random directions from covariance
+            n_rand = min(3, dim)  # increased number of random directions
+            if len(success_steps) > 0:
+                C_reg = C + 1e-12 * np.eye(dim)
+                try:
+                    L = np.linalg.cholesky(C_reg)
+                except np.linalg.LinAlgError:
+                    L = np.eye(dim)
+            else:
+                L = np.eye(dim)
+            for _ in range(n_rand):
+                if evals >= budget:
+                    break
+                z = rng.randn(dim)
+                rand_dir = L @ z
+                norm = np.linalg.norm(rand_dir)
+                if norm > 0:
+                    rand_dir = rand_dir / norm * step
+                else:
+                    rand_dir = np.zeros(dim)
+                candidate = best_x + rand_dir
+                candidate = np.clip(candidate, lb, ub)
+                f_val = func(candidate)
+                evals += 1
+                if f_val < best_f:
+                    best_f = f_val
+                    best_x = candidate.copy()
+                    improved = True
+                    report_best(best_f, best_x)
+                    s = rand_dir
+                    success_steps.append(s)
+                    if len(success_steps) > 2 * dim:
+                        success_steps.pop(0)
+                    C = (1 - decay) * C + decay * np.outer(s, s)
+                    step *= 1.2
+                    break
+            if not improved:
+                step *= 0.5
+                # Restart if step too small
+                if step < min_step:
+                    remaining = budget - evals
+                    if remaining > 0:
+                        n_restart = min(remaining, max(2 * dim, 1))
+                        # Generate new LHS points plus one random point
+                        restart_points = np.zeros((n_restart, dim))
+                        for i in range(dim):
+                            perm = rng.permutation(n_restart)
+                            u = rng.rand(n_restart)
+                            restart_points[:, i] = (perm + u) / n_restart
+                        restart_points = lb + restart_points * (ub - lb)
+                        # Add a purely random point for diversity
+                        random_point = lb + rng.rand(1, dim) * (ub - lb)
+                        restart_points = np.vstack((restart_points, random_point))
+                        for i in range(n_restart):
+                            if evals >= budget:
+                                break
+                            x = restart_points[i]
+                            f = func(x)
+                            evals += 1
+                            if f < best_f:
+                                best_f = f
+                                best_x = x.copy()
+                                report_best(best_f, best_x)
+                        step = initial_step
+                        C = np.eye(dim)
+                        success_steps.clear()
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000029 LLM reflection:
+- Summary: Mean AOCC improved by 0.037 over parent, with gains across all groups but still low on high-conditioning and multimodal functions.
+- Aim: Enhance step-size adaptation to improve convergence on ill-conditioned and multimodal landscapes without sacrificing budget efficiency.
+- Preserve: Latin hypercube initialization; covariance learning from successful steps; exploration probability for random points; adaptive step size with restart; coordinate and random direction polling
+- Change: Replace fixed step multipliers with success-rate-based adjustment (e.g., increase when success rate > 0.2, else decrease) for more robust control; Add a cumulative path length (simplified evolution path) to covariance update to better align search directions on narrow valleys
+- Avoid: Expensive matrix decompositions per iteration; Removing diversity mechanisms (exploration, random directions); Overcomplicating with many new parameters
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

@@ -1,0 +1,442 @@
+[
+  {
+    "created_at": "2026-05-22T16:48:29.328205+00:00",
+    "distance": 1841.112602706875,
+    "error_details": null,
+    "generation": 1,
+    "id": "cand_000006",
+    "metrics": {
+      "best_gap": null,
+      "budget": 10000,
+      "distance": 1841.112602706875,
+      "gap_by_instance_size": {
+        "201": null,
+        "501": null,
+        "801": null
+      },
+      "gap_by_instance_source": {
+        "synthetic:llamea:100:200": null,
+        "synthetic:llamea:100:500": null,
+        "synthetic:llamea:100:800": null
+      },
+      "invalid_tour_count": 0,
+      "mean_gap": null,
+      "mean_runtime": 0.46289741666502476,
+      "mean_tour_length": 1841.112602706875,
+      "median_gap": null,
+      "partial_timeout_count": 0,
+      "penalized_mean_gap": null,
+      "pool": "search_instances",
+      "problem": "tsp",
+      "records": [
+        {
+          "dimension": 201,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size200",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.19686458399519324,
+          "seed": 100,
+          "source": "synthetic:llamea:100:200",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1188.8150067121237
+        },
+        {
+          "dimension": 501,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size500",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.46365420799702406,
+          "seed": 100,
+          "source": "synthetic:llamea:100:500",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1877.6399087530485
+        },
+        {
+          "dimension": 801,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size800",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.7281734580028569,
+          "seed": 100,
+          "source": "synthetic:llamea:100:800",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 2456.8828926554525
+        }
+      ],
+      "runs": 3,
+      "runtime_error_count": 0,
+      "score_by_instance_size": {
+        "201": 1188.8150067121237,
+        "501": 1877.6399087530485,
+        "801": 2456.8828926554525
+      },
+      "score_by_instance_source": {
+        "synthetic:llamea:100:200": 1188.8150067121237,
+        "synthetic:llamea:100:500": 1877.6399087530485,
+        "synthetic:llamea:100:800": 2456.8828926554525
+      },
+      "score_name": "distance",
+      "scored_count": 0,
+      "seeds": [
+        100
+      ],
+      "timeout_count": 0,
+      "timeout_distance": null,
+      "timeout_fraction": 0.0,
+      "timeout_penalty": 0.0,
+      "timeout_seconds": 180.0,
+      "tour_length_by_instance_size": {
+        "201": 1188.8150067121237,
+        "501": 1877.6399087530485,
+        "801": 2456.8828926554525
+      },
+      "tour_length_by_instance_source": {
+        "synthetic:llamea:100:200": 1188.8150067121237,
+        "synthetic:llamea:100:500": 1877.6399087530485,
+        "synthetic:llamea:100:800": 2456.8828926554525
+      },
+      "unscored_timeout_count": 0,
+      "valid_count": 3,
+      "verbal_gradient": {
+        "aim": "Enhance solution quality by incorporating a restart or perturbation mechanism to escape local optima, while keeping the valid 2-opt core.",
+        "avoid": [
+          "Breaking tour validity or introducing index errors from complex move logic",
+          "Overspending budget on redundant evaluations or costly full-tour length recalculations"
+        ],
+        "candidate_id": "cand_000006",
+        "change": [
+          "Add a perturbation step (e.g., double-bridge) after local search plateaus to restart from a modified tour",
+          "Consider switching to best-improvement 2-opt within budget to find stronger moves each iteration"
+        ],
+        "delta_vs_best_parent": null,
+        "evidence": {},
+        "generation": 2,
+        "parent_ids": [
+          "cand_000001",
+          "cand_000003",
+          "cand_000002"
+        ],
+        "preserve": [
+          "nearest neighbor construction with random start",
+          "candidate list for 2-opt neighbor selection",
+          "budget decrement per delta evaluation",
+          "correct wrap-around segment reversal"
+        ],
+        "problem": "tsp",
+        "score_name": "distance",
+        "score_value": 1841.112602706875,
+        "source": "llm",
+        "summary": "Candidate runs without errors and produces valid tours, but tour lengths are likely suboptimal due to a simple first-improvement 2-opt without diversification or restart.",
+        "version": 1
+      },
+      "worst_gap": null
+    },
+    "name": "nearest_neighbor_candidate_2opt",
+    "parents": [
+      "cand_000001",
+      "cand_000003",
+      "cand_000002"
+    ],
+    "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S3: Recombine: build one coherent solver from complementary parent strengths.\nDo not concatenate parents or run them sequentially. Resolve conflicts and keep the child simpler than the sum.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Timeout, invalid, or error parents should be treated as failure evidence except for mechanisms explicitly preserved by their LLM reflections: cand_000001, cand_000003, cand_000002.\n- Strategy-aware parent use for S3: assign each parent a role such as backbone, complementary mechanism, specialist, or cautionary example; produce one coherent child rather than a sequential ensemble.\nPARENT SNAPSHOT:\n- cand_000001; gen=0; strategy=initial:1; status=error; distance=unknown; metrics=timeout_fraction=0.0\n- cand_000003; gen=0; strategy=initial:3; status=error; distance=unknown; metrics=timeout_fraction=0.0\n- cand_000002; gen=0; strategy=initial:2; status=invalid; distance=unknown; metrics=timeout_fraction=0.0\n\nPARENTS:\nCandidate cand_000001: candidate_local_search\nStatus: error; distance: inf\nThought: Builds greedy nearest neighbor tour from a seeded random start, then improves via budget-bounded 2-opt and relocation using nearest-neighbor candidate lists (size 15 for n>=80, else n-1). First-improvement with strict delta check. Early reporting of initial and improved tours.\nError details: error on llamea_seed100_size200 seed 100: IndexError: index 200 is out of bounds for axis 0 with size 200\nCode:\n```python\nimport numpy as np\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.arange(n, dtype=np.int32)\n        report_best_tour(tour)\n        return tour\n\n    np.random.seed(seed)\n    start = np.random.randint(n)\n    unvisited = set(range(n))\n    unvisited.remove(start)\n    tour = [start]\n    current = start\n    while unvisited:\n        next_city = min(unvisited, key=lambda x: distance_matrix[current, x])\n        tour.append(next_city)\n        unvisited.remove(next_city)\n        current = next_city\n    tour = np.array(tour, dtype=np.int32)\n    report_best_tour(tour)\n\n    # candidate lists: nearest neighbors\n    if n >= 80:\n        cand_size = min(15, n-1)\n    else:\n        cand_size = n-1\n    # For each node, store sorted indices of nearest neighbors (excluding self)\n    candidates = []\n    for i in range(n):\n        dists = distance_matrix[i]\n        # argsort gives all, but we only need top cand_size\n        # use argpartition for efficiency\n        if cand_size < n-1:\n            idx = np.argpartition(dists, cand_size)[:cand_size]\n            # sort within this subset to get nearest first (optional)\n            idx_sorted = idx[np.argsort(dists[idx])]\n        else:\n            idx_sorted = np.argsort(dists)[1:]  # skip self\n        candidates.append(idx_sorted)\n\n    # Helper to compute tour length (optional but used for delta)\n    def tour_length(tour):\n        total = 0.0\n        for i in range(n):\n            total += distance_matrix[tour[i], tour[(i+1)%n]]\n        return total\n\n    best_tour = tour.copy()\n    improved = True\n    eps = 1e-12\n    # Main search loop\n    while budget > 0 and improved:\n        improved = False\n        # 2-opt moves\n        for i in range(n):\n            if budget <= 0:\n                break\n            ip1 = (i+1) % n\n            a = tour[i]\n            b = tour[ip1]\n            # iterate over candidates of b\n            for j_cand in candidates[b]:\n                if budget <= 0:\n                    break\n                # j_cand is node index; find its position in tour\n                j = -1\n                for idx in range(n):\n                    if tour[idx] == j_cand:\n                        j = idx\n                        break\n                if j == -1 or j == i or j == ip1 or j == (i-1) % n:\n                    continue\n                jp1 = (j+1) % n\n                c = tour[j]\n                d = tour[jp1]\n                delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\n                budget -= 1\n                if delta < -eps:\n                    # apply 2-opt: reverse segment from ip1 to j\n                    if ip1 <= j:\n                        tour[ip1:j+1] = tour[ip1:j+1][::-1]\n                    else:\n                        # wrap around case\n                        segment = np.concatenate([tour[ip1:], tour[:j+1]])\n                        segment = segment[::-1]\n                        tour[ip1:] = segment[:n-ip1]\n                        tour[:j+1] = segment[n-ip1:]\n                    improved = True\n                    # report if better\n                    # we can compute length only on strict improvement, but delta ensures, so report\n                    # to save time, skip full length calc\n                    report_best_tour(tour.copy())\n                    break  # first improvement exit\n        # relocation moves\n        for i in range(n):\n            if budget <= 0:\n                break\n            ip1 = (i+1) % n\n            v = tour[ip1]\n            a = tour[i]\n            # iterate over candidates of v as potential insertion point after j\n            for j_cand in candidates[v]:\n                if budget <= 0:\n                    break\n                # find position j such that tour[j] == j_cand\n                j = -1\n                for idx in range(n):\n                    if tour[idx] == j_cand:\n                        j = idx\n                        break\n                if j == -1 or j == i or j == ip1:\n                    continue\n                jp1 = (j+1) % n\n                c = tour[j]\n                d = tour[jp1]\n                # current edges: (a,v) and (c,d); new edges: (a, next after v) and (c,v) and (v,d)\n                # but careful: if jp1 == ip1? that would be same edge? avoid.\n                next_v = tour[(ip1+1) % n]\n                delta = distance_matrix[a, next_v] + distance_matrix[c, v] + distance_matrix[v, d] - distance_matrix[a, v] - distance_matrix[c, d] - distance_matrix[v, next_v]\n                budget -= 1\n                if delta < -eps:\n                    # remove v from ip1, insert after j\n                    # remove v\n                    tour = np.delete(tour, ip1)\n                    # insert after j (note j index might shift if ip1 < j? we use original indices)\n                    # recompute j position after removal\n                    # simpler: rebuild list\n                    tlist = tour.tolist()\n                    # v has been removed, find its old index not needed\n                    # insert after j\n                    # actually after removal, the element at position ip1 is gone\n                    # But j remains same if j < ip1? messy\n                    # Better: reconstruct with slice\n                    # Use numpy: split tour into before v, after v, then insert after j\n                    # Since v is at ip1, tour = [tour[0:ip1], tour[ip1+1:]]\n                    # Then we want to insert v after position j (in original indices, but after removal, positions shift)\n                    # Let's compute new position for insertion: if j < ip1: insert at j+1; if j >= ip1: insert at j (since v removed)\n                    # But easier: use list manipulation\n                    tlist = tour.tolist()\n                    v_node = v\n                    # remove v (but we already did np.delete? Actually we did tour = np.delete(tour, ip1) above? Let's keep simple: use list version\n                    tlist = list(tour)\n                    # find index of v in tlist (should be at original ip1, but after delete it's different)\n                    # Simpler: reconstruct from original tour indices\n                    # Reset: use original tour array \"tour\" but we are modifying in place; better to work with list conversion once\n                    tlist = [int(x) for x in tour]\n                    idx_v = ip1\n                    v_val = tlist[idx_v]\n                    del tlist[idx_v]\n                    # now find insert position after j (j is index in original tour, but after deletion, if j > idx_v, insert at j; else at j+1)\n                    if j > idx_v:\n                        insert_pos = j  # because j shifted left by 1\n                    else:\n                        insert_pos = j + 1\n                    # but j is index in original tour of the candidate node; after removal, candidate node's index is still j if j < idx_v, else j-1\n                    # So we need to find the index of that node in the new list\n                    cand_node = c  # from original tour at j\n                    # find its current index\n                    curr_j = tlist.index(cand_node)\n                    # we want to insert after it\n                    insert_pos = curr_j + 1\n                    tlist.insert(insert_pos, v_val)\n                    tour = np.array(tlist, dtype=np.int32)\n                    improved = True\n                    report_best_tour(tour.copy())\n                    break\n        # If no improvement, break\n    return tour\n```\n\nCandidate cand_000003: IteratedLocalSearchTSP\nStatus: error; distance: inf\nThought: Iterated local search combining nearest neighbor initialization, 2-opt local improvement, and double-bridge perturbation. Seed initializes random number generator. Budget controls total distance evaluations in 2-opt and perturbation steps.\nError details: error on llamea_seed100_size200 seed 100: UnboundLocalError: cannot access local variable 'compute_tour_dist' where it is not associated with a value\nCode:\n```python\nimport numpy as np\nimport random\n\ndef solve_tsp(distance_matrix, seed, budget):\n    n = distance_matrix.shape[0]\n    rng = random.Random(seed)\n\n    if n <= 2:\n        tour = list(range(n))\n        report_best_tour(tour)\n        return np.array(tour)\n\n    # Nearest neighbor initial tour\n    unvisited = set(range(1, n))\n    tour = [0]\n    current = 0\n    while unvisited:\n        next_city = min(unvisited, key=lambda c: distance_matrix[current, c])\n        tour.append(next_city)\n        unvisited.remove(next_city)\n        current = next_city\n    best_tour = tour[:]\n    best_dist = compute_tour_dist(tour, distance_matrix)\n    report_best_tour(tour)\n\n    def compute_tour_dist(t, mat):\n        d = 0\n        for i in range(n):\n            d += mat[t[i], t[(i+1)%n]]\n        return d\n\n    def two_opt(t, budget_left):\n        improve = True\n        while improve and budget_left > 0:\n            improve = False\n            for i in range(n-2):\n                for j in range(i+2, n):  # j up to n-1, but we need j+1 mod n\n                    if budget_left <= 0:\n                        break\n                    budget_left -= 1\n                    a = t[i]\n                    b = t[i+1]\n                    c = t[j]\n                    d = t[(j+1)%n]\n                    delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\n                    if delta < -1e-12:\n                        t[i+1:j+1] = reversed(t[i+1:j+1])\n                        improve = True\n                        break\n                if improve:\n                    break\n        return t, budget_left\n\n    # Main ILS loop\n    current_tour = tour[:]\n    current_dist = best_dist\n    budget_remaining = budget\n\n    while budget_remaining > 0:\n        # Local search\n        improved_tour, budget_remaining = two_opt(current_tour, budget_remaining)\n        new_dist = compute_tour_dist(improved_tour, distance_matrix)\n        if new_dist < best_dist - 1e-12:\n            best_tour = improved_tour[:]\n            best_dist = new_dist\n            report_best_tour(best_tour)\n        current_tour = improved_tour[:]\n        current_dist = new_dist\n        if budget_remaining <= 0:\n            break\n\n        # Perturbation: double-bridge\n        # Choose three random breakpoints and ensure non-empty segments\n        a = rng.randint(0, n-1)\n        b = rng.randint(0, n-1)\n        c = rng.randint(0, n-1)\n        # sort them\n        i, j, k = sorted([a, b, c])\n        # Adjust to ensure segments have at least one node? Not strictly required but may produce weaker perturbations.\n        # We'll allow any; validity is guaranteed.\n        seg1 = current_tour[:i+1]\n        seg2 = current_tour[i+1:j+1]\n        seg3 = current_tour[j+1:k+1]\n        seg4 = current_tour[k+1:]\n        current_tour = seg1 + seg3 + seg2 + seg4\n        budget_remaining -= 1  # count perturbation as one unit\n\n    return np.array(best_tour)\n```\n\nCandidate cand_000002: cheapest_insertion_candidate_two_opt\nStatus: invalid; distance: inf\nThought: Construct an initial tour via cheapest insertion on a random permutation (O(n^2) time). Then improve with random 2-opt swaps, limiting attempts based on budget. Uses seed for reproducibility, calls report_best_tour on initial and improved tours. Handles n<=2 trivially.\nError details: Import not allowed: builtins\nCode:\n```python\nimport numpy as np\nimport random\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.array([0, 1] if n == 2 else [0])\n        from builtins import globals as _globals\n        if 'report_best_tour' in _globals():\n            _globals()['report_best_tour'](tour)\n        return tour\n    random.seed(seed)\n    dm = distance_matrix\n    # Cheapest insertion on random permutation\n    start = random.randrange(n)\n    tour = [start]\n    unvisited = set(range(n))\n    unvisited.remove(start)\n    second = random.choice(list(unvisited))\n    tour.append(second)\n    unvisited.remove(second)\n    remaining = list(unvisited)\n    random.shuffle(remaining)\n    for city in remaining:\n        best_cost = float('inf')\n        best_pos = 0\n        L = len(tour)\n        for i in range(L):\n            a = tour[i]\n            b = tour[(i+1) % L]\n            cost = dm[a][city] + dm[city][b] - dm[a][b]\n            if cost < best_cost:\n                best_cost = cost\n                best_pos = i+1\n        tour.insert(best_pos, city)\n    initial_tour = np.array(tour)\n    def tour_length(t):\n        length = 0.0\n        for i in range(len(t)):\n            a = t[i]\n            b = t[(i+1) % len(t)]\n            length += dm[a][b]\n        return length\n    best_tour = initial_tour.copy()\n    best_len = tour_length(best_tour)\n    if 'report_best_tour' in globals():\n        globals()['report_best_tour'](best_tour)\n    # Random 2-opt improvement\n    tour_list = best_tour.tolist()\n    n_tour = n\n    max_attempts = min(10000, max(100, budget // 2))\n    for _ in range(max_attempts):\n        i = random.randint(0, n_tour - 1)\n        j = random.randint(0, n_tour - 1)\n        if i > j:\n            i, j = j, i\n        if i == j:\n            continue\n        if (j - i) == 1 or (i == 0 and j == n_tour - 1):\n            continue\n        a = tour_list[i]\n        b = tour_list[(i+1) % n_tour]\n        c = tour_list[j]\n        d = tour_list[(j+1) % n_tour]\n        delta = dm[a][c] + dm[b][d] - dm[a][b] - dm[c][d]\n        if delta < -1e-12:\n            # reverse segment\n            tour_list[i+1 : j+1] = reversed(tour_list[i+1 : j+1])\n            best_len += delta\n            # update best if improvement is overall best (but tours are monotonic)\n            if best_len < tour_length(tour_list):\n                best_len = tour_length(tour_list)\n            if 'report_best_tour' in globals():\n                globals()['report_best_tour'](np.array(tour_list))\n    return np.array(tour_list)\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+    "raw_response": "",
+    "status": "valid",
+    "strategy": "S3",
+    "thought": "Construct tour via nearest neighbor from seeded random start, then improve with budget-limited first-improvement 2-opt using candidate lists of nearest neighbors for efficiency. Report initial and improved tours. Fixes parent indexing error by careful handling of segment reversal and wrap-around."
+  },
+  {
+    "created_at": "2026-05-22T16:49:21.274415+00:00",
+    "distance": 1841.112602706875,
+    "error_details": null,
+    "generation": 2,
+    "id": "cand_000009",
+    "metrics": {
+      "best_gap": null,
+      "budget": 10000,
+      "distance": 1841.112602706875,
+      "gap_by_instance_size": {
+        "201": null,
+        "501": null,
+        "801": null
+      },
+      "gap_by_instance_source": {
+        "synthetic:llamea:100:200": null,
+        "synthetic:llamea:100:500": null,
+        "synthetic:llamea:100:800": null
+      },
+      "invalid_tour_count": 0,
+      "mean_gap": null,
+      "mean_runtime": 0.5151702223277729,
+      "mean_tour_length": 1841.112602706875,
+      "median_gap": null,
+      "partial_timeout_count": 0,
+      "penalized_mean_gap": null,
+      "pool": "search_instances",
+      "problem": "tsp",
+      "records": [
+        {
+          "dimension": 201,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size200",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.23485237499698997,
+          "seed": 100,
+          "source": "synthetic:llamea:100:200",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1188.8150067121237
+        },
+        {
+          "dimension": 501,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size500",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.5204785839887336,
+          "seed": 100,
+          "source": "synthetic:llamea:100:500",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1877.6399087530485
+        },
+        {
+          "dimension": 801,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size800",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.790179707997595,
+          "seed": 100,
+          "source": "synthetic:llamea:100:800",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 2456.8828926554525
+        }
+      ],
+      "runs": 3,
+      "runtime_error_count": 0,
+      "score_by_instance_size": {
+        "201": 1188.8150067121237,
+        "501": 1877.6399087530485,
+        "801": 2456.8828926554525
+      },
+      "score_by_instance_source": {
+        "synthetic:llamea:100:200": 1188.8150067121237,
+        "synthetic:llamea:100:500": 1877.6399087530485,
+        "synthetic:llamea:100:800": 2456.8828926554525
+      },
+      "score_name": "distance",
+      "scored_count": 0,
+      "seeds": [
+        100
+      ],
+      "timeout_count": 0,
+      "timeout_distance": null,
+      "timeout_fraction": 0.0,
+      "timeout_penalty": 0.0,
+      "timeout_seconds": 180.0,
+      "tour_length_by_instance_size": {
+        "201": 1188.8150067121237,
+        "501": 1877.6399087530485,
+        "801": 2456.8828926554525
+      },
+      "tour_length_by_instance_source": {
+        "synthetic:llamea:100:200": 1188.8150067121237,
+        "synthetic:llamea:100:500": 1877.6399087530485,
+        "synthetic:llamea:100:800": 2456.8828926554525
+      },
+      "unscored_timeout_count": 0,
+      "valid_count": 3,
+      "worst_gap": null
+    },
+    "name": "ils_candidate_2opt",
+    "parents": [
+      "cand_000006",
+      "cand_000005"
+    ],
+    "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S3: Recombine: build one coherent solver from complementary parent strengths.\nDo not concatenate parents or run them sequentially. Resolve conflicts and keep the child simpler than the sum.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT-SPECIFIC LLM REFLECTIONS:\n\nParent cand_000006 LLM reflection:\n- Summary: Candidate runs without errors and produces valid tours, but tour lengths are likely suboptimal due to a simple first-improvement 2-opt without diversification or restart.\n- Aim: Enhance solution quality by incorporating a restart or perturbation mechanism to escape local optima, while keeping the valid 2-opt core.\n- Preserve: nearest neighbor construction with random start; candidate list for 2-opt neighbor selection; budget decrement per delta evaluation; correct wrap-around segment reversal\n- Change for S3: Add a perturbation step (e.g., double-bridge) after local search plateaus to restart from a modified tour; Consider switching to best-improvement 2-opt within budget to find stronger moves each iteration\n- Avoid: Breaking tour validity or introducing index errors from complex move logic; Overspending budget on redundant evaluations or costly full-tour length recalculations\n\nParent cand_000005 LLM reflection:\n- Summary: Candidate fixes the parent's error and runs validly, but tour lengths are relatively high, especially on larger instances.\n- Aim: Improve solution quality by enhancing the diversification mechanism to escape local optima more effectively while staying within the strict budget.\n- Preserve: Nearest neighbor initialization; 2-opt local search; Budget tracking as hard cap; report_best_tour usage\n- Change for S3: Replace double-bridge perturbation with random segment reversal and shuffle to create stronger disruptions\n- Avoid: Increasing per-iteration computational cost significantly; Generating invalid tours; Overcomplicating the perturbation at the expense of simplicity\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Best available parent by current scalar score: cand_000006 (distance=1841.11, status=valid, generation=1, strategy=S3).\n- Strategy-aware parent use for S3: assign each parent a role such as backbone, complementary mechanism, specialist, or cautionary example; produce one coherent child rather than a sequential ensemble.\nPARENT SNAPSHOT:\n- cand_000006; gen=1; strategy=S3; status=valid; distance=1841.11; relative_score=best; reflection=llm; metrics=timeout_fraction=0.0, mean_tour_length=1841.112602706875\n- cand_000005; gen=1; strategy=S2; status=valid; distance=1954.76; relative_score=delta=113.65; reflection=llm; metrics=timeout_fraction=0.0, mean_tour_length=1954.7630671163936\n\nPARENTS:\nCandidate cand_000006: nearest_neighbor_candidate_2opt\nStatus: valid; distance: 1841.11\nThought: Construct tour via nearest neighbor from seeded random start, then improve with budget-limited first-improvement 2-opt using candidate lists of nearest neighbors for efficiency. Report initial and improved tours. Fixes parent indexing error by careful handling of segment reversal and wrap-around.\nCode:\n```python\nimport numpy as np\n\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.arange(n, dtype=np.int32)\n        report_best_tour(tour)\n        return tour\n\n    # initialize RNG\n    np.random.seed(seed)\n\n    # nearest neighbor construction from random start\n    start = np.random.randint(n)\n    unvisited = set(range(n))\n    unvisited.remove(start)\n    tour = [start]\n    current = start\n    while unvisited:\n        next_city = min(unvisited, key=lambda x: distance_matrix[current, x])\n        tour.append(next_city)\n        unvisited.remove(next_city)\n        current = next_city\n    tour = np.array(tour, dtype=np.int32)\n    report_best_tour(tour.copy())\n\n    # candidate lists: top 15 nearest neighbors (or n-1 if n<80)\n    cand_size = min(15, n-1) if n >= 80 else n-1\n    candidates = []\n    for i in range(n):\n        dists = distance_matrix[i]\n        if cand_size < n - 1:\n            # use argpartition to get nearest indices\n            idx = np.argpartition(dists, cand_size)[:cand_size]\n            # sort within subset by distance\n            idx_sorted = idx[np.argsort(dists[idx])]\n        else:\n            idx_sorted = np.argsort(dists)[1:]  # skip self\n        candidates.append(idx_sorted)\n\n    # helper for tour length (optional, used for reporting)\n    def tour_length(t):\n        total = 0.0\n        for i in range(n):\n            total += distance_matrix[t[i], t[(i+1) % n]]\n        return total\n\n    best_tour = tour.copy()\n    best_len = tour_length(best_tour)\n    improved = True\n    eps = 1e-12\n\n    # main 2-opt loop\n    while budget > 0 and improved:\n        improved = False\n        # iterate over all edges (i, i+1)\n        for i in range(n):\n            if budget <= 0:\n                break\n            ip1 = (i + 1) % n\n            a = tour[i]\n            b = tour[ip1]\n            # consider candidates of b as potential j\n            for j_cand in candidates[b]:\n                if budget <= 0:\n                    break\n                # find position of j_cand in tour (j)\n                # since we have limited candidates, linear search is okay\n                # but we need to be careful with wrap-around; we search all positions\n                # Could precompute positions but overhead not needed\n                j = -1\n                for idx in range(n):\n                    if tour[idx] == j_cand:\n                        j = idx\n                        break\n                if j == -1:\n                    continue\n                # avoid same edge and adjacent edges\n                if j == i or j == ip1 or j == (i - 1) % n:\n                    continue\n                jp1 = (j + 1) % n\n                c = tour[j]\n                d = tour[jp1]\n                delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\n                budget -= 1\n                if delta < -eps:\n                    # apply 2-opt: reverse segment from ip1 to j\n                    if ip1 <= j:\n                        tour[ip1:j+1] = tour[ip1:j+1][::-1]\n                    else:\n                        # wrap-around: concatenate two parts, reverse, replace\n                        segment = np.concatenate([tour[ip1:], tour[:j+1]])\n                        segment = segment[::-1]\n                        tour[ip1:] = segment[:n-ip1]\n                        tour[:j+1] = segment[n-ip1:]\n                    improved = True\n                    # compute new length once for reporting\n                    new_len = tour_length(tour)\n                    if new_len < best_len - eps:\n                        best_len = new_len\n                        best_tour = tour.copy()\n                        report_best_tour(best_tour.copy())\n                    break  # first improvement\n        # if no improvement found, exit\n\n    return best_tour\n```\n\nCandidate cand_000005: ils_tsp_fix\nStatus: valid; distance: 1954.76\nThought: Fixes UnboundLocalError by moving compute_tour_dist before its first use. Uses nearest neighbor initialization, 2-opt local search, and double-bridge perturbation, with budget as hard cap on evaluations.\nCode:\n```python\nimport numpy as np\nimport random\n\ndef solve_tsp(distance_matrix, seed, budget):\n    n = distance_matrix.shape[0]\n    rng = random.Random(seed)\n\n    if n <= 2:\n        tour = list(range(n))\n        report_best_tour(tour)\n        return np.array(tour)\n\n    def compute_tour_dist(t, mat):\n        d = 0\n        for i in range(n):\n            d += mat[t[i], t[(i+1)%n]]\n        return d\n\n    # Nearest neighbor initial tour\n    unvisited = set(range(1, n))\n    tour = [0]\n    current = 0\n    while unvisited:\n        next_city = min(unvisited, key=lambda c: distance_matrix[current, c])\n        tour.append(next_city)\n        unvisited.remove(next_city)\n        current = next_city\n    best_tour = tour[:]\n    best_dist = compute_tour_dist(tour, distance_matrix)\n    report_best_tour(tour)\n\n    def two_opt(t, budget_left):\n        improve = True\n        while improve and budget_left > 0:\n            improve = False\n            for i in range(n-2):\n                for j in range(i+2, n):\n                    if budget_left <= 0:\n                        break\n                    budget_left -= 1\n                    a = t[i]\n                    b = t[i+1]\n                    c = t[j]\n                    d = t[(j+1)%n]\n                    delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\n                    if delta < -1e-12:\n                        t[i+1:j+1] = reversed(t[i+1:j+1])\n                        improve = True\n                        break\n                if improve:\n                    break\n        return t, budget_left\n\n    # Main ILS loop\n    current_tour = tour[:]\n    current_dist = best_dist\n    budget_remaining = budget\n\n    while budget_remaining > 0:\n        # Local search\n        improved_tour, budget_remaining = two_opt(current_tour, budget_remaining)\n        new_dist = compute_tour_dist(improved_tour, distance_matrix)\n        if new_dist < best_dist - 1e-12:\n            best_tour = improved_tour[:]\n            best_dist = new_dist\n            report_best_tour(best_tour)\n        current_tour = improved_tour[:]\n        current_dist = new_dist\n        if budget_remaining <= 0:\n            break\n\n        # Perturbation: double-bridge\n        a = rng.randint(0, n-1)\n        b = rng.randint(0, n-1)\n        c = rng.randint(0, n-1)\n        i, j, k = sorted([a, b, c])\n        seg1 = current_tour[:i+1]\n        seg2 = current_tour[i+1:j+1]\n        seg3 = current_tour[j+1:k+1]\n        seg4 = current_tour[k+1:]\n        current_tour = seg1 + seg3 + seg2 + seg4\n        budget_remaining -= 1\n\n    return np.array(best_tour)\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+    "raw_response": "",
+    "status": "valid",
+    "strategy": "S3",
+    "thought": "Combines nearest neighbor construction with candidate list 2-opt from cand_000006 and double-bridge perturbation from cand_000005. Uses first-improvement 2-opt with budget as hard cap. Perturbation helps escape local optima while keeping core efficient."
+  },
+  {
+    "created_at": "2026-05-22T16:48:28.592977+00:00",
+    "distance": 1954.7630671163936,
+    "error_details": null,
+    "generation": 1,
+    "id": "cand_000005",
+    "metrics": {
+      "best_gap": null,
+      "budget": 10000,
+      "distance": 1954.7630671163936,
+      "gap_by_instance_size": {
+        "201": null,
+        "501": null,
+        "801": null
+      },
+      "gap_by_instance_source": {
+        "synthetic:llamea:100:200": null,
+        "synthetic:llamea:100:500": null,
+        "synthetic:llamea:100:800": null
+      },
+      "invalid_tour_count": 0,
+      "mean_gap": null,
+      "mean_runtime": 0.023886763665359467,
+      "mean_tour_length": 1954.7630671163936,
+      "median_gap": null,
+      "partial_timeout_count": 0,
+      "penalized_mean_gap": null,
+      "pool": "search_instances",
+      "problem": "tsp",
+      "records": [
+        {
+          "dimension": 201,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size200",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.00860070799535606,
+          "seed": 100,
+          "source": "synthetic:llamea:100:200",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1347.467785556748
+        },
+        {
+          "dimension": 501,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size500",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.02104045799933374,
+          "seed": 100,
+          "source": "synthetic:llamea:100:500",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 1958.0809764490705
+        },
+        {
+          "dimension": 801,
+          "error": null,
+          "gap": null,
+          "instance": "llamea_seed100_size800",
+          "partial": false,
+          "pool": "search_instances",
+          "reference_kind": null,
+          "reference_length": null,
+          "runtime_seconds": 0.0420191250013886,
+          "seed": 100,
+          "source": "synthetic:llamea:100:800",
+          "status": "valid",
+          "timeout_limit_seconds": 180.0,
+          "tour_length": 2558.7404393433626
+        }
+      ],
+      "runs": 3,
+      "runtime_error_count": 0,
+      "score_by_instance_size": {
+        "201": 1347.467785556748,
+        "501": 1958.0809764490705,
+        "801": 2558.7404393433626
+      },
+      "score_by_instance_source": {
+        "synthetic:llamea:100:200": 1347.467785556748,
+        "synthetic:llamea:100:500": 1958.0809764490705,
+        "synthetic:llamea:100:800": 2558.7404393433626
+      },
+      "score_name": "distance",
+      "scored_count": 0,
+      "seeds": [
+        100
+      ],
+      "timeout_count": 0,
+      "timeout_distance": null,
+      "timeout_fraction": 0.0,
+      "timeout_penalty": 0.0,
+      "timeout_seconds": 180.0,
+      "tour_length_by_instance_size": {
+        "201": 1347.467785556748,
+        "501": 1958.0809764490705,
+        "801": 2558.7404393433626
+      },
+      "tour_length_by_instance_source": {
+        "synthetic:llamea:100:200": 1347.467785556748,
+        "synthetic:llamea:100:500": 1958.0809764490705,
+        "synthetic:llamea:100:800": 2558.7404393433626
+      },
+      "unscored_timeout_count": 0,
+      "valid_count": 3,
+      "verbal_gradient": {
+        "aim": "Improve solution quality by enhancing the diversification mechanism to escape local optima more effectively while staying within the strict budget.",
+        "avoid": [
+          "Increasing per-iteration computational cost significantly",
+          "Generating invalid tours",
+          "Overcomplicating the perturbation at the expense of simplicity"
+        ],
+        "candidate_id": "cand_000005",
+        "change": [
+          "Replace double-bridge perturbation with random segment reversal and shuffle to create stronger disruptions"
+        ],
+        "delta_vs_best_parent": null,
+        "evidence": {},
+        "generation": 2,
+        "parent_ids": [
+          "cand_000003"
+        ],
+        "preserve": [
+          "Nearest neighbor initialization",
+          "2-opt local search",
+          "Budget tracking as hard cap",
+          "report_best_tour usage"
+        ],
+        "problem": "tsp",
+        "score_name": "distance",
+        "score_value": 1954.7630671163936,
+        "source": "llm",
+        "summary": "Candidate fixes the parent's error and runs validly, but tour lengths are relatively high, especially on larger instances.",
+        "version": 1
+      },
+      "worst_gap": null
+    },
+    "name": "ils_tsp_fix",
+    "parents": [
+      "cand_000003"
+    ],
+    "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S2: Refine: use parent metrics and LLM reflections to make one or two targeted fixes.\nPreserve what works, address measured weakness, and avoid unrelated rewrites.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Timeout, invalid, or error parents should be treated as failure evidence except for mechanisms explicitly preserved by their LLM reflections: cand_000003.\n- Strategy-aware parent use for S2: use the strongest valid parent as the backbone and make one or two measured fixes from its LLM reflection aim and change guidance.\nPARENT SNAPSHOT:\n- cand_000003; gen=0; strategy=initial:3; status=error; distance=unknown; metrics=timeout_fraction=0.0\n\nPARENTS:\nCandidate cand_000003: IteratedLocalSearchTSP\nStatus: error; distance: inf\nThought: Iterated local search combining nearest neighbor initialization, 2-opt local improvement, and double-bridge perturbation. Seed initializes random number generator. Budget controls total distance evaluations in 2-opt and perturbation steps.\nError details: error on llamea_seed100_size200 seed 100: UnboundLocalError: cannot access local variable 'compute_tour_dist' where it is not associated with a value\nCode:\n```python\nimport numpy as np\nimport random\n\ndef solve_tsp(distance_matrix, seed, budget):\n    n = distance_matrix.shape[0]\n    rng = random.Random(seed)\n\n    if n <= 2:\n        tour = list(range(n))\n        report_best_tour(tour)\n        return np.array(tour)\n\n    # Nearest neighbor initial tour\n    unvisited = set(range(1, n))\n    tour = [0]\n    current = 0\n    while unvisited:\n        next_city = min(unvisited, key=lambda c: distance_matrix[current, c])\n        tour.append(next_city)\n        unvisited.remove(next_city)\n        current = next_city\n    best_tour = tour[:]\n    best_dist = compute_tour_dist(tour, distance_matrix)\n    report_best_tour(tour)\n\n    def compute_tour_dist(t, mat):\n        d = 0\n        for i in range(n):\n            d += mat[t[i], t[(i+1)%n]]\n        return d\n\n    def two_opt(t, budget_left):\n        improve = True\n        while improve and budget_left > 0:\n            improve = False\n            for i in range(n-2):\n                for j in range(i+2, n):  # j up to n-1, but we need j+1 mod n\n                    if budget_left <= 0:\n                        break\n                    budget_left -= 1\n                    a = t[i]\n                    b = t[i+1]\n                    c = t[j]\n                    d = t[(j+1)%n]\n                    delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\n                    if delta < -1e-12:\n                        t[i+1:j+1] = reversed(t[i+1:j+1])\n                        improve = True\n                        break\n                if improve:\n                    break\n        return t, budget_left\n\n    # Main ILS loop\n    current_tour = tour[:]\n    current_dist = best_dist\n    budget_remaining = budget\n\n    while budget_remaining > 0:\n        # Local search\n        improved_tour, budget_remaining = two_opt(current_tour, budget_remaining)\n        new_dist = compute_tour_dist(improved_tour, distance_matrix)\n        if new_dist < best_dist - 1e-12:\n            best_tour = improved_tour[:]\n            best_dist = new_dist\n            report_best_tour(best_tour)\n        current_tour = improved_tour[:]\n        current_dist = new_dist\n        if budget_remaining <= 0:\n            break\n\n        # Perturbation: double-bridge\n        # Choose three random breakpoints and ensure non-empty segments\n        a = rng.randint(0, n-1)\n        b = rng.randint(0, n-1)\n        c = rng.randint(0, n-1)\n        # sort them\n        i, j, k = sorted([a, b, c])\n        # Adjust to ensure segments have at least one node? Not strictly required but may produce weaker perturbations.\n        # We'll allow any; validity is guaranteed.\n        seg1 = current_tour[:i+1]\n        seg2 = current_tour[i+1:j+1]\n        seg3 = current_tour[j+1:k+1]\n        seg4 = current_tour[k+1:]\n        current_tour = seg1 + seg3 + seg2 + seg4\n        budget_remaining -= 1  # count perturbation as one unit\n\n    return np.array(best_tour)\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+    "raw_response": "",
+    "status": "valid",
+    "strategy": "S2",
+    "thought": "Fixes UnboundLocalError by moving compute_tour_dist before its first use. Uses nearest neighbor initialization, 2-opt local search, and double-bridge perturbation, with budget as hard cap on evaluations."
+  }
+]

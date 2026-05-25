@@ -1,0 +1,209 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000005: MemeticLHSLocal
+Status: valid; mean AOCC score: 0.185398 (higher is better)
+Thought: Combines Latin Hypercube Sampling (LHS) for global exploration with a simple random perturbation local search for exploitation. Initial LHS samples max(2*dim, budget/2) points to cover the space. Then, from the best found, iteratively perturbs with a Gaussian step, decaying step size. Uses seed for reproducibility. Reports every improvement via report_best. Ensures total function calls never exceed budget by checking before each evaluation.
+Mean AOCC: 0.18539754827803648
+Mean final error: 72.22464653609833
+AOCC by group: {'high_conditioning_unimodal': 0.1100294561761255, 'low_moderate_conditioning': 0.20187941900728879, 'multimodal_strong_global_structure': 0.15517462663286644, 'multimodal_weak_global_structure': 0.22064613737708236, 'separable': 0.2425544763426698}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+        self.best_x = None
+        self.best_y = np.inf
+        self.n_calls = 0
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        # Initial LHS
+        n_initial = min(self.budget, max(self.dim * 2, self.budget // 2))
+        if n_initial < 1:
+            n_initial = 1
+        points = self._lhs(lb, ub, n_initial)
+        for x in points:
+            if self.n_calls >= self.budget:
+                break
+            y = func(x)
+            self.n_calls += 1
+            if y < self.best_y:
+                self.best_y = y
+                self.best_x = x.copy()
+                report_best(y, x)
+        # Local search
+        step_size = (ub - lb) * 0.1
+        while self.n_calls < self.budget:
+            dx = self.rng.normal(0, step_size, size=self.dim)
+            x_new = self.best_x + dx
+            x_new = np.clip(x_new, lb, ub)
+            y = func(x_new)
+            self.n_calls += 1
+            if y < self.best_y:
+                self.best_y = y
+                self.best_x = x_new.copy()
+                report_best(y, x_new)
+            step_size *= 0.99
+        return self.best_y, self.best_x
+
+    def _lhs(self, lb, ub, n):
+        points = np.zeros((n, self.dim))
+        for i in range(self.dim):
+            strata = np.linspace(lb[i], ub[i], n+1)[:-1]
+            order = self.rng.permutation(n)
+            points[:, i] = strata[order] + self.rng.uniform(0, (ub[i]-lb[i])/n, size=n)
+        return points
+```
+
+Candidate cand_000003: restarted_adaptive_random_search
+Status: valid; mean AOCC score: 0.0392536 (higher is better)
+Thought: Starts with random initial point. Samples Gaussian perturbations around best with adaptive scale per dimension. On improvement, scale shrinks to exploit; on stagnation, scale grows to explore. After a fixed number of non-improving evaluations, restarts from a random point. Uses budget efficiently with anytime performance. Seed controls random number generation.
+Mean AOCC: 0.03925360112777591
+Mean final error: 4803565.182210885
+AOCC by group: {'high_conditioning_unimodal': 0.019269735588896608, 'low_moderate_conditioning': 0.015205287178439, 'multimodal_strong_global_structure': 0.09086319165964514, 'multimodal_weak_global_structure': 0.06239957126188068, 'separable': 0.003720557160150755}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+        self.stagnation_limit = max(1, budget // 10)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        rng = self.rng
+        budget = self.budget
+
+        # Initial scale as 20% of domain range per dimension
+        initial_scale = 0.2 * (ub - lb)
+        scale = initial_scale.copy()
+
+        # Initial random point
+        best_x = rng.uniform(lb, ub)
+        best_val = func(best_x)
+        report_best(best_val, best_x)
+        evals = 1
+        no_improve = 0
+
+        while evals < budget:
+            # Generate candidate by perturbing best
+            candidate = best_x + rng.normal(0, scale, size=dim)
+            candidate = np.clip(candidate, lb, ub)
+            val = func(candidate)
+            evals += 1
+
+            if val < best_val:
+                best_val = val
+                best_x = candidate
+                report_best(best_val, best_x)
+                no_improve = 0
+                # Shrink scale to exploit
+                scale = np.maximum(scale * 0.5, 1e-8 * (ub - lb))
+            else:
+                no_improve += 1
+                if no_improve >= self.stagnation_limit:
+                    if evals >= budget:
+                        break
+                    # Restart: evaluate a new random point
+                    new_x = rng.uniform(lb, ub)
+                    new_val = func(new_x)
+                    evals += 1
+                    if new_val < best_val:
+                        best_val = new_val
+                        best_x = new_x
+                        report_best(best_val, best_x)
+                    no_improve = 0
+                    scale = initial_scale.copy()
+                else:
+                    # Gradually expand scale when not improving
+                    if no_improve % max(1, self.stagnation_limit // 4) == 0:
+                        scale = np.minimum(scale * 1.5, ub - lb)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e3_hybrid_recombination
+
+GOAL: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

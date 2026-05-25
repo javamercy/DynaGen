@@ -1,0 +1,213 @@
+{
+  "created_at": "2026-05-22T16:35:31.244438+00:00",
+  "distance": 874.8684836772505,
+  "error_details": null,
+  "generation": 1,
+  "id": "cand_000005",
+  "metrics": {
+    "best_gap": null,
+    "budget": 10000,
+    "distance": 874.8684836772505,
+    "gap_by_instance_size": {
+      "101": null,
+      "201": null,
+      "51": null
+    },
+    "gap_by_instance_source": {
+      "synthetic:llamea:11:100": null,
+      "synthetic:llamea:11:200": null,
+      "synthetic:llamea:11:50": null,
+      "synthetic:llamea:23:100": null,
+      "synthetic:llamea:23:200": null,
+      "synthetic:llamea:23:50": null
+    },
+    "invalid_tour_count": 0,
+    "mean_gap": null,
+    "mean_runtime": 0.043397485998866614,
+    "mean_tour_length": 874.8684836772505,
+    "median_gap": null,
+    "partial_timeout_count": 0,
+    "penalized_mean_gap": null,
+    "pool": "search_instances",
+    "problem": "tsp",
+    "records": [
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.029610583995236084,
+        "seed": 100,
+        "source": "synthetic:llamea:11:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 688.0112932720731
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.033216957992408425,
+        "seed": 100,
+        "source": "synthetic:llamea:11:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 825.3582982959288
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed11_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.06709112499083858,
+        "seed": 100,
+        "source": "synthetic:llamea:11:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1199.2983865787367
+      },
+      {
+        "dimension": 51,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size50",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.01667341600114014,
+        "seed": 100,
+        "source": "synthetic:llamea:23:50",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 602.9348882207267
+      },
+      {
+        "dimension": 101,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size100",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.03296825000143144,
+        "seed": 100,
+        "source": "synthetic:llamea:23:100",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 815.6109372035074
+      },
+      {
+        "dimension": 201,
+        "error": null,
+        "gap": null,
+        "instance": "llamea_seed23_size200",
+        "partial": false,
+        "pool": "search_instances",
+        "reference_kind": null,
+        "reference_length": null,
+        "runtime_seconds": 0.08082458301214501,
+        "seed": 100,
+        "source": "synthetic:llamea:23:200",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "tour_length": 1117.9970984925303
+      }
+    ],
+    "runs": 6,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "101": 820.4846177497182,
+      "201": 1158.6477425356334,
+      "51": 645.4730907464
+    },
+    "score_by_instance_source": {
+      "synthetic:llamea:11:100": 825.3582982959288,
+      "synthetic:llamea:11:200": 1199.2983865787367,
+      "synthetic:llamea:11:50": 688.0112932720731,
+      "synthetic:llamea:23:100": 815.6109372035074,
+      "synthetic:llamea:23:200": 1117.9970984925303,
+      "synthetic:llamea:23:50": 602.9348882207267
+    },
+    "score_name": "distance",
+    "scored_count": 0,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 0,
+    "timeout_distance": null,
+    "timeout_fraction": 0.0,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "tour_length_by_instance_size": {
+      "101": 820.4846177497182,
+      "201": 1158.6477425356334,
+      "51": 645.4730907464
+    },
+    "tour_length_by_instance_source": {
+      "synthetic:llamea:11:100": 825.3582982959288,
+      "synthetic:llamea:11:200": 1199.2983865787367,
+      "synthetic:llamea:11:50": 688.0112932720731,
+      "synthetic:llamea:23:100": 815.6109372035074,
+      "synthetic:llamea:23:200": 1117.9970984925303,
+      "synthetic:llamea:23:50": 602.9348882207267
+    },
+    "unscored_timeout_count": 0,
+    "valid_count": 6,
+    "verbal_gradient": {
+      "aim": "Introduce a lightweight restart mechanism (e.g., partial perturbation) to escape local optima while staying within the budget.",
+      "avoid": [
+        "Adding expensive evaluations or nested loops that exhaust budget prematurely",
+        "Complex data structures that slow down position updates",
+        "Invalid tour structures or delta miscalculations"
+      ],
+      "candidate_id": "cand_000005",
+      "change": [
+        "Add a multi-start restart after a number of evaluations without improvement, using a randomized perturbation of the current tour.",
+        "Optionally reduce candidate list size after restarts to evaluate fewer moves early on."
+      ],
+      "delta_vs_best_parent": -4.1870433382955525,
+      "evidence": {},
+      "generation": 2,
+      "parent_ids": [
+        "cand_000001"
+      ],
+      "preserve": [
+        "Candidate list pruning",
+        "Two-phase improvement (2-opt then relocation)",
+        "report_best_tour on improvements",
+        "Greedy construction"
+      ],
+      "problem": "tsp",
+      "score_name": "distance",
+      "score_value": 874.8684836772505,
+      "source": "llm",
+      "summary": "The 2-opt and relocation local search with candidate lists improved over its parent by fixing a relocation degeneracy bug, but still only makes limited progress within the fixed budget.",
+      "version": 1
+    },
+    "worst_gap": null
+  },
+  "name": "refined_2opt_reloc_fixed",
+  "parents": [
+    "cand_000001"
+  ],
+  "prompt": "[system]\nYou generate executable, reliable full TSP solvers for evolutionary search.\n\n[user]\nSTRATEGY S2: Refine: use parent metrics and LLM reflections to make one or two targeted fixes.\nPreserve what works, address measured weakness, and avoid unrelated rewrites.\n\nDistance is the search objective for TSP; lower distance is better.\n\nPARENT AWARENESS:\n- Treat selected parents as evaluated evidence, not templates to copy blindly.\n- Parent ranking in this prompt uses lower distance as better unless a problem metric explicitly says otherwise.\n- Best available parent by current scalar score: cand_000001 (distance=879.056, status=valid, generation=0, strategy=initial:1).\n- Strategy-aware parent use for S2: use the strongest valid parent as the backbone and make one or two measured fixes from its LLM reflection aim and change guidance.\nPARENT SNAPSHOT:\n- cand_000001; gen=0; strategy=initial:1; status=valid; distance=879.056; relative_score=best; metrics=timeout_fraction=0.0, mean_tour_length=879.0555270155461\n\nPARENTS:\nCandidate cand_000001: size_adaptive_candidate_ls\nStatus: valid; distance: 879.056\nThought: Greedy nearest neighbor initial tour, then first-improvement local search with 2-opt and relocation using static candidate lists. For n>=80, candidates limited to 20 nearest neighbors. Budget caps total move evaluations (delta calculations). Uses seed for reproducibility. Calls report_best_tour initially and on improvements.\nCode:\n```python\nimport numpy as np\nimport random\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n    n = distance_matrix.shape[0]\n    if n <= 2:\n        tour = np.arange(n, dtype=np.int32)\n        if n == 2:\n            report_best_tour(tour)\n        return tour\n    rng = random.Random(seed)\n    # Candidate list: for each node, sorted indices by distance (excluding self)\n    candidate_size = 30 if n < 80 else 20\n    candidates = []\n    for i in range(n):\n        dists = distance_matrix[i]\n        # Exclude self (distance 0), argsort gives ascending order\n        order = np.argsort(dists)\n        order = order[order != i]  # remove self\n        if len(order) > candidate_size:\n            order = order[:candidate_size]\n        candidates.append(list(order))\n    \n    # Greedy nearest neighbor with random start\n    def greedy_tour():\n        start = rng.randint(0, n-1)\n        visited = set([start])\n        tour = [start]\n        current = start\n        while len(visited) < n:\n            # Find nearest unvisited neighbor\n            dists = distance_matrix[current]\n            best = None\n            best_dist = float('inf')\n            for j in range(n):\n                if j not in visited and dists[j] < best_dist:\n                    best = j\n                    best_dist = dists[j]\n            visited.add(best)\n            tour.append(best)\n            current = best\n        return np.array(tour, dtype=np.int32)\n    \n    tour = greedy_tour()\n    report_best_tour(tour)\n    \n    # Helper functions\n    def get_pos(tour):\n        pos = np.empty(n, dtype=np.int32)\n        for idx, node in enumerate(tour):\n            pos[node] = idx\n        return pos\n    \n    def tour_length(tour):\n        total = 0\n        for i in range(n):\n            total += distance_matrix[tour[i]][tour[(i+1)%n]]\n        return total\n    \n    current_dist = tour_length(tour)\n    pos = get_pos(tour)\n    \n    # Precompute all 2-opt candidate pairs (i, j) where j > i and candidate of tour[i]\n    def generate_2opt_pairs(tour, pos):\n        pairs = []\n        for i in range(n):\n            node = tour[i]\n            for cand in candidates[node]:\n                j = pos[cand]\n                if j <= i:\n                    continue\n                # Avoid adjacent edges: i+1 should not be j, and j+1 should not be i (mod n)\n                if (i+1)%n == j or (j+1)%n == i:\n                    continue\n                pairs.append((i, j))\n        return pairs\n    \n    # Generate relocation pairs (u, v) where v is candidate of u and v != u, and moving u after v is non-trivial\n    def generate_reloc_pairs(tour, pos):\n        pairs = []\n        for u in range(n):\n            i = pos[u]\n            for v in candidates[u]:\n                if v == u:\n                    continue\n                k = pos[v]\n                # Cannot move to same position or adjacent (mod n) to avoid degenerate\n                # Actually moving to after v is fine even if adjacent, but we skip if k==i or (k+1)%n == i?\n                # We'll allow all, the delta calculation handles\n                pairs.append((u, v))\n        return pairs\n    \n    evals = 0\n    improved = True\n    while evals < budget and improved:\n        improved = False\n        # First 2-opt phase\n        pairs = generate_2opt_pairs(tour, pos)\n        rng.shuffle(pairs)\n        for (i, j) in pairs:\n            if evals >= budget:\n                break\n            a = tour[i]\n            b = tour[(i+1)%n]\n            c = tour[j]\n            d = tour[(j+1)%n]\n            old = distance_matrix[a][b] + distance_matrix[c][d]\n            new = distance_matrix[a][c] + distance_matrix[b][d]\n            delta = new - old\n            evals += 1\n            if delta < -1e-12:\n                # apply 2-opt\n                if i < j:\n                    tour[i+1:j+1] = tour[i+1:j+1][::-1]\n                else: # wrap around: reverse from i+1 to end and from start to j\n                    segment = np.concatenate((tour[i+1:], tour[:j+1]))\n                    segment = segment[::-1]\n                    tour[i+1:] = segment[:n-i-1]\n                    tour[:j+1] = segment[n-i-1:]\n                pos = get_pos(tour)\n                current_dist += delta\n                report_best_tour(tour)\n                improved = True\n                break\n        if improved:\n            continue\n        # Relocation phase\n        pairs = generate_reloc_pairs(tour, pos)\n        rng.shuffle(pairs)\n        for (u, v) in pairs:\n            if evals >= budget:\n                break\n            i = pos[u]\n            k = pos[v]\n            if i == k:\n                continue\n            prev_u = tour[(i-1)%n]\n            next_u = tour[(i+1)%n]\n            prev_v = tour[k]\n            next_v = tour[(k+1)%n]\n            old_edges = distance_matrix[prev_u][u] + distance_matrix[u][next_u] + distance_matrix[prev_v][next_v]\n            new_edges = distance_matrix[prev_u][next_u] + distance_matrix[prev_v][u] + distance_matrix[u][next_v]\n            delta = new_edges - old_edges\n            evals += 1\n            if delta < -1e-12:\n                # apply relocation: remove u from its position and insert after v\n                # Build new tour list\n                new_tour = []\n                for idx in range(n):\n                    if idx == i:\n                        continue\n                    new_tour.append(tour[idx])\n                # Now insert u after v in new list; find new index of v\n                # Since removal shifted indices, we need to find where v is now\n                # Using the original indices, we can compute new index\n                # Simpler: construct full list manually\n                tour_list = tour.tolist()\n                # remove u\n                tour_list.remove(u)\n                # get index of v (since u removed, indices shifted)\n                idx_v = tour_list.index(v)\n                # insert u after v\n                tour_list.insert(idx_v+1, u)\n                tour = np.array(tour_list, dtype=np.int32)\n                pos = get_pos(tour)\n                current_dist += delta\n                report_best_tour(tour)\n                improved = True\n                break\n    return tour\n```\n\nImplement exactly this interface:\n\ndef solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:\n\nRules:\n- Distance is the search objective for TSP; lower distance is better.\n- Return a 1D tour with each node exactly once; do not repeat the start node.\n- Handle all n; for n <= 2 return the trivial valid tour.\n- Always return a valid tour, even with tiny budget.\n- Use only distance_matrix; do not assume coordinates or hard-code instances.\n- Use seed for randomness and budget as a hard cap on search effort.\n- Create a valid incumbent early; call report_best_tour(tour) for initial and improved incumbents.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.\n- Keep code compact; avoid brittle repair, heavy recursion, and unguarded expensive loops.\n\nInternal check before final JSON: correct signature, valid tour on every return path,\nearly report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n\n{\n  \"name\": \"short snake_case_or_title name\",\n  \"thought\": \"brief public summary of the idea, seed use, and budget use\",\n  \"code\": \"complete Python code as a JSON string\"\n}\n\nNo Markdown, fences, or text outside JSON. The code string must define solve_tsp.",
+  "raw_response": "",
+  "status": "valid",
+  "strategy": "S2",
+  "thought": "Refined from parent cand_000001 by fixing relocation delta bug (skip moves where target node is adjacent to moving node) and removing dead wrap-around code in 2-opt. Uses same initial greedy and candidate lists."
+}

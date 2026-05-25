@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000004",
+  "generation": 3,
+  "gradient": {
+    "aim": "Improve AOCC on multimodal and high-conditioning groups by adding covariance or per-coordinate step adaptation.",
+    "avoid": [
+      "multi-population schemes (exceed budget)",
+      "non-deterministic random draws breaking reproducibility",
+      "changes that degrade separable function performance"
+    ],
+    "candidate_id": "cand_000004",
+    "change": [
+      "replace fixed coordinate directions with adaptive covariance matrix or per-coordinate step sizes",
+      "add restart or diversification when step shrinks without improvement"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 3,
+    "parent_ids": [],
+    "preserve": [
+      "simple step-size increase/decrease",
+      "bound clipping",
+      "single-point sequential evaluation",
+      "deterministic seeding"
+    ],
+    "problem": "bbob",
+    "score_name": "mean_aocc",
+    "score_value": 0.2821317620176895,
+    "source": "llm",
+    "summary": "Coordinate pattern search achieved mean AOCC 0.282 with strong separable but weak multimodal/high-conditioning performance.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "bbob",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: maximize mean AOCC under strict objective-evaluation budgets\nDomain focus: step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, local refinement, bound handling, and budget accounting\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\nclass Optimizer:\\n    def __init__(self, budget: int, dim: int, seed: int):\\n        self.budget = budget\\n        self.dim = dim\\n        self.seed = seed\\n        self.rng = np.random.RandomState(seed)\\n\\n    def __call__(self, func):\\n        lb = func.bounds.lb\\n        ub = func.bounds.ub\\n        best_x = lb + (ub - lb) * self.rng.rand(self.dim)\\n        best_f = func(best_x)\\n        report_best(best_f, best_x)\\n        evals = 1\\n        step = 0.1 * np.mean(ub - lb)\\n        directions = []\\n        for i in range(self.dim):\\n            e = np.zeros(self.dim)\\n            e[i] = 1.0\\n            directions.append(e)\\n            directions.append(-e)\\n        while evals < self.budget:\\n            improved = False\\n            for d in directions:\\n                if evals >= self.budget:\\n                    break\\n                candidate = best_x + step * d\\n                candidate = np.clip(candidate, lb, ub)\\n                f_val = func(candidate)\\n                evals += 1\\n                if f_val < best_f:\\n                    best_f = f_val\\n                    best_x = candidate.copy()\\n                    improved = True\\n                    report_best(best_f, best_x)\\n                    break\\n            if improved:\\n                step *= 1.2\\n            else:\\n                step *= 0.5\\n                if step < 1e-15:\\n                    break\\n        return best_f, best_x\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000004\",\"metrics\":{\"aocc_by_function\":{\"1\":0.9537876931142443,\"10\":0.015406473648171888,\"11\":0.03284722700726079,\"12\":0.08402111552719749,\"13\":0.07899959928249102,\"14\":0.5174635702637641,\"15\":0.043147246928766286,\"16\":0.1106555488647079,\"17\":0.10432174983553062,\"18\":0.039135439371961324,\"19\":0.18604327718425173,\"2\":0.8799207296515892,\"20\":0.21376766090750335,\"21\":0.3999250977735153,\"22\":0.0659787736632524,\"23\":0.18993894522150045,\"24\":0.05179671573312855,\"3\":0.16221651852244526,\"4\":0.15234254208017664,\"5\":0.9961973468428301,\"6\":0.8402151076494889,\"7\":0.11150763813063608,\"8\":0.2850742222292127,\"9\":0.25645204899092194},\"aocc_by_group\":{\"high_conditioning_unimodal\":0.14574759714577704,\"low_moderate_conditioning\":0.3733122542500649,\"multimodal_strong_global_structure\":0.09666065243704357,\"multimodal_weak_global_structure\":0.18428143865978,\"separable\":0.6288929660422571},\"aocc_lower_bound\":1e-08,\"aocc_upper_bound\":100.0,\"best_aocc\":0.9964273735070336,\"best_final_error\":0.0,\"budget\":10000,\"final_error_by_function\":{\"1\":3.315866100213801e-14,\"10\":123.78831675212025,\"11\":56.58691902490644,\"12\":16.611810642603366,\"13\":18.72979928273019,\"14\":0.00035493504842065704,\"15\":46.33908354254121,\"16\":8.11832744839812,\"17\":9.880926627808378,\"18\":48.3022329839759,\"19\":1.7381921147384578,\"2\":4.736951571734001e-15,\"20\":0.7077863820555876,\"21\":5.991443226523361,\"22\":42.957954307924275,\"23\":1.2521398026901205,\"24\":31.338473350029506,\"3\":2.9848754920068594,\"4\":2.9848754920068643,\"5\":0.0,\"6\":2.777439078727184e-08,\"7\":7.465863541558739,\"8\":0.04756376828814268,\"9\":1.321108429115469},\"history\":{\"buckets\":[\"global\",\"bbob:group:high_conditioning_unimodal\",\"bbob:group:low_moderate_conditioning\",\"bbob:group:multimodal_strong_global_structure\",\"bbob:group:multimodal_weak_global_structure\",\"bbob:group:separable\",\"bbob:function:1\",\"bbob:function:10\",\"bbob:function:11\",\"bbob:function:12\",\"bbob:function:13\",\"bbob:function:14\",\"bbob:function:15\",\"bbob:function:16\",\"bbob:function:17\",\"bbob:function:18\",\"bbob:function:19\",\"bbob:function:2\",\"bbob:function:20\",\"bbob:function:21\",\"bbob:function:22\",\"bbob:function:23\",\"bbob:function:24\",\"bbob:function:3\",\"bbob:function:4\",\"bbob:function:5\",\"bbob:function:6\",\"bbob:function:7\",\"bbob:function:8\",\"bbob:function:9\",\"bbob:runtime:fast\",\"bbob:timeout:robust\",\"bbob:mechanism:random_search\"],\"diversity_score\":1.0,\"history_score\":0.7608460703051181,\"in_history\":true,\"primary_bucket\":\"bbob:group:separable\",\"quality_score\":0.2821317620176895,\"robustness_score\":0.5106123093926528},\"invalid_count\":0,\"mean_aocc\":0.2821317620176895,\"mean_evaluations\":4753.902777777777,\"mean_final_error\":17.79783529895184,\"mean_runtime\":0.40992131891666855,\"median_aocc\":0.137334669745043,\"median_final_error\":3.960119484953445,\"partial_timeout_count\":0,\"penalized_mean_aocc\":0.2821317620176895,\"pool\":\"search_instances\",\"problem\":\"bbob\",\"runs\":72,\"runtime_error_count\":0,\"score_name\":\"mean_aocc\",\"scored_count\":72,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_mean_aocc\":0.2821317620176895,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"unscored_timeout_count\":0,\"valid_count\":72,\"worst_aocc\":0.0,\"worst_final_error\":298.50601074042993},\"score_name\":\"mean_aocc\",\"score_value\":0.2821317620176895,\"status\":\"valid\",\"thought\":\"A pattern search optimizer that explores coordinate directions and adapts step size. Initializes at a random point within bounds, then iteratively polls positive and negative coordinate axes, expanding step on success and contracting on failure. Uses seed for reproducibility. Reports improvements via report_best. Budget used for function evaluations.\"},\"delta_vs_best_parent\":null,\"generation\":3,\"goal\":\"maximize mean AOCC under strict objective-evaluation budgets\",\"parents\":[],\"problem\":\"bbob\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Coordinate pattern search achieved mean AOCC 0.282 with strong separable but weak multimodal/high-conditioning performance.\",\n  \"aim\": \"Improve AOCC on multimodal and high-conditioning groups by adding covariance or per-coordinate step adaptation.\",\n  \"preserve\": [\"simple step-size increase/decrease\", \"bound clipping\", \"single-point sequential evaluation\", \"deterministic seeding\"],\n  \"change\": [\"replace fixed coordinate directions with adaptive covariance matrix or per-coordinate step sizes\", \"add restart or diversification when step shrinks without improvement\"],\n  \"avoid\": [\"multi-population schemes (exceed budget)\", \"non-deterministic random draws breaking reproducibility\", \"changes that degrade separable function performance\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

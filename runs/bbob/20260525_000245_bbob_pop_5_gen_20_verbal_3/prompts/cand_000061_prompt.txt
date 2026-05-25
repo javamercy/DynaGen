@@ -1,0 +1,185 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000042: simulated_annealing_cauchy
+Status: valid; mean AOCC score: 0.26192 (higher is better)
+Thought: Simulated annealing with Cauchy perturbations for heavy-tailed exploration, geometric cooling schedule, and occasional random restart to escape local optima. Initializes at a random feasible point, then iteratively proposes new points by adding Cauchy noise scaled by step size, which is adapted using the 1/5 success rule. Accepts worse points with a probability that decreases with temperature. Restarts by reinitializing to a random point when no improvement for a fraction of remaining budget. Uses seed for reproducibility. Budget is tracked exactly.
+Mean AOCC: 0.26192029892731855
+Mean final error: 65.14483923012486
+AOCC by group: {'high_conditioning_unimodal': 0.14612801194303193, 'low_moderate_conditioning': 0.36115101871135313, 'multimodal_strong_global_structure': 0.1747077930597975, 'multimodal_weak_global_structure': 0.2089953864309824, 'separable': 0.4384654284482348}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        np.random.seed(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+
+        # Initial feasible point
+        best_x = np.random.uniform(lb, ub, dim)
+        best_val = func(best_x)
+        calls = 1
+        report_best(best_val, best_x)
+
+        current_x = best_x.copy()
+        current_val = best_val
+
+        # Hyperparameters
+        step_size = 0.2 * np.mean(ub - lb)
+        temp = 1.0
+        temp_decay = 0.99
+        success_ratio_target = 0.2
+        success_ratio_window = 20
+        success_count = 0
+        no_improve_count = 0
+        restart_threshold = max(5, int(budget * 0.1))
+
+        # Cooling schedule: linear or geometric? Use geometric.
+        while calls < budget:
+            # Propose new point using Cauchy distribution
+            noise = np.random.standard_cauchy(dim)
+            new_x = current_x + step_size * noise
+            new_x = np.clip(new_x, lb, ub)
+            new_val = func(new_x)
+            calls += 1
+
+            delta = new_val - current_val
+            # Metropolis acceptance
+            if delta < 0 or np.random.uniform() < np.exp(-delta / (temp + 1e-100)):
+                current_x = new_x
+                current_val = new_val
+                if new_val < best_val:
+                    best_val = new_val
+                    best_x = new_x.copy()
+                    report_best(best_val, best_x)
+                    no_improve_count = 0
+                else:
+                    success_count += 1
+            else:
+                # Not accepted, count as failure for step adaptation
+                pass
+
+            # Step size adaptation via 1/5 rule (over window)
+            if calls % success_ratio_window == 0:
+                ratio = success_count / success_ratio_window
+                if ratio > success_ratio_target:
+                    step_size *= 1.2
+                else:
+                    step_size *= 0.85
+                success_count = 0
+
+            # Temperature decay
+            temp *= temp_decay
+
+            # Restart if no improvement for too long
+            if (best_val == current_val and calls < budget):
+                no_improve_count += 1
+            else:
+                no_improve_count = 0
+
+            if no_improve_count >= restart_threshold and calls < budget:
+                # Restart from random point
+                current_x = np.random.uniform(lb, ub, dim)
+                current_val = func(current_x)
+                calls += 1
+                if current_val < best_val:
+                    best_val = current_val
+                    best_x = current_x.copy()
+                    report_best(best_val, best_x)
+                # Reset step size and temperature
+                step_size = 0.2 * np.mean(ub - lb)
+                temp = 1.0
+                no_improve_count = 0
+                success_count = 0
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000042 LLM reflection:
+- Summary: Simulated annealing with Cauchy perturbations achieved mean AOCC 0.262, far below parent CMA-ES (0.551), due to lack of covariance adaptation and poor exploration of ill-conditioned landscapes.
+- Aim: Restore covariance matrix adaptation and rank-mu update to handle high conditioning, and improve multimodal diversification via targeted restarts.
+- Preserve: Budget-exact call accounting; Feasible initialization with clipping; Seed reproducibility
+- Change: Replace Cauchy noise with CMA-ES sampling using full covariance matrix; Replace simple 1/5 rule with cumulative step-size adaptation and rank-mu covariance update
+- Avoid: Overly complex hyperparameter tuning that wastes budget; Ignoring coordinate dependencies in step-size control; Frequent restarts that discard valuable progress
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

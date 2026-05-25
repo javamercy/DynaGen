@@ -1,0 +1,451 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000050: de_diversify_explore_restart
+Status: valid; mean AOCC score: 0.440262 (higher is better)
+Thought: This optimizer enhances the parent's DE with LHS initialization and local refinement by incorporating multiple mutation strategies (DE/rand/1 and DE/current-to-rand/1) chosen probabilistically, adaptive scaling factor F randomly sampled each generation, and a restart mechanism triggered by stagnation. The restart replaces the population with a new LHS sample (excluding the best) to escape local optima. Population size is kept moderate. seed controls all randomness. Budget is strictly enforced by counting evaluations.
+Mean AOCC: 0.44026174392645556
+Mean final error: 0.8017872814244285
+AOCC by group: {'high_conditioning_unimodal': 0.44520929540153004, 'low_moderate_conditioning': 0.5488203251129395, 'multimodal_strong_global_structure': 0.32403131507077965, 'multimodal_weak_global_structure': 0.27299953472541555, 'separable': 0.6319599655589098}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop_size = max(4, min(5 * self.dim, self.budget // 3))
+        # Latin Hypercube Sampling
+        points = np.zeros((pop_size, self.dim))
+        for i in range(self.dim):
+            perm = self.rng.permutation(pop_size)
+            u = self.rng.rand(pop_size)
+            points[:, i] = lb[i] + (perm + u) / pop_size * (ub[i] - lb[i])
+        pop_fitness = np.full(pop_size, np.inf)
+        best_x = None
+        best_f = np.inf
+        evals = 0
+        for i in range(pop_size):
+            if evals >= self.budget:
+                break
+            x = points[i]
+            f = func(x)
+            evals += 1
+            pop_fitness[i] = f
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+        # DE parameters
+        CR = 0.9
+        # 1+1 ES local refinement parameters
+        sigma = 0.2 * (ub - lb)
+        local_ref_interval = max(1, pop_size)
+        gen_evals = 0
+        stagnation_counter = 0
+        max_stagnation = max(10, self.budget // 10)
+        while evals < self.budget:
+            # DE iteration
+            target_idx = self.rng.randint(pop_size)
+            candidates = list(range(pop_size))
+            candidates.remove(target_idx)
+            if len(candidates) >= 3:
+                # Choose mutation strategy
+                if self.rng.rand() < 0.5:
+                    # DE/rand/1
+                    idx = self.rng.choice(candidates, 3, replace=False)
+                    a, b, c = idx
+                    F = 0.5 + self.rng.rand() * 0.5
+                    mutant = points[a] + F * (points[b] - points[c])
+                else:
+                    # DE/current-to-rand/1 (rotation invariant)
+                    idx = self.rng.choice(candidates, 2, replace=False)
+                    a, b = idx
+                    F = 0.5 + self.rng.rand() * 0.5
+                    K = self.rng.rand()
+                    mutant = points[target_idx] + K * (points[a] - points[target_idx]) + F * (points[b] - points[a])
+                trial = points[target_idx].copy()
+                j_rand = self.rng.randint(self.dim)
+                for j in range(self.dim):
+                    if self.rng.rand() < CR or j == j_rand:
+                        trial[j] = mutant[j]
+                trial = np.clip(trial, lb, ub)
+                f_trial = func(trial)
+                evals += 1
+                gen_evals += 1
+                if f_trial < pop_fitness[target_idx]:
+                    points[target_idx] = trial
+                    pop_fitness[target_idx] = f_trial
+                    if f_trial < best_f:
+                        best_f = f_trial
+                        best_x = trial.copy()
+                        report_best(best_f, best_x)
+                        stagnation_counter = 0
+                else:
+                    stagnation_counter += 1
+            else:
+                # fallback: evaluate random point
+                if evals >= self.budget:
+                    break
+                x = lb + self.rng.rand(self.dim) * (ub - lb)
+                f = func(x)
+                evals += 1
+                gen_evals += 1
+                worst_idx = np.argmax(pop_fitness)
+                if f < pop_fitness[worst_idx]:
+                    points[worst_idx] = x
+                    pop_fitness[worst_idx] = f
+                    if f < best_f:
+                        best_f = f
+                        best_x = x.copy()
+                        report_best(best_f, best_x)
+                        stagnation_counter = 0
+                else:
+                    stagnation_counter += 1
+            # Local refinement
+            if gen_evals >= local_ref_interval and evals < self.budget:
+                gen_evals = 0
+                delta = sigma * self.rng.randn(self.dim)
+                candidate = best_x + delta
+                candidate = np.clip(candidate, lb, ub)
+                f_candidate = func(candidate)
+                evals += 1
+                if f_candidate < best_f:
+                    best_f = f_candidate
+                    best_x = candidate.copy()
+                    sigma *= 1.1
+                    report_best(best_f, best_x)
+                    stagnation_counter = 0
+                else:
+                    sigma *= 0.9
+                    stagnation_counter += 1
+            # Restart if stagnation
+            if stagnation_counter >= max_stagnation and evals < self.budget:
+                # Replace population except best with new LHS sample
+                new_pop_size = pop_size - 1
+                new_points = np.zeros((new_pop_size, self.dim))
+                for i in range(self.dim):
+                    perm = self.rng.permutation(new_pop_size)
+                    u = self.rng.rand(new_pop_size)
+                    new_points[:, i] = lb[i] + (perm + u) / new_pop_size * (ub[i] - lb[i])
+                # Evaluate and replace worst individuals
+                for i in range(new_pop_size):
+                    if evals >= self.budget:
+                        break
+                    x = new_points[i]
+                    f = func(x)
+                    evals += 1
+                    worst_idx = np.argmax(pop_fitness)
+                    if f < pop_fitness[worst_idx]:
+                        points[worst_idx] = x
+                        pop_fitness[worst_idx] = f
+                        if f < best_f:
+                            best_f = f
+                            best_x = x.copy()
+                            report_best(best_f, best_x)
+                # Ensure best individual remains (if it was replaced, keep best_x)
+                # reset stagnation
+                stagnation_counter = 0
+                # re-insert best into population (maybe replace the worst)
+                worst_idx = np.argmax(pop_fitness)
+                points[worst_idx] = best_x.copy()
+                pop_fitness[worst_idx] = best_f
+        return best_f, best_x
+```
+
+Candidate cand_000021: lhs_pattern_search_restart_cov
+Status: valid; mean AOCC score: 0.298689 (higher is better)
+Thought: Extends Latin hypercube initialization and adaptive pattern search with restart when step size shrinks, using a covariance estimate from successful steps to generate random directions beyond coordinate axes, improving multimodal performance.
+Mean AOCC: 0.29868946465132395
+Mean final error: 17.335398150740485
+AOCC by group: {'high_conditioning_unimodal': 0.1726153252477662, 'low_moderate_conditioning': 0.40316746639714784, 'multimodal_strong_global_structure': 0.13374546771584347, 'multimodal_weak_global_structure': 0.16756869155009005, 'separable': 0.6372459726949372}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        rng = self.rng
+        budget = self.budget
+
+        # Latin hypercube initialization
+        n_init = min(budget, max(2 * dim, 1))
+        best_x = None
+        best_f = np.inf
+        evals = 0
+        points = np.zeros((n_init, dim))
+        for i in range(dim):
+            perm = rng.permutation(n_init)
+            u = rng.rand(n_init)
+            points[:, i] = (perm + u) / n_init
+        points = lb + points * (ub - lb)
+        for i in range(n_init):
+            if evals >= budget:
+                break
+            x = points[i]
+            f = func(x)
+            evals += 1
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+
+        # Pattern search with covariance-guided random directions
+        initial_step = 0.1 * np.mean(ub - lb)
+        step = initial_step
+        # Coordinate directions
+        directions = []
+        for i in range(dim):
+            e = np.zeros(dim)
+            e[i] = 1.0
+            directions.append(e)
+            directions.append(-e)
+        # Covariance matrix for random directions
+        C = np.eye(dim)
+        decay = 0.1
+        success_steps = []  # store recent successful step vectors
+
+        while evals < budget:
+            improved = False
+            # Poll coordinate directions
+            for d in directions:
+                if evals >= budget:
+                    break
+                candidate = best_x + step * d
+                candidate = np.clip(candidate, lb, ub)
+                f_val = func(candidate)
+                evals += 1
+                if f_val < best_f:
+                    best_f = f_val
+                    best_x = candidate.copy()
+                    improved = True
+                    report_best(best_f, best_x)
+                    # Record successful step
+                    s = step * d  # actual step vector
+                    success_steps.append(s)
+                    if len(success_steps) > 2 * dim:
+                        success_steps.pop(0)
+                    # Update covariance
+                    C = (1 - decay) * C + decay * np.outer(s, s)
+                    break
+            if improved:
+                step *= 1.2
+                continue
+            # If no improvement from coordinates, try random directions from covariance
+            n_rand = min(2, dim)
+            if len(success_steps) > 0:
+                # Ensure C is positive definite
+                C_reg = C + 1e-12 * np.eye(dim)
+                try:
+                    L = np.linalg.cholesky(C_reg)
+                except np.linalg.LinAlgError:
+                    L = np.eye(dim)
+            else:
+                L = np.eye(dim)
+            for _ in range(n_rand):
+                if evals >= budget:
+                    break
+                z = rng.randn(dim)
+                rand_dir = L @ z
+                norm = np.linalg.norm(rand_dir)
+                if norm > 0:
+                    rand_dir = rand_dir / norm * step
+                else:
+                    rand_dir = np.zeros(dim)
+                candidate = best_x + rand_dir
+                candidate = np.clip(candidate, lb, ub)
+                f_val = func(candidate)
+                evals += 1
+                if f_val < best_f:
+                    best_f = f_val
+                    best_x = candidate.copy()
+                    improved = True
+                    report_best(best_f, best_x)
+                    s = rand_dir
+                    success_steps.append(s)
+                    if len(success_steps) > 2 * dim:
+                        success_steps.pop(0)
+                    C = (1 - decay) * C + decay * np.outer(s, s)
+                    step *= 1.2
+                    break
+            if not improved:
+                step *= 0.5
+                # Restart if step too small
+                if step < 1e-12 * initial_step:
+                    remaining = budget - evals
+                    if remaining > 0:
+                        n_restart = min(remaining, max(2 * dim, 1))
+                        # Generate new LHS points
+                        restart_points = np.zeros((n_restart, dim))
+                        for i in range(dim):
+                            perm = rng.permutation(n_restart)
+                            u = rng.rand(n_restart)
+                            restart_points[:, i] = (perm + u) / n_restart
+                        restart_points = lb + restart_points * (ub - lb)
+                        for i in range(n_restart):
+                            if evals >= budget:
+                                break
+                            x = restart_points[i]
+                            f = func(x)
+                            evals += 1
+                            if f < best_f:
+                                best_f = f
+                                best_x = x.copy()
+                                report_best(best_f, best_x)
+                        step = initial_step
+                        C = np.eye(dim)
+                        success_steps.clear()
+        return best_f, best_x
+```
+
+Candidate cand_000055: simplified_de
+Status: valid; mean AOCC score: 0.463514 (higher is better)
+Thought: Simplified Differential Evolution with uniform random initialization and fixed parameters. Uses DE/rand/1/bin mutation and binomial crossover. Population size scales with dimension and budget. All stochastic operations controlled by seed. Evaluates initial population and then iterates generating trial vectors until budget exhausted. Clips to bounds. Reports best improvements.
+Mean AOCC: 0.46351380566735717
+Mean final error: 0.8370818076666973
+AOCC by group: {'high_conditioning_unimodal': 0.47495880806671376, 'low_moderate_conditioning': 0.48863793541098915, 'multimodal_strong_global_structure': 0.36566581933311665, 'multimodal_weak_global_structure': 0.32746230371423024, 'separable': 0.6658689877604622}
+Code:
+```python
+class Optimizer:
+    def __init__(self, budget, dim, seed):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop_size = max(4, min(5 * self.dim, self.budget // 2))
+        pop_size = min(pop_size, self.budget)
+        points = self.rng.uniform(lb, ub, size=(pop_size, self.dim))
+        pop_fitness = np.full(pop_size, np.inf)
+        best_x = None
+        best_f = np.inf
+        evals = 0
+        for i in range(pop_size):
+            if evals >= self.budget:
+                break
+            x = points[i]
+            f = func(x)
+            evals += 1
+            pop_fitness[i] = f
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+        F = 0.5
+        CR = 0.9
+        while evals < self.budget:
+            target = self.rng.randint(pop_size)
+            indices = [i for i in range(pop_size) if i != target]
+            if len(indices) < 3:
+                break
+            a, b, c = self.rng.choice(indices, 3, replace=False)
+            mutant = points[a] + F * (points[b] - points[c])
+            trial = points[target].copy()
+            j_rand = self.rng.randint(self.dim)
+            for j in range(self.dim):
+                if self.rng.rand() < CR or j == j_rand:
+                    trial[j] = mutant[j]
+            trial = np.clip(trial, lb, ub)
+            f_trial = func(trial)
+            evals += 1
+            if f_trial < best_f:
+                best_f = f_trial
+                best_x = trial.copy()
+                report_best(best_f, best_x)
+            if f_trial < pop_fitness[target]:
+                points[target] = trial
+                pop_fitness[target] = f_trial
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

@@ -1,0 +1,194 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000045: regret_steepest_doublebridge
+
+Status: valid; distance: 17.4218
+
+Thought: Initialize with 10 restarts of regret-insertion to get best tour. Then iteratively apply steepest-ascent 2-opt (evaluate all pairs, apply best improvement) until no improvement or budget exhausted. After a full pass without improvement, apply double-bridge perturbation to escape local optima, ensuring no revisitation. Report best tour on every improvement.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n, dtype=np.int32)
+        report_best_tour(tour.copy())
+        return tour
+    rng = np.random.RandomState(seed)
+    best_tour = None
+    best_length = np.inf
+    # Multiple restarts for construction
+    for restart in range(10):
+        start = rng.randint(n)
+        dists = distance_matrix[start].copy()
+        dists[start] = np.inf
+        second = np.argmin(dists)
+        tour = [start, second]
+        remaining = set(range(n)) - {start, second}
+        while remaining:
+            best_regret = -1e100
+            best_city = None
+            best_pos = None
+            best_cost = None
+            for city in remaining:
+                costs = []
+                L = len(tour)
+                for p in range(L):
+                    left = tour[p]
+                    right = tour[(p+1)%L]
+                    cost = distance_matrix[left, city] + distance_matrix[city, right] - distance_matrix[left, right]
+                    costs.append(cost)
+                sorted_costs = sorted(costs)
+                b = sorted_costs[0]
+                second_best = sorted_costs[1] if len(sorted_costs) > 1 else b
+                regret = second_best - b
+                if regret > best_regret or (regret == best_regret and (best_cost is None or b < best_cost)):
+                    best_regret = regret
+                    best_city = city
+                    best_pos = np.argmin(costs)
+                    best_cost = b
+            insert_idx = best_pos + 1
+            tour = tour[:insert_idx] + [best_city] + tour[insert_idx:]
+            remaining.remove(best_city)
+        curr_tour = np.array(tour, dtype=np.int32)
+        curr_length = sum(distance_matrix[curr_tour[i], curr_tour[(i+1)%n]] for i in range(n))
+        if curr_length < best_length:
+            best_length = curr_length
+            best_tour = curr_tour.copy()
+    report_best_tour(best_tour.copy())
+    # Steepest-ascent 2-opt with double-bridge perturbation
+    current_tour = best_tour.copy()
+    current_length = best_length
+    attempts = 0
+    improved = True
+    visited_tours = set()
+    visited_tours.add(tuple(current_tour))
+    while attempts < budget and improved:
+        improved = False
+        best_delta = 0
+        best_i = best_j = None
+        # scan all (i,j) pairs for best improvement
+        for i in range(n-1):
+            if attempts >= budget:
+                break
+            for j in range(i+2, n):
+                if attempts >= budget:
+                    break
+                if i == 0 and j == n-1:
+                    continue
+                a = current_tour[i]
+                b = current_tour[(i+1)%n]
+                c = current_tour[j]
+                d = current_tour[(j+1)%n]
+                old = distance_matrix[a,b] + distance_matrix[c,d]
+                new = distance_matrix[a,c] + distance_matrix[b,d]
+                attempts += 1
+                if new < old:
+                    delta = new - old
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_i = i
+                        best_j = j
+                        improved = True
+            if attempts >= budget:
+                break
+        if improved:
+            i, j = best_i, best_j
+            current_tour[i+1:j+1] = current_tour[i+1:j+1][::-1]
+            current_length += best_delta
+            report_best_tour(current_tour.copy())
+            if current_length < best_length:
+                best_length = current_length
+                best_tour = current_tour.copy()
+            visited_tours.add(tuple(current_tour))
+        else:
+            # double-bridge perturbation
+            if attempts < budget:
+                for _ in range(5):
+                    cut1 = rng.randint(1, n//2)
+                    cut2 = rng.randint(cut1+1, 3*n//4)
+                    cut3 = rng.randint(cut2+1, n-1)
+                    if cut1 < cut2 < cut3:
+                        new_tour = np.concatenate([current_tour[:cut1], current_tour[cut3:], current_tour[cut2:cut3], current_tour[cut1:cut2]])
+                        if len(new_tour) == n:
+                            tup = tuple(new_tour)
+                            if tup not in visited_tours:
+                                current_tour = new_tour
+                                current_length = sum(distance_matrix[current_tour[i], current_tour[(i+1)%n]] for i in range(n))
+                                visited_tours.add(tup)
+                                attempts += 1
+                                improved = True
+                                break
+                if not improved:
+                    break
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000045 LLM reflection:
+- Summary: Steepest-ascent 2-opt with 10 regret-insertion restarts and double-bridge perturbation improved tour length by ~0.1 over first-improvement parent (17.42 vs 17.52).
+- Aim: Increase perturbation diversity to escape deep local minima more effectively within the budget.
+- Preserve: regret-insertion restarts; steepest-ascent best-improvement 2-opt; report_best_tour on each improvement
+- Change: Replace double-bridge perturbation with a single random 2-opt swap that may be accepted even without immediate gain; Optionally increase restart count from 10 to 15 if budget permits
+- Avoid: Reverting to first-improvement 2-opt; Adding random shuffle to 2-opt scans; Costly perturbation iterations that waste budget
+
+Parent cand_000031 LLM reflection:
+- Summary: Candidate achieved fast runtime (0.79s) but poorer tour quality (19.09 vs parent 17.47) due to cheap construction and small candidate list.
+- Aim: Improve tour quality by using a more effective initial construction or slightly larger candidate list while keeping runtime under strict budget.
+- Preserve: fast nearest neighbor construction; double-bridge perturbation for escape; small candidate list for fast 2-opt
+- Change: replace nearest neighbor with a cheap regret-based insertion (e.g., using partial candidate list); increase candidate list size to 30-40 for better 2-opt moves
+- Avoid: reintroducing heavy construction that caused previous slow runtime; overcomplicating restart logic or adding excessive budget checks
+
+Parent cand_000084 LLM reflection:
+- Summary: Candidate improved over immediate parent but remained 0.0097 above best parent, achieving moderate quality with efficient budget use.
+- Aim: Increase solution quality by strengthening local search (e.g., steepest-ascent 2-opt or Or-opt) without exhausting budget, leveraging efficient construction and perturbation.
+- Preserve: regret insertion with random start and tie-breaking; nearest-neighbor candidate list (k=50); incremental distance updates; periodic restart on stagnation
+- Change: Replace first-improvement 2-opt with limited steepest-ascent scan (evaluate all candidate moves per iteration, apply best improvement); Replace random 2-opt perturbation with double-bridge kick for stronger diversification
+- Avoid: removing or shrinking candidate list; drastically increasing per-iteration cost; invalid tours or excessive budget consumption; overly aggressive restart threshold discarding good solutions
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour, even when budget is very small.
+- Use only distance_matrix; do not assume coordinates.
+- Use seed for randomness.
+- Treat budget as a hard cap on search effort.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

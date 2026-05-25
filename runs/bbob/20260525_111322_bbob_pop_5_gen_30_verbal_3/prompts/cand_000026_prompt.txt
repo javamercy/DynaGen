@@ -1,0 +1,235 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000009: multi_start_pattern_search
+Status: valid; mean AOCC score: 0.2518 (higher is better)
+Thought: Multi-start pattern search optimizer. Divides budget into multiple independent pattern search runs from random initial points. Each run polls positive and negative coordinate directions with adaptive step size: expands step on success, contracts on failure. When step size shrinks below a threshold or run budget exhausted, restarts from a new random point. Uses seed for reproducibility via numpy RandomState. Tracks best overall and calls report_best on improvement. All points clipped to bounds.
+Mean AOCC: 0.2518003900288531
+Mean final error: 41.92829707024654
+AOCC by group: {'high_conditioning_unimodal': 0.15736624185300888, 'low_moderate_conditioning': 0.16032172064141306, 'multimodal_strong_global_structure': 0.09911771932020687, 'multimodal_weak_global_structure': 0.20469496723662264, 'separable': 0.6192055672155262}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_val = float('inf')
+        best_x = None
+
+        while budget > 0:
+            # Start a new pattern search from random point
+            x = lb + (ub - lb) * rng.rand(dim)
+            val = func(x)
+            budget -= 1
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+
+            step = 0.1 * np.mean(ub - lb)
+            step_min = 1e-10 * np.mean(ub - lb)
+
+            # Generate directions: positive and negative axes
+            directions = []
+            for i in range(dim):
+                e = np.zeros(dim)
+                e[i] = 1.0
+                directions.append(e)
+                directions.append(-e)
+
+            improved = True
+            while budget > 0 and step > step_min:
+                if not improved:
+                    step *= 0.5
+                    if step < step_min:
+                        break
+                improved = False
+                for d in directions:
+                    if budget <= 0:
+                        break
+                    candidate = np.clip(x + step * d, lb, ub)
+                    val = func(candidate)
+                    budget -= 1
+                    if val < best_val:
+                        best_val = val
+                        best_x = candidate.copy()
+                        report_best(best_val, best_x)
+                        x = candidate
+                        improved = True
+                        break
+                if not improved:
+                    step *= 0.5
+        return best_val, best_x
+```
+
+Candidate cand_000013: intensified_pattern_search
+Status: valid; mean AOCC score: 0.294226 (higher is better)
+Thought: Exploitation-focused version of multi-start pattern search. Starts by evaluating a fraction of the budget (10%) on random points to identify a promising region, then performs a single pattern search from the best point. Pattern search polls coordinate directions with adaptive step size: expands step by 1.2 on success, contracts by 0.5 on failure. When step size falls below a very small threshold (1e-12 * scale), it triggers a local restart: a small Gaussian perturbation (0.1 * scale) around the current best point, resets step size, and continues pattern search. This concentrates budget on refining the best solution found, avoiding wasteful random restarts. Seed controls the initial sampling and perturbations via numpy RandomState.
+Mean AOCC: 0.2942262496301849
+Mean final error: 16.881349415578523
+AOCC by group: {'high_conditioning_unimodal': 0.1553118451794828, 'low_moderate_conditioning': 0.3034475793754159, 'multimodal_strong_global_structure': 0.16422553849972563, 'multimodal_weak_global_structure': 0.22631979240401953, 'separable': 0.6236707586413269}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = np.random.RandomState(self.seed)
+        scale = np.mean(ub - lb)
+
+        # Initial random sampling to find a good starting point
+        n_init = max(1, int(0.1 * budget))
+        best_val = float('inf')
+        best_x = None
+        for _ in range(n_init):
+            x = lb + (ub - lb) * rng.rand(dim)
+            val = func(x)
+            budget -= 1
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            if budget <= 0:
+                return best_val, best_x
+
+        # Pattern search starting from best initial point
+        x = best_x.copy()
+        step = 0.1 * scale
+        step_min = 1e-12 * scale
+        directions = []
+        for i in range(dim):
+            e = np.zeros(dim)
+            e[i] = 1.0
+            directions.append(e)
+            directions.append(-e)
+
+        while budget > 0:
+            improved = False
+            for d in directions:
+                if budget <= 0:
+                    break
+                candidate = np.clip(x + step * d, lb, ub)
+                val = func(candidate)
+                budget -= 1
+                if val < best_val:
+                    best_val = val
+                    best_x = candidate.copy()
+                    report_best(best_val, best_x)
+                    x = candidate
+                    improved = True
+                    step *= 1.2
+                    break
+            if not improved:
+                step *= 0.5
+                if step < step_min:
+                    # Local restart around best point
+                    x = best_x + 0.1 * scale * rng.randn(dim)
+                    x = np.clip(x, lb, ub)
+                    val = func(x)
+                    budget -= 1
+                    if val < best_val:
+                        best_val = val
+                        best_x = x.copy()
+                        report_best(best_val, best_x)
+                    else:
+                        x = best_x.copy()
+                    step = 0.1 * scale
+            if budget <= 0:
+                break
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e3_hybrid_recombination
+
+GOAL: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

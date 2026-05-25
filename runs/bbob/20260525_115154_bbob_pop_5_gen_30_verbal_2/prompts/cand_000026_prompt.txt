@@ -1,0 +1,208 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000021: adaptive_de_restart
+Status: valid; mean AOCC score: 0.254003 (higher is better)
+Thought: Adaptive Differential Evolution with success-history adaptation of F and CR, and periodic restart to maintain diversity. Population size scales with dimension (max(4*dim,10)). Adaptation uses a memory of successful parameter values, sampled per individual. When population diversity drops below a threshold, a partial restart reinitializes 70% of the population while keeping the best. This improves exploration on multimodal functions and adaptation on high-conditioning landscapes.
+Mean AOCC: 0.2540034553746221
+Mean final error: 8.273193364257358
+AOCC by group: {'high_conditioning_unimodal': 0.18341732427079074, 'low_moderate_conditioning': 0.26571600267645495, 'multimodal_strong_global_structure': 0.2198851469729038, 'multimodal_weak_global_structure': 0.23152675836308925, 'separable': 0.3718145540502382}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        import numpy as np
+        rng = np.random.RandomState(self.seed)
+        dim = self.dim
+        budget = self.budget
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+
+        pop_size = max(4 * dim, 10)
+        if pop_size > budget // 2:
+            pop_size = max(3, budget // 2)
+
+        pop = rng.uniform(lb, ub, size=(pop_size, dim))
+        fitness = np.full(pop_size, np.inf)
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        for i in range(pop_size):
+            if evals >= budget:
+                break
+            fitness[i] = func(pop[i])
+            evals += 1
+            if fitness[i] < best_val:
+                best_val = fitness[i]
+                best_x = pop[i].copy()
+                report_best(best_val, best_x)
+
+        # Success-history memory for F and CR
+        mem_f = np.full(5, 0.5)
+        mem_cr = np.full(5, 0.8)
+        mem_idx = 0
+
+        # Track initial diversity for restart
+        init_std = np.std(pop, axis=0).mean()
+
+        while evals < budget:
+            # Adaptive F and CR per individual
+            F_array = np.zeros(pop_size)
+            CR_array = np.zeros(pop_size)
+            for i in range(pop_size):
+                idx = rng.randint(len(mem_f))
+                F_array[i] = rng.uniform(mem_f[idx] - 0.1, mem_f[idx] + 0.1)
+                F_array[i] = np.clip(F_array[i], 0.1, 0.9)
+                CR_array[i] = rng.uniform(mem_cr[idx] - 0.1, mem_cr[idx] + 0.1)
+                CR_array[i] = np.clip(CR_array[i], 0.0, 1.0)
+
+            new_pop = np.empty_like(pop)
+            new_fitness = np.empty(pop_size)
+            success_F = []
+            success_CR = []
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                candidates = list(range(pop_size))
+                candidates.remove(i)
+                a, b, c = rng.choice(candidates, size=3, replace=False)
+                mutant = pop[a] + F_array[i] * (pop[b] - pop[c])
+                mutant = np.clip(mutant, lb, ub)
+                j_rand = rng.randint(dim)
+                trial = pop[i].copy()
+                for j in range(dim):
+                    if rng.rand() < CR_array[i] or j == j_rand:
+                        trial[j] = mutant[j]
+                trial_fit = func(trial)
+                evals += 1
+                if trial_fit < fitness[i]:
+                    new_pop[i] = trial
+                    new_fitness[i] = trial_fit
+                    success_F.append(F_array[i])
+                    success_CR.append(CR_array[i])
+                    if trial_fit < best_val:
+                        best_val = trial_fit
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+                else:
+                    new_pop[i] = pop[i]
+                    new_fitness[i] = fitness[i]
+            pop = new_pop
+            fitness = new_fitness
+
+            # Update memory with success parameters
+            if len(success_F) > 0:
+                weights = np.array([1.0] * len(success_F))
+                mean_F = np.average(success_F, weights=weights)
+                mean_CR = np.average(success_CR, weights=weights)
+                mem_f[mem_idx] = mean_F
+                mem_cr[mem_idx] = mean_CR
+                mem_idx = (mem_idx + 1) % len(mem_f)
+
+            # Check diversity for restart
+            if evals < budget:
+                current_std = np.std(pop, axis=0).mean()
+                if current_std < 0.1 * init_std and evals < budget - pop_size:
+                    # Keep best, reinitialize 70% of rest
+                    keep = np.argmin(fitness)
+                    n_restart = int(0.7 * pop_size)
+                    idx_restart = rng.choice([i for i in range(pop_size) if i != keep], size=n_restart, replace=False)
+                    for idx in idx_restart:
+                        pop[idx] = rng.uniform(lb, ub, size=dim)
+                        if evals >= budget:
+                            break
+                        fitness[idx] = func(pop[idx])
+                        evals += 1
+                        if fitness[idx] < best_val:
+                            best_val = fitness[idx]
+                            best_x = pop[idx].copy()
+                            report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000007 LLM reflection:
+- Summary: DE with local search achieved mean AOCC 0.4366, slightly worse than parent 0.4517, with poor performance on multimodal and high-conditioning functions.
+- Aim: Improve multimodal and high-conditioning function performance via enhanced exploration and adaptation.
+- Preserve: DE rand/1/bin core; population size scaling
+- Change: Replace static local search with adaptive restart or diversity mechanism; Dynamically adjust F and CR based on progress
+- Avoid: Over-exploitation early; Wasting budget on local search in multimodal landscapes
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.
