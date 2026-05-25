@@ -8,8 +8,6 @@ class InterfaceLLM:
         self.model_LLM = model_LLM
         self.debug_mode = debug_mode
 
-        print("- check remote LLM API")
-
         if self.api_key is None or self.api_endpoint is None or self.api_key == 'xxx' or self.api_endpoint == 'xxx':
             print(">> Stop with wrong API setting: Set api_endpoint (e.g., api.chat...) and api_key (e.g., kx-...) !")
             exit()

@@ -6,6 +6,7 @@ import types
 import pickle
 import random
 import resource
+import platform
 import argparse
 import warnings
 
@@ -26,6 +27,7 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super().default(obj)
+
 
 # class EVOL:
 #     def __init__(self, paras, prob=None):
@@ -66,9 +68,10 @@ class NumpyEncoder(json.JSONEncoder):
 
 def evaluate(eva, code_string):
     # set memory limit to avoid getting killed by OS
-    soft_limit_bytes = 4 * 1024 * 1024 * 1024  # 4 GB
-    hard_limit_bytes = 5 * 1024 * 1024 * 1024  # 5 GB
-    resource.setrlimit(resource.RLIMIT_AS, (soft_limit_bytes, hard_limit_bytes))
+    if platform.system() != "Darwin":
+        soft_limit_bytes = 4 * 1024 * 1024 * 1024  # 4 GB
+        hard_limit_bytes = 5 * 1024 * 1024 * 1024  # 5 GB
+        resource.setrlimit(resource.RLIMIT_AS, (soft_limit_bytes, hard_limit_bytes))
 
     # noinspection PyBroadException
     try:
@@ -96,7 +99,51 @@ def evaluate(eva, code_string):
         return None, {}
 
 
-api_key = ""
+api_key = os.environ.get("DEEPSEEK_API_KEY")
+
+VRP_PROBLEM = "vrp_construct"
+VRP_DATASET = "1"
+VRP_TRAIN_DATA_PATH = "./training_data_1/instances.pkl"
+VRP_TEST_DATA_DIR = "./testing/vrp/testing_data_1"
+VRP_TRAIN_SIZE = 100
+VRP_TRAIN_INSTANCES = 20
+VRP_TEST_SIZES = [10, 20, 50, 100, 200]
+VRP_TEST_INSTANCES = 64
+VRP_POP_SIZE = 5
+VRP_GENS = 2
+VRP_TIMEOUT = 180
+VRP_LLM_ENDPOINT = "api.deepseek.com"
+VRP_LLM_MODEL = "deepseek-v4-flash"
+REQUIRED_ORTOOL_KEYS = {"total_distance", "max_distance", "distances", "routes", "missed"}
+
+
+def load_vrp_pickle(path: str, expected_instances: int, expected_nodes: int):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"path does not exist: {path}")
+
+    with open(path, 'rb') as f:
+        dataset = pickle.load(f)
+
+    if len(dataset) != expected_instances:
+        raise ValueError(f"{path} has {len(dataset)} instances, expected {expected_instances}")
+
+    for idx, instance in enumerate(dataset):
+        if not isinstance(instance, tuple) or len(instance) != 3:
+            raise ValueError(f"{path} instance {idx} is not a 3-tuple")
+
+        coordinates, _, ortool = instance
+        if len(coordinates) != expected_nodes:
+            raise ValueError(f"{path} instance {idx} has {len(coordinates)} nodes, expected {expected_nodes}")
+
+        if not isinstance(ortool, dict):
+            raise ValueError(f"{path} instance {idx} does not contain an OR-Tools dict")
+
+        missing_keys = REQUIRED_ORTOOL_KEYS - set(ortool.keys())
+        if missing_keys:
+            raise ValueError(f"{path} instance {idx} OR-Tools reference missing keys: {sorted(missing_keys)}")
+
+    return dataset
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Handler interface for running experiments.')
@@ -105,7 +152,7 @@ if __name__ == "__main__":
     parser.add_argument('dataset',
                         type=str, help='which dataset to use for testing and training')
     parser.add_argument('-m', '--model',
-                        type=str, default='gpt-3.5-turbo', help='model to use to generate heuristic')
+                        type=str, default=VRP_LLM_MODEL, help='ignored for VRP; kept for compatibility')
     parser.add_argument('--mini',
                         action='store_true', default=False, help='perform a miniature test run')
     parser.add_argument('-n', '--n_threads',
@@ -113,6 +160,18 @@ if __name__ == "__main__":
     parser.add_argument('--eval',
                         action='store_true', default=False, help='just evaluate the results')
     args = parser.parse_args()
+
+    if args.exp != VRP_PROBLEM:
+        print(f"Error: this runner is configured for {VRP_PROBLEM} only.")
+        exit(1)
+
+    if args.dataset != VRP_DATASET:
+        print(f"Error: this runner uses dataset {VRP_DATASET} only.")
+        exit(1)
+
+    if not api_key:
+        print("Error: set DEEPSEEK_API_KEY in the environment.")
+        exit(1)
 
     short_name = args.exp.split('_')[0]
     short_type = args.exp.split('_')[1]
@@ -124,25 +183,22 @@ if __name__ == "__main__":
 
     # Parameter initialization
     paras = Paras()
+    n_proc = os.cpu_count() or 1
 
     # Set parameters
     paras.set_paras(method="eoh",
                     problem=args.exp,
-                    llm_api_endpoint="api.openai.com",
+                    llm_api_endpoint=VRP_LLM_ENDPOINT,
                     llm_api_key=api_key,
-                    llm_model=args.model,
-                    ec_pop_size=10,  # number of samples in each population
-                    ec_n_pop=20,  # number of populations
-                    # ec_pop_size=5,  # number of samples in each population
-                    # ec_n_pop=10,  # number of populations
-                    # ec_pop_size=5,  # number of samples in each population
-                    # ec_n_pop=10,  # number of populations
-                    exp_n_proc=8,  # multi-core parallel
+                    llm_model=VRP_LLM_MODEL,
+                    ec_pop_size=VRP_POP_SIZE,  # number of samples in each population
+                    ec_n_pop=VRP_GENS,  # number of generations
+                    exp_n_proc=n_proc,  # parallel LLM/evaluation workers
                     exp_extended_init=True,
                     exp_strict_init=True,
                     exp_debug_mode=False,
                     eva_numba_decorator=False,
-                    eva_timeout=180,  # Set the maximum evaluation time for each heuristic (increase it if more instances are used for evaluation)
+                    eva_timeout=VRP_TIMEOUT,  # maximum evaluation time for each heuristic
                     )
 
     if args.mini:
@@ -152,12 +208,13 @@ if __name__ == "__main__":
     print("-  parameters loaded -")
 
     # Check if the results folder already exists
-    results = os.path.join("./testing", short_name, long_name, "results_" + args.model)
+    run_name = f"results_{VRP_LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}"
+    results = os.path.join("./testing", short_name, long_name, run_name)
     if not os.path.exists(results):
         os.makedirs(results)
     # else:
-        # print(f"Error: already exists {results}")
-        # exit(1)
+    # print(f"Error: already exists {results}")
+    # exit(1)
 
     # Create subfolders
     subfolders = ["pops", "pops_best", "eval"]
@@ -170,20 +227,17 @@ if __name__ == "__main__":
     paras.exp_output_path = results
 
     # Load training dataset
-    n_test_ins = 8
-    instance_file_name = f"./testing/{short_name}/training_data_{args.dataset}/instances.pkl"
+    n_test_ins = VRP_TRAIN_INSTANCES
+    instance_file_name = VRP_TRAIN_DATA_PATH
     print(f"Loading training dataset from {instance_file_name}")
-    if not os.path.exists(instance_file_name):
-        print(f"Error: path does not exist {instance_file_name}")
-        exit(1)
-    with open(instance_file_name, 'rb') as f:
-        instance_dataset = pickle.load(f)
+    instance_dataset = load_vrp_pickle(instance_file_name, VRP_TRAIN_INSTANCES, VRP_TRAIN_SIZE)
     print("- training dataset loaded -")
 
     # Load the problem
     random.seed(2024)  # set a random seed
     problem_generator = problems.Probs(paras.problem)
-    problem = problem_generator.get_problem(instance_dataset, 50, n_test_ins)
+    problem = problem_generator.get_problem(instance_dataset, VRP_TRAIN_SIZE, n_test_ins)
+    problem.n_jobs = 1  # EoH already parallelizes candidate evaluations across CPU cores.
 
     train_start = time.time()
     if not args.eval:
@@ -207,9 +261,7 @@ if __name__ == "__main__":
         if f"population_generation_{i}.json" in files:
             last_generation = f"population_generation_{i}.json"
 
-
     # last_generation = "population_generation_10.json"
-
 
     pop_file = os.path.join(results, "pops_best", last_generation)
     print(f"Using population from {pop_file}")
@@ -226,8 +278,8 @@ if __name__ == "__main__":
     with open(baseline_path, 'r') as file:
         baseline_code_string = file.read()
 
-    problem_size = [10, 20, 50, 100, 200]
-    n_test_ins = 64
+    problem_size = VRP_TEST_SIZES
+    n_test_ins = VRP_TEST_INSTANCES
     print("Start evaluation...")
 
     o_avg_max_dis = []
@@ -249,6 +301,7 @@ if __name__ == "__main__":
     h_feasible = []
 
     eval_results = os.path.join(results, "eval")
+    summary = {}
     with (open(os.path.join(eval_results, "results.txt"), "w") as file):
         file.write(f"Train time: {train_time}\n")
 
@@ -256,11 +309,11 @@ if __name__ == "__main__":
         heuristic_results = {}
 
         for size in problem_size:
-            instance_file_name = f"./testing/{short_name}/testing_data_{args.dataset}/instance_data_{size}.pkl"
-            with open(instance_file_name, 'rb') as f:
-                instance_dataset = pickle.load(f)
+            instance_file_name = os.path.join(VRP_TEST_DATA_DIR, f"instance_data_{size}.pkl")
+            instance_dataset = load_vrp_pickle(instance_file_name, n_test_ins, size)
 
             eva = problem_generator.get_problem(instance_dataset, size, n_test_ins)
+            eva.n_jobs = n_proc
 
             b_time_start = time.time()
             # b_score, b_results = evaluate(eva, baseline_code_string)
@@ -271,6 +324,7 @@ if __name__ == "__main__":
             # h_score, h_results = evaluate(eva, heuristic_code_string)
             _, h_all_results = evaluate(eva, heuristic_code_string)
             h_time_res = time.time() - h_time_start
+
 
             def unpack_results(results):
                 missed = 0
@@ -299,6 +353,7 @@ if __name__ == "__main__":
 
                 return missed, unfeasible, max_diss, scores
 
+
             # if "missed" in h_all_results["ortool"][0].keys():
             #     o_results = [ort["max_distance"] for ort in h_all_results["ortool"] if ort["missed"] == 0]
             # else:
@@ -312,39 +367,39 @@ if __name__ == "__main__":
                     if h_all_results["ortool"][i]["missed"] > 0:
                         o_unfeasible += 1
             o_missed_percent = (o_missed / (n_test_ins * size)) * 100
-            o_success_percent = (1 - o_unfeasible/n_test_ins) * 100
+            o_success_percent = (1 - o_unfeasible / n_test_ins) * 100
 
             b_missed, b_unfeasible, b_results, b_scores = unpack_results(b_all_results)
             b_result = np.average(b_results)
             b_score = np.average(b_scores)
             b_missed_percent = (b_missed / (n_test_ins * size)) * 100
-            b_success_percent = (1 - b_unfeasible/n_test_ins) * 100
+            b_success_percent = (1 - b_unfeasible / n_test_ins) * 100
 
             h_missed, h_unfeasible, h_results, h_scores = unpack_results(h_all_results)
             h_result = np.average(h_results)
             h_score = np.average(h_scores)
             h_missed_percent = (h_missed / (n_test_ins * size)) * 100
-            h_success_percent = (1 - h_unfeasible/n_test_ins) * 100
+            h_success_percent = (1 - h_unfeasible / n_test_ins) * 100
 
             try:
                 header = f"Instance size {size} with {len(h_all_results['ortool'][0]['routes'])} trucks:\n"
             except:
                 header = f"Instance size {size}:\n"
             result = (
-                header +
-                f" - OR-Tool avg dist: {o_result:.3f}\n"
-                f" - OR-Tool missed (%): {o_missed_percent:.3f}\n"
-                f" - OR-Tool feasible (%): {o_success_percent:.3f}\n"
-                f" - Baseline avg dist: {b_result:.3f}\n"
-                f" - Baseline avg score: {b_score:.3f}\n"
-                f" - Baseline missed (%): {b_missed_percent:.3f}\n"
-                f" - Baseline feasible (%): {b_success_percent:.3f}\n"
-                f" - Time taken: {b_time_res:.3f}\n"
-                f" - Heuristic avg dist: {h_result:.3f}\n"
-                f" - Heuristic avg score: {h_score:.3f}\n"
-                f" - Heuristic missed (%): {h_missed_percent:.3f}\n"
-                f" - Heuristic feasible (%): {h_success_percent:.3f}\n"
-                f" - Time taken: {h_time_res:.3f}\n"
+                    header +
+                    f" - OR-Tool TTT: {o_result:.3f}\n"
+                    f" - OR-Tool missed (%): {o_missed_percent:.3f}\n"
+                    f" - OR-Tool feasible (%): {o_success_percent:.3f}\n"
+                    f" - Baseline TTT: {b_result:.3f}\n"
+                    f" - Baseline gap (%): {b_score:.3f}\n"
+                    f" - Baseline missed (%): {b_missed_percent:.3f}\n"
+                    f" - Baseline feasible (%): {b_success_percent:.3f}\n"
+                    f" - Time taken: {b_time_res:.3f}\n"
+                    f" - Heuristic TTT: {h_result:.3f}\n"
+                    f" - Heuristic gap (%): {h_score:.3f}\n"
+                    f" - Heuristic missed (%): {h_missed_percent:.3f}\n"
+                    f" - Heuristic feasible (%): {h_success_percent:.3f}\n"
+                    f" - Time taken: {h_time_res:.3f}\n"
             )
             print(result)
             file.write(result + "\n")
@@ -367,32 +422,142 @@ if __name__ == "__main__":
             h_missed_p.append(h_missed_percent)
             h_feasible.append(h_success_percent)
 
+            baseline_results[str(size)] = {
+                "ttt": b_result,
+                "gap_percent": b_score,
+                "gaps_percent": b_scores,
+                "missed_percent": b_missed_percent,
+                "feasible_percent": b_success_percent,
+                "eval_time_seconds": b_time_res,
+                "results": b_all_results,
+            }
+            heuristic_results[str(size)] = {
+                "ttt": h_result,
+                "gap_percent": h_score,
+                "gaps_percent": h_scores,
+                "missed_percent": h_missed_percent,
+                "feasible_percent": h_success_percent,
+                "eval_time_seconds": h_time_res,
+                "results": h_all_results,
+            }
+
+        gap_by_size = {str(size): float(gap) for size, gap in zip(problem_size, h_avg_scores)}
+        ttt_by_size = {str(size): float(ttt) for size, ttt in zip(problem_size, h_avg_max_dis)}
+        mean_gap = float(np.average(h_avg_scores))
+        mean_ttt = float(np.average(h_avg_max_dis))
+        summary = {
+            "problem": args.exp,
+            "dataset": args.dataset,
+            "training_instances": VRP_TRAIN_INSTANCES,
+            "training_nodes": VRP_TRAIN_SIZE,
+            "test_instances_per_size": VRP_TEST_INSTANCES,
+            "test_sizes": problem_size,
+            "parallel_workers": n_proc,
+            "pop_size": paras.ec_pop_size,
+            "gens": paras.ec_n_pop,
+            "timeout_seconds": paras.eva_timeout,
+            "gap_by_instance_size": gap_by_size,
+            "mean_gap": mean_gap,
+            "ttt_by_instance_size": ttt_by_size,
+            "mean_ttt": mean_ttt,
+            "ttt_value": mean_ttt,
+            "train_time_seconds": train_time,
+            "heuristic_eval_time_seconds": float(sum(h_eval_times)),
+        }
+        summary_text = (
+            "Summary:\n"
+            f" - Gap by size (%): {gap_by_size}\n"
+            f" - mean_gap (%): {mean_gap:.3f}\n"
+            f" - TTT by size: {ttt_by_size}\n"
+            f" - TTT value: {mean_ttt:.3f}\n"
+        )
+        print(summary_text)
+        file.write(summary_text + "\n")
+
     with open(os.path.join(eval_results, "baseline_results.json"), "w") as file:
         file.write(json.dumps(baseline_results, indent=4, cls=NumpyEncoder))
     with open(os.path.join(eval_results, "heuristic_results.json"), "w") as file:
         file.write(json.dumps(heuristic_results, indent=4, cls=NumpyEncoder))
+    with open(os.path.join(eval_results, "summary.json"), "w") as file:
+        file.write(json.dumps(summary, indent=4, cls=NumpyEncoder))
 
     # save this stuff
     latex = (
-        "OR-Tool"             + "".join(f" & {x:.3f}" for x in o_avg_max_dis) + " \\\\\n"
-        "OR-Tool missed"      + "".join(f" & {x:.3f}" for x in o_missed_p) + " \\\\\n"
-        "OR-Tool feasible"    + "".join(f" & {x:.3f}" for x in o_feasible) + " \\\\\n"
-        "Baseline"            + "".join(f" & {x:.3f}" for x in b_avg_max_dis) + " \\\\\n"
-        "Baseline score"      + "".join(f" & {x:.3f}" for x in b_avg_scores) + " \\\\\n"
-        "Baseline missed"     + "".join(f" & {x:.3f}" for x in b_missed_p) + " \\\\\n"
-        "Baseline feasible"   + "".join(f" & {x:.3f}" for x in b_feasible) + " \\\\\n"
-        "Time (Sec)"          + "".join(f" & {x:.3f}" for x in b_eval_times) + " \\\\\n"
-        "Heuristic"           + "".join(f" & {x:.3f}" for x in h_avg_max_dis) + " \\\\\n"
-        "Heuristic score"     + "".join(f" & {x:.3f}" for x in h_avg_scores) + " \\\\\n"
-        "Heuristic missed"    + "".join(f" & {x:.3f}" for x in h_missed_p) + " \\\\\n"
-        "Heuristic feasible"  + "".join(f" & {x:.3f}" for x in h_feasible) + " \\\\\n"
-        "Time (Sec)"          + "".join(f" & {x:.3f}" for x in h_eval_times) + " \\\\\n"
+            "OR-Tool" + "".join(f" & {x:.3f}" for x in o_avg_max_dis) + " \\\\\n"
+                                                                        "OR-Tool missed" + "".join(
+        f" & {x:.3f}" for x in o_missed_p) + " \\\\\n"
+                                             "OR-Tool feasible" + "".join(f" & {x:.3f}" for x in o_feasible) + " \\\\\n"
+                                                                                                               "Baseline" + "".join(
+        f" & {x:.3f}" for x in b_avg_max_dis) + " \\\\\n"
+                                                "Baseline score" + "".join(
+        f" & {x:.3f}" for x in b_avg_scores) + " \\\\\n"
+                                               "Baseline missed" + "".join(
+        f" & {x:.3f}" for x in b_missed_p) + " \\\\\n"
+                                             "Baseline feasible" + "".join(
+        f" & {x:.3f}" for x in b_feasible) + " \\\\\n"
+                                             "Time (Sec)" + "".join(f" & {x:.3f}" for x in b_eval_times) + " \\\\\n"
+                                                                                                           "Heuristic" + "".join(
+        f" & {x:.3f}" for x in h_avg_max_dis) + " \\\\\n"
+                                                "Heuristic score" + "".join(
+        f" & {x:.3f}" for x in h_avg_scores) + " \\\\\n"
+                                               "Heuristic missed" + "".join(
+        f" & {x:.3f}" for x in h_missed_p) + " \\\\\n"
+                                             "Heuristic feasible" + "".join(
+        f" & {x:.3f}" for x in h_feasible) + " \\\\\n"
+                                             "Time (Sec)" + "".join(f" & {x:.3f}" for x in h_eval_times) + " \\\\\n"
     )
+    latex = (
+            "OR-Tool TTT" + "".join(f" & {x:.3f}" for x in o_avg_max_dis) + " \\\\n"
+                                                                            "OR-Tool missed" + "".join(
+        f" & {x:.3f}" for x in o_missed_p) + " \\\\n"
+                                             "OR-Tool feasible" + "".join(f" & {x:.3f}" for x in o_feasible) + " \\\\n"
+                                                                                                               "Baseline TTT" + "".join(
+        f" & {x:.3f}" for x in b_avg_max_dis) + " \\\\n"
+                                                "Baseline gap" + "".join(f" & {x:.3f}" for x in b_avg_scores) + " \\\\n"
+                                                                                                                "Baseline missed" + "".join(
+        f" & {x:.3f}" for x in b_missed_p) + " \\\\n"
+                                             "Baseline feasible" + "".join(f" & {x:.3f}" for x in b_feasible) + " \\\\n"
+                                                                                                                "Time (Sec)" + "".join(
+        f" & {x:.3f}" for x in b_eval_times) + " \\\\n"
+                                               "Heuristic TTT" + "".join(
+        f" & {x:.3f}" for x in h_avg_max_dis) + " \\\\n"
+                                                "Heuristic gap" + "".join(
+        f" & {x:.3f}" for x in h_avg_scores) + " \\\\n"
+                                               "Heuristic missed" + "".join(
+        f" & {x:.3f}" for x in h_missed_p) + " \\\\n"
+                                             "Heuristic feasible" + "".join(
+        f" & {x:.3f}" for x in h_feasible) + " \\\\n"
+                                             "Time (Sec)" + "".join(f" & {x:.3f}" for x in h_eval_times) + " \\\\n"
+                                                                                                           f"mean_gap & {summary['mean_gap']:.3f} \\\\n"
+                                                                                                           f"TTT value & {summary['ttt_value']:.3f} \\\\n"
+    )
+    latex_eol = f" {chr(92) * 2}\n"
+    latex_rows = [
+        ("OR-Tool TTT", o_avg_max_dis),
+        ("OR-Tool missed", o_missed_p),
+        ("OR-Tool feasible", o_feasible),
+        ("Baseline TTT", b_avg_max_dis),
+        ("Baseline gap", b_avg_scores),
+        ("Baseline missed", b_missed_p),
+        ("Baseline feasible", b_feasible),
+        ("Time (Sec)", b_eval_times),
+        ("Heuristic TTT", h_avg_max_dis),
+        ("Heuristic gap", h_avg_scores),
+        ("Heuristic missed", h_missed_p),
+        ("Heuristic feasible", h_feasible),
+        ("Time (Sec)", h_eval_times),
+    ]
+    latex = "".join(
+        label + "".join(f" & {x:.3f}" for x in values) + latex_eol
+        for label, values in latex_rows
+    )
+    latex += f"mean_gap & {summary['mean_gap']:.3f}{latex_eol}"
+    latex += f"TTT value & {summary['ttt_value']:.3f}{latex_eol}"
     with open(os.path.join(eval_results, "latex.txt"), "w") as file:
         file.write(latex)
 
     # https://stackoverflow.com/a/63243881
-    sizes = [10, 20, 50, 100, 200]
+    sizes = VRP_TEST_SIZES
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 
     ax1.set_title("Baseline")

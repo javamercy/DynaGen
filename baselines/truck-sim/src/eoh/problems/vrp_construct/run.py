@@ -1,3 +1,6 @@
+import os
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 
 from src.eoh.problems.interface import PromptsBase, ProblemBase, truck_num_scaling
@@ -27,7 +30,7 @@ class Prompts(PromptsBase):
 
         self._prompt_func_name: str = "select_next_node"
         self._prompt_func_inputs: list[str] = ["current_node",
-                                               "truck_nodes"
+                                               "truck_nodes",
                                                "depot_node",
                                                "unvisited_nodes",
                                                "distance_matrix"]
@@ -41,7 +44,7 @@ class Prompts(PromptsBase):
 
 
 class VRPConstruct(ProblemBase):
-    def __init__(self, data, size: int, n_test: int):
+    def __init__(self, data, size: int, n_test: int, n_jobs: int | None = None):
         super().__init__()
         self.neighbor_size = np.minimum(50, size)
         self.running_time = 10
@@ -50,23 +53,13 @@ class VRPConstruct(ProblemBase):
         self.instance_data = data
         self.n_instance = n_test
         self.truck_num = truck_num_scaling(size)
+        self.n_jobs = n_jobs or os.cpu_count() or 1
 
         self.prompts: PromptsBase = Prompts()
 
     def eval(self, eva):
-        dis = np.zeros((self.truck_num, self.n_instance))
-        results = {
-            "heuristic": [],
-            "ortool": [],
-            "routes": [],
-        }
-        scores = []
-        n_ins = 0
-
-        for instance, distance_matrix, ortool in self.instance_data:
-            if n_ins == self.n_instance:
-                break
-
+        def eval_instance(data):
+            instance, distance_matrix, ortool = data
             # get neighborhood matrix
             neighbor_matrix = self.generate_neighborhood_matrix(instance)
             destination_node = 0
@@ -93,7 +86,6 @@ class VRPConstruct(ProblemBase):
 
                 if unvisited_near_nodes.size == 0:
                     # there are cases when heuristic cannot handle zero nodes
-                    cur_truck.wait()
                     continue
 
                 next_node = eva.select_next_node(cur_node,
@@ -110,18 +102,36 @@ class VRPConstruct(ProblemBase):
             flatten = [n for r in routes for n in r]
             assert len(flatten) == (self.problem_size + self.truck_num - 1)
 
+            distances = np.zeros(self.truck_num)
             for i in range(self.truck_num):
-                distance = self.tour_cost(instance, routes[i])
-                dis[i, n_ins] = distance
+                distances[i] = self.tour_cost(instance, routes[i])
 
-            max_dis = np.max(dis[:, n_ins])
-            scores.append(max_dis / ortool["max_distance"])
+            max_dis = np.max(distances)
+            return max_dis, max_dis / ortool["max_distance"], ortool, routes
+
+        instances = self.instance_data[:self.n_instance]
+        max_workers = min(self.n_jobs, len(instances))
+        if max_workers > 1:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                evaluated = list(executor.map(eval_instance, instances))
+        else:
+            evaluated = [eval_instance(instance) for instance in instances]
+
+        results = {
+            "heuristic": [],
+            "ortool": [],
+            "routes": [],
+            "missed": [],
+        }
+        scores = []
+
+        for max_dis, score, ortool, routes in evaluated:
+            scores.append(score)
 
             results["heuristic"].append(max_dis)
             results["ortool"].append(ortool)
             results["routes"].append(routes)
-
-            n_ins += 1
+            results["missed"].append(0)
 
         # max_dis = np.max(dis, axis=0)
         # ave_dis = np.average(max_dis)

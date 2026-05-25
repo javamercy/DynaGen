@@ -199,15 +199,11 @@ class Evolution:
         prompt_content = self.get_prompt_i1()
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ i1 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
 
@@ -215,15 +211,11 @@ class Evolution:
         prompt_content = self.get_prompt_i2()
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ i2 ] : \n", prompt_content)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
 
@@ -231,15 +223,11 @@ class Evolution:
         prompt_content = self.get_prompt_e1(parents)
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ e1 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
     
@@ -247,15 +235,11 @@ class Evolution:
         prompt_content = self.get_prompt_e2(parents)
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ e2 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
     
@@ -263,15 +247,11 @@ class Evolution:
         prompt_content = self.get_prompt_m1(parents)
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m1 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
     
@@ -279,15 +259,11 @@ class Evolution:
         prompt_content = self.get_prompt_m2(parents)
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m2 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]
     
@@ -295,14 +271,10 @@ class Evolution:
         prompt_content = self.get_prompt_m3(parents)
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m3 ] : \n", prompt_content )
-            print(">>> Press 'Enter' to continue")
-            input()
       
         [code_all, algorithm] = self._get_alg(prompt_content)
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
             print("\n >>> check designed code: \n", code_all)
-            print(">>> Press 'Enter' to continue")
-            input()
 
         return [code_all, algorithm]

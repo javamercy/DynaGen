@@ -2,7 +2,7 @@ import resource
 import sys
 import types
 import warnings
-import traceback
+import platform
 
 import numpy as np
 
@@ -82,9 +82,10 @@ class ProblemBase:
 
     def evaluate(self, code_string):
         # set memory limit to avoid getting killed by OS
-        soft_limit_bytes = 4 * 1024 * 1024 * 1024  # 4 GB
-        hard_limit_bytes = 5 * 1024 * 1024 * 1024  # 5 GB
-        resource.setrlimit(resource.RLIMIT_AS, (soft_limit_bytes, hard_limit_bytes))
+        if platform.system() != "Darwin":
+            soft_limit_bytes = 4 * 1024 * 1024 * 1024  # 4 GB
+            hard_limit_bytes = 5 * 1024 * 1024 * 1024  # 5 GB
+            resource.setrlimit(resource.RLIMIT_AS, (soft_limit_bytes, hard_limit_bytes))
 
         # noinspection PyBroadException
         try:

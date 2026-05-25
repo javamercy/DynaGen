@@ -2,7 +2,6 @@ import re
 import time
 import random
 import warnings
-
 import numpy as np
 import concurrent.futures
 
@@ -201,7 +200,6 @@ class InterfaceEC:
                 future.cancel()        
                 # fitness = self.interface_eval.evaluate(code)
 
-            print(results['missed'])
             if strict and ('missed' in results) and sum(results['missed']) > 0:
                 p = None
                 offspring = {
@@ -260,8 +258,6 @@ class InterfaceEC:
         for p, off in results:
             out_p.append(p)
             out_off.append(off)
-            if self.debug:
-                print(f">>> check offsprings: \n {off}")
         return out_p, out_off
 
     # def get_algorithm(self,pop,operator, pop_size, n_p):
