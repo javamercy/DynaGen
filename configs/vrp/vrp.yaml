@@ -16,17 +16,17 @@ llm:
   api_key_env: DEEPSEEK_API_KEY
 
 evolution:
-  population_size: 3
-  generations: 5
+  population_size: 5
+  generations: 20
   offspring_per_strategy: 1
   verbal_gradients:
-    enabled: false
+    enabled: true
     llm_model: deepseek-v4-flash
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 5
     temperature: 0.2
   history:
-    enabled: false
+    enabled: true
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]

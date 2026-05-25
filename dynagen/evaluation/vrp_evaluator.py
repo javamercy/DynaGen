@@ -19,20 +19,20 @@ class VRPCandidateEvaluator:
             self,
             instances: list[VRPInstance],
             *,
-            timeout_seconds: float,
+            timeout_seconds: float | None,
             pool_name: str,
             timeout_penalty: float = 10.0,
     ) -> None:
         if not instances:
             raise ValueError("At least one VRP instance is required for evaluation")
-        if timeout_seconds <= 0:
+        if timeout_seconds is not None and timeout_seconds <= 0:
             raise ValueError("Timeout must be a positive number")
         if timeout_penalty < 0:
             raise ValueError("Timeout penalty must be non-negative")
         if not pool_name:
             raise ValueError("Pool name cannot be empty")
         self.instances = tuple(instances)
-        self.timeout_seconds = float(timeout_seconds)
+        self.timeout_seconds = float(timeout_seconds) if timeout_seconds is not None else None
         self.timeout_penalty = float(timeout_penalty)
         self.pool_name = pool_name
 

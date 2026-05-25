@@ -38,7 +38,7 @@ def run_vrp_solver(
         code: str,
         instance: VRPInstance,
         *,
-        timeout_seconds: float,
+        timeout_seconds: float | None,
 ) -> VRPSolverRunResult:
     execution = execute_vrp_solver_code(
         code,
@@ -69,7 +69,7 @@ def execute_vrp_solver_code(
         code: str,
         instance: VRPInstance,
         *,
-        timeout_seconds: float,
+        timeout_seconds: float | None,
 ) -> VRPSolverExecutionResult:
     context = _multiprocessing_context()
     result_queue = context.Queue(maxsize=1)
@@ -78,10 +78,9 @@ def execute_vrp_solver_code(
         target=_worker,
         args=(code, instance, result_queue, best_routes_queue),
     )
-    timeout_limit = float(timeout_seconds)
     start = time.perf_counter()
     process.start()
-    payload = _get_worker_result_until_deadline(result_queue, process, start=start, timeout_seconds=timeout_limit)
+    payload = _get_worker_result_until_deadline(result_queue, process, start=start, timeout_seconds=timeout_seconds)
     runtime = time.perf_counter() - start
     if payload is not None:
         process.join(1.0)
@@ -94,7 +93,7 @@ def execute_vrp_solver_code(
         return _execution_result_from_payload(
             payload,
             reported_value=_reported_routes(best_routes_queue),
-            timeout_limit_seconds=timeout_limit,
+            timeout_limit_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
         )
     if process.is_alive():
         process.terminate()
@@ -106,8 +105,12 @@ def execute_vrp_solver_code(
             "timeout",
             reported_value=_reported_routes(best_routes_queue),
             runtime_seconds=runtime,
-            error=f"VRP solver timed out after {runtime:.6g}s (timeout_seconds={timeout_limit:.6g})",
-            timeout_limit_seconds=timeout_limit,
+            error=(
+                f"VRP solver timed out after {runtime:.6g}s (timeout_seconds={float(timeout_seconds):.6g})"
+                if timeout_seconds is not None else
+                f"VRP solver timed out after {runtime:.6g}s"
+            ),
+            timeout_limit_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
         )
     try:
         status, value, child_runtime, error = result_queue.get_nowait()
@@ -118,14 +121,14 @@ def execute_vrp_solver_code(
                 reported_value=_reported_routes(best_routes_queue),
                 runtime_seconds=runtime,
                 error="VRP solver exited without returning a result",
-                timeout_limit_seconds=timeout_limit,
+                timeout_limit_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
             )
         return VRPSolverExecutionResult(
             "error",
             reported_value=_reported_routes(best_routes_queue),
             runtime_seconds=runtime,
             error=f"VRP solver process exited with code {process.exitcode}",
-            timeout_limit_seconds=timeout_limit,
+            timeout_limit_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
         )
     return VRPSolverExecutionResult(
         status,
@@ -133,7 +136,7 @@ def execute_vrp_solver_code(
         reported_value=_reported_routes(best_routes_queue),
         runtime_seconds=child_runtime,
         error=error,
-        timeout_limit_seconds=timeout_limit,
+        timeout_limit_seconds=float(timeout_seconds) if timeout_seconds is not None else None,
     )
 
 
@@ -171,7 +174,15 @@ def _empty_run_result(
     )
 
 
-def _get_worker_result_until_deadline(result_queue, process, *, start: float, timeout_seconds: float):
+def _get_worker_result_until_deadline(result_queue, process, *, start: float, timeout_seconds: float | None):
+    if timeout_seconds is None:
+        while True:
+            try:
+                return result_queue.get(timeout=0.05)
+            except queue.Empty:
+                if not process.is_alive():
+                    return None
+
     deadline = start + float(timeout_seconds)
     while True:
         remaining = deadline - time.perf_counter()

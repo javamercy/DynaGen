@@ -92,6 +92,43 @@ class VRPFlowTests(unittest.TestCase):
         self.assertEqual(config.problem.vrp_search_limit, 2)
         self.assertIsInstance(problem_for_config(config), VRPProblem)
 
+    def test_vrp_uses_no_timeout_for_test_pool(self) -> None:
+        config = RunConfig.from_dict({
+            "run": {"name": "vrp_test", "output_dir": "runs/test", "seed": 1},
+            "llm": {
+                "provider": "ollama",
+                "model": "fake",
+                "temperature": 0.1,
+            },
+            "problem": {
+                "type": "vrp",
+                "vrp_search_limit": 2,
+                "vrp_test_sizes": [10],
+                "vrp_test_limit_per_size": 2,
+            },
+            "evolution": {
+                "population_size": 1,
+                "generations": 0,
+                "offspring_per_strategy": 1,
+                "strategies": ["e1_radical_exploration"],
+            },
+            "evaluation": {
+                "timeout_seconds": 180,
+                "metric": "mean_gap",
+            },
+            "data": {
+                "search_instances": "data/vrp/train/instances.pkl",
+                "test_instances": "data/vrp/test",
+            },
+        })
+
+        problem = VRPProblem()
+        search_evaluator = problem.build_evaluator(config, pool_name="search_instances")
+        test_evaluator = problem.build_evaluator(config, pool_name="test_instances")
+
+        self.assertEqual(search_evaluator.timeout_seconds, 180.0)
+        self.assertIsNone(test_evaluator.timeout_seconds)
+
     def test_vrp_evaluator_accepts_complete_metaheuristic_solver(self) -> None:
         instances = load_vrp_instances(
             "data/vrp/test",

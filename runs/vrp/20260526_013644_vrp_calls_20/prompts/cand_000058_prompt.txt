@@ -1,0 +1,877 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY e1_radical_exploration: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000054: refined_threshold_search
+Status: valid; gap: 3.66473
+Thought: Regret construction with random tie-breaking, threshold accepting local search (2-opt, relocate, swap) with higher initial threshold and slower decay, periodic random perturbation from longest route every 20 iterations, and restart after stagnation for 60 iterations with alternating tie-breaking to avoid premature convergence.
+Mean gap: 3.664726335407648
+Mean max route distance: 2.127803924702693
+Mean total route distance: 12.656593846911994
+Gap by instance size: {'100': 3.664726335407648}
+Gap by truck count: {'6': 3.664726335407648}
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix, truck_count):
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        return sum(distance_matrix[route[i], route[i+1]] for i in range(len(route)-1))
+
+    def compute_max_dist(routes):
+        return max(route_distance(r) for r in routes)
+
+    def build_solution(random_tie=False):
+        routes = [[0, 0] for _ in range(truck_count)]
+        route_distances = [0.0 for _ in range(truck_count)]
+        unassigned = set(customers)
+        while unassigned:
+            candidates = []
+            for cust in unassigned:
+                costs = []
+                for r in range(truck_count):
+                    route = routes[r]
+                    for pos in range(1, len(route)):
+                        delta = distance_matrix[route[pos-1], cust] + distance_matrix[cust, route[pos]] - distance_matrix[route[pos-1], route[pos]]
+                        new_dist = route_distances[r] + delta
+                        costs.append((new_dist, r, pos))
+                costs.sort(key=lambda x: x[0])
+                best = costs[0]
+                second = costs[1] if len(costs) > 1 else (float('inf'), -1, -1)
+                regret = second[0] - best[0]
+                candidates.append((regret, cust, best[1], best[2], best[0]))
+            if random_tie:
+                max_regret = max(c[0] for c in candidates)
+                tied = [c for c in candidates if c[0] == max_regret]
+                chosen = random.choice(tied)
+            else:
+                candidates.sort(key=lambda x: (-x[0], x[1]))
+                chosen = candidates[0]
+            regret, cust, r_idx, pos, new_dist = chosen
+            routes[r_idx].insert(pos, cust)
+            route_distances[r_idx] = new_dist
+            unassigned.remove(cust)
+        return routes, route_distances
+
+    # Initial construction with deterministic tie-breaking
+    routes, route_distances = build_solution(random_tie=False)
+    best_routes = [r[:] for r in routes]
+    best_max = compute_max_dist(routes)
+    try:
+        report_best_vrp(best_routes)
+    except NameError:
+        pass
+
+    current_routes = [r[:] for r in routes]
+    current_max = best_max
+    deviation = 0.2 * current_max  # higher initial threshold
+    total_iter = 500
+    stagnation_counter = 0
+    restart_flag = False
+
+    for it in range(total_iter):
+        improved = False
+
+        # Intra-route 2-opt
+        for r_idx in range(truck_count):
+            route = current_routes[r_idx]
+            if len(route) <= 3:
+                continue
+            best_i = None
+            best_j = None
+            best_new_max = current_max + deviation + 1
+            for i in range(1, len(route)-2):
+                for j in range(i+2, len(route)-1):
+                    new_route = route[:i+1] + route[j:i:-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    candidate_max = new_dist
+                    for rr in range(truck_count):
+                        if rr != r_idx:
+                            candidate_max = max(candidate_max, route_distances[rr])
+                    if candidate_max < best_new_max:
+                        best_new_max = candidate_max
+                        best_i = i
+                        best_j = j
+            if best_i is not None and best_new_max <= current_max + deviation:
+                new_route = current_routes[r_idx][:best_i+1] + current_routes[r_idx][best_j:best_i:-1] + current_routes[r_idx][best_j+1:]
+                current_routes[r_idx] = new_route
+                route_distances[r_idx] = route_distance(new_route)
+                current_max = compute_max_dist(current_routes)
+                if current_max < best_max:
+                    best_max = current_max
+                    best_routes = [r[:] for r in current_routes]
+                    try:
+                        report_best_vrp(best_routes)
+                    except NameError:
+                        pass
+                improved = True
+
+        # Inter-route relocate
+        best_move = None
+        best_new_max = current_max + deviation + 1
+        for r_from in range(truck_count):
+            if len(current_routes[r_from]) <= 2:
+                continue
+            for pos_from in range(1, len(current_routes[r_from])-1):
+                cust = current_routes[r_from][pos_from]
+                prev = current_routes[r_from][pos_from-1]
+                next = current_routes[r_from][pos_from+1]
+                delta_from = distance_matrix[prev, next] - distance_matrix[prev, cust] - distance_matrix[cust, next]
+                new_from_dist = route_distances[r_from] + delta_from
+                for r_to in range(truck_count):
+                    if r_to == r_from:
+                        continue
+                    route_to = current_routes[r_to]
+                    for pos_to in range(1, len(route_to)):
+                        prev_to = route_to[pos_to-1]
+                        next_to = route_to[pos_to]
+                        delta_to = distance_matrix[prev_to, cust] + distance_matrix[cust, next_to] - distance_matrix[prev_to, next_to]
+                        new_to_dist = route_distances[r_to] + delta_to
+                        candidate_max = max(new_from_dist, new_to_dist)
+                        for rr in range(truck_count):
+                            if rr != r_from and rr != r_to:
+                                candidate_max = max(candidate_max, route_distances[rr])
+                        if candidate_max < best_new_max:
+                            best_new_max = candidate_max
+                            best_move = (r_from, pos_from, r_to, pos_to, new_from_dist, new_to_dist)
+        if best_move is not None and best_new_max <= current_max + deviation:
+            r_from, pos_from, r_to, pos_to, new_from_dist, new_to_dist = best_move
+            cust = current_routes[r_from].pop(pos_from)
+            current_routes[r_to].insert(pos_to, cust)
+            route_distances[r_from] = new_from_dist
+            route_distances[r_to] = new_to_dist
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            improved = True
+
+        # Inter-route swap
+        best_move = None
+        best_new_max = current_max + deviation + 1
+        for r1 in range(truck_count):
+            if len(current_routes[r1]) <= 2:
+                continue
+            for pos1 in range(1, len(current_routes[r1])-1):
+                cust1 = current_routes[r1][pos1]
+                prev1 = current_routes[r1][pos1-1]
+                next1 = current_routes[r1][pos1+1]
+                for r2 in range(r1+1, truck_count):
+                    if len(current_routes[r2]) <= 2:
+                        continue
+                    for pos2 in range(1, len(current_routes[r2])-1):
+                        cust2 = current_routes[r2][pos2]
+                        prev2 = current_routes[r2][pos2-1]
+                        next2 = current_routes[r2][pos2+1]
+                        delta1 = distance_matrix[prev1, cust2] + distance_matrix[cust2, next1] - distance_matrix[prev1, cust1] - distance_matrix[cust1, next1]
+                        new_dist1 = route_distances[r1] + delta1
+                        delta2 = distance_matrix[prev2, cust1] + distance_matrix[cust1, next2] - distance_matrix[prev2, cust2] - distance_matrix[cust2, next2]
+                        new_dist2 = route_distances[r2] + delta2
+                        candidate_max = max(new_dist1, new_dist2)
+                        for rr in range(truck_count):
+                            if rr != r1 and rr != r2:
+                                candidate_max = max(candidate_max, route_distances[rr])
+                        if candidate_max < best_new_max:
+                            best_new_max = candidate_max
+                            best_move = (r1, pos1, r2, pos2, new_dist1, new_dist2)
+        if best_move is not None and best_new_max <= current_max + deviation:
+            r1, pos1, r2, pos2, new_dist1, new_dist2 = best_move
+            cust1 = current_routes[r1][pos1]
+            cust2 = current_routes[r2][pos2]
+            current_routes[r1][pos1] = cust2
+            current_routes[r2][pos2] = cust1
+            route_distances[r1] = new_dist1
+            route_distances[r2] = new_dist2
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            improved = True
+
+        # Diversification: every 20 iterations, randomly move a customer from longest route to a random position elsewhere
+        if it % 20 == 0 and it > 0:
+            max_dist = -1
+            longest_route_idx = None
+            for r_idx in range(truck_count):
+                d = route_distances[r_idx]
+                if d > max_dist:
+                    max_dist = d
+                    longest_route_idx = r_idx
+            if longest_route_idx is not None and len(current_routes[longest_route_idx]) > 2:
+                pos_from = random.randint(1, len(current_routes[longest_route_idx])-2)
+                cust = current_routes[longest_route_idx].pop(pos_from)
+                other_routes = [r for r in range(truck_count) if r != longest_route_idx]
+                if other_routes:
+                    r_to = random.choice(other_routes)
+                    pos_to = random.randint(1, len(current_routes[r_to])-1)
+                    current_routes[r_to].insert(pos_to, cust)
+                    route_distances[longest_route_idx] = route_distance(current_routes[longest_route_idx])
+                    route_distances[r_to] = route_distance(current_routes[r_to])
+                    current_max = compute_max_dist(current_routes)
+                    if current_max < best_max:
+                        best_max = current_max
+                        best_routes = [r[:] for r in current_routes]
+                        try:
+                            report_best_vrp(best_routes)
+                        except NameError:
+                            pass
+                    improved = True
+
+        if improved:
+            stagnation_counter = 0
+        else:
+            stagnation_counter += 1
+            deviation *= 0.995
+
+        # Restart if stagnation for 60 iterations
+        if stagnation_counter >= 60:
+            new_routes, new_distances = build_solution(random_tie=restart_flag)
+            current_routes = [r[:] for r in new_routes]
+            route_distances = new_distances[:]
+            current_max = compute_max_dist(current_routes)
+            deviation = 0.2 * current_max
+            stagnation_counter = 0
+            restart_flag = not restart_flag
+
+    return best_routes
+```
+
+Candidate cand_000024: regret_simulated_annealing_splitmerge
+Status: valid; gap: 152.691
+Thought: Regret-based construction with deterministic tie-breaking, followed by local search combining relocate, 2-opt, and split/merge neighborhoods. Simulated annealing accepts worsening moves with probability exp(-delta/temperature) to escape local minima. Temperature decays geometrically over max_iters iterations. Reports best routes found.
+Mean gap: 152.6914317047934
+Mean max route distance: 5.143952257283024
+Mean total route distance: 10.238901368214062
+Gap by instance size: {'100': 152.6914317047934}
+Gap by truck count: {'6': 152.6914317047934}
+History source: yes
+History bucket: vrp:size:100
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+
+def solve_vrp(distance_matrix, truck_count):
+    n = distance_matrix.shape[0]
+    depot = 0
+    # ---- Regret construction ----
+    unassigned = set(range(1, n))
+    routes = [[depot, depot] for _ in range(truck_count)]
+    
+    def route_dist(route):
+        d = 0
+        for i in range(len(route)-1):
+            d += distance_matrix[route[i], route[i+1]]
+        return d
+    
+    def best_insertion(cust, route):
+        best_cost = float('inf')
+        best_pos = -1
+        for pos in range(1, len(route)):
+            i = route[pos-1]
+            j = route[pos]
+            cost = distance_matrix[i, cust] + distance_matrix[cust, j] - distance_matrix[i, j]
+            if cost < best_cost:
+                best_cost = cost
+                best_pos = pos
+        return best_cost, best_pos
+    
+    while unassigned:
+        best_regret = -1
+        best_cust = -1
+        best_route_idx = -1
+        best_pos = -1
+        best_cost_for_cust = float('inf')
+        
+        for cust in unassigned:
+            costs = []
+            for r_idx, route in enumerate(routes):
+                cost, pos = best_insertion(cust, route)
+                costs.append((cost, r_idx, pos))
+            costs.sort(key=lambda x: x[0])
+            if len(costs) == 1:
+                regret = costs[0][0] * 2
+            else:
+                regret = costs[1][0] - costs[0][0]
+            if regret > best_regret or (regret == best_regret and costs[0][0] > best_cost_for_cust):
+                best_regret = regret
+                best_cust = cust
+                best_cost_for_cust = costs[0][0]
+                best_route_idx = costs[0][1]
+                best_pos = costs[0][2]
+            elif regret == best_regret and costs[0][0] == best_cost_for_cust:
+                if cust < best_cust:
+                    best_cust = cust
+                    best_route_idx = costs[0][1]
+                    best_pos = costs[0][2]
+        route = routes[best_route_idx]
+        route.insert(best_pos, best_cust)
+        unassigned.remove(best_cust)
+    
+    best_routes = [list(r) for r in routes]
+    best_max = max(route_dist(r) for r in best_routes)
+    report_best_vrp(best_routes)
+    
+    # ---- Simulated Annealing Local Search ----
+    current_routes = [list(r) for r in best_routes]
+    current_max = best_max
+    n_customers = n - 1
+    max_iters = 4 * n_customers  # finite bound
+    T_start = 0.3 * best_max  # initial temperature
+    T_end = 0.01
+    T = T_start
+    
+    for it in range(max_iters):
+        if T < T_end:
+            break
+        # Generate neighbor: inter-route relocate or 2-opt or split-merge
+        # We'll try each neighborhood in order, accept if improves or via SA
+        improved = False
+        # ---- Inter-route relocate ----
+        for r_idx, route in enumerate(current_routes):
+            if len(route) <= 3:
+                continue
+            cust_list = route[1:-1]
+            for cust in cust_list:
+                new_route_src = [x for x in route if x != cust]
+                for other_idx, other_route in enumerate(current_routes):
+                    if other_idx == r_idx:
+                        continue
+                    cost, pos = best_insertion(cust, other_route)
+                    candidate_routes = [list(r) for r in current_routes]
+                    candidate_routes[r_idx] = new_route_src
+                    other_new = list(other_route)
+                    other_new.insert(pos, cust)
+                    candidate_routes[other_idx] = other_new
+                    dists = [route_dist(r) for r in candidate_routes]
+                    new_max = max(dists)
+                    delta = new_max - current_max
+                    if delta < 0 or np.random.random() < np.exp(-delta / T):
+                        current_routes = candidate_routes
+                        current_max = new_max
+                        if new_max < best_max:
+                            best_max = new_max
+                            best_routes = [list(r) for r in current_routes]
+                            report_best_vrp(best_routes)
+                        improved = True
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if improved:
+            T *= 0.99
+            continue
+        # ---- Intra-route 2-opt ----
+        for r_idx, route in enumerate(current_routes):
+            if len(route) <= 4:
+                continue
+            n_nodes = len(route)
+            for i in range(1, n_nodes-2):
+                for j in range(i+1, n_nodes-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    candidate_routes = [list(r) for r in current_routes]
+                    candidate_routes[r_idx] = new_route
+                    dists = [route_dist(r) for r in candidate_routes]
+                    new_max = max(dists)
+                    delta = new_max - current_max
+                    if delta < 0 or np.random.random() < np.exp(-delta / T):
+                        current_routes = candidate_routes
+                        current_max = new_max
+                        if new_max < best_max:
+                            best_max = new_max
+                            best_routes = [list(r) for r in current_routes]
+                            report_best_vrp(best_routes)
+                        improved = True
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if improved:
+            T *= 0.99
+            continue
+        # ---- Split/Merge ----
+        # Pick two distinct routes with at least 2 customers each (after depots)
+        for r1_idx in range(truck_count):
+            r1 = current_routes[r1_idx]
+            if len(r1) <= 3:  # depot + one customer
+                continue
+            for r2_idx in range(truck_count):
+                if r2_idx <= r1_idx:
+                    continue
+                r2 = current_routes[r2_idx]
+                if len(r2) <= 3:
+                    continue
+                # For each possible split point in r1 (excluding first and last depot)
+                for split in range(1, len(r1)-1):
+                    # segment from r1[split] to r1[-2] (inclusive) to be moved
+                    if split >= len(r1)-1:
+                        continue
+                    segment = r1[split:-1]  # list of customers
+                    # Remove segment from r1
+                    new_r1 = r1[:split] + [r1[-1]]
+                    # Insert segment into r2 at each possible position (excluding last depot)
+                    for pos in range(1, len(r2)):
+                        new_r2 = r2[:pos] + segment + r2[pos:]
+                        candidate_routes = [list(r) for r in current_routes]
+                        candidate_routes[r1_idx] = new_r1
+                        candidate_routes[r2_idx] = new_r2
+                        dists = [route_dist(r) for r in candidate_routes]
+                        new_max = max(dists)
+                        delta = new_max - current_max
+                        if delta < 0 or np.random.random() < np.exp(-delta / T):
+                            current_routes = candidate_routes
+                            current_max = new_max
+                            if new_max < best_max:
+                                best_max = new_max
+                                best_routes = [list(r) for r in current_routes]
+                                report_best_vrp(best_routes)
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if improved:
+            T *= 0.99
+        else:
+            T *= 0.98  # cool down even if no improvement
+    
+    # Ensure exactly truck_count routes, each starting/ending with 0
+    result = []
+    for r in best_routes:
+        if len(r) <= 2:
+            result.append([0, 0])
+        else:
+            if r[0] != 0:
+                r.insert(0, 0)
+            if r[-1] != 0:
+                r.append(0)
+            result.append(r)
+    while len(result) < truck_count:
+        result.append([0, 0])
+    return result
+```
+
+Candidate cand_000055: RegretRandomPerturb
+Status: valid; gap: 2.07516
+Thought: Augments RegretThresholdCrossRestart with stochastic construction (probabilistic regret selection) and perturbation via random customer relocations when stagnation detected, to reduce variance and improve worst-case performance.
+Mean gap: 2.0751556709741297
+Mean max route distance: 2.097500425949568
+Mean total route distance: 12.509444563084804
+Gap by instance size: {'100': 2.0751556709741297}
+Gap by truck count: {'6': 2.0751556709741297}
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix, truck_count):
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        return sum(distance_matrix[route[i], route[i+1]] for i in range(len(route)-1))
+    
+    def compute_max_dist(routes):
+        return max(route_distance(r) for r in routes)
+    
+    # Stochastic construction: probabilistic regret
+    def construct_routes(tie_break_reverse=False):
+        routes = [[0, 0] for _ in range(truck_count)]
+        route_distances = [0.0 for _ in range(truck_count)]
+        unassigned = set(customers)
+        while unassigned:
+            best_candidates = []  # list of (regret, cust, route_idx, pos, new_dist)
+            for cust in list(unassigned):
+                costs = []
+                for r in range(truck_count):
+                    route = routes[r]
+                    for pos in range(1, len(route)):
+                        delta = distance_matrix[route[pos-1], cust] + distance_matrix[cust, route[pos]] - distance_matrix[route[pos-1], route[pos]]
+                        new_dist = route_distances[r] + delta
+                        costs.append((new_dist, r, pos))
+                costs.sort(key=lambda x: x[0])
+                best = costs[0]
+                second = costs[1] if len(costs) > 1 else (float('inf'), -1, -1)
+                regret = second[0] - best[0]
+                best_candidates.append((regret, cust, best[1], best[2], best[0]))
+            # sort by regret descending
+            best_candidates.sort(key=lambda x: -x[0])
+            # stochastic selection: with 0.8 probability pick best, else random among top 3
+            if random.random() < 0.8 or len(best_candidates) <= 1:
+                idx = 0
+            else:
+                k = min(3, len(best_candidates))
+                idx = random.randint(0, k-1)
+            regret, cust, r_idx, pos, new_dist = best_candidates[idx]
+            routes[r_idx].insert(pos, cust)
+            route_distances[r_idx] = new_dist
+            unassigned.remove(cust)
+        return routes, route_distances
+    
+    # Initial construction
+    routes, route_distances = construct_routes(tie_break_reverse=False)
+    best_routes = [r[:] for r in routes]
+    best_max = compute_max_dist(routes)
+    try:
+        report_best_vrp(best_routes)
+    except NameError:
+        pass
+    
+    current_routes = [r[:] for r in routes]
+    current_max = best_max
+    deviation = 0.1 * current_max
+    max_iter = 600
+    no_improve = 0
+    perturbation_counter = 0
+    for it in range(max_iter):
+        improved = False
+        # Intra-route 2-opt
+        for r_idx in range(truck_count):
+            route = current_routes[r_idx]
+            if len(route) <= 3:
+                continue
+            best_i = None
+            best_j = None
+            best_new_max = current_max + deviation + 1
+            for i in range(1, len(route)-2):
+                for j in range(i+2, len(route)-1):
+                    new_route = route[:i+1] + route[j:i:-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    candidate_max = new_dist
+                    for rr in range(truck_count):
+                        if rr != r_idx:
+                            candidate_max = max(candidate_max, route_distances[rr])
+                    if candidate_max < best_new_max:
+                        best_new_max = candidate_max
+                        best_i = i
+                        best_j = j
+            if best_i is not None and best_new_max <= current_max + deviation:
+                new_route = current_routes[r_idx][:best_i+1] + current_routes[r_idx][best_j:best_i:-1] + current_routes[r_idx][best_j+1:]
+                current_routes[r_idx] = new_route
+                route_distances[r_idx] = route_distance(new_route)
+                current_max = compute_max_dist(current_routes)
+                if current_max < best_max:
+                    best_max = current_max
+                    best_routes = [r[:] for r in current_routes]
+                    try:
+                        report_best_vrp(best_routes)
+                    except NameError:
+                        pass
+                improved = True
+        
+        # Inter-route relocate
+        best_move = None
+        best_new_max = current_max + deviation + 1
+        for r_from in range(truck_count):
+            if len(current_routes[r_from]) <= 2:
+                continue
+            for pos_from in range(1, len(current_routes[r_from])-1):
+                cust = current_routes[r_from][pos_from]
+                prev = current_routes[r_from][pos_from-1]
+                next_c = current_routes[r_from][pos_from+1]
+                delta_from = distance_matrix[prev, next_c] - distance_matrix[prev, cust] - distance_matrix[cust, next_c]
+                new_from_dist = route_distances[r_from] + delta_from
+                for r_to in range(truck_count):
+                    if r_to == r_from:
+                        continue
+                    route_to = current_routes[r_to]
+                    for pos_to in range(1, len(route_to)):
+                        prev_to = route_to[pos_to-1]
+                        next_to = route_to[pos_to]
+                        delta_to = distance_matrix[prev_to, cust] + distance_matrix[cust, next_to] - distance_matrix[prev_to, next_to]
+                        new_to_dist = route_distances[r_to] + delta_to
+                        candidate_max = max(new_from_dist, new_to_dist)
+                        for rr in range(truck_count):
+                            if rr != r_from and rr != r_to:
+                                candidate_max = max(candidate_max, route_distances[rr])
+                        if candidate_max < best_new_max:
+                            best_new_max = candidate_max
+                            best_move = (r_from, pos_from, r_to, pos_to, new_from_dist, new_to_dist)
+        if best_move is not None and best_new_max <= current_max + deviation:
+            r_from, pos_from, r_to, pos_to, new_from_dist, new_to_dist = best_move
+            cust = current_routes[r_from].pop(pos_from)
+            current_routes[r_to].insert(pos_to, cust)
+            route_distances[r_from] = new_from_dist
+            route_distances[r_to] = new_to_dist
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            improved = True
+        
+        # Inter-route swap
+        best_move = None
+        best_new_max = current_max + deviation + 1
+        for r1 in range(truck_count):
+            if len(current_routes[r1]) <= 2:
+                continue
+            for pos1 in range(1, len(current_routes[r1])-1):
+                cust1 = current_routes[r1][pos1]
+                prev1 = current_routes[r1][pos1-1]
+                next1 = current_routes[r1][pos1+1]
+                for r2 in range(r1+1, truck_count):
+                    if len(current_routes[r2]) <= 2:
+                        continue
+                    for pos2 in range(1, len(current_routes[r2])-1):
+                        cust2 = current_routes[r2][pos2]
+                        prev2 = current_routes[r2][pos2-1]
+                        next2 = current_routes[r2][pos2+1]
+                        delta1 = distance_matrix[prev1, cust2] + distance_matrix[cust2, next1] - distance_matrix[prev1, cust1] - distance_matrix[cust1, next1]
+                        new_dist1 = route_distances[r1] + delta1
+                        delta2 = distance_matrix[prev2, cust1] + distance_matrix[cust1, next2] - distance_matrix[prev2, cust2] - distance_matrix[cust2, next2]
+                        new_dist2 = route_distances[r2] + delta2
+                        candidate_max = max(new_dist1, new_dist2)
+                        for rr in range(truck_count):
+                            if rr != r1 and rr != r2:
+                                candidate_max = max(candidate_max, route_distances[rr])
+                        if candidate_max < best_new_max:
+                            best_new_max = candidate_max
+                            best_move = (r1, pos1, r2, pos2, new_dist1, new_dist2)
+        if best_move is not None and best_new_max <= current_max + deviation:
+            r1, pos1, r2, pos2, new_dist1, new_dist2 = best_move
+            cust1 = current_routes[r1][pos1]
+            cust2 = current_routes[r2][pos2]
+            current_routes[r1][pos1] = cust2
+            current_routes[r2][pos2] = cust1
+            route_distances[r1] = new_dist1
+            route_distances[r2] = new_dist2
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            improved = True
+        
+        # Inter-route cross-exchange
+        best_move = None
+        best_new_max = current_max + deviation + 1
+        for r1 in range(truck_count):
+            for r2 in range(r1+1, truck_count):
+                route1 = current_routes[r1]
+                route2 = current_routes[r2]
+                if len(route1) <= 2 or len(route2) <= 2:
+                    continue
+                for i in range(1, len(route1)-2):
+                    for j in range(1, len(route2)-2):
+                        new_route1 = route1[:i+1] + route2[j+1:]
+                        new_route2 = route2[:j+1] + route1[i+1:]
+                        new_dist1 = route_distance(new_route1)
+                        new_dist2 = route_distance(new_route2)
+                        candidate_max = max(new_dist1, new_dist2)
+                        for rr in range(truck_count):
+                            if rr != r1 and rr != r2:
+                                candidate_max = max(candidate_max, route_distances[rr])
+                        if candidate_max < best_new_max:
+                            best_new_max = candidate_max
+                            best_move = (r1, r2, i, j, new_route1, new_route2, new_dist1, new_dist2)
+        if best_move is not None and best_new_max <= current_max + deviation:
+            r1, r2, i, j, new_route1, new_route2, new_dist1, new_dist2 = best_move
+            current_routes[r1] = new_route1
+            current_routes[r2] = new_route2
+            route_distances[r1] = new_dist1
+            route_distances[r2] = new_dist2
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            improved = True
+        
+        # Diversification: every 50 iterations, relocate worst customer from longest route
+        if it % 50 == 0 and it > 0:
+            max_dist = -1
+            longest_route_idx = None
+            for r_idx in range(truck_count):
+                d = route_distances[r_idx]
+                if d > max_dist:
+                    max_dist = d
+                    longest_route_idx = r_idx
+            if longest_route_idx is not None and len(current_routes[longest_route_idx]) > 2:
+                best_gain = float('inf')
+                best_pos_from = None
+                for pos in range(1, len(current_routes[longest_route_idx])-1):
+                    cust = current_routes[longest_route_idx][pos]
+                    prev = current_routes[longest_route_idx][pos-1]
+                    next_c = current_routes[longest_route_idx][pos+1]
+                    gain = distance_matrix[prev, cust] + distance_matrix[cust, next_c] - distance_matrix[prev, next_c]
+                    if gain < best_gain:
+                        best_gain = gain
+                        best_pos_from = pos
+                if best_pos_from is not None:
+                    cust = current_routes[longest_route_idx].pop(best_pos_from)
+                    best_insert = None
+                    best_insert_max = float('inf')
+                    for r_to in range(truck_count):
+                        if r_to == longest_route_idx:
+                            continue
+                        for pos_to in range(1, len(current_routes[r_to])):
+                            new_dist = route_distances[r_to] + distance_matrix[current_routes[r_to][pos_to-1], cust] + distance_matrix[cust, current_routes[r_to][pos_to]] - distance_matrix[current_routes[r_to][pos_to-1], current_routes[r_to][pos_to]]
+                            temp_routes = [r[:] for r in current_routes]
+                            temp_routes[r_to].insert(pos_to, cust)
+                            cand_max = compute_max_dist(temp_routes)
+                            if cand_max < best_insert_max:
+                                best_insert_max = cand_max
+                                best_insert = (r_to, pos_to, new_dist)
+                    if best_insert is not None:
+                        r_to, pos_to, new_dist = best_insert
+                        current_routes[r_to].insert(pos_to, cust)
+                        route_distances[longest_route_idx] = route_distance(current_routes[longest_route_idx])
+                        route_distances[r_to] = new_dist
+                        current_max = compute_max_dist(current_routes)
+                        if current_max < best_max:
+                            best_max = current_max
+                            best_routes = [r[:] for r in current_routes]
+                            try:
+                                report_best_vrp(best_routes)
+                            except NameError:
+                                pass
+                        improved = True
+        
+        # Perturbation: if no improvement for 30 iterations, relocate random customers
+        if not improved:
+            perturbation_counter += 1
+        else:
+            perturbation_counter = 0
+        if perturbation_counter >= 30 and not improved:
+            # relocate up to 3 random customers
+            for _ in range(min(3, len(customers)//2)):
+                # pick a random non-depot customer
+                all_cust = []
+                for r in current_routes:
+                    for c in r[1:-1]:
+                        all_cust.append(c)
+                if not all_cust:
+                    break
+                cust = random.choice(all_cust)
+                # find its current route and position
+                found = False
+                for r_idx in range(truck_count):
+                    route = current_routes[r_idx]
+                    for pos in range(1, len(route)-1):
+                        if route[pos] == cust:
+                            # remove it
+                            removed = current_routes[r_idx].pop(pos)
+                            # insert into a random route at random position (avoid duplicates)
+                            r_to = random.randint(0, truck_count-1)
+                            pos_to = random.randint(1, len(current_routes[r_to]))
+                            current_routes[r_to].insert(pos_to, cust)
+                            found = True
+                            break
+                    if found:
+                        break
+            # recalc distances and max
+            for r_idx in range(truck_count):
+                route_distances[r_idx] = route_distance(current_routes[r_idx])
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            deviation = 0.1 * current_max
+            perturbation_counter = 0
+        else:
+            if not improved:
+                deviation *= 0.98
+                no_improve += 1
+            else:
+                no_improve = 0
+        
+        # Restart after 100 iterations without improvement
+        if no_improve >= 100:
+            routes2, dists2 = construct_routes(tie_break_reverse=True)
+            current_routes = [r[:] for r in routes2]
+            route_distances = dists2[:]
+            current_max = compute_max_dist(current_routes)
+            if current_max < best_max:
+                best_max = current_max
+                best_routes = [r[:] for r in current_routes]
+                try:
+                    report_best_vrp(best_routes)
+                except NameError:
+                    pass
+            deviation = 0.1 * current_max
+            no_improve = 0
+    
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
