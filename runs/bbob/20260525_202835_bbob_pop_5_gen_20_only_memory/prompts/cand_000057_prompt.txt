@@ -1,0 +1,153 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000043: multi_start_coordinate_search
+Status: valid; mean AOCC score: 0.277611 (higher is better)
+Thought: Exploration-focused variant of random_order_coordinate_search. It repeatedly performs coordinate search cycles with random coordinate order, halving step size when no improvement occurs in a full cycle. When step size becomes too small (below 0.001 of bound range), the algorithm restarts from a new random point, resetting step size to the initial value. This multi-start strategy increases exploration by escaping local optima and sampling diverse basins, while retaining the core coordinate search mechanism. The best overall solution is tracked and returned. Seed controls random generation for initial points and coordinate permutations.
+Mean AOCC: 0.2776113856059954
+Mean final error: 38.29111502555707
+AOCC by group: {'high_conditioning_unimodal': 0.16408789052901834, 'low_moderate_conditioning': 0.3027295398498442, 'multimodal_strong_global_structure': 0.20925688229121003, 'multimodal_weak_global_structure': 0.27448269439517853, 'separable': 0.4425235518134958}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        best_val = np.inf
+        best_x = None
+        # Main loop: restart until budget exhausted
+        while self.budget > 0:
+            # Initialize a new run
+            x = lb + self.rng.random(dim) * (ub - lb)
+            val = func(x)
+            self.budget -= 1
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            step = 0.2 * (ub - lb)
+            min_step = 1e-3 * (ub - lb)
+            # Coordinate search within this run
+            while self.budget > 0:
+                improved = False
+                perm = self.rng.permutation(dim)
+                for i in perm:
+                    if self.budget <= 0:
+                        break
+                    # Try positive direction
+                    x_new = x.copy()
+                    x_new[i] = np.clip(x[i] + step[i], lb[i], ub[i])
+                    val_new = func(x_new)
+                    self.budget -= 1
+                    if val_new < val:
+                        val = val_new
+                        x = x_new.copy()
+                        if val < best_val:
+                            best_val = val
+                            best_x = x.copy()
+                            report_best(best_val, best_x)
+                        improved = True
+                        continue  # skip negative if positive improved
+                    # Try negative direction
+                    if self.budget <= 0:
+                        break
+                    x_new[i] = np.clip(x[i] - step[i], lb[i], ub[i])
+                    val_new = func(x_new)
+                    self.budget -= 1
+                    if val_new < val:
+                        val = val_new
+                        x = x_new.copy()
+                        if val < best_val:
+                            best_val = val
+                            best_x = x.copy()
+                            report_best(best_val, best_x)
+                        improved = True
+                if not improved:
+                    step *= 0.5
+                    # Check for restart condition: step too small
+                    if np.all(step < min_step):
+                        break  # exit inner while to restart
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m4_contract_repair
+
+GOAL: Revise one parent to better satisfy the required interface, constraints, safety rules, and budget limits. Preserve the main algorithmic idea, but fix invalid return paths, unsafe assumptions, missing fallback behavior, and fragile edge cases.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

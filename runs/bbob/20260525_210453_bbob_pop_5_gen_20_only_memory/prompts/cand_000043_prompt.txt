@@ -1,0 +1,154 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000027: particle_swarm_optimizer
+Status: valid; mean AOCC score: 0.321649 (higher is better)
+Thought: A Particle Swarm Optimizer (PSO) with uniform initialization. Each particle has a position and velocity, updated using inertia weight (w=0.7), cognitive coefficient (c1=1.5), and social coefficient (c2=1.5). Personal best and global best are tracked. Positions are clipped to bounds. Swarm size = min(5*dim, max(10, budget//4)). Uses seed for reproducibility. Calls report_best on initial best and every improvement. Budget is managed by counting function evaluations.
+Mean AOCC: 0.3216489727117869
+Mean final error: 8.885125493761546
+AOCC by group: {'high_conditioning_unimodal': 0.38725889827916615, 'low_moderate_conditioning': 0.4198537157839439, 'multimodal_strong_global_structure': 0.1872498611903631, 'multimodal_weak_global_structure': 0.17097349458148897, 'separable': 0.46254984233840357}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+import random
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        random.seed(seed)
+
+    def __call__(self, func):
+        budget = self.budget
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop_size = min(5 * dim, max(10, budget // 4))
+        # Initialize positions and velocities
+        positions = np.random.uniform(lb, ub, (pop_size, dim))
+        velocities = np.random.uniform(-np.abs(ub - lb) * 0.1, np.abs(ub - lb) * 0.1, (pop_size, dim))
+        # Personal bests
+        pbest_positions = positions.copy()
+        pbest_values = np.full(pop_size, np.inf)
+        best_x = None
+        best_f = np.inf
+        fcalls = 0
+        # Evaluate initial swarm
+        for i in range(pop_size):
+            if fcalls >= budget:
+                break
+            x = np.clip(positions[i], lb, ub)
+            val = func(x)
+            fcalls += 1
+            pbest_values[i] = val
+            pbest_positions[i] = x.copy()
+            if val < best_f:
+                best_f = val
+                best_x = x.copy()
+                report_best(best_f, best_x)
+        # PSO parameters
+        w = 0.7
+        c1 = 1.5
+        c2 = 1.5
+        # Main loop
+        while fcalls < budget:
+            for i in range(pop_size):
+                if fcalls >= budget:
+                    break
+                r1 = random.random()
+                r2 = random.random()
+                # Velocity update
+                velocities[i] = w * velocities[i] + c1 * r1 * (pbest_positions[i] - positions[i]) + c2 * r2 * (best_x - positions[i])
+                # Position update
+                positions[i] = positions[i] + velocities[i]
+                # Clip to bounds
+                positions[i] = np.clip(positions[i], lb, ub)
+                # Evaluate
+                val = func(positions[i])
+                fcalls += 1
+                # Update personal best
+                if val < pbest_values[i]:
+                    pbest_values[i] = val
+                    pbest_positions[i] = positions[i].copy()
+                    # Update global best
+                    if val < best_f:
+                        best_f = val
+                        best_x = positions[i].copy()
+                        report_best(best_f, best_x)
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m6_diversify_search
+
+GOAL: Create a more exploration-focused version of one parent. Improve how it generates diverse candidates, escapes stagnation, varies search trajectories, uses restarts or perturbations, or avoids premature convergence while respecting the contract.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

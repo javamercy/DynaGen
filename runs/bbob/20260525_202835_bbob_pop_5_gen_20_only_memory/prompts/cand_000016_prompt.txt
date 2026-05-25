@@ -1,0 +1,137 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000011: random_order_coordinate_search
+Status: valid; mean AOCC score: 0.273104 (higher is better)
+Thought: A simple coordinate search that randomizes the order of coordinates each cycle. It starts with a random point, then iteratively cycles through all coordinates in a random permutation, trying positive and negative steps. Step sizes are global and halved when no improvement is made in a full cycle. This avoids per-coordinate adaptation for robustness. Seed controls the random permutation order.
+Mean AOCC: 0.27310424550920714
+Mean final error: 19.407210636531236
+AOCC by group: {'high_conditioning_unimodal': 0.16952569573149437, 'low_moderate_conditioning': 0.37474151863116173, 'multimodal_strong_global_structure': 0.09398675365758441, 'multimodal_weak_global_structure': 0.13321517354764836, 'separable': 0.6143795406025377}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        # initial point
+        x0 = lb + self.rng.random(dim) * (ub - lb)
+        best_x = x0.copy()
+        best_val = func(best_x)
+        self.budget -= 1
+        report_best(best_val, best_x)
+        # global step size per coordinate
+        step = 0.1 * (ub - lb)
+        while self.budget > 0:
+            improved = False
+            perm = self.rng.permutation(dim)
+            for i in perm:
+                if self.budget <= 0:
+                    break
+                # try positive direction
+                x_new = best_x.copy()
+                x_new[i] = np.clip(best_x[i] + step[i], lb[i], ub[i])
+                val_new = func(x_new)
+                self.budget -= 1
+                if val_new < best_val:
+                    best_val = val_new
+                    best_x = x_new.copy()
+                    report_best(best_val, best_x)
+                    improved = True
+                    continue  # skip negative direction for this coordinate
+                # try negative direction
+                if self.budget <= 0:
+                    break
+                x_new[i] = np.clip(best_x[i] - step[i], lb[i], ub[i])
+                val_new = func(x_new)
+                self.budget -= 1
+                if val_new < best_val:
+                    best_val = val_new
+                    best_x = x_new.copy()
+                    report_best(best_val, best_x)
+                    improved = True
+            if not improved:
+                step *= 0.5
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

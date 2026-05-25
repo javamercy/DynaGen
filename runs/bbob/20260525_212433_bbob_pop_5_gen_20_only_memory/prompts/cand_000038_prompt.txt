@@ -1,0 +1,315 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000023: differential_evolution_currenttobest
+Status: valid; mean AOCC score: 0.54955 (higher is better)
+Thought: Modified differential evolution that replaces the rand/1 mutation with current-to-best/1 to accelerate convergence toward the best found point. Population initialized uniformly within bounds. Binomial crossover with CR=0.9. Greedy selection: offspring replaces parent if better. Clipping keeps points inside bounds. Seed controls NumPy RandomState. Budget is split: pop_size individuals initially, then each generation evaluates pop_size offspring until budget exhausted.
+Mean AOCC: 0.549550042526956
+Mean final error: 1.1335209382197862
+AOCC by group: {'high_conditioning_unimodal': 0.7276652909315503, 'low_moderate_conditioning': 0.6670486897268352, 'multimodal_strong_global_structure': 0.39291675057170067, 'multimodal_weak_global_structure': 0.3773414290169894, 'separable': 0.6062777818276807}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.pop_size = max(4, min(20, budget // 20))
+        self.F = 0.8
+        self.CR = 0.9
+        self.rng = np.random.RandomState(seed)
+        self.best_val = float('inf')
+        self.best_x = None
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        evals = 0
+        pop = lb + (ub - lb) * self.rng.rand(self.pop_size, self.dim)
+        pop_fit = np.full(self.pop_size, np.inf)
+        for i in range(self.pop_size):
+            if evals >= self.budget:
+                break
+            pop_fit[i] = func(pop[i])
+            evals += 1
+            if pop_fit[i] < self.best_val:
+                self.best_val = pop_fit[i]
+                self.best_x = pop[i].copy()
+                report_best(self.best_val, self.best_x)
+        while evals < self.budget:
+            new_pop = pop.copy()
+            for i in range(self.pop_size):
+                if evals >= self.budget:
+                    break
+                # mutation: current-to-best/1
+                idxs = [j for j in range(self.pop_size) if j != i]
+                a, b = self.rng.choice(idxs, 2, replace=False)
+                mutant = pop[i] + self.F * (self.best_x - pop[i]) + self.F * (pop[a] - pop[b])
+                mutant = np.clip(mutant, lb, ub)
+                # binomial crossover
+                cross_points = self.rng.rand(self.dim) < self.CR
+                if not np.any(cross_points):
+                    cross_points[self.rng.randint(self.dim)] = True
+                trial = np.where(cross_points, mutant, pop[i])
+                trial_fit = func(trial)
+                evals += 1
+                if trial_fit < self.best_val:
+                    self.best_val = trial_fit
+                    self.best_x = trial.copy()
+                    report_best(self.best_val, self.best_x)
+                if trial_fit < pop_fit[i]:
+                    new_pop[i] = trial
+                    pop_fit[i] = trial_fit
+            pop = new_pop
+        return self.best_val, self.best_x
+```
+
+Candidate cand_000035: DE_rand1_expcrossover
+Status: valid; mean AOCC score: 0.495842 (higher is better)
+Thought: Differential Evolution with rand/1 mutation and exponential crossover to enhance exploration on multimodal functions. Population initialized uniformly. Greedy selection replaces parent if offspring improves. seed controls NumPy RandomState. Budget split evenly: pop_size individuals initialized, then each generation evaluates pop_size offspring. All points clipped to bounds.
+Mean AOCC: 0.49584220909412646
+Mean final error: 0.9965016169249845
+AOCC by group: {'high_conditioning_unimodal': 0.540068500035088, 'low_moderate_conditioning': 0.6483869408586757, 'multimodal_strong_global_structure': 0.2572852025749664, 'multimodal_weak_global_structure': 0.4288236842444783, 'separable': 0.6351556641103338}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.pop_size = max(4, min(20, budget // 20))
+        if self.pop_size > budget:
+            self.pop_size = budget
+        self.F = 0.8
+        self.CR = 0.9
+        self.rng = np.random.RandomState(seed)
+        self.best_val = float('inf')
+        self.best_x = None
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        evals = 0
+        pop = lb + (ub - lb) * self.rng.rand(self.pop_size, self.dim)
+        pop_fit = np.full(self.pop_size, np.inf)
+        for i in range(self.pop_size):
+            if evals >= self.budget:
+                break
+            pop_fit[i] = func(pop[i])
+            evals += 1
+            if pop_fit[i] < self.best_val:
+                self.best_val = pop_fit[i]
+                self.best_x = pop[i].copy()
+                report_best(self.best_val, self.best_x)
+        while evals < self.budget:
+            new_pop = pop.copy()
+            for i in range(self.pop_size):
+                if evals >= self.budget:
+                    break
+                idxs = [j for j in range(self.pop_size) if j != i]
+                a, b, c = self.rng.choice(idxs, 3, replace=False)
+                mutant = pop[a] + self.F * (pop[b] - pop[c])
+                mutant = np.clip(mutant, lb, ub)
+                # Exponential crossover
+                trial = pop[i].copy()
+                n = self.rng.randint(self.dim)
+                L = 0
+                while True:
+                    trial[(n + L) % self.dim] = mutant[(n + L) % self.dim]
+                    L += 1
+                    if L >= self.dim or self.rng.rand() > self.CR:
+                        break
+                trial_fit = func(trial)
+                evals += 1
+                if trial_fit < self.best_val:
+                    self.best_val = trial_fit
+                    self.best_x = trial.copy()
+                    report_best(self.best_val, self.best_x)
+                if trial_fit < pop_fit[i]:
+                    new_pop[i] = trial
+                    pop_fit[i] = trial_fit
+            pop = new_pop
+        return self.best_val, self.best_x
+```
+
+Candidate cand_000034: diversified_de_rand2_restart
+Status: valid; mean AOCC score: 0.205782 (higher is better)
+Thought: Population-based Differential Evolution (DE) with rand/2 mutation and binomial crossover, designed for exploration. Population size scaled to budget (max(6, min(30, budget//15))) for diversity. Uses fixed F=0.9 and CR=0.5 to promote exploration. Implements a restart mechanism: if no improvement for 10 generations, randomly reinitialize half of the population (excluding current best) to escape stagnation. Clipping ensures feasibility. Budget tracked precisely. report_best called on initial and every improvement. seed controls NumPy RandomState.
+Mean AOCC: 0.20578213005222915
+Mean final error: 161.96950821137108
+AOCC by group: {'high_conditioning_unimodal': 0.09893767971308792, 'low_moderate_conditioning': 0.1447456103167016, 'multimodal_strong_global_structure': 0.15455026373406794, 'multimodal_weak_global_structure': 0.16176407851715208, 'separable': 0.4567057140330307}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.pop_size = max(6, min(30, budget // 15))
+        self.F = 0.9
+        self.CR = 0.5
+        self.stall_limit = 10
+        self.rng = np.random.RandomState(seed)
+        self.best_val = float('inf')
+        self.best_x = None
+
+    def __call__(self, func):
+        if self.budget == 0:
+            return float('inf'), None
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        evals = 0
+        pop = lb + (ub - lb) * self.rng.rand(self.pop_size, self.dim)
+        pop_fit = np.full(self.pop_size, np.inf)
+        for i in range(self.pop_size):
+            if evals >= self.budget:
+                break
+            pop_fit[i] = func(pop[i])
+            evals += 1
+            if pop_fit[i] < self.best_val:
+                self.best_val = pop_fit[i]
+                self.best_x = pop[i].copy()
+                report_best(self.best_val, self.best_x)
+        no_improve_gen = 0
+        while evals < self.budget:
+            # Restart if stalled
+            if no_improve_gen >= self.stall_limit:
+                # Reinitialize worst half of population (excluding best)
+                order = np.argsort(pop_fit)
+                best_idx = order[0]
+                worst_indices = order[self.pop_size//2:]
+                for idx in worst_indices:
+                    if idx == best_idx:
+                        continue
+                    pop[idx] = lb + (ub - lb) * self.rng.rand(self.dim)
+                    pop_fit[idx] = func(pop[idx])
+                    evals += 1
+                    if pop_fit[idx] < self.best_val:
+                        self.best_val = pop_fit[idx]
+                        self.best_x = pop[idx].copy()
+                        report_best(self.best_val, self.best_x)
+                    if evals >= self.budget:
+                        break
+                no_improve_gen = 0
+                if evals >= self.budget:
+                    break
+            # Normal DE generation
+            new_pop = pop.copy()
+            new_fit = pop_fit.copy()
+            improved = False
+            for i in range(self.pop_size):
+                if evals >= self.budget:
+                    break
+                # rand/2 mutation: select 5 distinct indices different from i
+                idxs = [j for j in range(self.pop_size) if j != i]
+                a, b, c, d, e = self.rng.choice(idxs, 5, replace=False)
+                mutant = pop[a] + self.F * (pop[b] - pop[c]) + self.F * (pop[d] - pop[e])
+                mutant = np.clip(mutant, lb, ub)
+                # binomial crossover
+                cross_points = self.rng.rand(self.dim) < self.CR
+                if not np.any(cross_points):
+                    cross_points[self.rng.randint(self.dim)] = True
+                trial = np.where(cross_points, mutant, pop[i])
+                trial_fit = func(trial)
+                evals += 1
+                if trial_fit < self.best_val:
+                    self.best_val = trial_fit
+                    self.best_x = trial.copy()
+                    report_best(self.best_val, self.best_x)
+                if trial_fit < new_fit[i]:
+                    new_pop[i] = trial
+                    new_fit[i] = trial_fit
+                    improved = True
+            pop = new_pop
+            pop_fit = new_fit
+            if improved:
+                no_improve_gen = 0
+            else:
+                no_improve_gen += 1
+            # Ensure best survives (elitism)
+            best_idx_gen = np.argmin(pop_fit)
+            if pop_fit[best_idx_gen] < self.best_val:
+                self.best_val = pop_fit[best_idx_gen]
+                self.best_x = pop[best_idx_gen].copy()
+                report_best(self.best_val, self.best_x)
+        return self.best_val, self.best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.
