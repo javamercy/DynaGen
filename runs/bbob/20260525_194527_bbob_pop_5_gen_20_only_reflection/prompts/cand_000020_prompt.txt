@@ -1,0 +1,174 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000001: cma_es_optimizer
+Status: valid; mean AOCC score: 0.511942 (higher is better)
+Thought: CMA-ES with population size adaptive to dimension, using weighted recombination and cumulative step-size adaptation. Initial mean uniform in bounds. Covariance matrix updated with rank-1 and rank-mu. Random seed used for reproducibility. Budget allocated across generations, stopping when next population exceeds remaining budget.
+Mean AOCC: 0.5119415624337994
+Mean final error: 2.7366711377654753
+AOCC by group: {'high_conditioning_unimodal': 0.8153389708841783, 'low_moderate_conditioning': 0.7142757009135225, 'multimodal_strong_global_structure': 0.2754106087657506, 'multimodal_weak_global_structure': 0.20333873896534632, 'separable': 0.5918106203361438}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rs = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        d = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        # initial mean
+        xmean = self.rs.uniform(lb, ub, d)
+        fbest = func(xmean)
+        xbest = xmean.copy()
+        report_best(fbest, xbest)
+        total_evals = 1
+        # CMA-ES parameters
+        sigma = 0.3 * np.mean(ub - lb)
+        C = np.eye(d)
+        lam = 4 + int(3 * np.log(d))
+        mu = max(lam // 2, 1)
+        weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+        weights /= weights.sum()
+        mueff = 1.0 / np.sum(weights**2)
+        cc = 4.0 / (d + 4.0)
+        cs = (mueff + 2.0) / (d + mueff + 5.0)
+        c1 = 2.0 / ((d + 1.3)**2 + mueff)
+        cmu = min(1.0 - c1, 2.0 * (mueff - 2.0 + 1.0 / mueff) / ((d + 2.0)**2 + mueff))
+        ds = 1.0 + 2.0 * max(0.0, np.sqrt((mueff - 1.0) / (d + 1.0)) - 1.0) + cs
+        pc = np.zeros(d)
+        ps = np.zeros(d)
+        norm_expected = np.sqrt(d) * (1.0 - 1.0 / (4.0 * d) + 1.0 / (21.0 * d * d))
+        while total_evals + lam <= self.budget:
+            try:
+                B = np.linalg.cholesky(C)
+            except np.linalg.LinAlgError:
+                C += 1e-9 * np.eye(d)
+                B = np.linalg.cholesky(C)
+            z = self.rs.randn(lam, d)
+            x = xmean + sigma * np.dot(z, B.T)
+            x = np.clip(x, lb, ub)
+            fvals = np.zeros(lam)
+            for i in range(lam):
+                fvals[i] = func(x[i])
+                total_evals += 1
+                if fvals[i] < fbest:
+                    fbest = fvals[i]
+                    xbest = x[i].copy()
+                    report_best(fbest, xbest)
+            idx = np.argsort(fvals)
+            x_sorted = x[idx]
+            old_xmean = xmean.copy()
+            xmean = np.dot(weights, x_sorted[:mu])
+            x_diff = (xmean - old_xmean) / sigma
+            pc = (1 - cc) * pc + np.sqrt(cc * (2 - cc) * mueff) * x_diff
+            try:
+                invB = np.linalg.solve(B, np.eye(d))
+            except np.linalg.LinAlgError:
+                invB = np.linalg.inv(B)
+            ps = (1 - cs) * ps + np.sqrt(cs * (2 - cs) * mueff) * np.dot(invB, x_diff)
+            C = (1 - c1 - cmu) * C + c1 * np.outer(pc, pc)
+            diff = x_sorted[:mu] - old_xmean
+            diff_norm = diff / sigma
+            C += cmu * np.dot(diff_norm.T, np.dot(np.diag(weights), diff_norm))
+            C = (C + C.T) / 2.0
+            ps_norm = np.linalg.norm(ps)
+            sigma = sigma * np.exp((cs / ds) * (ps_norm / norm_expected - 1.0))
+        return fbest, xbest
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000001 LLM reflection:
+- Summary: The candidate achieved a mean AOCC of 0.5119 with strong unimodal and separable performance, but weak multimodal and high-conditioning multimodal results, especially on functions with weak global structure.
+- Aim: Improve multimodal diversification and local refinement to raise AOCC on functions with weak global structure, without exceeding strict evaluation budgets.
+- Preserve: Covariance matrix adaptation (rank-1 and rank-mu); Cumulative step-size adaptation (CSA); Weighted recombination with elitist update
+- Change: Add a restart mechanism with increasing population size when stagnation is detected; Incorporate bound handling via resampling instead of clipping to maintain variance
+- Avoid: Over-parameterizing adaptation rates; Introducing operations that significantly increase per-generation evaluations
+
+Parent cand_000008 LLM reflection:
+- Summary: Restart logic slightly improved mean AOCC from 0.3256 to 0.3286, but multimodal performance remains weak.
+- Aim: Improve multimodal diversification to better escape local optima on strongly structured multimodal functions.
+- Preserve: coordinate search with step adaptation; restart on stagnation; pattern move
+- Change: Add a diversification mechanism (e.g., random perturbations or differential mutation) during search; Increase restart frequency or use non-uniform restart distribution
+- Avoid: Aggressive step expansion that ruins fine-scale refinement; Costly operations that consume budget without proportional improvement
+
+Parent cand_000006 LLM reflection:
+- Summary: The candidate achieves moderate mean AOCC (0.326) with strong separable and low/moderate conditioning performance but weak on multimodal and high-conditioning problems.
+- Aim: Improve performance on multimodal and high-conditioning functions by enhancing restart diversification or adding covariance adaptation for better local refinement.
+- Preserve: Coordinate-wise exploratory moves; Adaptive step sizes (expand/shrink); Pattern moves after improvement; Stagnation-based restarts
+- Change: Incorporate covariance matrix adaptation or orthogonal sampling for multimodal diversity; Add adaptive restart trigger based on step-size collapse or function value diversity
+- Avoid: Uncontrolled step-size growth that wastes budget; Overly complex schemes that increase evaluations without clear benefit
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.
