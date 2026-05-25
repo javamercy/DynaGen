@@ -1,0 +1,49 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 2,
+  "gradient": {
+    "aim": "Enhance multimodal diversification and adapt control parameters to improve AOCC on hard multimodal functions.",
+    "avoid": [
+      "overcomplicating overhead that wastes evaluations",
+      "losing robust bound handling",
+      "introducing hyperparameters without budget-aware tuning",
+      "radically altering the core DE mating scheme"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "add a restart mechanism triggered by population diversity loss",
+      "adapt F and CR per individual using success-history based method"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "population-based DE structure",
+      "binomial crossover with clipping to bounds",
+      "report_best on improvements",
+      "simple budget accounting via generations"
+    ],
+    "problem": "bbob",
+    "score_name": "mean_aocc",
+    "score_value": 0.2718846434873407,
+    "source": "llm",
+    "summary": "DE rand/1/bin achieves moderate mean AOCC (0.272) but struggles on multimodal problems and lacks parameter adaptation.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "bbob",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: maximize mean AOCC under strict objective-evaluation budgets\nDomain focus: step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, local refinement, bound handling, and budget accounting\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\nclass Optimizer:\\n    def __init__(self, budget: int, dim: int, seed: int):\\n        self.budget = budget\\n        self.dim = dim\\n        self.seed = seed\\n\\n    def __call__(self, func):\\n        rng = np.random.RandomState(self.seed)\\n        lb = func.bounds.lb\\n        ub = func.bounds.ub\\n        dim = self.dim\\n        budget = self.budget\\n\\n        # Population size\\n        NP = min(10 * dim, max(4, budget // 2 - 1))\\n        if NP < 4:\\n            NP = 4\\n        # Ensure budget can accommodate initial population and at least one generation\\n        if budget < NP:\\n            NP = budget  # degenerate case: just random search\\n        \\n        # Initialize population\\n        pop = lb + (ub - lb) * rng.rand(NP, dim)\\n        fitness = np.zeros(NP)\\n        for i in range(NP):\\n            fitness[i] = func(pop[i])\\n        \\n        # Initial best\\n        best_idx = np.argmin(fitness)\\n        best_x = pop[best_idx].copy()\\n        best_val = fitness[best_idx]\\n        report_best(best_val, best_x)\\n        \\n        func_evals = NP\\n        \\n        # Main DE loop\\n        if NP > 1:\\n            F = 0.8\\n            CR = 0.9\\n            max_gen = (budget - func_evals) // NP\\n            for gen in range(max_gen):\\n                for i in range(NP):\\n                    # Select three distinct random indices\\n                    candidates = list(range(NP))\\n                    candidates.remove(i)\\n                    idx = rng.choice(candidates, 3, replace=False)\\n                    a, b, c = pop[idx[0]], pop[idx[1]], pop[idx[2]]\\n                    mutant = a + F * (b - c)\\n                    # Binomial crossover\\n                    trial = pop[i].copy()\\n                    j_rand = rng.randint(dim)\\n                    for j in range(dim):\\n                        if rng.rand() < CR or j == j_rand:\\n                            trial[j] = mutant[j]\\n                    # Clip to bounds\\n                    trial = np.clip(trial, lb, ub)\\n                    # Evaluate\\n                    trial_fitness = func(trial)\\n                    func_evals += 1\\n                    if trial_fitness < fitness[i]:\\n                        pop[i] = trial\\n                        fitness[i] = trial_fitness\\n                        if trial_fitness < best_val:\\n                            best_val = trial_fitness\\n                            best_x = trial.copy()\\n                            report_best(best_val, best_x)\\n                    if func_evals >= budget:\\n                        break\\n                if func_evals >= budget:\\n                    break\\n        return best_val, best_x\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"aocc_by_function\":{\"1\":0.6542606175844337,\"10\":0.15988437449529566,\"11\":0.2848389921542008,\"12\":0.03957775627801944,\"13\":0.187048431840952,\"14\":0.4921289287180854,\"15\":0.08307844461780108,\"16\":0.18997450799495127,\"17\":0.28431266091456137,\"18\":0.21205265438853038,\"19\":0.18561445892697867,\"2\":0.37613977635667206,\"20\":0.17824229560012841,\"21\":0.2976418758985763,\"22\":0.19345329581386453,\"23\":0.1931276114993964,\"24\":0.07121724700866443,\"3\":0.1022385129240957,\"4\":0.08350844762899456,\"5\":0.9460809946673511,\"6\":0.29968482288148485,\"7\":0.5963099731664251,\"8\":0.2050484835820773,\"9\":0.20976627875463608},\"aocc_by_group\":{\"high_conditioning_unimodal\":0.23269569669731063,\"low_moderate_conditioning\":0.3277023895961559,\"multimodal_strong_global_structure\":0.19100654536856457,\"multimodal_weak_global_structure\":0.18673646516412604,\"separable\":0.43244566983230937},\"aocc_lower_bound\":1e-08,\"aocc_upper_bound\":100.0,\"best_aocc\":0.9491543669031195,\"best_final_error\":0.0,\"budget\":10000,\"final_error_by_function\":{\"1\":1.0371555466311595e-10,\"10\":0.00416583769282397,\"11\":0.00011896451040212715,\"12\":5.74686924804481,\"13\":0.02411204732888687,\"14\":2.2808047219768923e-06,\"15\":10.090973617794148,\"16\":0.5803962874413126,\"17\":0.010671503243945798,\"18\":0.07580925175327735,\"19\":1.0745914040961868,\"2\":2.7993800699732674e-07,\"20\":1.033326436111641,\"21\":1.0160916676954646,\"22\":0.6918609008781758,\"23\":0.8810512876484231,\"24\":15.343377925746507,\"3\":5.911879002264072,\"4\":8.190605369207896,\"5\":0.0,\"6\":0.0004553343310102302,\"7\":0.0,\"8\":0.0033575302555751327,\"9\":0.0017637112785090874},\"invalid_count\":0,\"mean_aocc\":0.2718846434873407,\"mean_evaluations\":10000.0,\"mean_final_error\":2.1117283286737294,\"mean_runtime\":2.834183887583246,\"median_aocc\":0.20188544596745178,\"median_final_error\":0.03311031741587911,\"partial_timeout_count\":0,\"penalized_mean_aocc\":0.2718846434873407,\"pool\":\"search_instances\",\"problem\":\"bbob\",\"runs\":72,\"runtime_error_count\":0,\"score_name\":\"mean_aocc\",\"scored_count\":72,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_mean_aocc\":0.2718846434873407,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"unscored_timeout_count\":0,\"valid_count\":72,\"worst_aocc\":0.029389458627436624,\"worst_final_error\":18.05410966073397},\"score_name\":\"mean_aocc\",\"score_value\":0.2718846434873407,\"status\":\"valid\",\"thought\":\"Differential Evolution (DE) with rand/1/bin strategy. Initialize population uniformly in bounds. For each generation, for each individual, generate mutant by adding scaled difference of two random distinct individuals, then binomial crossover with parent, clip to bounds, evaluate, and replace if better. Track global best, call report_best on improvements. Budget managed by controlling generations: compute population size NP as min(10*dim, max(4, budget//2 - 1)), then generations = (budget - NP) // NP. Use seed for reproducible random numbers.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"maximize mean AOCC under strict objective-evaluation budgets\",\"parents\":[],\"problem\":\"bbob\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"DE rand/1/bin achieves moderate mean AOCC (0.272) but struggles on multimodal problems and lacks parameter adaptation.\",\n  \"aim\": \"Enhance multimodal diversification and adapt control parameters to improve AOCC on hard multimodal functions.\",\n  \"preserve\": [\n    \"population-based DE structure\",\n    \"binomial crossover with clipping to bounds\",\n    \"report_best on improvements\",\n    \"simple budget accounting via generations\"\n  ],\n  \"change\": [\n    \"add a restart mechanism triggered by population diversity loss\",\n    \"adapt F and CR per individual using success-history based method\"\n  ],\n  \"avoid\": [\n    \"overcomplicating overhead that wastes evaluations\",\n    \"losing robust bound handling\",\n    \"introducing hyperparameters without budget-aware tuning\",\n    \"radically altering the core DE mating scheme\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

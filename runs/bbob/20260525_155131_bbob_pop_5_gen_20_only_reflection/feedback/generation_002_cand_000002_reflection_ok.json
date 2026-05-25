@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve adaptability across diverse landscape types through adaptive parameter control and restart diversity to raise mean AOCC.",
+    "avoid": [
+      "adding complex extra components that increase runtime significantly",
+      "distorting the core DE structure or breaking accurate budget accounting"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "implement self-adaptive F and CR (e.g., jDE mechanism)",
+      "add restart triggered on stagnation to escape local optima"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "uniform initialization within bounds",
+      "greedy selection with best tracking",
+      "boundary clipping via np.clip",
+      "budget-adaptive population size heuristic"
+    ],
+    "problem": "bbob",
+    "score_name": "mean_aocc",
+    "score_value": 0.2718846434873407,
+    "source": "llm",
+    "summary": "Standard DE/rand/1/bin achieved mean AOCC of 0.272, with strong performance on separable functions but weaker on multimodal and high-conditioning problems.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "bbob",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: maximize mean AOCC under strict objective-evaluation budgets\nDomain focus: step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, local refinement, bound handling, and budget accounting\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\nclass Optimizer:\\n    def __init__(self, budget: int, dim: int, seed: int):\\n        self.budget = budget\\n        self.dim = dim\\n        self.seed = seed\\n        np.random.seed(seed)\\n        self.NP = max(4, min(int(budget/2), 10*dim))\\n        self.F = 0.8\\n        self.CR = 0.9\\n        self.lb = None\\n        self.ub = None\\n        self.best_x = None\\n        self.best_val = float('inf')\\n        self.calls = 0\\n\\n    def __call__(self, func):\\n        self.lb = func.bounds.lb\\n        self.ub = func.bounds.ub\\n        # Initialize population\\n        pop = np.random.uniform(self.lb, self.ub, (self.NP, self.dim))\\n        fitness = np.full(self.NP, float('inf'))\\n        for i in range(self.NP):\\n            val = func(pop[i])\\n            self.calls += 1\\n            fitness[i] = val\\n            if val < self.best_val:\\n                self.best_val = val\\n                self.best_x = pop[i].copy()\\n                report_best(self.best_val, self.best_x)\\n        # Main evolution loop\\n        while self.calls < self.budget:\\n            for i in range(self.NP):\\n                if self.calls >= self.budget:\\n                    break\\n                # Mutation\\n                candidates = list(range(self.NP))\\n                candidates.remove(i)\\n                r1, r2, r3 = np.random.choice(candidates, 3, replace=False)\\n                mutant = pop[r1] + self.F * (pop[r2] - pop[r3])\\n                mutant = np.clip(mutant, self.lb, self.ub)\\n                # Crossover\\n                j_rand = np.random.randint(self.dim)\\n                trial = np.where(np.random.rand(self.dim) < self.CR, mutant, pop[i])\\n                trial[j_rand] = mutant[j_rand]\\n                # Evaluation and selection\\n                val = func(trial)\\n                self.calls += 1\\n                if val < fitness[i]:\\n                    pop[i] = trial\\n                    fitness[i] = val\\n                    if val < self.best_val:\\n                        self.best_val = val\\n                        self.best_x = trial.copy()\\n                        report_best(self.best_val, self.best_x)\\n        return self.best_val, self.best_x\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"aocc_by_function\":{\"1\":0.6542606175844337,\"10\":0.15988437449529566,\"11\":0.2848389921542008,\"12\":0.03957775627801944,\"13\":0.187048431840952,\"14\":0.4921289287180854,\"15\":0.08307844461780108,\"16\":0.18997450799495127,\"17\":0.28431266091456137,\"18\":0.21205265438853038,\"19\":0.18561445892697867,\"2\":0.37613977635667206,\"20\":0.17824229560012841,\"21\":0.2976418758985763,\"22\":0.19345329581386453,\"23\":0.1931276114993964,\"24\":0.07121724700866443,\"3\":0.1022385129240957,\"4\":0.08350844762899456,\"5\":0.9460809946673511,\"6\":0.29968482288148485,\"7\":0.5963099731664251,\"8\":0.2050484835820773,\"9\":0.20976627875463608},\"aocc_by_group\":{\"high_conditioning_unimodal\":0.23269569669731063,\"low_moderate_conditioning\":0.3277023895961559,\"multimodal_strong_global_structure\":0.19100654536856457,\"multimodal_weak_global_structure\":0.18673646516412604,\"separable\":0.43244566983230937},\"aocc_lower_bound\":1e-08,\"aocc_upper_bound\":100.0,\"best_aocc\":0.9491543669031195,\"best_final_error\":0.0,\"budget\":10000,\"final_error_by_function\":{\"1\":1.0371555466311595e-10,\"10\":0.00416583769282397,\"11\":0.00011896451040212715,\"12\":5.74686924804481,\"13\":0.02411204732888687,\"14\":2.2808047219768923e-06,\"15\":10.090973617794148,\"16\":0.5803962874413126,\"17\":0.010671503243945798,\"18\":0.07580925175327735,\"19\":1.0745914040961868,\"2\":2.7993800699732674e-07,\"20\":1.033326436111641,\"21\":1.0160916676954646,\"22\":0.6918609008781758,\"23\":0.8810512876484231,\"24\":15.343377925746507,\"3\":5.911879002264072,\"4\":8.190605369207896,\"5\":0.0,\"6\":0.0004553343310102302,\"7\":0.0,\"8\":0.0033575302555751327,\"9\":0.0017637112785090874},\"invalid_count\":0,\"mean_aocc\":0.2718846434873407,\"mean_evaluations\":10000.0,\"mean_final_error\":2.1117283286737294,\"mean_runtime\":4.038771516597295,\"median_aocc\":0.20188544596745178,\"median_final_error\":0.03311031741587911,\"partial_timeout_count\":0,\"penalized_mean_aocc\":0.2718846434873407,\"pool\":\"search_instances\",\"problem\":\"bbob\",\"runs\":72,\"runtime_error_count\":0,\"score_name\":\"mean_aocc\",\"scored_count\":72,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_mean_aocc\":0.2718846434873407,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"unscored_timeout_count\":0,\"valid_count\":72,\"worst_aocc\":0.029389458627436624,\"worst_final_error\":18.05410966073397},\"score_name\":\"mean_aocc\",\"score_value\":0.2718846434873407,\"status\":\"valid\",\"thought\":\"Implement a standard differential evolution (DE/rand/1/bin) optimizer with a fixed population size. The population is initialized uniformly at random within the bounds. At each generation, trial vectors are generated via mutation and binomial crossover, with greedy selection. The best solution is tracked and reported. The random seed ensures reproducibility. The budget is managed by limiting the number of function evaluations; initial population consumes NP calls, then generations run until the budget is exhausted. The population size NP is set as a function of dimension and budget to balance exploration and exploitation.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"maximize mean AOCC under strict objective-evaluation budgets\",\"parents\":[],\"problem\":\"bbob\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Standard DE/rand/1/bin achieved mean AOCC of 0.272, with strong performance on separable functions but weaker on multimodal and high-conditioning problems.\",\n  \"aim\": \"Improve adaptability across diverse landscape types through adaptive parameter control and restart diversity to raise mean AOCC.\",\n  \"preserve\": [\n    \"uniform initialization within bounds\",\n    \"greedy selection with best tracking\",\n    \"boundary clipping via np.clip\",\n    \"budget-adaptive population size heuristic\"\n  ],\n  \"change\": [\n    \"implement self-adaptive F and CR (e.g., jDE mechanism)\",\n    \"add restart triggered on stagnation to escape local optima\"\n  ],\n  \"avoid\": [\n    \"adding complex extra components that increase runtime significantly\",\n    \"distorting the core DE structure or breaking accurate budget accounting\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

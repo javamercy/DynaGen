@@ -1,0 +1,166 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000014: pattern_restart_refined
+Status: valid; mean AOCC score: 0.273179 (higher is better)
+Thought: Coordinate-wise pattern search with per-coordinate step adaptation and deterministic cycling. Restarts the search from a new random point when a full cycle fails to improve the current best, preserving global best. Seed controls initial point and restart randomization. Step sizes reset to 20% of range on restart. Budget strictly tracked.
+Mean AOCC: 0.2731788549346117
+Mean final error: 22.583839415126004
+AOCC by group: {'high_conditioning_unimodal': 0.1589667137668281, 'low_moderate_conditioning': 0.297170774165898, 'multimodal_strong_global_structure': 0.1813609867751838, 'multimodal_weak_global_structure': 0.2981863868443323, 'separable': 0.4350077969670734}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        # initial point
+        cur_x = self.rng.uniform(lb, ub)
+        cur_f = func(cur_x)
+        best_x = cur_x.copy()
+        best_f = cur_f
+        report_best(best_f, best_x)
+        evals = 1
+        step = 0.2 * (ub - lb)
+        min_step = 1e-3 * (ub - lb)
+        while evals < self.budget:
+            improved_in_cycle = False
+            for coord in range(dim):
+                if evals >= self.budget:
+                    break
+                # try positive direction
+                candidate = cur_x.copy()
+                candidate[coord] += step[coord]
+                candidate = np.clip(candidate, lb, ub)
+                f_candidate = func(candidate)
+                evals += 1
+                if f_candidate < cur_f:
+                    cur_f = f_candidate
+                    cur_x = candidate.copy()
+                    if f_candidate < best_f:
+                        best_f = f_candidate
+                        best_x = cur_x.copy()
+                        report_best(best_f, best_x)
+                    improved_in_cycle = True
+                    step[coord] *= 1.2
+                    continue  # skip negative direction on success
+                # try negative direction
+                if evals >= self.budget:
+                    step[coord] *= 0.5
+                    break
+                candidate2 = cur_x.copy()
+                candidate2[coord] -= step[coord]
+                candidate2 = np.clip(candidate2, lb, ub)
+                f_candidate2 = func(candidate2)
+                evals += 1
+                if f_candidate2 < cur_f:
+                    cur_f = f_candidate2
+                    cur_x = candidate2.copy()
+                    if f_candidate2 < best_f:
+                        best_f = f_candidate2
+                        best_x = cur_x.copy()
+                        report_best(best_f, best_x)
+                    improved_in_cycle = True
+                    step[coord] *= 1.2
+                else:
+                    step[coord] *= 0.5
+                step[coord] = max(step[coord], min_step[coord])
+            if not improved_in_cycle and evals < self.budget:
+                # restart: new random point
+                new_x = self.rng.uniform(lb, ub)
+                new_f = func(new_x)
+                evals += 1
+                if new_f < best_f:
+                    best_f = new_f
+                    best_x = new_x.copy()
+                    report_best(best_f, best_x)
+                cur_x = new_x.copy()
+                cur_f = new_f
+                step = 0.2 * (ub - lb)  # reset step sizes
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000014 LLM reflection:
+- Summary: Candidate improved mean AOCC to 0.273 (+0.057 over best parent) by introducing a separate current point and restart on full-cycle stagnation, but still fails on multimodal and ill-conditioned functions.
+- Aim: Improve multimodal diversification and restart effectiveness to increase AOCC on multimodal weak/strong global structure groups.
+- Preserve: Per-coordinate step-size adaptation (increase/decrease factors); Tracking of current point separate from best; Bounds clipping; Budget-accounting loop
+- Change: Enhance restart: use a random perturbation with scaled step sizes rather than full reset to 20% range; Add occasional global diversification step (e.g., random coordinate resets during cycle)
+- Avoid: Introducing new evaluation cost beyond budget; Breaking the deterministic ordering or seed reproducibility; Degrading performance on separable/high-conditioning unimodal functions
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

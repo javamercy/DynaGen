@@ -1,0 +1,46 @@
+{
+  "candidate_id": "cand_000004",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve multimodal diversification and local refinement to boost AOCC on difficult landscapes.",
+    "avoid": [
+      "Complex covariance learning that wastes budget",
+      "Overly aggressive step-size growth that hinders fine-tuning"
+    ],
+    "candidate_id": "cand_000004",
+    "change": [
+      "Add restart when stagnation detected (no improvement for N iterations)",
+      "Replace single random perturbation with multiple parallel coordinated probes"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Coordinate-wise step-size adaptation",
+      "Bound handling via clipping",
+      "Strict budget accounting"
+    ],
+    "problem": "bbob",
+    "score_name": "mean_aocc",
+    "score_value": 0.3172866290988814,
+    "source": "llm",
+    "summary": "Moderate mean AOCC but poor on multimodal and ill-conditioned functions.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "bbob",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: maximize mean AOCC under strict objective-evaluation budgets\nDomain focus: step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, local refinement, bound handling, and budget accounting\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\nclass Optimizer:\\n    def __init__(self, budget: int, dim: int, seed: int):\\n        self.budget = budget\\n        self.dim = dim\\n        self.rng = np.random.RandomState(seed)\\n        self.best_x = None\\n        self.best_val = np.inf\\n\\n    def __call__(self, func):\\n        lb = func.bounds.lb\\n        ub = func.bounds.ub\\n        # initial random point\\n        x0 = lb + self.rng.rand(self.dim) * (ub - lb)\\n        val0 = func(x0)\\n        self.best_x = x0.copy()\\n        self.best_val = val0\\n        report_best(self.best_val, self.best_x)\\n        evals = 1\\n        # initial step size as fraction of range\\n        step_size = 0.1\\n        while evals < self.budget:\\n            improved = False\\n            for i in range(self.dim):\\n                if evals >= self.budget:\\n                    break\\n                step = step_size * (ub[i] - lb[i])\\n                # positive step\\n                x_new = self.best_x.copy()\\n                x_new[i] = np.clip(self.best_x[i] + step, lb[i], ub[i])\\n                val_new = func(x_new)\\n                evals += 1\\n                if val_new < self.best_val:\\n                    self.best_val = val_new\\n                    self.best_x[i] = x_new[i]\\n                    improved = True\\n                    report_best(self.best_val, self.best_x)\\n                else:\\n                    if evals >= self.budget:\\n                        break\\n                    # negative step\\n                    x_new2 = self.best_x.copy()\\n                    x_new2[i] = np.clip(self.best_x[i] - step, lb[i], ub[i])\\n                    val_new2 = func(x_new2)\\n                    evals += 1\\n                    if val_new2 < self.best_val:\\n                        self.best_val = val_new2\\n                        self.best_x[i] = x_new2[i]\\n                        improved = True\\n                        report_best(self.best_val, self.best_x)\\n            # adapt step size\\n            if improved:\\n                step_size *= 1.2\\n            else:\\n                step_size *= 0.5\\n            # random perturbation\\n            if evals < self.budget:\\n                x_rnd = np.clip(self.best_x + step_size * (ub - lb) * (2*self.rng.rand(self.dim)-1), lb, ub)\\n                val_rnd = func(x_rnd)\\n                evals += 1\\n                if val_rnd < self.best_val:\\n                    self.best_val = val_rnd\\n                    self.best_x = x_rnd.copy()\\n                    improved = True\\n                    report_best(self.best_val, self.best_x)\\n        return self.best_val, self.best_x\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000004\",\"metrics\":{\"aocc_by_function\":{\"1\":0.9824519498038901,\"10\":0.013243397441040208,\"11\":0.048118110269934795,\"12\":0.10220467755537395,\"13\":0.09869653573786198,\"14\":0.5436979797771251,\"15\":0.0822334954609124,\"16\":0.1083529515117559,\"17\":0.10266266921055633,\"18\":0.045917591904984546,\"19\":0.18140582959804052,\"2\":0.9532841312027824,\"20\":0.21156010278323786,\"21\":0.4007260220423501,\"22\":0.349545067413787,\"23\":0.18154168831954212,\"24\":0.06738075659157905,\"3\":0.13004127305276733,\"4\":0.1820125258989489,\"5\":0.996705142153087,\"6\":0.9262709457461623,\"7\":0.25984892019160427,\"8\":0.32426696421094064,\"9\":0.3227103704948882},\"aocc_by_group\":{\"high_conditioning_unimodal\":0.1611921401562672,\"low_moderate_conditioning\":0.4582743001608989,\"multimodal_strong_global_structure\":0.10411450753724995,\"multimodal_weak_global_structure\":0.24215072743009924,\"separable\":0.6488990044222952},\"aocc_lower_bound\":1e-08,\"aocc_upper_bound\":100.0,\"best_aocc\":0.9971284097030668,\"best_final_error\":0.0,\"budget\":10000,\"final_error_by_function\":{\"1\":3.315866100213801e-14,\"10\":90.81036240631498,\"11\":44.29911756798171,\"12\":13.303523974805012,\"13\":10.172096447228311,\"14\":0.00014492839346994893,\"15\":23.215508071935506,\"16\":9.136763675188476,\"17\":9.459087797355773,\"18\":35.284638412008285,\"19\":1.8325954020957482,\"2\":0.0,\"20\":0.7735872719061566,\"21\":5.991441416578624,\"22\":24.026425577891445,\"23\":1.574560698028911,\"24\":21.944883627910983,\"3\":5.969742572502544,\"4\":1.6582650951555138,\"5\":0.0,\"6\":3.365722515506301e-11,\"7\":2.993921896873234,\"8\":0.01920743663181194,\"9\":0.007878117155961206},\"invalid_count\":0,\"mean_aocc\":0.3172866290988814,\"mean_evaluations\":10000.0,\"mean_final_error\":12.603073016415673,\"mean_runtime\":1.78226622344443,\"median_aocc\":0.16335384593439448,\"median_final_error\":2.2126316953399865,\"partial_timeout_count\":0,\"penalized_mean_aocc\":0.3172866290988814,\"pool\":\"search_instances\",\"problem\":\"bbob\",\"runs\":72,\"runtime_error_count\":0,\"score_name\":\"mean_aocc\",\"scored_count\":72,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_mean_aocc\":0.3172866290988814,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"unscored_timeout_count\":0,\"valid_count\":72,\"worst_aocc\":0.0,\"worst_final_error\":176.42851454747625},\"score_name\":\"mean_aocc\",\"score_value\":0.3172866290988814,\"status\":\"valid\",\"thought\":\"Start with a random point within bounds. Then iteratively probe each coordinate direction with step size proportional to the range. For each coordinate, try positive and negative steps; accept improvements and adapt step size (increase if improvement, decrease otherwise). Occasionally inject a random perturbation from the current best to encourage exploration. Use numpy RandomState for reproducibility based on seed. Count evaluations strictly to stay within budget.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"maximize mean AOCC under strict objective-evaluation budgets\",\"parents\":[],\"problem\":\"bbob\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Moderate mean AOCC but poor on multimodal and ill-conditioned functions.\",\n  \"aim\": \"Improve multimodal diversification and local refinement to boost AOCC on difficult landscapes.\",\n  \"preserve\": [\"Coordinate-wise step-size adaptation\", \"Bound handling via clipping\", \"Strict budget accounting\"],\n  \"change\": [\"Add restart when stagnation detected (no improvement for N iterations)\", \"Replace single random perturbation with multiple parallel coordinated probes\"],\n  \"avoid\": [\"Complex covariance learning that wastes budget\", \"Overly aggressive step-size growth that hinders fine-tuning\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

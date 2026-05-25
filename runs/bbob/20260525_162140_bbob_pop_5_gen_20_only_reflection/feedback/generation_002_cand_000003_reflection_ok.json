@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000003",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve mean AOCC by enabling coordinate-wise step size adaptation and more effective restart diversification.",
+    "avoid": [
+      "Overhauling algorithm entirely",
+      "Adding complex matrix operations increasing runtime",
+      "Altering successful adaptation on easy functions"
+    ],
+    "candidate_id": "cand_000003",
+    "change": [
+      "Introduce separate step sizes per dimension updated via success-failure counters",
+      "Modify restart to generate a new uniform random point in search space"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Seed-based reproducibility",
+      "Budget-counting with clipping to bounds",
+      "Centered sampling at best point"
+    ],
+    "problem": "bbob",
+    "score_name": "mean_aocc",
+    "score_value": 0.21603436462641668,
+    "source": "llm",
+    "summary": "Adaptive random search achieves moderate mean AOCC 0.216, strong on separable/low-conditioning functions but weak on high-conditioning and multimodal.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "bbob",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: maximize mean AOCC under strict objective-evaluation budgets\nDomain focus: step-size control, covariance or coordinate adaptation, restart behavior, multimodal diversification, local refinement, bound handling, and budget accounting\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\nclass Optimizer:\\n    def __init__(self, budget, dim, seed):\\n        self.budget = budget\\n        self.dim = dim\\n        self.seed = seed\\n        self.rng = np.random.RandomState(seed)\\n\\n    def __call__(self, func):\\n        lb = func.bounds.lb\\n        ub = func.bounds.ub\\n        dim = self.dim\\n        budget = self.budget\\n        rng = self.rng\\n\\n        # Initialization\\n        x0 = lb + rng.rand(dim) * (ub - lb)\\n        f0 = func(x0)\\n        best_x = x0\\n        best_f = f0\\n        report_best(best_f, best_x)\\n        evals = 1\\n\\n        # Parameters\\n        init_radius = 0.2 * np.mean(ub - lb)\\n        radius = init_radius\\n        stagnation_limit = max(10, dim * 10)\\n        no_improve_steps = 0\\n        success_window = 5\\n        success_count = 0\\n\\n        while evals < budget:\\n            # Sample candidate\\n            candidate = best_x + rng.uniform(-radius, radius, dim)\\n            candidate = np.clip(candidate, lb, ub)\\n            f = func(candidate)\\n            evals += 1\\n\\n            if f < best_f - 1e-12:\\n                best_f = f\\n                best_x = candidate\\n                report_best(best_f, best_x)\\n                no_improve_steps = 0\\n                success_count += 1\\n            else:\\n                no_improve_steps += 1\\n\\n            # Adapt radius\\n            if evals % success_window == 0:\\n                if success_count > 0.5 * success_window:\\n                    radius = min(radius * 1.2, 0.5 * np.mean(ub - lb))\\n                else:\\n                    radius = max(radius * 0.8, 0.01 * np.mean(ub - lb))\\n                success_count = 0\\n\\n            # Restart if stagnation\\n            if no_improve_steps >= stagnation_limit:\\n                # Reset radius and recenter at best\\n                radius = init_radius\\n                no_improve_steps = 0\\n                # optionally sample a random point to escape? but keep best\\n                # We'll just continue from best with new radius\\n\\n        return best_f, best_x\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000003\",\"metrics\":{\"aocc_by_function\":{\"1\":0.444467602359144,\"10\":0.0034962849697668173,\"11\":0.09416205526112938,\"12\":0.017331625967722048,\"13\":0.09741235669653436,\"14\":0.416434399694435,\"15\":0.0970601562549146,\"16\":0.20999561251046917,\"17\":0.19005587782406794,\"18\":0.13014254065549405,\"19\":0.19441449282901982,\"2\":0.020049187466122022,\"20\":0.19502647528300357,\"21\":0.3122262026284078,\"22\":0.2495881861121447,\"23\":0.19282691179975228,\"24\":0.09496546481591288,\"3\":0.10075989991954497,\"4\":0.07692798038027969,\"5\":0.9089684423998556,\"6\":0.3110989094833299,\"7\":0.5176096764003301,\"8\":0.14082604247845767,\"9\":0.16897836684416226},\"aocc_by_group\":{\"high_conditioning_unimodal\":0.12576734451791752,\"low_moderate_conditioning\":0.28462824880156995,\"multimodal_strong_global_structure\":0.16433373601479312,\"multimodal_weak_global_structure\":0.20892664812784423,\"separable\":0.31023462250498923},\"aocc_lower_bound\":1e-08,\"aocc_upper_bound\":100.0,\"best_aocc\":0.9536793306426734,\"best_final_error\":0.0,\"budget\":10000,\"final_error_by_function\":{\"1\":0.002618021789274394,\"10\":143.67691947742154,\"11\":3.837683570927967,\"12\":567.688626296529,\"13\":8.821255899081882,\"14\":0.00730166628230459,\"15\":7.829195957060435,\"16\":1.2794289092089979,\"17\":1.39575886191913,\"18\":4.1206724619546735,\"19\":0.7809382508797474,\"2\":82.43125073395088,\"20\":0.9735740498426253,\"21\":3.337862921533745,\"22\":20.64249784406883,\"23\":0.9843763449862136,\"24\":7.851627130545704,\"3\":9.97821758545453,\"4\":16.772916513149994,\"5\":0.0,\"6\":0.07110542979050176,\"7\":0.15995904716745457,\"8\":2.775194458005714,\"9\":1.9986221177345602},\"invalid_count\":0,\"mean_aocc\":0.21603436462641668,\"mean_evaluations\":10000.0,\"mean_final_error\":36.97573348122024,\"mean_runtime\":1.3442821207082463,\"median_aocc\":0.15324869627890358,\"median_final_error\":2.1618384706714266,\"partial_timeout_count\":0,\"penalized_mean_aocc\":0.21603436462641668,\"pool\":\"search_instances\",\"problem\":\"bbob\",\"runs\":72,\"runtime_error_count\":0,\"score_name\":\"mean_aocc\",\"scored_count\":72,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_mean_aocc\":0.21603436462641668,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"unscored_timeout_count\":0,\"valid_count\":72,\"worst_aocc\":0.0,\"worst_final_error\":1217.579056869017},\"score_name\":\"mean_aocc\",\"score_value\":0.21603436462641668,\"status\":\"valid\",\"thought\":\"Random search with adaptive radius centered on best point. Starts with uniform random point. Each iteration samples a candidate from a hypercube of side length 2*radius centered at best, clipped to bounds. Radius adapts based on improvement success: if improved in last window, radius increases; else decreases. After a stagnation period (no improvement for dim*10 steps), reset radius to initial value and recenter at current best. Uses seed for reproducibility. Budget-safe by counting evaluations.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"maximize mean AOCC under strict objective-evaluation budgets\",\"parents\":[],\"problem\":\"bbob\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Adaptive random search achieves moderate mean AOCC 0.216, strong on separable/low-conditioning functions but weak on high-conditioning and multimodal.\",\n  \"aim\": \"Improve mean AOCC by enabling coordinate-wise step size adaptation and more effective restart diversification.\",\n  \"preserve\": [\n    \"Seed-based reproducibility\",\n    \"Budget-counting with clipping to bounds\",\n    \"Centered sampling at best point\"\n  ],\n  \"change\": [\n    \"Introduce separate step sizes per dimension updated via success-failure counters\",\n    \"Modify restart to generate a new uniform random point in search space\"\n  ],\n  \"avoid\": [\n    \"Overhauling algorithm entirely\",\n    \"Adding complex matrix operations increasing runtime\",\n    \"Altering successful adaptation on easy functions\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

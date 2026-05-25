@@ -1,0 +1,211 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000064: adaptive_restart_de_cauchy
+Status: valid; mean AOCC score: 0.501694 (higher is better)
+Thought: DE/best/1 with dither (F=0.5+0.5*rand), CR=0.9, stagnation limit = max(5, NP//2, dim). Up to 3 restarts: reinitialize with 50% uniform and 50% Cauchy around best (scale=0.2*(ub-lb)). After restart, local refinement using 90% small Gaussian steps and 10% Cauchy jumps (scale=0.1*(ub-lb)) for multimodal escape. Seed controls all randomness. Budget strictly observed.
+Mean AOCC: 0.5016935448375575
+Mean final error: 1.485445705930137
+AOCC by group: {'high_conditioning_unimodal': 0.6545646518075178, 'low_moderate_conditioning': 0.7218531297437588, 'multimodal_strong_global_structure': 0.29650135675515266, 'multimodal_weak_global_structure': 0.28374800965406766, 'separable': 0.5958324932085308}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        self.NP = max(4, min(int(budget/2), 10*dim))
+        self.CR = 0.9
+        self.lb = None
+        self.ub = None
+        self.best_x = None
+        self.best_val = float('inf')
+        self.calls = 0
+
+    def __call__(self, func):
+        self.lb = func.bounds.lb
+        self.ub = func.bounds.ub
+        pop = np.random.uniform(self.lb, self.ub, (self.NP, self.dim))
+        fitness = np.full(self.NP, float('inf'))
+        for i in range(self.NP):
+            val = func(pop[i])
+            self.calls += 1
+            fitness[i] = val
+            if val < self.best_val:
+                self.best_val = val
+                self.best_x = pop[i].copy()
+                report_best(self.best_val, self.best_x)
+        generation = 0
+        stagnation = 0
+        stagnation_limit = max(5, self.NP // 2, self.dim)
+        restarts = 0
+        max_restarts = 3
+        while self.calls < self.budget:
+            improved_this_gen = False
+            for i in range(self.NP):
+                if self.calls >= self.budget:
+                    break
+                candidates = list(range(self.NP))
+                candidates.remove(i)
+                r1, r2 = np.random.choice(candidates, 2, replace=False)
+                F = 0.5 + 0.5 * np.random.rand()
+                mutant = self.best_x + F * (pop[r1] - pop[r2])
+                mutant = np.clip(mutant, self.lb, self.ub)
+                j_rand = np.random.randint(self.dim)
+                trial = np.where(np.random.rand(self.dim) < self.CR, mutant, pop[i])
+                trial[j_rand] = mutant[j_rand]
+                val = func(trial)
+                self.calls += 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    if val < self.best_val:
+                        self.best_val = val
+                        self.best_x = trial.copy()
+                        report_best(self.best_val, self.best_x)
+                        improved_this_gen = True
+            generation += 1
+            if improved_this_gen:
+                stagnation = 0
+            else:
+                stagnation += 1
+            if stagnation >= stagnation_limit and restarts < max_restarts and self.calls < self.budget:
+                restarts += 1
+                stagnation = 0
+                # Reinitialize population: mix uniform and Cauchy around best
+                new_pop = np.empty((self.NP - 1, self.dim))
+                for j in range(self.NP - 1):
+                    if np.random.rand() < 0.5:
+                        new_pop[j] = np.random.uniform(self.lb, self.ub)
+                    else:
+                        # Cauchy step from best
+                        step = np.random.standard_cauchy(self.dim) * 0.2 * (self.ub - self.lb)
+                        new_pop[j] = np.clip(self.best_x + step, self.lb, self.ub)
+                new_fitness = np.full(self.NP - 1, float('inf'))
+                for j, x in enumerate(new_pop):
+                    if self.calls >= self.budget:
+                        break
+                    val = func(x)
+                    self.calls += 1
+                    new_fitness[j] = val
+                    if val < self.best_val:
+                        self.best_val = val
+                        self.best_x = x.copy()
+                        report_best(self.best_val, self.best_x)
+                # Keep best point and new population
+                pop = np.vstack((self.best_x.reshape(1, -1), new_pop))
+                fitness = np.concatenate(([self.best_val], new_fitness))
+                # Local refinement: mix small Gaussian and occasional Cauchy
+                local_steps = max(1, min(10, int(self.budget / 100)))
+                for _ in range(local_steps):
+                    if self.calls >= self.budget:
+                        break
+                    if np.random.rand() < 0.9:
+                        step = np.random.randn(self.dim) * 0.01 * (self.ub - self.lb)
+                    else:
+                        step = np.random.standard_cauchy(self.dim) * 0.1 * (self.ub - self.lb)
+                    candidate = np.clip(self.best_x + step, self.lb, self.ub)
+                    val = func(candidate)
+                    self.calls += 1
+                    if val < self.best_val:
+                        self.best_val = val
+                        self.best_x = candidate.copy()
+                        report_best(self.best_val, self.best_x)
+                        pop[0] = self.best_x
+                        fitness[0] = self.best_val
+        return self.best_val, self.best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000064 LLM reflection:
+- Summary: Slight mean AOCC improvement from Cauchy-based restart reinitialization and mixed Gaussian/Cauchy local refinement, but multimodal functions with weak global structure remain challenging.
+- Aim: Improve multimodal escape on functions with weak global structure while preserving unimodal and separable performance.
+- Preserve: Cauchy-based restart reinitialization with 0.2 scale; dither F=0.5+0.5*rand; stagnation-based restart trigger; strict budget accounting; bound clipping
+- Change: Increase Cauchy step scale in local refinement for stronger multimodal escape; Add success-based step size adaptation in local refinement
+- Avoid: Removing Cauchy restart or dither F; Adding budget-intensive operations; Degrading unimodal performance
+
+Parent cand_000040 LLM reflection:
+- Summary: Slight mean AOCC drop due to weaker multimodal performance on functions 15,16,19,22,24; mixed restart and uniform local refinement hurt weak-global-structure functions.
+- Aim: Improve multimodal diversification by introducing more aggressive exploration during restart reinitialization and using heavy-tailed perturbations in local refinement to escape local optima.
+- Preserve: DE/best/1 mutation with dither (F=0.5+0.5*rand); stagnation limit including dimension (max(5, NP//2, dim)); budget accounting and restart trigger logic
+- Change: Replace uniform/local restart mix with a strategy that samples more broadly (e.g., Cauchy jumps or higher fraction of uniform points) to improve exploration on multimodal landscapes.; Replace uniform local refinement with a mixture of small Gaussian steps for refinement and occasional large Cauchy steps for escape.
+- Avoid: Reducing performance on separable/unimodal functions through excessive exploration; Adding complex mechanisms that waste budget (e.g., inner loops without evaluation control)
+
+Parent cand_000069 LLM reflection:
+- Summary: This candidate slightly improves mean AOCC (0.4965 vs parent 0.4950) by adding Cauchy-based restart diversification and adaptive step-size local refinement after restarts.
+- Aim: Improve multimodal convergence by enhancing population diversity or adaptation of mutation parameters during search.
+- Preserve: DE/best/1 with dithering; stagnation-based restart with Cauchy-uniform mix; adaptive sigma local refinement; population size heuristic NP
+- Change: Adapt CR or F based on generation or landscape feedback; Introduce a diversity-based restart trigger to complement stagnation detection
+- Avoid: Drastic changes to budget accounting or evaluation loops; Adding extra parameters without clear benefit; Removing the Cauchy restart mix which helps multimodal functions
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

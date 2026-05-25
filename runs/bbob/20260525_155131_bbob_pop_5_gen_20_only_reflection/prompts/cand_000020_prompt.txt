@@ -1,0 +1,399 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000012: jde_best1
+Status: valid; mean AOCC score: 0.412093 (higher is better)
+Thought: Self-adaptive DE (jDE) with best/1/bin mutation. Each individual has own F and CR, updated with small probabilities from uniform distributions to adapt exploration/exploitation. Initial population uniform in bounds. Mutation uses best individual as base. Binomial crossover with individual CR. Greedy selection. Seed controls all randomness. Budget guarded.
+Mean AOCC: 0.41209258138505644
+Mean final error: 1.1325361203157773
+AOCC by group: {'high_conditioning_unimodal': 0.37847113241396463, 'low_moderate_conditioning': 0.5733681737407343, 'multimodal_strong_global_structure': 0.2725322560273037, 'multimodal_weak_global_structure': 0.2167927450532371, 'separable': 0.651553718161178}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        self.NP = max(4, min(int(budget/2), 10*dim))
+        self.tau_F = 0.1
+        self.tau_CR = 0.1
+        self.F_l = 0.1
+        self.F_u = 0.9
+        self.CR_l = 0.0
+        self.CR_u = 1.0
+        self.best_x = None
+        self.best_val = float('inf')
+        self.calls = 0
+
+    def __call__(self, func):
+        self.lb = func.bounds.lb
+        self.ub = func.bounds.ub
+        pop = np.random.uniform(self.lb, self.ub, (self.NP, self.dim))
+        fitness = np.full(self.NP, float('inf'))
+        for i in range(self.NP):
+            val = func(pop[i])
+            self.calls += 1
+            fitness[i] = val
+            if val < self.best_val:
+                self.best_val = val
+                self.best_x = pop[i].copy()
+                report_best(self.best_val, self.best_x)
+        # Initialize F and CR arrays
+        F = np.random.uniform(self.F_l, self.F_u, self.NP)
+        CR = np.random.uniform(self.CR_l, self.CR_u, self.NP)
+        generation = 0
+        while self.calls < self.budget:
+            for i in range(self.NP):
+                if self.calls >= self.budget:
+                    break
+                # Adaptive parameters
+                if np.random.rand() < self.tau_F:
+                    F[i] = np.random.uniform(self.F_l, self.F_u)
+                if np.random.rand() < self.tau_CR:
+                    CR[i] = np.random.uniform(self.CR_l, self.CR_u)
+                # Mutation with best as base
+                candidates = list(range(self.NP))
+                candidates.remove(i)
+                r1, r2 = np.random.choice(candidates, 2, replace=False)
+                mutant = self.best_x + F[i] * (pop[r1] - pop[r2])
+                mutant = np.clip(mutant, self.lb, self.ub)
+                # Binomial crossover
+                j_rand = np.random.randint(self.dim)
+                trial = np.where(np.random.rand(self.dim) < CR[i], mutant, pop[i])
+                trial[j_rand] = mutant[j_rand]
+                val = func(trial)
+                self.calls += 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    if val < self.best_val:
+                        self.best_val = val
+                        self.best_x = trial.copy()
+                        report_best(self.best_val, self.best_x)
+            generation += 1
+        return self.best_val, self.best_x
+```
+
+Candidate cand_000015: restarting_coordinate_search
+Status: valid; mean AOCC score: 0.334423 (higher is better)
+Thought: Begin with a uniform random point. Then iteratively probe each coordinate direction with per-coordinate step sizes. For each dimension, try positive and negative steps, accept improvements, and adapt step size (increase if improved, decrease otherwise). After each full pass, if no improvement for several iterations (stagnation), restart from a new random point and reset step sizes. Additionally, perform multiple random perturbations (parallel probes) as diversification: generate several candidate points by adding scaled Gaussian noise to the current best, evaluate them, and accept the best if better. Use numpy RandomState for reproducibility from seed. Budget counting is strict.
+Mean AOCC: 0.3344234561041588
+Mean final error: 8.009376693454549
+AOCC by group: {'high_conditioning_unimodal': 0.18888836254391936, 'low_moderate_conditioning': 0.45026273361970953, 'multimodal_strong_global_structure': 0.10429720234488295, 'multimodal_weak_global_structure': 0.3032154923723912, 'separable': 0.6486213451430012}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.rng = np.random.RandomState(seed)
+        self.best_x = None
+        self.best_val = np.inf
+        self.evals = 0
+        self.step_sizes = None
+        self.no_improve_count = 0
+        self.stagnation_limit = max(5 * dim, 20)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        # initial random point
+        self.best_x = lb + self.rng.rand(self.dim) * (ub - lb)
+        self.best_val = func(self.best_x)
+        self.evals = 1
+        report_best(self.best_val, self.best_x)
+        # initialize per-coordinate step sizes as 10% of range
+        self.step_sizes = 0.1 * (ub - lb)
+        while self.evals < self.budget:
+            improved_any = False
+            for i in range(self.dim):
+                if self.evals >= self.budget:
+                    break
+                step = self.step_sizes[i]
+                # positive step
+                x_new = self.best_x.copy()
+                x_new[i] = np.clip(self.best_x[i] + step, lb[i], ub[i])
+                val_new = func(x_new)
+                self.evals += 1
+                if val_new < self.best_val:
+                    self.best_val = val_new
+                    self.best_x[i] = x_new[i]
+                    improved_any = True
+                    self.step_sizes[i] *= 1.2
+                    report_best(self.best_val, self.best_x)
+                else:
+                    if self.evals >= self.budget:
+                        break
+                    # negative step
+                    x_new2 = self.best_x.copy()
+                    x_new2[i] = np.clip(self.best_x[i] - step, lb[i], ub[i])
+                    val_new2 = func(x_new2)
+                    self.evals += 1
+                    if val_new2 < self.best_val:
+                        self.best_val = val_new2
+                        self.best_x[i] = x_new2[i]
+                        improved_any = True
+                        self.step_sizes[i] *= 1.2
+                        report_best(self.best_val, self.best_x)
+                    else:
+                        self.step_sizes[i] *= 0.5
+                        # ensure minimum step size
+                        self.step_sizes[i] = max(self.step_sizes[i], 1e-12 * (ub[i] - lb[i]))
+            # parallel random probes for diversification
+            if self.evals < self.budget:
+                n_probes = min(5, self.budget - self.evals)
+                candidates = []
+                for _ in range(n_probes):
+                    if self.evals >= self.budget:
+                        break
+                    # random direction scaled by current step sizes
+                    perturb = self.step_sizes * self.rng.randn(self.dim)
+                    x_probe = np.clip(self.best_x + perturb, lb, ub)
+                    val_probe = func(x_probe)
+                    self.evals += 1
+                    candidates.append((val_probe, x_probe))
+                # accept best if improvement
+                best_candidate = min(candidates, key=lambda x: x[0])
+                if best_candidate[0] < self.best_val:
+                    self.best_val = best_candidate[0]
+                    self.best_x = best_candidate[1].copy()
+                    improved_any = True
+                    report_best(self.best_val, self.best_x)
+            # stagnation detection and restart
+            if improved_any:
+                self.no_improve_count = 0
+            else:
+                self.no_improve_count += 1
+                if self.no_improve_count >= self.stagnation_limit and self.evals < self.budget:
+                    # restart from new random point
+                    self.best_x = lb + self.rng.rand(self.dim) * (ub - lb)
+                    self.best_val = func(self.best_x)
+                    self.evals += 1
+                    report_best(self.best_val, self.best_x)
+                    self.step_sizes = 0.1 * (ub - lb)
+                    self.no_improve_count = 0
+        return self.best_val, self.best_x
+```
+
+Candidate cand_000014: cmaes_ipop_mirror
+Status: valid; mean AOCC score: 0.319113 (higher is better)
+Thought: CMA-ES with increasing population size (IPOP) restarts and mirrored sampling to improve multimodal optimization. Initial mean uniform in bounds, sigma=0.2*span. Population size lambda grows at each restart (starting from 4+3*log(dim)). Mirrored sampling generates opposite pairs for better exploration. Stagnation triggers restart after no improvement for floor(budget/10) evals. Budget is shared across restarts. Clips samples to bounds. Uses rank-1 update and cumulative step-size adaptation. Seed controls randomness.
+Mean AOCC: 0.31911328229696617
+Mean final error: 3.007809281737414
+AOCC by group: {'high_conditioning_unimodal': 0.30845996075138865, 'low_moderate_conditioning': 0.5676142449709956, 'multimodal_strong_global_structure': 0.13891062860135614, 'multimodal_weak_global_structure': 0.20435115646389254, 'separable': 0.4259306132320038}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        span = ub - lb
+        
+        best_value = np.inf
+        best_x = np.zeros(dim)
+        
+        # Initial mean
+        mean = lb + self.rng.rand(dim) * span
+        best_value = func(mean)
+        best_x = mean.copy()
+        report_best(best_value, best_x)
+        evals = 1
+        
+        # Base population size
+        base_lambda = max(4, min(self.budget // 10, 4 + int(3 * np.log(dim))))
+        if base_lambda < 1:
+            base_lambda = 1
+        
+        # Restart parameters
+        stagnation_limit = max(1, self.budget // 10)
+        
+        # Main loop with restarts
+        restart = 0
+        while evals < self.budget:
+            # Increase population size at each restart
+            lambda_ = base_lambda * (2 ** restart)
+            if lambda_ > self.budget - evals:
+                lambda_ = self.budget - evals
+            if lambda_ < 1:
+                break
+            
+            mu = lambda_ // 2
+            if mu < 1:
+                mu = 1
+            weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+            weights = weights / np.sum(weights)
+            mueff = 1.0 / np.sum(weights**2)
+            
+            cs = (mueff + 2) / (dim + mueff + 3)
+            damps = 1 + 2 * max(0, np.sqrt((mueff - 1) / (dim + 1)) - 1) + cs
+            ps = np.zeros(dim)
+            
+            ccov = (1.0 / mueff) * 2.0 / ((dim + 1.3)**2) + 1.0 - 1.0 / mueff
+            pc = np.zeros(dim)
+            C = np.eye(dim)
+            sigma = 0.2 * np.mean(span)
+            
+            # Stagnation tracking
+            last_improve = evals
+            
+            # Inner CMA-ES run
+            while evals < self.budget:
+                remaining = self.budget - evals
+                if remaining < lambda_:
+                    lambda_ = remaining
+                    if lambda_ < 1:
+                        break
+                    mu = lambda_ // 2
+                    if mu < 1:
+                        mu = 1
+                    weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+                    weights = weights / np.sum(weights)
+                    mueff = 1.0 / np.sum(weights**2)
+                
+                # Cholesky decomposition
+                try:
+                    L = np.linalg.cholesky(C)
+                except np.linalg.LinAlgError:
+                    C = np.eye(dim)
+                    L = np.eye(dim)
+                
+                # Generate samples with mirrored pairs
+                half = lambda_ // 2
+                remainder = lambda_ % 2
+                z = self.rng.randn(dim, half)
+                samples = np.zeros((lambda_, dim))
+                for i in range(half):
+                    samples[2*i] = mean + sigma * (L @ z[:, i])
+                    samples[2*i+1] = mean - sigma * (L @ z[:, i])
+                if remainder == 1:
+                    samples[-1] = mean + sigma * (L @ self.rng.randn(dim))
+                
+                # Clip to bounds
+                samples = np.clip(samples, lb, ub)
+                
+                # Evaluate
+                vals = np.full(lambda_, np.inf)
+                for i in range(lambda_):
+                    if evals >= self.budget:
+                        break
+                    vals[i] = func(samples[i])
+                    evals += 1
+                    if vals[i] < best_value:
+                        best_value = vals[i]
+                        best_x = samples[i].copy()
+                        report_best(best_value, best_x)
+                        last_improve = evals
+                
+                # Sort
+                idx = np.argsort(vals)
+                samples_sorted = samples[idx]
+                
+                # Update mean
+                mean_old = mean.copy()
+                mean = np.dot(weights, samples_sorted[:mu])
+                
+                # Update step size path
+                invsqrtC = np.linalg.inv(L)
+                ps = (1 - cs) * ps + np.sqrt(cs * (2 - cs) * mueff) * (invsqrtC @ (mean - mean_old)) / sigma
+                sigma = sigma * np.exp(cs / damps * (np.linalg.norm(ps) / (np.sqrt(dim) * (1 - 1/(4*dim) + 1/(21*dim**2))) - 1))
+                
+                # Update covariance path
+                pc = (1 - ccov) * pc + np.sqrt(ccov * (2 - ccov) * mueff) * (mean - mean_old) / sigma
+                C = (1 - ccov) * C + ccov * np.outer(pc, pc)
+                C = (C + C.T) / 2
+                eigvals = np.linalg.eigvalsh(C)
+                if np.min(eigvals) < 1e-12:
+                    C += np.eye(dim) * (1e-12 - np.min(eigvals))
+                
+                # Stagnation check
+                if evals - last_improve > stagnation_limit:
+                    break
+            
+            restart += 1
+        
+        return best_value, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.
