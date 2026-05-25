@@ -1,5 +1,5 @@
 run:
-  name: tsp_calls_20
+  name: tsp_pop_5_gen_20_verbal_2
   output_dir: runs/tsp
   seed: 100
 
@@ -14,7 +14,7 @@ evolution:
   generations: 20
   offspring_per_strategy: 1
   history:
-    enabled: false
+    enabled: true
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -33,8 +33,8 @@ evolution:
     temperature: 0.3
 
 evaluation:
-  budget: 7000
-  timeout_seconds: 180
+  budget: 10000
+  timeout_seconds: 300
   timeout_penalty: 0
   seeds: [ 100 ]
   metric: average_gap

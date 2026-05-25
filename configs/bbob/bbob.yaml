@@ -1,5 +1,5 @@
 run:
-  name: bbob_pop_5_gen_20_verbal_3
+  name: bbob_pop_5_gen_30_verbal_2
   output_dir: runs/bbob
   seed: 100
 
@@ -23,7 +23,7 @@ llm:
 
 evolution:
   population_size: 5
-  generations: 20
+  generations: 30
   offspring_per_strategy: 1
   history:
     enabled: true
@@ -39,7 +39,7 @@ evolution:
     robustness_weight: 0.35
   verbal_gradients:
     enabled: true
-    llm_every_n_generations: 3
+    llm_every_n_generations: 2
     max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
     temperature: 0.3
