@@ -1,0 +1,182 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000047 LLM reflection:
+- Summary: Genetic algorithm reduced gap to 5.13 but timed out on all 100-customer instances due to excessive runtime.
+- Aim: Reduce runtime to avoid timeouts while maintaining or improving solution quality.
+- Preserve: random keys representation; greedy insertion minimizing max route distance; uniform crossover and mutation; population/generation scaling with instance size
+- Change: Add early termination if no improvement for several generations; Limit population size and generations to cut runtime
+- Avoid: Adding complexity that increases runtime further; Losing diversity or greedy insertion logic; Random perturbations that degrade solution quality
+
+Parent cand_000030 LLM reflection:
+- Summary: Candidate improved max-route-distance gap from 20.33% to 15.18% by adding distance-aware perturbation that ejects customers from the longest route based on savings and reinserts to minimize new max distance.
+- Aim: Further reduce the maximum route distance by adding cross-route 2-opt* exchanges to enable more flexible balancing between routes.
+- Preserve: Clarke-Wright savings initialization; Focused local search on the longest route (relocate, swap, 2-opt); Distance-aware perturbation that ejects by savings and reinserts greedily
+- Change: Add a cross-route 2-opt* exchange that swaps segments between the longest and another route to reduce overall max distance.
+- Avoid: Blind random perturbations that ignore distance impact; Breaking route validity or degenerating solution quality; Excessive runtime from too many neighbors in cross-route search
+
+Parent cand_000045 LLM reflection:
+- Summary: Improved average gap to 3.77% but worst-case gap reached 11.01%, indicating inconsistent max-route minimization across 100-customer instances.
+- Aim: Reduce worst-case max-route distance and improve consistency by refining perturbation or acceptance criteria.
+- Preserve: Clarke-Wright savings initialization; intra-route 2-opt; inter-route relocate/swap; distance-aware ejection chain perturbation
+- Change: Add a greedy rebalancing step after perturbation to reassign customers from overloaded routes; Use simulated annealing acceptance for restarts instead of only accepting strict improvements
+- Avoid: Introducing randomness that increases variance; Adding expensive operators that greatly increase runtime; Overcomplicating the perturbation with many parameters
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000047: random_key_ga_max_balance
+Status: timeout; gap: 5.13246
+Thought: Genetic algorithm using random keys representation. Decodes each key vector into a permutation of customers, then constructs routes by greedy insertion that minimizes the max route distance. Uniform crossover and mutation. Population size and generations scale with instance size. Reports best solution found.
+Mean gap: 5.132456543078219
+Mean max route distance: 2.1573401881814265
+Mean total route distance: 12.753416525702296
+Gap by instance size: {'100': 5.132456543078219}
+Gap by truck count: {'6': 5.132456543078219}
+Error details: timeout on instances_000: VRP solver timed out after 180.002s (timeout_seconds=180)
+Code:
+```python
+import numpy as np
+import random
+
+def route_distance(route, dm):
+    return sum(dm[route[i], route[i+1]] for i in range(len(route)-1))
+
+def decode(keys, truck_count, customers, dm):
+    n_cust = len(customers)
+    order = np.argsort(keys)
+    routes = [[0, 0] for _ in range(truck_count)]
+    for idx in order:
+        cust = customers[idx]
+        best_truck = None
+        best_new_max = float('inf')
+        for t in range(truck_count):
+            route = routes[t]
+            # evaluate best position in route
+            best_pos = None
+            best_local_max = float('inf')
+            current_dists = [route_distance(routes[tt], dm) for tt in range(truck_count) if tt != t]
+            for pos in range(1, len(route)):
+                new_route = route[:pos] + [cust] + route[pos:]
+                new_dist = route_distance(new_route, dm)
+                new_max = max(max(current_dists) if current_dists else 0, new_dist)
+                if new_max < best_local_max:
+                    best_local_max = new_max
+                    best_pos = pos
+            if best_local_max < best_new_max:
+                best_new_max = best_local_max
+                best_truck = t
+        # insert into best_truck at best position
+        route = routes[best_truck]
+        best_pos = None
+        best_new_dist = float('inf')
+        for pos in range(1, len(route)):
+            new_route = route[:pos] + [cust] + route[pos:]
+            new_dist = route_distance(new_route, dm)
+            if new_dist < best_new_dist:
+                best_new_dist = new_dist
+                best_pos = pos
+        if best_pos is None:
+            best_pos = len(route)
+        routes[best_truck] = route[:best_pos] + [cust] + route[best_pos:]
+    return routes
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    np.random.seed(0)
+    random.seed(0)
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    if truck_count >= n - 1:
+        routes = [[0, c, 0] for c in customers]
+        while len(routes) < truck_count:
+            routes.append([0, 0])
+        report_best_vrp(routes)
+        return routes
+    
+    num_cust = n - 1
+    pop_size = max(10, num_cust // 2)
+    generations = max(10, num_cust * 2)
+    
+    # initial population
+    pop = [np.random.uniform(size=num_cust) for _ in range(pop_size)]
+    best_routes = None
+    best_max = float('inf')
+    
+    for gen in range(generations):
+        fitness = []
+        all_routes = []
+        for keys in pop:
+            routes = decode(keys, truck_count, customers, distance_matrix)
+            max_dist = max(route_distance(r, distance_matrix) for r in routes)
+            fitness.append(max_dist)
+            all_routes.append(routes)
+            if max_dist < best_max - 1e-12:
+                best_max = max_dist
+                best_routes = [r[:] for r in routes]
+                report_best_vrp(best_routes)
+        # create next generation
+        best_idx = int(np.argmin(fitness))
+        next_pop = [pop[best_idx]]
+        for _ in range(pop_size - 1):
+            # tournament selection
+            i1, i2 = np.random.choice(pop_size, 2, replace=False)
+            winner = i1 if fitness[i1] < fitness[i2] else i2
+            # crossover with another random parent
+            parent1 = pop[winner]
+            parent2 = pop[np.random.randint(pop_size)]
+            child = np.where(np.random.uniform(size=num_cust) < 0.5, parent1, parent2)
+            # mutation
+            mut_rate = 1.0 / num_cust
+            mut_mask = np.random.uniform(size=num_cust) < mut_rate
+            child[mut_mask] = np.random.uniform(size=int(mut_mask.sum()))
+            next_pop.append(child)
+        pop = next_pop
+    
+    if best_routes is None:
+        # fallback: just return first decoded routes
+        best_routes = all_routes[0]
+        report_best_vrp(best_routes)
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
