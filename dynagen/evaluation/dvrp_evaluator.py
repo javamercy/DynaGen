@@ -11,7 +11,7 @@ from dynagen.evaluation.base import EvaluationResult, EvaluationStatus
 from dynagen.evaluation.dvrp_metrics import aggregate_dvrp_records, compute_dvrp_gap
 from dynagen.execution.dvrp_runner import run_dvrp_policy
 
-DVRP_SCORE_NAME = "ttt"
+DVRP_SCORE_NAME = "gap"
 
 
 class DVRPCandidateEvaluator:
@@ -19,15 +19,15 @@ class DVRPCandidateEvaluator:
             self,
             instances: list[DVRPInstance],
             *,
-            seeds: tuple[int, ...] | list[int],
-            budget: int,
+            seeds: tuple[int, ...] | list[int] | None = None,
+            budget: int | None = None,
             timeout_seconds: float,
             pool_name: str,
             timeout_penalty: float = 10.0,
     ) -> None:
         if not instances:
             raise ValueError("At least one DVRP instance is required for evaluation")
-        if budget <= 0:
+        if budget is not None and budget <= 0:
             raise ValueError("Budget must be a positive integer")
         if timeout_seconds <= 0:
             raise ValueError("Timeout must be a positive number")
@@ -37,8 +37,8 @@ class DVRPCandidateEvaluator:
             raise ValueError("Pool name cannot be empty")
 
         self.instances = tuple(instances)
-        self.seeds = tuple(int(seed) for seed in seeds)
-        self.budget = int(budget)
+        self.seeds = tuple(int(seed) for seed in seeds) if seeds else (0,)
+        self.budget = int(budget) if budget is not None else 1
         self.timeout_seconds = float(timeout_seconds)
         self.timeout_penalty = float(timeout_penalty)
         self.pool_name = pool_name
@@ -66,10 +66,10 @@ class DVRPCandidateEvaluator:
         records = self._run_all_instances(code)
         metrics = self._with_context(aggregate_dvrp_records(records, timeout_penalty=self.timeout_penalty))
         status = _candidate_status(metrics)
-        ttt = _candidate_ttt(status, metrics)
-        metrics[DVRP_SCORE_NAME] = ttt
+        gap = _candidate_gap(status, metrics)
+        metrics[DVRP_SCORE_NAME] = gap
         error_feedback = _error_feedback(records) if status != "valid" else None
-        return EvaluationResult(status, ttt, metrics, error_feedback, score_name=DVRP_SCORE_NAME)
+        return EvaluationResult(status, gap, metrics, error_feedback, score_name=DVRP_SCORE_NAME)
 
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
         tasks = [
@@ -146,14 +146,14 @@ def _candidate_status(metrics: dict[str, Any]) -> EvaluationStatus:
     return "invalid"
 
 
-def _candidate_ttt(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
+def _candidate_gap(status: EvaluationStatus, metrics: dict[str, Any]) -> float:
     if status == "valid":
-        if metrics["mean_ttt"] is not None:
-            return float(metrics["mean_ttt"])
+        if metrics["mean_gap"] is not None:
+            return float(metrics["mean_gap"])
         return math.inf
     if status == "timeout":
-        timeout_ttt = metrics.get("timeout_ttt")
-        return float(timeout_ttt) if timeout_ttt is not None else math.inf
+        timeout_gap = metrics.get("timeout_gap")
+        return float(timeout_gap) if timeout_gap is not None else math.inf
     return math.inf
 
 

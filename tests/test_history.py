@@ -101,8 +101,8 @@ class HistoryTests(unittest.TestCase):
             status=CandidateStatus.VALID,
             metrics={
                 "problem": "dvrp",
-                "score_name": "ttt",
-                "ttt": 10.0,
+                "score_name": "gap",
+                "gap": 10.0,
                 "runs": 2,
                 "valid_count": 2,
                 "mean_gap": 10.0,

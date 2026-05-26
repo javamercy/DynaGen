@@ -13,8 +13,8 @@ def build_dvrp_history_profile(candidate: Candidate) -> dict[str, Any]:
         mean_gap = metric_float(metrics, "mean_gap")
     mean_ttt = metric_float(metrics, "mean_ttt")
     ttt = metric_float(metrics, "ttt")
-    score_value = mean_ttt if mean_ttt is not None else ttt if ttt is not None else mean_gap
-    scale = 1000.0 if mean_ttt is not None or ttt is not None else 100.0
+    score_value = mean_gap if mean_gap is not None else mean_ttt if mean_ttt is not None else ttt
+    scale = 25.0 if mean_gap is not None else 1000.0
     quality_score = _lower_score(score_value, scale=scale)
     timeout_fraction = metric_float(metrics, "timeout_fraction") or 0.0
     valid_ratio = _ratio(metrics.get("valid_count"), metrics.get("runs"))
@@ -130,11 +130,13 @@ def _completion_score(metrics: dict[str, Any]) -> float:
 
 def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
     keys = [
+        "gap",
         "ttt",
         "mean_ttt",
         "penalized_mean_ttt",
         "mean_gap",
         "penalized_mean_gap",
+        "timeout_gap",
         "median_gap",
         "worst_gap",
         "best_gap",
@@ -148,6 +150,9 @@ def _metrics_snapshot(metrics: dict[str, Any]) -> dict[str, Any]:
         "score_by_instance_size",
         "score_by_truck_count",
         "score_by_instance_source",
+        "ttt_by_instance_size",
+        "ttt_by_truck_count",
+        "ttt_by_instance_source",
     ]
     return {key: metrics.get(key) for key in keys if key in metrics}
 

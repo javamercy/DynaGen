@@ -7,11 +7,12 @@ from dynagen.prompts.dvrp_templates import (
     render_dvrp_candidates,
 )
 
+
 def build_dvrp_evolution_prompt(
-    strategy: str,
-    parents: list[Candidate],
-    *,
-    feedback_context: str = "",
+        strategy: str,
+        parents: list[Candidate],
+        *,
+        feedback_context: str = "",
 ) -> list[dict[str, str]]:
     strategy_enum = Strategy(strategy)
     strategy_description = STRATEGIES_METADATA[strategy_enum]["description"]
@@ -39,6 +40,7 @@ def build_dvrp_evolution_prompt(
     ])
     user = "\n\n".join(blocks)
     return [
-        {"role": "system", "content": "You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time)."},
+        {"role": "system",
+         "content": "You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time)."},
         {"role": "user", "content": user},
     ]

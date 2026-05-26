@@ -6,7 +6,7 @@ import numpy as np
 DVRP_BASELINES = {
     "greedy": r'''import numpy as np
 
-def choose_next_customer(current_position, depot_position, truck_positions, available_customers, current_time, seed, budget):
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers, current_time):
     if len(available_customers) == 0:
         return None
 
@@ -15,7 +15,7 @@ def choose_next_customer(current_position, depot_position, truck_positions, avai
 ''',
     "heuristic": r'''import numpy as np
 
-def choose_next_customer(current_position, depot_position, truck_positions, available_customers, current_time, seed, budget):
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers, current_time):
     scores = []
     for customer_pos in available_customers:
         distance = np.linalg.norm(current_position - customer_pos)

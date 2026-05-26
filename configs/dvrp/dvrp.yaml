@@ -6,7 +6,7 @@ run:
 problem:
   type: dvrp
   dvrp_search_limit: 10
-  dvrp_test_sizes: [ 50, 100, 200 ]
+  dvrp_test_sizes: [ 10, 20, 50, 100, 200 ]
   dvrp_test_limit_per_size: 64
 
 llm:
@@ -16,12 +16,11 @@ llm:
   api_key_env: DEEPSEEK_API_KEY
 
 evolution:
-  population_size: 2
-  generations: 3
+  population_size: 5
+  generations: 6
   offspring_per_strategy: 1
-  strategies: [ S1, S2, S3 ]
   history:
-    enabled: false
+    enabled: true
     max_size: 64
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
@@ -35,16 +34,15 @@ evolution:
   verbal_gradients:
     enabled: true
     llm_every_n_generations: 2
-    max_llm_calls_per_generation: 2
+    max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
     temperature: 0.3
 
 evaluation:
-  budget: 10000
-  timeout_seconds: 60
+  timeout_seconds: 180
   timeout_penalty: 0
   seeds: [ 100 ]
-  metric: mean_ttt
+  metric: mean_gap
 
 data:
   search_instances: data/dvrp/train/instances.pkl

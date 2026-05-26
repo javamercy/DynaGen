@@ -6,7 +6,7 @@ from dynagen.evaluation.dvrp_metrics import aggregate_dvrp_records
 
 
 class DVRPMetricTests(unittest.TestCase):
-    def test_aggregate_uses_ttt_as_primary_score(self) -> None:
+    def test_aggregate_uses_gap_as_primary_score(self) -> None:
         records = [
             {
                 "status": "valid",
@@ -26,25 +26,26 @@ class DVRPMetricTests(unittest.TestCase):
 
         self.assertEqual(metrics["mean_ttt"], 12.0)
         self.assertEqual(metrics["mean_gap"], 20.0)
-        self.assertEqual(metrics["score_by_instance_size"], {"11": 12.0})
+        self.assertEqual(metrics["score_by_instance_size"], {"11": 20.0})
         self.assertEqual(metrics["gap_by_instance_size"], {"11": 20.0})
+        self.assertEqual(metrics["ttt_by_instance_size"], {"11": 12.0})
         self.assertNotIn("mean_makespan", metrics)
         self.assertNotIn("timeout_distance", metrics)
 
-    def test_dvrp_candidate_serializes_score_as_ttt(self) -> None:
+    def test_dvrp_candidate_serializes_score_as_gap(self) -> None:
         candidate = Candidate(
             id="greedy",
             generation=0,
             strategy="baseline",
             distance=49.8579,
             status=CandidateStatus.VALID,
-            metrics={"problem": "dvrp", "score_name": "ttt", "ttt": 49.8579},
+            metrics={"problem": "dvrp", "score_name": "gap", "gap": 49.8579},
         )
 
         data = candidate.to_dict(include_code=False)
 
-        self.assertEqual(candidate.score_name, "ttt")
-        self.assertEqual(data["ttt"], 49.8579)
+        self.assertEqual(candidate.score_name, "gap")
+        self.assertEqual(data["gap"], 49.8579)
         self.assertNotIn("distance", data)
 
 

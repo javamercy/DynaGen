@@ -89,7 +89,7 @@ class DVRPSimulationResult:
         )
 
 
-DVRPPolicy = Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float, int, int], object]
+DVRPPolicy = Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float], object]
 
 
 def load_dvrp_instances(
@@ -161,8 +161,6 @@ def simulate_dvrp_policy(
             truck_positions,
             customer_positions,
             float(requests.current_time),
-            int(seed) + decisions,
-            int(budget),
         )
         decisions += 1
 

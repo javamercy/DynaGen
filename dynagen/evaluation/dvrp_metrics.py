@@ -5,6 +5,7 @@ from typing import Any
 
 
 UNSCORED_TIMEOUT_TTT = 1_000_000.0
+UNSCORED_TIMEOUT_GAP = 1_000_000.0
 
 
 def compute_dvrp_gap(ttt: float, reference_ttt: float | None) -> float | None:
@@ -63,16 +64,22 @@ def aggregate_dvrp_records(records: list[dict[str, Any]], *, timeout_penalty: fl
         "timeout_ttt": penalized_mean_ttt if penalized_mean_ttt is not None else (
             UNSCORED_TIMEOUT_TTT if timeout_count else None
         ),
+        "timeout_gap": penalized_mean_gap if penalized_mean_gap is not None else (
+            UNSCORED_TIMEOUT_GAP if timeout_count else None
+        ),
         "median_gap": _median(gaps),
         "worst_gap": max(gaps) if gaps else None,
         "best_gap": min(gaps) if gaps else None,
         "mean_runtime": _mean(runtimes),
-        "score_by_instance_size": _group_mean_ttt(records, "dimension"),
-        "score_by_truck_count": _group_mean_ttt(records, "truck_count"),
-        "score_by_instance_source": _group_mean_ttt(records, "source"),
+        "score_by_instance_size": _group_mean_primary_score(records, "dimension"),
+        "score_by_truck_count": _group_mean_primary_score(records, "truck_count"),
+        "score_by_instance_source": _group_mean_primary_score(records, "source"),
         "gap_by_instance_size": _group_mean_gap(records, "dimension"),
         "gap_by_truck_count": _group_mean_gap(records, "truck_count"),
         "gap_by_instance_source": _group_mean_gap(records, "source"),
+        "ttt_by_instance_size": _group_mean_ttt(records, "dimension"),
+        "ttt_by_truck_count": _group_mean_ttt(records, "truck_count"),
+        "ttt_by_instance_source": _group_mean_ttt(records, "source"),
         "records": records,
     }
     return metrics
@@ -115,4 +122,23 @@ def _group_mean_gap(records: list[dict[str, Any]], key: str) -> dict[str, float 
     for record in records:
         if _has_finite_gap(record):
             groups[str(record.get(key, "unknown"))].append(float(record["gap"]))
+    return {group: _mean(groups[group]) for group in sorted(all_keys)}
+
+
+def _primary_score(record: dict[str, Any]) -> float | None:
+    if _has_finite_gap(record):
+        return float(record["gap"])
+    ttt = record.get("ttt")
+    if ttt is not None and math.isfinite(float(ttt)):
+        return float(ttt)
+    return None
+
+
+def _group_mean_primary_score(records: list[dict[str, Any]], key: str) -> dict[str, float | None]:
+    groups: dict[str, list[float]] = defaultdict(list)
+    all_keys = {str(record.get(key, "unknown")) for record in records}
+    for record in records:
+        score = _primary_score(record)
+        if score is not None:
+            groups[str(record.get(key, "unknown"))].append(score)
     return {group: _mean(groups[group]) for group in sorted(all_keys)}

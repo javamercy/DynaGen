@@ -155,13 +155,11 @@ def _validate_dvrp_policy_signature_ast(node: ast.FunctionDef) -> ValidationResu
         "truck_positions",
         "available_customers",
         "current_time",
-        "seed",
-        "budget",
     ]
     if len(positional) != len(expected) or args.vararg or args.kwonlyargs or args.kwarg:
-        return ValidationResult(False, "choose_next_customer must accept exactly seven parameters")
+        return ValidationResult(False, "choose_next_customer must accept exactly five parameters")
     if [arg.arg for arg in positional] != expected:
-        return ValidationResult(False, "choose_next_customer parameters must be current_position, depot_position, truck_positions, available_customers, current_time, seed, budget")
+        return ValidationResult(False, "choose_next_customer parameters must be current_position, depot_position, truck_positions, available_customers, current_time")
     return ValidationResult(True)
 
 

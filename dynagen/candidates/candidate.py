@@ -113,7 +113,7 @@ class Candidate:
         if problem == "bbob":
             return "mean_aocc"
         if problem == "dvrp":
-            return "ttt"
+            return "gap"
         if problem == "vrp":
             return "gap"
         if problem == "tsp":

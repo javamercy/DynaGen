@@ -228,6 +228,7 @@ class VerbalGradientTests(unittest.TestCase):
                 "mean_gap": 1.0,
                 "mean_ttt": 10.0,
                 "score_by_instance_size": {"33": 1.0},
+                "ttt_by_instance_size": {"33": 10.0},
             },
             distance=10.0,
             status=CandidateStatus.VALID,
