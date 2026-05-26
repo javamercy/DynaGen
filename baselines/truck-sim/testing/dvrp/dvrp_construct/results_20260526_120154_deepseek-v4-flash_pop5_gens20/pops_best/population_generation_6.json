@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the unvisited customer that maximizes the difference between its distance to the second closest truck and its distance to the current truck, thereby preferring customers that are distinctly closer to this truck than to any other; if there is only one truck, it selects the nearest customer.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = 0\n    best_score = -np.inf\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        cur = np.array(cur_truck_pos)\n\n        # Distance from current truck to this customer\n        d_cur = np.linalg.norm(cust - cur)\n\n        # Distances from all trucks to this customer\n        dists = [np.linalg.norm(cust - np.array(t)) for t in all_truck_pos]\n        dists.sort()\n\n        if len(dists) >= 2:\n            best = dists[0]\n            second = dists[1]\n            score = second - d_cur\n        else:\n            score = -d_cur\n\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+     "objective": 32.1635,
+     "other_inf": null
+}

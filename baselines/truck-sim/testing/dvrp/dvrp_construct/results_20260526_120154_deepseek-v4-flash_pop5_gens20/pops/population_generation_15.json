@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The algorithm selects the unvisited customer that maximizes the Gaussian kernel weight of the current truck relative to all trucks, thereby favoring customers where the current truck's influence is dominant relative to other trucks.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos)\n    best_node = 0\n    best_score = -np.inf\n    sigma = 1.0  # fixed bandwidth for Gaussian kernel\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        # distances from all trucks to this customer\n        dists = [np.linalg.norm(cust - np.array(t)) for t in all_truck_pos]\n        # Gaussian kernel weights\n        weights = np.exp(-np.array(dists)**2 / (2 * sigma**2))\n        total_weight = np.sum(weights)\n        weight_cur = np.exp(-np.linalg.norm(cust - cur)**2 / (2 * sigma**2))\n        score = weight_cur / total_weight if total_weight > 0 else 0.0\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 26.53054,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited customer that maximizes the difference between its distance to the centroid of all truck positions and its distance to the current truck.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos)\n    centroid = np.mean([np.array(t) for t in all_truck_pos], axis=0)\n    best_node = 0\n    best_score = -np.inf\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        d_centroid = np.linalg.norm(cust - centroid)\n        d_cur = np.linalg.norm(cust - cur)\n        score = d_centroid - d_cur\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 26.61396,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited customer that maximizes the difference between the average distance from all other trucks to the customer and the distance from the current truck to the customer.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = 0\n    best_score = -np.inf\n\n    # Find index of current truck in all_truck_pos (assuming it exists)\n    cur_idx = None\n    for i, pos in enumerate(all_truck_pos):\n        if np.allclose(np.array(pos), np.array(cur_truck_pos)):\n            cur_idx = i\n            break\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        d_cur = np.linalg.norm(cust - np.array(cur_truck_pos))\n\n        # Distances from all trucks to this customer, excluding the current truck\n        other_dists = []\n        for i, t in enumerate(all_truck_pos):\n            if i != cur_idx:\n                other_dists.append(np.linalg.norm(cust - np.array(t)))\n\n        if len(other_dists) > 0:\n            avg_other = np.mean(other_dists)\n        else:\n            avg_other = 0.0\n\n        score = avg_other - d_cur\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 27.5393,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the unvisited customer that maximizes the product of\n     the difference between the average distance from all trucks and the current\n     truck's distance, and (one plus the standard deviation of those distances),\n     thereby favoring customers that are relatively closer to the current truck\n     while also leveraging variance to balance workload.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    \"\"\"\n    {The algorithm selects the unvisited customer that maximizes the product of\n     the difference between the average distance from all trucks and the current\n     truck's distance, and (one plus the standard deviation of those distances),\n     thereby favoring customers that are relatively closer to the current truck\n     while also leveraging variance to balance workload.}\n    \"\"\"\n    cur = np.array(cur_truck_pos)\n    best_node = 0\n    best_score = -np.inf\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        dists = [np.linalg.norm(cust - np.array(t)) for t in all_truck_pos]\n        avg_dist = np.mean(dists)\n        std_dist = np.std(dists)\n        cur_dist = np.linalg.norm(cust - cur)\n        score = (avg_dist - cur_dist) * (1.0 + std_dist)\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 27.84846,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the unvisited customer that maximizes the difference between the average distance from all trucks to that customer and the current truck's distance, plus the standard deviation of those distances, thereby favoring customers with high variance in truck distances.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos)\n    best_node = 0\n    best_score = -np.inf\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        dists = [np.linalg.norm(cust - np.array(t)) for t in all_truck_pos]\n        avg_dist = np.mean(dists)\n        std_dist = np.std(dists)\n        cur_dist = np.linalg.norm(cust - cur)\n        score = avg_dist - cur_dist + std_dist\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 27.90328,
+          "other_inf": null
+     }
+]

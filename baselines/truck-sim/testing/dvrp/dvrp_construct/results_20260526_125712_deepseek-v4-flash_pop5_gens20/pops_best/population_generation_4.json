@@ -1,0 +1,6 @@
+{
+     "algorithm": "The new algorithm assigns the current truck to the nearest unvisited customer that is within a factor K (K=1.5) of the distance to the nearest other truck, otherwise returns None to wait.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    # Positions of other trucks (excluding current)\n    other_trucks = [p for p in all_truck_pos if not np.array_equal(p, cur_truck_pos)]\n    \n    best_node = None\n    best_dist = float('inf')\n    K = 1.5  # parameter \u2013 can be adjusted\n    \n    for i, cust in enumerate(unvisited_customers):\n        dist_cur = np.linalg.norm(cur_truck_pos - cust)\n        if other_trucks:\n            dist_other = min(np.linalg.norm(t - cust) for t in other_trucks)\n        else:\n            dist_other = float('inf')\n        \n        # Accept if current truck is within factor K of the nearest other truck's distance\n        if dist_cur < K * dist_other and dist_cur < best_dist:\n            best_dist = dist_cur\n            best_node = i\n    \n    return best_node",
+     "objective": 25.13972,
+     "other_inf": null
+}

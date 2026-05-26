@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The new algorithm computes a score as the difference between the reciprocal of the squared distance to the current truck and the reciprocal of the distance to the nearest other truck, and chooses the unvisited customer with the highest score, waiting if the maximum score is non-positive.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos, dtype=float)\n    others = [np.array(p, dtype=float) for p in all_truck_pos\n              if not np.array_equal(np.array(p, dtype=float), cur)]\n    \n    best_node = None\n    best_score = -float('inf')\n    eps = 1e-8\n\n    for i, cust in enumerate(unvisited_customers):\n        cust = np.array(cust, dtype=float)\n        d_cur = np.linalg.norm(cust - cur)\n        if others:\n            d_other = min(np.linalg.norm(cust - o) for o in others)\n        else:\n            d_other = float('inf')\n        # Reciprocal difference score with squared distance to current truck\n        score = 1.0 / (d_cur**2 + eps) - 1.0 / (d_other + eps)\n        if score > best_score:\n            best_score = score\n            best_node = i\n\n    if best_score <= 0:\n        return None\n    else:\n        return best_node",
+          "objective": 22.51839,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    cur = np.array(cur_truck_pos)\n    others = [np.array(p) for p in all_truck_pos if not np.array_equal(p, cur)]\n\n    best_node = None\n    best_score = -np.inf\n\n    for i, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        dist_cur = np.linalg.norm(cust - cur)\n        attraction = 1.0 / (1.0 + dist_cur)\n\n        if others:\n            other_dists = [np.linalg.norm(cust - o) for o in others]\n            repulsion = np.mean([1.0 / (1.0 + d) for d in other_dists])\n        else:\n            repulsion = 0.0\n\n        score = attraction - repulsion\n        if score > best_score:\n            best_score = score\n            best_node = i\n\n    if best_score <= 0:\n        return None\n    return best_node",
+          "objective": 22.7833,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited customer that maximizes the difference between the inverse square of its distance to the current truck and the inverse square of its distance to the nearest other truck, and wait if the maximum is non-positive.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos, dtype=float)\n    others = [np.array(p, dtype=float) for p in all_truck_pos\n              if not np.array_equal(np.array(p, dtype=float), cur)]\n    \n    best_node = None\n    best_score = -float('inf')\n    eps = 1e-8\n\n    for i, cust in enumerate(unvisited_customers):\n        cust = np.array(cust, dtype=float)\n        d_cur = np.linalg.norm(cust - cur)\n        if others:\n            d_other = min(np.linalg.norm(cust - o) for o in others)\n        else:\n            d_other = float('inf')\n        # Inverse square difference score\n        score = 1.0 / (d_cur * d_cur + eps) - 1.0 / (d_other * d_other + eps)\n        if score > best_score:\n            best_score = score\n            best_node = i\n\n    if best_score <= 0:\n        return None\n    else:\n        return best_node",
+          "objective": 22.94177,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the unvisited customer that maximizes the difference between the reciprocal of its distance to the current truck and the reciprocal of its distance to the nearest other truck, and waits if the maximum is non-positive.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos, dtype=float)\n    others = [np.array(p, dtype=float) for p in all_truck_pos\n              if not np.array_equal(np.array(p, dtype=float), cur)]\n    \n    best_node = None\n    best_score = -float('inf')\n    eps = 1e-8\n\n    for i, cust in enumerate(unvisited_customers):\n        cust = np.array(cust, dtype=float)\n        d_cur = np.linalg.norm(cust - cur)\n        if others:\n            d_other = min(np.linalg.norm(cust - o) for o in others)\n        else:\n            d_other = float('inf')\n        # Reciprocal difference score\n        score = 1.0 / (d_cur + eps) - 1.0 / (d_other + eps)\n        if score > best_score:\n            best_score = score\n            best_node = i\n\n    if best_score <= 0:\n        return None\n    else:\n        return best_node",
+          "objective": 23.57893,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm assigns the current truck to the unvisited customer that maximizes the difference between its exponential attraction (based on distance) and the average exponential attraction of other trucks; if no customer yields a positive difference, the truck waits.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    if not unvisited_customers:\n        return None\n\n    cur = np.array(cur_truck_pos)\n    others = [np.array(p) for p in all_truck_pos if not np.array_equal(p, cur)]\n\n    best_node = None\n    best_score = -np.inf\n\n    for i, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        dist_cur = np.linalg.norm(cust - cur)\n        attraction = np.exp(-dist_cur)\n\n        if others:\n            other_dists = [np.linalg.norm(cust - o) for o in others]\n            repulsion = np.mean([np.exp(-d) for d in other_dists])\n        else:\n            repulsion = 0.0\n\n        score = attraction - repulsion\n        if score > best_score:\n            best_score = score\n            best_node = i\n\n    if best_score <= 0:\n        return None\n    return best_node",
+          "objective": 23.94273,
+          "other_inf": null
+     }
+]

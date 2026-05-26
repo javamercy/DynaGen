@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The algorithm computes a weighted combination of the current travel distance, the distance to the nearest other truck (with a negative weight to encourage spreading out), and the distance to the depot (with a negative weight to prioritize customers farther from base), selecting the customer that minimizes the score.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = 0\n    best_score = float('inf')\n    other_trucks = [pos for pos in all_truck_pos if not np.array_equal(pos, cur_truck_pos)]\n    for idx, cust in enumerate(unvisited_customers):\n        d_cur = np.linalg.norm(cust - cur_truck_pos)\n        d_depot = np.linalg.norm(cust - depot_pos)\n        if other_trucks:\n            d_other = min(np.linalg.norm(cust - t) for t in other_trucks)\n        else:\n            d_other = 0\n        # new weights: alpha=0.5, beta=0.3 (subtracted)\n        score = d_cur - 0.5 * d_other - 0.3 * d_depot\n        if score < best_score:\n            best_score = score\n            best_node = idx\n    return best_node",
+          "objective": 29.65194,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    \"\"\"The algorithm selects the next customer by minimizing a composite score that combines the travel distance, the negative logarithm of the distance to the nearest other truck, and the negative logarithm of the distance to the depot, promoting spreading and far-from-depot choices.\"\"\"\n    best_node = 0\n    best_score = float('inf')\n    other_trucks = [pos for pos in all_truck_pos if not np.array_equal(pos, cur_truck_pos)]\n    \n    for idx, cust in enumerate(unvisited_customers):\n        d_cur = np.linalg.norm(cust - cur_truck_pos)\n        d_depot = np.linalg.norm(cust - depot_pos)\n        if other_trucks:\n            d_other = min(np.linalg.norm(cust - t) for t in other_trucks)\n        else:\n            d_other = 0  # log(1)=0 so no effect\n        # Using logarithmic transformation for different form\n        score = d_cur - 0.5 * np.log(d_other + 1) - 0.3 * np.log(d_depot + 1)\n        if score < best_score:\n            best_score = score\n            best_node = idx\n    \n    return best_node",
+          "objective": 31.1341,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    \"\"\"\n    The algorithm computes a weighted combination of the current travel distance, the distance to the nearest other truck (to avoid overlap), and the distance to the depot (to prioritize customers away from base), selecting the customer that minimizes this score.\n    \"\"\"\n    best_node = 0\n    best_score = float('inf')\n    # exclude current truck from other trucks\n    other_trucks = [pos for pos in all_truck_pos if not np.array_equal(pos, cur_truck_pos)]\n    for idx, cust in enumerate(unvisited_customers):\n        d_cur = np.linalg.norm(cust - cur_truck_pos)\n        d_depot = np.linalg.norm(cust - depot_pos)\n        # distance to nearest other truck (if any)\n        if other_trucks:\n            d_other = min(np.linalg.norm(cust - t) for t in other_trucks)\n        else:\n            d_other = 0\n        # weights: alpha=0.4, beta=0.2 (tunable)\n        score = d_cur - 0.4 * d_other + 0.2 * d_depot\n        if score < best_score:\n            best_score = score\n            best_node = idx\n    return best_node",
+          "objective": 33.30054,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited customer that maximizes the difference between its distance to the nearest other truck (including depot) and its distance to the current truck.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_score = -np.inf\n    best_node = 0\n\n    for idx, cust in enumerate(unvisited_customers):\n        dist_self = np.linalg.norm(cust - cur_truck_pos)\n\n        # compute min distance to other trucks (excluding current) and depot\n        min_other = np.linalg.norm(cust - depot_pos)\n        for pos in all_truck_pos:\n            if not np.array_equal(pos, cur_truck_pos):\n                d = np.linalg.norm(cust - pos)\n                if d < min_other:\n                    min_other = d\n\n        score = min_other - dist_self\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+          "objective": 34.10159,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the customer that minimizes the ratio of the distance from the current truck to the customer to the sum of distances from all other trucks to the customer, thereby favoring customers that are relatively closer to the current truck while being far from others.",
+          "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    best_node = 0\n    best_score = float('inf')\n    other_trucks = [pos for pos in all_truck_pos if not np.array_equal(pos, cur_truck_pos)]\n    \n    for idx, cust in enumerate(unvisited_customers):\n        d_cur = np.linalg.norm(cust - cur_truck_pos)\n        if other_trucks:\n            sum_other = sum(np.linalg.norm(cust - t) for t in other_trucks)\n        else:\n            sum_other = 1  # avoid division by zero\n        score = d_cur / sum_other\n        if score < best_score:\n            best_score = score\n            best_node = idx\n    return best_node",
+          "objective": 34.35684,
+          "other_inf": null
+     }
+]

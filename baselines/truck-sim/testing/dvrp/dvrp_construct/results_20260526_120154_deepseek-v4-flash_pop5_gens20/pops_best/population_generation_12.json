@@ -1,0 +1,6 @@
+{
+     "algorithm": "The algorithm selects the unvisited customer that maximizes the Gaussian kernel weight of the current truck relative to all trucks, thereby favoring customers where the current truck's influence is dominant relative to other trucks.",
+     "code": "import numpy as np\n\ndef select_next_node(cur_truck_pos, depot_pos, all_truck_pos, unvisited_customers):\n    cur = np.array(cur_truck_pos)\n    best_node = 0\n    best_score = -np.inf\n    sigma = 1.0  # fixed bandwidth for Gaussian kernel\n\n    for idx, cust in enumerate(unvisited_customers):\n        cust = np.array(cust)\n        # distances from all trucks to this customer\n        dists = [np.linalg.norm(cust - np.array(t)) for t in all_truck_pos]\n        # Gaussian kernel weights\n        weights = np.exp(-np.array(dists)**2 / (2 * sigma**2))\n        total_weight = np.sum(weights)\n        weight_cur = np.exp(-np.linalg.norm(cust - cur)**2 / (2 * sigma**2))\n        score = weight_cur / total_weight if total_weight > 0 else 0.0\n        if score > best_score:\n            best_score = score\n            best_node = idx\n\n    return best_node",
+     "objective": 26.53054,
+     "other_inf": null
+}
