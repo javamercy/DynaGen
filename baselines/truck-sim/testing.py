@@ -102,23 +102,12 @@ def evaluate(eva, code_string):
 
 api_key = os.environ.get("DEEPSEEK_API_KEY")
 
-VRP_PROBLEM = "vrp_construct"
-VRP_DATASET = "1"
-VRP_TRAIN_DATA_PATH = "./training_data_1/instances.pkl"
-VRP_TEST_DATA_DIR = "./testing/vrp/testing_data_1"
-VRP_TRAIN_SIZE = 100
-VRP_TRAIN_INSTANCES = 20
-VRP_TEST_SIZES = [10, 20, 50, 100, 200]
-VRP_TEST_INSTANCES = 64
-VRP_POP_SIZE = 5
-VRP_GENS = 20
-VRP_TIMEOUT = 180
-VRP_LLM_ENDPOINT = "api.deepseek.com"
-VRP_LLM_MODEL = "deepseek-v4-flash"
+LLM_ENDPOINT = "api.deepseek.com"
+LLM_MODEL = "deepseek-v4-flash"
 REQUIRED_ORTOOL_KEYS = {"total_distance", "max_distance", "distances", "routes", "missed"}
 
 
-def load_vrp_pickle(path: str, expected_instances: int, expected_nodes: int):
+def load_dataset_pickle(path: str, expected_instances: int, expected_nodes: int):
     if not os.path.exists(path):
         raise FileNotFoundError(f"path does not exist: {path}")
 
@@ -153,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument('dataset',
                         type=str, help='which dataset to use for testing and training')
     parser.add_argument('-m', '--model',
-                        type=str, default=VRP_LLM_MODEL, help='ignored for VRP; kept for compatibility')
+                        type=str, default=LLM_MODEL, help='ignored for VRP; kept for compatibility')
     parser.add_argument('--mini',
                         action='store_true', default=False, help='perform a miniature test run')
     parser.add_argument('-n', '--n_threads',
@@ -162,13 +151,25 @@ if __name__ == "__main__":
                         action='store_true', default=False, help='just evaluate the results')
     args = parser.parse_args()
 
-    if args.exp != VRP_PROBLEM:
-        print(f"Error: this runner is configured for {VRP_PROBLEM} only.")
+    if args.exp == "vrp_construct":
+        train_data_path = f"./training_data_{args.dataset}/instances.pkl"
+        test_data_dir = f"./testing/vrp/testing_data_{args.dataset}"
+        train_size = 100
+        train_instances = 20
+    elif args.exp == "dvrp_construct":
+        train_data_path = f"./testing/dvrp/training_data_{args.dataset}/instances.pkl"
+        test_data_dir = f"./testing/dvrp/testing_data_{args.dataset}"
+        train_size = 50
+        train_instances = 10
+    else:
+        print(f"Error: unsupported experiment {args.exp}")
         exit(1)
 
-    if args.dataset != VRP_DATASET:
-        print(f"Error: this runner uses dataset {VRP_DATASET} only.")
-        exit(1)
+    test_sizes = [10, 20, 50, 100, 200]
+    test_instances = 64
+    pop_size = 3
+    gens = 2
+    timeout = 180
 
     if not api_key:
         print("Error: set DEEPSEEK_API_KEY in the environment.")
@@ -189,18 +190,18 @@ if __name__ == "__main__":
     # Set parameters
     paras.set_paras(method="eoh",
                     problem=args.exp,
-                    llm_api_endpoint=VRP_LLM_ENDPOINT,
+                    llm_api_endpoint=LLM_ENDPOINT,
                     llm_api_key=api_key,
-                    llm_model=VRP_LLM_MODEL,
-                    ec_pop_size=VRP_POP_SIZE,  # number of samples in each population
-                    ec_n_pop=VRP_GENS,  # number of generations
+                    llm_model=LLM_MODEL,
+                    ec_pop_size=pop_size,  # number of samples in each population
+                    ec_n_pop=gens,  # number of generations
                     ec_operators=['e1', 'e2', 'm1', 'm2', 'm3'],
                     exp_n_proc=n_proc,  # parallel LLM/evaluation workers
                     exp_extended_init=True,
                     exp_strict_init=True,
                     exp_debug_mode=False,
                     eva_numba_decorator=False,
-                    eva_timeout=VRP_TIMEOUT,  # maximum evaluation time for each heuristic
+                    eva_timeout=timeout,  # maximum evaluation time for each heuristic
                     )
 
     if args.mini:
@@ -209,37 +210,46 @@ if __name__ == "__main__":
 
     print("-  parameters loaded -")
 
-    # Check if the results folder already exists
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"results_{timestamp}_{VRP_LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}"
-    results = os.path.join("./testing", short_name, long_name, run_name)
-    if not os.path.exists(results):
-        os.makedirs(results)
-    # else:
-    # print(f"Error: already exists {results}")
-    # exit(1)
+    base_results_dir = os.path.join("./testing", short_name, long_name)
 
-    # Create subfolders
-    subfolders = ["pops", "pops_best", "eval"]
-    for subfolder in subfolders:
-        subfolder_path = os.path.join(results, subfolder)
-        if not os.path.exists(subfolder_path):
-            os.makedirs(subfolder_path)
-    print("- output folder created -")
+    if args.eval:
+        # Find the latest results folder matching the criteria
+        import glob
+
+        pattern = os.path.join(base_results_dir, f"results_*_{LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}")
+        matching_dirs = sorted(glob.glob(pattern))
+        if not matching_dirs:
+            print(f"Error: No results found matching pattern {pattern}")
+            exit(1)
+        results = matching_dirs[-1]  # Get the most recent one
+        print(f"Evaluating existing run: {results}")
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_name = f"results_{timestamp}_{LLM_MODEL}_pop{paras.ec_pop_size}_gens{paras.ec_n_pop}"
+        results = os.path.join(base_results_dir, run_name)
+        if not os.path.exists(results):
+            os.makedirs(results)
+        # Create subfolders
+        subfolders = ["pops", "pops_best", "eval"]
+        for subfolder in subfolders:
+            subfolder_path = os.path.join(results, subfolder)
+            if not os.path.exists(subfolder_path):
+                os.makedirs(subfolder_path)
+        print("- output folder created -")
 
     paras.exp_output_path = results
 
     # Load training dataset
-    n_test_ins = VRP_TRAIN_INSTANCES
-    instance_file_name = VRP_TRAIN_DATA_PATH
+    n_test_ins = train_instances
+    instance_file_name = train_data_path
     print(f"Loading training dataset from {instance_file_name}")
-    instance_dataset = load_vrp_pickle(instance_file_name, VRP_TRAIN_INSTANCES, VRP_TRAIN_SIZE)
+    instance_dataset = load_dataset_pickle(instance_file_name, train_instances, train_size)
     print("- training dataset loaded -")
 
     # Load the problem
     random.seed(2024)  # set a random seed
     problem_generator = problems.Probs(paras.problem)
-    problem = problem_generator.get_problem(instance_dataset, VRP_TRAIN_SIZE, n_test_ins)
+    problem = problem_generator.get_problem(instance_dataset, train_size, n_test_ins)
     problem.n_jobs = 1  # EoH already parallelizes candidate evaluations across CPU cores.
 
     train_start = time.time()
@@ -281,8 +291,8 @@ if __name__ == "__main__":
     with open(baseline_path, 'r') as file:
         baseline_code_string = file.read()
 
-    problem_size = VRP_TEST_SIZES
-    n_test_ins = VRP_TEST_INSTANCES
+    problem_size = test_sizes
+    n_test_ins = test_instances
     print("Start evaluation...")
 
     o_avg_max_dis = []
@@ -312,8 +322,8 @@ if __name__ == "__main__":
         heuristic_results = {}
 
         for size in problem_size:
-            instance_file_name = os.path.join(VRP_TEST_DATA_DIR, f"instance_data_{size}.pkl")
-            instance_dataset = load_vrp_pickle(instance_file_name, n_test_ins, size)
+            instance_file_name = os.path.join(test_data_dir, f"instance_data_{size}.pkl")
+            instance_dataset = load_dataset_pickle(instance_file_name, n_test_ins, size)
 
             eva = problem_generator.get_problem(instance_dataset, size, n_test_ins)
             eva.n_jobs = n_proc
@@ -451,9 +461,9 @@ if __name__ == "__main__":
         summary = {
             "problem": args.exp,
             "dataset": args.dataset,
-            "training_instances": VRP_TRAIN_INSTANCES,
-            "training_nodes": VRP_TRAIN_SIZE,
-            "test_instances_per_size": VRP_TEST_INSTANCES,
+            "training_instances": train_instances,
+            "training_nodes": train_size,
+            "test_instances_per_size": test_instances,
             "test_sizes": problem_size,
             "parallel_workers": n_proc,
             "pop_size": paras.ec_pop_size,
@@ -560,7 +570,7 @@ if __name__ == "__main__":
         file.write(latex)
 
     # https://stackoverflow.com/a/63243881
-    sizes = VRP_TEST_SIZES
+    sizes = test_sizes
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 
     ax1.set_title("Baseline")
