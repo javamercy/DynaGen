@@ -167,8 +167,8 @@ if __name__ == "__main__":
 
     test_sizes = [10, 20, 50, 100, 200]
     test_instances = 64
-    pop_size = 3
-    gens = 2
+    pop_size = 5
+    gens = 20
     timeout = 180
 
     if not api_key:
