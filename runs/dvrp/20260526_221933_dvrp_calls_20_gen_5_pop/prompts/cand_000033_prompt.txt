@@ -1,0 +1,88 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000028 LLM reflection:
+- Summary: The candidate improved robustness but achieved the same gap (46.68%) as its parent, showing no progress toward reducing last-truck return time.
+- Aim: Introduce a mechanism that increases depot-return pressure, e.g., a higher depot-distance weight or a term penalizing customers far from depot when other trucks are near depot.
+- Preserve: Composite scoring with dist_current, nearest_other, and dist_depot; Exclusion of current truck via argmin for nearest_other calculation
+- Change: Raise depot-distance weight from 0.8 to at least 1.0 to prioritize early returns; Consider scaling depot-distance by a factor that increases with total remaining workload or time
+- Avoid: Adding full temporal simulation or future-state prediction; Introducing random or unsupported heuristics without evidence; Increasing runtime substantially or causing invalid indices
+
+PARENTS:
+Candidate cand_000028: balanced_return_penalty_repaired
+Status: valid; Gap: 46.684%
+Thought: Revised parent: compute nearest_other by excluding current truck index via argmin of distances; robust to floating point; no waiting.
+Mean gap: 46.6839982241735
+Mean TTT: 4.315853315403739
+Gap by instance size: {'50': 46.6839982241735}
+TTT by instance size: {'50': 4.315853315403739}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Distance from current truck to each customer
+    dist_current = np.linalg.norm(available_customers - current_position, axis=1)
+    # Distance from each customer to depot
+    dist_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    # Identify index of current truck by closest position (robust to small floating errors)
+    truck_dists = np.linalg.norm(truck_positions - current_position, axis=1)
+    idx = np.argmin(truck_dists)
+    # Compute distances from each customer to all trucks
+    diff = available_customers[:, np.newaxis, :] - truck_positions[np.newaxis, :, :]
+    dist_matrix = np.linalg.norm(diff, axis=2)  # shape (n_available, n_trucks)
+    # Exclude the current truck by setting its column to infinity
+    dist_matrix[:, idx] = np.inf
+    nearest_other = np.min(dist_matrix, axis=1)
+    # Composite score: smaller is better
+    score = dist_current - nearest_other + 0.8 * dist_depot
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

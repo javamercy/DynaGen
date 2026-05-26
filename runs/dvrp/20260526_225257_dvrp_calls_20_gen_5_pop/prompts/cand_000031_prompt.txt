@@ -1,0 +1,126 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000026 LLM reflection:
+- Summary: Regret-based dispatch with farthest-distance waiting reduced gap to 38.25%, worse than best parent's 34.98%, indicating excessive waiting or suboptimal regret thresholds.
+- Aim: Reduce gap below 34.98% by tightening the waiting rule to avoid waiting when nearby customers remain, balancing fleet progress toward depot.
+- Preserve: Regret calculation as best_other_cost minus cost_now for urgency; Using current truck's depot distance relative to others for waiting decision; Simple cost_now = travel to customer + return to depot
+- Change: Modify waiting condition: only wait if no positive regret and current truck is not the farthest AND number of remaining customers exceeds a threshold (e.g., > 2) to prevent idle trucks; Add a small bonus to regret for customers that reduce the maximum depot distance among trucks
+- Avoid: Heavy simulation or lookahead that increases per-decision runtime; Ignoring truck balance or causing all trucks to wait simultaneously; Overfitting to a specific customer count or seed
+
+Parent cand_000017 LLM reflection:
+- Summary: Reduced mean waits from 32.3 to 4.4 and improved gap by ~9.5% vs parent, yet gap remains 48% above best known.
+- Aim: Sharpen the isolation penalty decay and depot pressure modulation to minimize last-truck return time.
+- Preserve: Time-decaying beta and gamma coefficients; Tie-breaking on smaller customer-to-depot distance; Waiting condition with depot proximity and own-score threshold
+- Change: Increase beta decay rate to force earlier isolation; Add a fleet balance term that penalizes extreme clustering among trucks
+- Avoid: Reintroducing excessive waiting; Overcomplicating the score with unvalidated terms; Neglecting depot-return pressure late in episode
+
+Parent cand_000007 LLM reflection:
+- Summary: The candidate improved gap by 10.97 points but still 43.7% above optimum due to insufficient dynamic balancing of depot pressure and truck competition.
+- Aim: Improve fleet balance by making the isolation and depot-return penalties depend on the number of remaining customers or current time.
+- Preserve: Distance-to-depot term in score; Isolation penalty from nearest other truck; Edge case handling for single truck
+- Change: Make isolation weight beta decay with fewer remaining customers to reduce over-isolation late in the route; Introduce a time-dependent multiplier on customer_to_depot to increase pressure when time is high
+- Avoid: Adding runtime-heavy computations; Removing isolation term; Overcomplicating with many new parameters
+
+PARENTS:
+Candidate cand_000026: regret_based_wait
+Status: valid; Gap: 38.2477%
+Thought: Compute regret = best_other_cost - cost_now for each customer. Pick customer with highest positive regret. If no positive regret and current truck is not farthest from depot, wait; else pick customer with minimum cost_now.
+Mean gap: 38.247749339932234
+Mean TTT: 4.077727407645261
+Gap by instance size: {'50': 38.247749339932234}
+TTT by instance size: {'50': 4.077727407645261}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    # Current truck's cost to serve each customer: travel from current to customer, then to depot
+    current_to_customer = np.linalg.norm(available_customers - current_position, axis=1)
+    customer_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    cost_now = current_to_customer + customer_to_depot
+    
+    # Identify other trucks (exclude current position)
+    mask = np.all(np.abs(truck_positions - current_position) < 1e-8, axis=1)
+    other_trucks = truck_positions[~mask]
+    
+    if len(other_trucks) == 0:
+        # Only one truck, pick customer with minimal cost
+        best_idx = np.argmin(cost_now)
+        return int(best_idx)
+    
+    # For each customer, compute best cost if served by another truck (now)
+    # For each other truck, cost = distance(other_truck, customer) + distance(customer, depot)
+    other_to_customer = np.linalg.norm(available_customers[:, None, :] - other_trucks[None, :, :], axis=2)  # (n_cust, n_other)
+    best_other_cost = np.min(other_to_customer, axis=1) + customer_to_depot
+    
+    # Regret = how much better is it to serve now by this truck vs best other?
+    regret = best_other_cost - cost_now  # positive means urgent to serve now
+    
+    max_regret = np.max(regret)
+    if max_regret > 1e-6:
+        # There is at least one customer with positive regret
+        best_idx = np.argmax(regret)
+        return int(best_idx)
+    
+    # No positive regret: all customers are as good or better served by another truck.
+    # Decide whether to wait. Wait if this truck is not the farthest from depot,
+    # because if it is farthest, delaying may worsen TTT.
+    current_depot_dist = np.linalg.norm(current_position - depot_position)
+    other_depot_dists = np.linalg.norm(other_trucks - depot_position, axis=1)
+    if current_depot_dist < np.max(other_depot_dists):
+        # Current truck is not the farthest, so it can wait (other trucks are further out)
+        return None
+    else:
+        # Current truck is farthest; it should take a customer with minimal cost to start returning
+        best_idx = np.argmin(cost_now)
+        return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

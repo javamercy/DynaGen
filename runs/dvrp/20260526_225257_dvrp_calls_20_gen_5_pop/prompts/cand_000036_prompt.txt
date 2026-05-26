@@ -1,0 +1,108 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000035: regret_with_balanced_wait
+Status: valid; Gap: 44.5158%
+Thought: Regret-based dispatch with a small bonus for reducing max depot distance among trucks. Wait only if no positive regret, current truck not farthest, and customers remain > 2.
+Mean gap: 44.51575689283233
+Mean TTT: 4.249467897726843
+Gap by instance size: {'50': 44.51575689283233}
+TTT by instance size: {'50': 4.249467897726843}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    # Costs for current truck
+    current_to_customer = np.linalg.norm(available_customers - current_position, axis=1)
+    customer_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    cost_now = current_to_customer + customer_to_depot
+    
+    # Identify other trucks
+    mask = np.all(np.abs(truck_positions - current_position) < 1e-8, axis=1)
+    other_trucks = truck_positions[~mask]
+    
+    if len(other_trucks) == 0:
+        best_idx = np.argmin(cost_now)
+        return int(best_idx)
+    
+    # Other trucks' costs to each customer
+    other_to_customer = np.linalg.norm(available_customers[:, None, :] - other_trucks[None, :, :], axis=2)
+    best_other_cost = np.min(other_to_customer, axis=1) + customer_to_depot
+    
+    # Regret
+    regret = best_other_cost - cost_now
+    
+    # Bonus for reducing max depot distance
+    current_depot_dist = np.linalg.norm(current_position - depot_position)
+    other_depot_dists = np.linalg.norm(other_trucks - depot_position, axis=1)
+    current_max_depot = max(current_depot_dist, np.max(other_depot_dists))
+    # New max if this truck serves customer: max(other_depot_dists.max(), customer_to_depot)
+    new_max = np.maximum(np.max(other_depot_dists), customer_to_depot)
+    reduction = current_max_depot - new_max
+    bonus = 0.1 * reduction  # small scaling factor
+    regret += bonus
+    
+    max_regret = np.max(regret)
+    if max_regret > 1e-6:
+        best_idx = np.argmax(regret)
+        return int(best_idx)
+    
+    # No positive regret: decide whether to wait
+    if current_depot_dist < np.max(other_depot_dists) and len(available_customers) > 2:
+        return None
+    else:
+        best_idx = np.argmin(cost_now)
+        return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

@@ -1,0 +1,102 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000014 LLM reflection:
+- Summary: Increasing depot-return weight from 0.5 to 0.8 widened gap to 46.68 vs parent 44.39, indicating excessive depot pressure hurts performance.
+- Aim: Reduce gap by lowering depot-return coefficient (e.g., 0.3–0.5) or adding a waiting condition when other trucks are near, better balancing return pressure and workload.
+- Preserve: Composite score using dist_current, nearest_other, and dist_depot; Masking to exclude current truck from other-truck distances
+- Change: Lower depot-return weight to 0.4; Optionally skip assignment if nearest other truck is within a small threshold (indicating imminent competition)
+- Avoid: Adding time-dependent state or complex waiting logic; Removing the other-truck competition term
+
+Parent cand_000008 LLM reflection:
+- Summary: Gap improved by 7.98% over best parent after flipping nearest_other weight from -0.3 to -1, but gap remains high at 44.39%.
+- Aim: Reduce gap further by increasing the depot distance weight to accelerate truck returns.
+- Preserve: Composite score combining distances to current truck, depot, and nearest other truck; Use of only online dispatch state with no waiting
+- Change: Increase depot distance weight (currently 0.5) to 0.7–1.0 to apply stronger return pressure; Optionally add a nonlinear penalty for customers far from depot
+- Avoid: Adding waiting logic without evidence of benefit in this regime; Overfitting to 3-truck instances or small instance sizes
+
+Parent cand_000010 LLM reflection:
+- Summary: This candidate achieved a 52.38% gap with moderate waiting (8.3 waits) and nearly full completion (49/50), but did not improve over parent; waiting is absent, and benefits from balancing depot distance and competition may be limited by fixed weights.
+- Aim: Reduce last-return time by introducing a waiting condition that only dispatches if the benefit of immediate service outweighs the expected improvement from waiting for a more centrally located customer, using only online state.
+- Preserve: Weighted distance score balancing distance to depot and competition from other trucks; Identification of current truck index via closest position; Always selecting a customer when available (baseline)
+- Change: Add a waiting threshold: if the best score exceeds a dynamic threshold based on average distance to depot of remaining customers, wait instead of dispatching; Adjust weight on dist_depot from 0.5 to 0.7 to increase depot-return pressure
+- Avoid: Using global or future knowledge; Adding complex time-dependent heuristics that hurt runtime; Reducing completion rate unnecessarily
+
+PARENTS:
+Candidate cand_000014: accelerated_balancing_planner
+Status: valid; Gap: 46.684%
+Thought: Select customer minimizing distance from current truck minus distance to nearest other truck plus 0.8 times distance to depot to promote faster depot returns. No waiting.
+Mean gap: 46.6839982241735
+Mean TTT: 4.315853315403739
+Gap by instance size: {'50': 46.6839982241735}
+TTT by instance size: {'50': 4.315853315403739}
+Code:
+```python
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Distance from current truck to each customer
+    dist_current = np.linalg.norm(available_customers - current_position, axis=1)
+    # Distance from each customer to depot
+    dist_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    # Identify the index of the current truck in truck_positions (assumes exact match)
+    mask = np.all(truck_positions == current_position, axis=1)
+    # Distance from each customer to nearest other truck
+    other_trucks = truck_positions[~mask]
+    if len(other_trucks) == 0:
+        # No other trucks, ignore balancing term
+        score = dist_current + 0.8 * dist_depot
+    else:
+        diff = available_customers[:, np.newaxis, :] - other_trucks[np.newaxis, :, :]
+        dist_other = np.linalg.norm(diff, axis=2)
+        nearest_other = np.min(dist_other, axis=1)
+        # Composite score: smaller is better
+        score = dist_current - nearest_other + 0.8 * dist_depot
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

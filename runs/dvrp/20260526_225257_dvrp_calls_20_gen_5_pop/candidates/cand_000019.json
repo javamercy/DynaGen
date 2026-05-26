@@ -1,0 +1,343 @@
+{
+  "created_at": "2026-05-26T19:59:53.866485+00:00",
+  "error_details": "timeout on instances_001 seed 100: DVRP policy timed out after 180s (timeout_seconds=180)",
+  "gap": 102.66053225888867,
+  "generation": 3,
+  "id": "cand_000019",
+  "metrics": {
+    "best_gap": 33.447865251328786,
+    "budget": 1,
+    "gap": 102.66053225888867,
+    "gap_by_instance_size": {
+      "50": 102.66053225888867
+    },
+    "gap_by_instance_source": {
+      "data/dvrp/train/instances.pkl": 102.66053225888867
+    },
+    "gap_by_truck_count": {
+      "3": 102.66053225888867
+    },
+    "history": {
+      "buckets": [
+        "global",
+        "dvrp:size:50",
+        "dvrp:trucks:3",
+        "dvrp:source:instances.pkl",
+        "dvrp:completion:high",
+        "dvrp:mechanism:nearest_available",
+        "dvrp:mechanism:wait_control",
+        "dvrp:mechanism:lookahead",
+        "dvrp:mechanism:return_policy"
+      ],
+      "diversity_score": 1.0,
+      "history_score": 0.6742152610463054,
+      "in_history": true,
+      "primary_bucket": "dvrp:size:50",
+      "quality_score": 0.1958318640666588,
+      "robustness_score": 0.5096668485132757
+    },
+    "history_selection": {
+      "bucket_score": 0.1958318640666588,
+      "buckets": [
+        "global",
+        "dvrp:size:50",
+        "dvrp:trucks:3",
+        "dvrp:source:instances.pkl",
+        "dvrp:completion:high",
+        "dvrp:mechanism:nearest_available",
+        "dvrp:mechanism:wait_control",
+        "dvrp:mechanism:lookahead",
+        "dvrp:mechanism:return_policy"
+      ],
+      "history_score": 0.637851624682669,
+      "primary_bucket": "dvrp:size:50",
+      "role": "regime specialist"
+    },
+    "invalid_count": 0,
+    "mean_completed_count": 29.4,
+    "mean_decisions": 57.6,
+    "mean_gap": 102.66053225888867,
+    "mean_runtime": 73.3072953513998,
+    "mean_ttt": 6.022921112887301,
+    "mean_waits": 30.7,
+    "median_gap": 92.58017702988496,
+    "penalized_mean_gap": 102.66053225888867,
+    "penalized_mean_ttt": 6.022921112887301,
+    "pool": "search_instances",
+    "problem": "dvrp",
+    "records": [
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 69,
+        "dimension": 50,
+        "error": null,
+        "gap": 95.50634830664444,
+        "instance": "instances_000",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.836,
+        "runtime_seconds": 0.7112030410062289,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 5.544560037976436,
+        "waits": 28
+      },
+      {
+        "completed_count": 0,
+        "customer_count": 49,
+        "decisions": 0,
+        "dimension": 50,
+        "error": "DVRP policy timed out after 180s (timeout_seconds=180)",
+        "gap": null,
+        "instance": "instances_001",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.763,
+        "runtime_seconds": 180.00045593100367,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "timeout",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": null,
+        "waits": 0
+      },
+      {
+        "completed_count": 0,
+        "customer_count": 49,
+        "decisions": 0,
+        "dimension": 50,
+        "error": "DVRP policy timed out after 180.001s (timeout_seconds=180)",
+        "gap": null,
+        "instance": "instances_002",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.793,
+        "runtime_seconds": 180.00082526399638,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "timeout",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": null,
+        "waits": 0
+      },
+      {
+        "completed_count": 0,
+        "customer_count": 49,
+        "decisions": 0,
+        "dimension": 50,
+        "error": "DVRP policy timed out after 180s (timeout_seconds=180)",
+        "gap": null,
+        "instance": "instances_003",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.967,
+        "runtime_seconds": 180.00038176200178,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "timeout",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": null,
+        "waits": 0
+      },
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 103,
+        "dimension": 50,
+        "error": null,
+        "gap": 89.65400575312549,
+        "instance": "instances_004",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.722,
+        "runtime_seconds": 2.733901217012317,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 5.162382036600076,
+        "waits": 55
+      },
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 145,
+        "dimension": 50,
+        "error": null,
+        "gap": 153.69819615536358,
+        "instance": "instances_005",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 3.244,
+        "runtime_seconds": 3.1386093570035882,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 8.229969483279994,
+        "waits": 100
+      },
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 121,
+        "dimension": 50,
+        "error": null,
+        "gap": 161.17790091966,
+        "instance": "instances_006",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.697,
+        "runtime_seconds": 3.095670392998727,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 7.043967987803231,
+        "waits": 76
+      },
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 81,
+        "dimension": 50,
+        "error": null,
+        "gap": 82.47887716720969,
+        "instance": "instances_007",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 3.04,
+        "runtime_seconds": 2.6884324839920737,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 5.547357865883175,
+        "waits": 34
+      },
+      {
+        "completed_count": 0,
+        "customer_count": 49,
+        "decisions": 0,
+        "dimension": 50,
+        "error": "DVRP policy timed out after 180.001s (timeout_seconds=180)",
+        "gap": null,
+        "instance": "instances_008",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 2.983,
+        "runtime_seconds": 180.00051538199477,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "timeout",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": null,
+        "waits": 0
+      },
+      {
+        "completed_count": 49,
+        "customer_count": 49,
+        "decisions": 57,
+        "dimension": 50,
+        "error": null,
+        "gap": 33.447865251328786,
+        "instance": "instances_009",
+        "pool": "search_instances",
+        "reference_kind": "ortools_static_full_future",
+        "reference_ttt": 3.454,
+        "runtime_seconds": 0.7029586829885375,
+        "seed": 100,
+        "source": "data/dvrp/train/instances.pkl",
+        "status": "valid",
+        "timeout_limit_seconds": 180.0,
+        "truck_count": 3,
+        "ttt": 4.609289265780896,
+        "waits": 14
+      }
+    ],
+    "runs": 10,
+    "runtime_error_count": 0,
+    "score_by_instance_size": {
+      "50": 102.66053225888867
+    },
+    "score_by_instance_source": {
+      "data/dvrp/train/instances.pkl": 102.66053225888867
+    },
+    "score_by_truck_count": {
+      "3": 102.66053225888867
+    },
+    "score_name": "gap",
+    "scored_count": 6,
+    "seeds": [
+      100
+    ],
+    "timeout_count": 4,
+    "timeout_fraction": 0.4,
+    "timeout_gap": 102.66053225888867,
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 180.0,
+    "timeout_ttt": 6.022921112887301,
+    "ttt_by_instance_size": {
+      "50": 6.022921112887301
+    },
+    "ttt_by_instance_source": {
+      "data/dvrp/train/instances.pkl": 6.022921112887301
+    },
+    "ttt_by_truck_count": {
+      "3": 6.022921112887301
+    },
+    "valid_count": 6,
+    "verbal_gradient": {
+      "aim": "Reduce computational cost of lookahead to avoid timeouts while preserving regret-based filtering and waiting comparison, targeting mean runtime under 2s.",
+      "avoid": [
+        "Complex multi-step insertion simulation that leads to runtime >10s",
+        "Removing waiting behavior entirely",
+        "Using lookahead that evaluates all customers or many insertion positions"
+      ],
+      "candidate_id": "cand_000019",
+      "change": [
+        "Replace full insertion lookahead with a lightweight heuristic based on regret score and distance to depot",
+        "Limit lookahead size to at most 3 farthest customers or use single-candidate evaluation"
+      ],
+      "delta_vs_best_parent": 50.059474472486755,
+      "evidence": {},
+      "generation": 12,
+      "parent_ids": [
+        "cand_000006"
+      ],
+      "preserve": [
+        "regret-based candidate filtering (non-positive regret)",
+        "ability to return None for waiting",
+        "distance-to-depot ranking for customer selection"
+      ],
+      "problem": "dvrp",
+      "score_name": "gap",
+      "score_value": 102.66053225888867,
+      "source": "llm",
+      "summary": "The candidate added a waiting evaluation and limited lookahead on farthest customers, but caused 40% timeout and worse gap (102.7 vs parent 52.6) due to high runtime.",
+      "version": 1
+    },
+    "worst_gap": 161.17790091966
+  },
+  "name": "far_sighted_wait_with_regret_filtering",
+  "parents": [
+    "cand_000006"
+  ],
+  "prompt": "[system]\nYou generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).\n\n[user]\nImplement exactly this interface:\n\ndef choose_next_customer(\n    current_position: np.ndarray,        # (2,) the deciding truck's position\n    depot_position: np.ndarray,          # (2,)\n    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks\n    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers\n    current_time: float,\n) -> int | None:\n\nRules:\n- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.\n- Decide which customer the active truck (at current_position) should head to next.\n- Return an index into available_customers, or None to wait at the current position.\n- If available_customers is empty, return None.\n- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.\n- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.\n- Do not read/write files, use network, spawn subprocesses, or call external solvers.\n- No module-level mutable globals; the function may be called many times across instances.\n\nVERBAL GRADIENT MODE: follow the reflection below as the primary source of change.\n\nUse the supplied parents as supporting evidence only.\n\nPARENT-SPECIFIC LLM REFLECTIONS:\n\nParent cand_000006 LLM reflection:\n- Summary: Regret filtering with greedy lookahead cut gap from 62% to 53% but still high, runtime ~1s, suggesting need for lighter simulation and better waiting.\n- Aim: Improve TTT by reducing lookahead overhead and adding explicit waiting/return-urgency decisions.\n- Preserve: regret-based candidate filtering; greedy insertion framework for TTT estimation; use of current position and depot as fixed endpoints\n- Change: Simplify lookahead: simulate only a few high-impact customers (e.g., farthest from depot) instead of all remaining; Include waiting as an explicit candidate with anticipated delay cost based on truck balance and return pressure\n- Avoid: Removing regret filtering entirely; Adding heavy nested loops that increase runtime further; Ignoring waiting action or returning None prematurely without cost evaluation\n\nPARENTS:\nCandidate cand_000006: regret_lookahead_hybrid\nStatus: valid; Gap: 52.6011%\nThought: Combine regret-based dispatch with a lightweight lookahead: first filter to customers where the current truck is best (non-positive regret), then among those simulate a greedy insertion of remaining customers and pick the one minimizing estimated TTT. If none, wait.\nMean gap: 52.60105778640191\nMean TTT: 4.482114606383933\nGap by instance size: {'50': 52.60105778640191}\nTTT by instance size: {'50': 4.482114606383933}\nCode:\n```python\nimport numpy as np\n\ndef choose_next_customer(\n    current_position: np.ndarray,\n    depot_position: np.ndarray,\n    truck_positions: np.ndarray,\n    available_customers: np.ndarray,\n    current_time: float,\n) -> int | None:\n    n_available = len(available_customers)\n    if n_available == 0:\n        return None\n\n    n_trucks = truck_positions.shape[0]\n\n    # Identify the deciding truck index (closest to current_position)\n    dist_to_current = np.linalg.norm(truck_positions - current_position, axis=1)\n    deciding_truck_idx = np.argmin(dist_to_current)\n\n    # Precompute distances from each truck to each customer and to depot\n    depot = depot_position\n    dist_to_depot = np.linalg.norm(available_customers - depot, axis=1)\n\n    # For each customer, compute regret = cost_now - best_other_cost\n    regrets = np.empty(n_available)\n    for i in range(n_available):\n        cust = available_customers[i]\n        d_curr_cust = np.linalg.norm(current_position - cust)\n        cost_now = current_time + d_curr_cust + dist_to_depot[i]\n\n        best_other = float('inf')\n        for j in range(n_trucks):\n            if j == deciding_truck_idx:\n                continue\n            d_truck_cust = np.linalg.norm(truck_positions[j] - cust)\n            cost_other = current_time + d_truck_cust + dist_to_depot[i]\n            if cost_other < best_other:\n                best_other = cost_other\n\n        if n_trucks == 1:\n            regrets[i] = -float('inf')  # current truck is the only option\n        else:\n            regrets[i] = cost_now - best_other\n\n    # Candidates: non-positive regret\n    candidates = [i for i in range(n_available) if regrets[i] <= 0]\n    if not candidates:\n        return None\n\n    # Helper to compute route time given list of waypoints\n    def route_time(waypoints):\n        t = 0.0\n        for p in range(len(waypoints)-1):\n            t += np.linalg.norm(waypoints[p] - waypoints[p+1])\n        return t\n\n    best_index = None\n    best_ttt = float('inf')\n\n    # Evaluate each candidate with a greedy insertion of remaining customers\n    for cand_idx in candidates:\n        cand_cust = available_customers[cand_idx]\n        # Initialize routes: each route starts at truck position and ends at depot\n        routes = [ [truck_positions[t].copy(), depot] for t in range(n_trucks) ]\n        # Insert candidate as first stop for deciding truck\n        routes[deciding_truck_idx] = [routes[deciding_truck_idx][0], cand_cust, routes[deciding_truck_idx][1]]\n\n        # Unassigned customers (all except candidate)\n        unassigned = [available_customers[i].copy() for i in range(n_available) if i != cand_idx]\n\n        # Greedy assignment: for each unassigned customer, find cheapest insertion across all trucks\n        for cust in unassigned:\n            best_truck = -1\n            best_pos = -1\n            best_inc = float('inf')\n            for t_idx in range(n_trucks):\n                waypoints = routes[t_idx]\n                # Determine allowed insertion gaps for deciding truck: can't insert before the first stop (cand_cust)\n                start_gap = 0\n                # Actually, we can insert anywhere except between start and its first stop which is already fixed?\n                # But the decision is to go to that customer first, so we should not insert before it.\n                # However, after assigning candidate, we can insert further customers between cand_cust and depot or after?\n                # Since the route is start -> cand_cust -> ... -> depot, we can insert after cand_cust.\n                # So for deciding truck, start_gap = 1 (skip the first segment start->cand_cust)\n                if t_idx == deciding_truck_idx:\n                    start_gap = 1\n                for p in range(start_gap, len(waypoints)-1):\n                    prev = waypoints[p]\n                    nxt = waypoints[p+1]\n                    inc = np.linalg.norm(prev - cust) + np.linalg.norm(cust - nxt) - np.linalg.norm(prev - nxt)\n                    if inc < best_inc:\n                        best_inc = inc\n                        best_truck = t_idx\n                        best_pos = p+1  # insert after prev\n            # Insert the customer at best position\n            routes[best_truck].insert(best_pos, cust)\n\n        # Compute maximum route time\n        max_route_time = 0.0\n        for waypoints in routes:\n            rt = route_time(waypoints)\n            if rt > max_route_time:\n                max_route_time = rt\n        ttt = current_time + max_route_time\n\n        if ttt < best_ttt:\n            best_ttt = ttt\n            best_index = cand_idx\n\n    return best_index\n```\n\nMinimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.\n\nInternal check before final JSON: correct choose_next_customer signature, returns None or a valid\navailable_customers index, handles empty available_customers no I/O/network/subprocesses.\n\nReturn one JSON object and nothing else:\n{\n  \"name\": \"snake_case_or_title\",\n  \"thought\": \"brief public summary of the dispatch rule, tie-break, and wait condition\",\n  \"code\": \"complete Python code as a JSON string\"\n}",
+  "raw_response": "",
+  "status": "timeout",
+  "strategy": "m3_simplify_generalize",
+  "thought": "Filter candidates by non-positive regret; evaluate each candidate with a greedy lookahead on a limited set of farthest customers (up to 10). Also evaluate waiting (no move) by greedily assigning the same set of farthest customers to other trucks. Return the candidate with minimal estimated TTT, or wait if waiting yields lower TTT."
+}

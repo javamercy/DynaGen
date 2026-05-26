@@ -1,0 +1,118 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000017 LLM reflection:
+- Summary: Reduced mean waits from 32.3 to 4.4 and improved gap by ~9.5% vs parent, yet gap remains 48% above best known.
+- Aim: Sharpen the isolation penalty decay and depot pressure modulation to minimize last-truck return time.
+- Preserve: Time-decaying beta and gamma coefficients; Tie-breaking on smaller customer-to-depot distance; Waiting condition with depot proximity and own-score threshold
+- Change: Increase beta decay rate to force earlier isolation; Add a fleet balance term that penalizes extreme clustering among trucks
+- Avoid: Reintroducing excessive waiting; Overcomplicating the score with unvalidated terms; Neglecting depot-return pressure late in episode
+
+PARENTS:
+Candidate cand_000017: exploit_intensified
+Status: valid; Gap: 48.4654%
+Thought: Improves parent 'adaptive_isolation_with_waiting' by making depot penalty gamma decay with time (prioritize far customers early, near customers late), increasing isolation weight beta, and tightening the waiting condition to avoid unnecessary idle time. Also adds a tie-break for smaller depot distance.
+Mean gap: 48.46538700046252
+Mean TTT: 4.356720334664718
+Gap by instance size: {'50': 48.46538700046252}
+TTT by instance size: {'50': 4.356720334664718}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    # distances
+    cur_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    own_score = cur_to_cust + cust_to_depot
+    
+    # other trucks
+    mask = ~np.all(truck_positions == current_position, axis=1)
+    other_trucks = truck_positions[mask]
+    if len(other_trucks) == 0:
+        return int(np.argmin(own_score))
+    
+    # distance from each customer to nearest other truck
+    dist_to_other = np.linalg.norm(available_customers[:, None] - other_trucks[None, :], axis=2)
+    nearest_other = np.min(dist_to_other, axis=1)
+    
+    # time-dependent parameters: beta (isolation) decays, gamma (depot) decays
+    t = current_time
+    beta = 2.0 * max(0, 1 - 0.08 * t)      # initial 2.0, decays faster
+    gamma = 2.0 * max(0, 1 - 0.1 * t)       # initial 2.0 (favors far), decays to 0
+    
+    # score = cur_to_cust + cust_to_depot - beta*nearest_other - gamma*cust_to_depot
+    # = cur_to_cust - beta*nearest_other + (1 - gamma)*cust_to_depot
+    score = cur_to_cust + cust_to_depot - beta * nearest_other - gamma * cust_to_depot
+    
+    # tie-breaking: prefer smaller cust_to_depot if scores very close
+    # we will modify argmin to consider second criterion
+    best_idx = np.argmin(score)
+    best_score = score[best_idx]
+    # find all within epsilon of best
+    eps = 1e-6
+    candidates = np.where(score - best_score < eps)[0]
+    if len(candidates) > 1:
+        # among candidates, choose one with smallest cust_to_depot
+        best_idx = candidates[np.argmin(cust_to_depot[candidates])]
+    
+    # waiting condition: only if very close to depot, other trucks far, and best own_score high
+    cur_to_depot = np.linalg.norm(current_position - depot_position)
+    mean_other_depot = np.mean(np.linalg.norm(other_trucks - depot_position, axis=1))
+    min_own = np.min(own_score)
+    # wait only if current truck is very near depot, others are far, and own_score is large relative to current distance
+    if cur_to_depot < 0.3 * mean_other_depot and min_own > 3 * cur_to_depot:
+        # also avoid waiting when many customers remain (crude proxy: len>5)
+        if len(available_customers) <= 5:
+            return None
+    
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

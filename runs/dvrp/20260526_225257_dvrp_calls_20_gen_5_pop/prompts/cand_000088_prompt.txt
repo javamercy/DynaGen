@@ -1,0 +1,119 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000037 LLM reflection:
+- Summary: Candidate improved gap from 44.35 to 34.43 by using regret with centroid balance and depot reduction bonus, but still high gap suggests tuning opportunities.
+- Aim: Tune the relative weights of the centroid balance and depot-reduction bonuses to further reduce the gap, especially in scenarios with many remaining customers.
+- Preserve: regret-based dispatch; depot-distance-reduction bonus; waiting rule based on farthest truck and few customers
+- Change: Adjust alpha (centroid balance) and beta (depot reduction) weights, possibly with a small time-dependent scaling
+- Avoid: Adding stateful tracking; Altering the core regret calculation; Introducing complex per-instance parameters
+
+PARENTS:
+Candidate cand_000037: regret_balanced_wait
+Status: valid; Gap: 34.4314%
+Thought: Combines regret-based dispatch with a fleet balance bonus (distance to centroid of other trucks) and a bonus for reducing the maximum depot distance. Waits only if no positive regret, current truck is not the farthest, and there are more than 2 customers left; otherwise serves the best customer.
+Mean gap: 34.4313959246904
+Mean TTT: 3.9532267663137213
+Gap by instance size: {'50': 34.4313959246904}
+TTT by instance size: {'50': 3.9532267663137213}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    # Costs for current truck
+    cur_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    cost_now = cur_to_cust + cust_to_depot
+    
+    # Other trucks mask
+    mask = ~np.all(np.abs(truck_positions - current_position) < 1e-8, axis=1)
+    other_trucks = truck_positions[mask]
+    
+    if len(other_trucks) == 0:
+        return int(np.argmin(cost_now))
+    
+    # Regret: best other cost - cost_now
+    other_to_cust = np.linalg.norm(available_customers[:, None, :] - other_trucks[None, :, :], axis=2)
+    best_other_cost = np.min(other_to_cust, axis=1) + cust_to_depot
+    regret = best_other_cost - cost_now
+    
+    # Fleet balance bonus: positive for customers far from centroid of other trucks
+    centroid_other = np.mean(other_trucks, axis=0)
+    dist_to_centroid = np.linalg.norm(available_customers - centroid_other, axis=1)
+    alpha = 0.2
+    regret += alpha * dist_to_centroid
+    
+    # Bonus for reducing the maximum depot distance
+    current_depot_dist = np.linalg.norm(current_position - depot_position)
+    other_depot_dists = np.linalg.norm(other_trucks - depot_position, axis=1)
+    current_max_depot = max(current_depot_dist, np.max(other_depot_dists))
+    new_max = np.maximum(np.max(other_depot_dists), cust_to_depot)
+    reduction = current_max_depot - new_max
+    beta = 0.1
+    regret += beta * reduction
+    
+    max_regret = np.max(regret)
+    if max_regret > 1e-6:
+        best_idx = np.argmax(regret)
+        return int(best_idx)
+    
+    # No positive regret: decide whether to wait
+    is_farthest = current_depot_dist >= np.max(other_depot_dists) - 1e-6
+    if is_farthest or len(available_customers) <= 2:
+        best_idx = np.argmin(cost_now)
+        return int(best_idx)
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

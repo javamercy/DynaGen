@@ -1,0 +1,107 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000021 LLM reflection:
+- Summary: Candidate added a wait condition that worsened gap from 54.67 to 56.48, causing excessive delays by suppressing dispatch when own_score is small relative to the farthest other truck's depot distance.
+- Aim: Improve coordination by refining the wait condition to trigger only when the truck's return would not help the bottleneck, and adjust the isolation bonus beta to better balance travel distance and spread.
+- Preserve: own_score (current->customer + customer->depot) as primary cost; isolation bonus (distance to nearest other truck) to encourage spatial spread; fallback to own_score when no other trucks present
+- Change: Replace max_other_depot with average depot distance of other trucks in wait condition, and reduce threshold from 0.5 to 0.3 to decrease unnecessary waiting; Lower beta from 0.5 to 0.3 to reduce overemphasis on isolation over direct efficiency
+- Avoid: Removing the isolation bonus entirely; Introducing many new hyperparameters that require tuning; Making wait condition so strict that waiting never occurs or so loose that it causes excessive delays
+
+Parent cand_000037 LLM reflection:
+- Summary: Candidate improved gap from 44.35 to 34.43 by using regret with centroid balance and depot reduction bonus, but still high gap suggests tuning opportunities.
+- Aim: Tune the relative weights of the centroid balance and depot-reduction bonuses to further reduce the gap, especially in scenarios with many remaining customers.
+- Preserve: regret-based dispatch; depot-distance-reduction bonus; waiting rule based on farthest truck and few customers
+- Change: Adjust alpha (centroid balance) and beta (depot reduction) weights, possibly with a small time-dependent scaling
+- Avoid: Adding stateful tracking; Altering the core regret calculation; Introducing complex per-instance parameters
+
+PARENTS:
+Candidate cand_000021: waiting_isolation_dispatch
+Status: valid; Gap: 56.4758%
+Thought: Dispatch rule: minimize own_score (current->customer + customer->depot) minus 0.5 * nearest other truck distance, but if the best own_score is less than half of the maximum other truck distance to depot, wait (return None) to avoid early returns that do not help the bottleneck.
+Mean gap: 56.475791423883834
+Mean TTT: 4.600797852867755
+Gap by instance size: {'50': 56.475791423883834}
+TTT by instance size: {'50': 4.600797852867755}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # compute own_score (current->customer + customer->depot)
+    current_to_customer = np.linalg.norm(available_customers - current_position, axis=1)
+    customer_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    own_score = current_to_customer + customer_to_depot
+    best_own_idx = np.argmin(own_score)
+    best_own_val = own_score[best_own_idx]
+    # identify other trucks
+    mask = np.all(np.abs(truck_positions - current_position) < 1e-8, axis=1)
+    other_trucks = truck_positions[~mask]
+    if len(other_trucks) > 0:
+        # compute other trucks' distances to depot
+        other_depot_dist = np.linalg.norm(other_trucks - depot_position, axis=1)
+        max_other_depot = np.max(other_depot_dist)
+        # wait if best own_score is small relative to max other truck depot distance
+        if best_own_val < 0.5 * max_other_depot:
+            return None
+        # otherwise compute full score with isolation bonus
+        dist_to_other = np.linalg.norm(available_customers[:, None, :] - other_trucks[None, :, :], axis=2)
+        nearest_other = np.min(dist_to_other, axis=1)
+        beta = 0.5
+        score = own_score - beta * nearest_other
+        best_idx = np.argmin(score)
+        return int(best_idx)
+    else:
+        # no other trucks, just use own_score
+        return int(best_own_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

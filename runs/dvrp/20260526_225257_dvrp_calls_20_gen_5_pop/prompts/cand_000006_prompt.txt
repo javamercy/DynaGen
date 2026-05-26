@@ -1,0 +1,204 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY e3_hybrid_recombination: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000005: regret_based_dispatch
+Status: valid; Gap: 62.0359%
+Thought: For each available customer, compute regret as the difference between the current truck's estimated return time if serving now and the best other truck's estimated return time. If any customer has non-positive regret (current truck is best), pick the one with smallest return time; otherwise wait. This stateless rule balances load and minimizes TTT.
+Mean gap: 62.03591508558735
+Mean TTT: 4.780745959356699
+Gap by instance size: {'50': 62.03591508558735}
+TTT by instance size: {'50': 4.780745959356699}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    n_available = len(available_customers)
+    if n_available == 0:
+        return None
+    
+    n_trucks = truck_positions.shape[0]
+    
+    # find index of current truck (closest)
+    dist_to_current = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(dist_to_current)
+    
+    best_cost = float('inf')
+    best_idx = None
+    depot = depot_position
+    
+    for i in range(n_available):
+        cust = available_customers[i]
+        d_curr_cust = np.linalg.norm(current_position - cust)
+        d_cust_depot = np.linalg.norm(cust - depot)
+        cost_now = current_time + d_curr_cust + d_cust_depot
+        
+        # compute best other cost
+        best_other = float('inf')
+        for j in range(n_trucks):
+            if j == current_idx:
+                continue
+            d_truck_cust = np.linalg.norm(truck_positions[j] - cust)
+            cost_other = current_time + d_truck_cust + d_cust_depot
+            if cost_other < best_other:
+                best_other = cost_other
+        
+        if n_trucks == 1:
+            regret = -float('inf')  # always serve now
+        else:
+            regret = cost_now - best_other
+        
+        # consider if current truck is best (regret <= 0)
+        if regret <= 0:
+            if cost_now < best_cost:
+                best_cost = cost_now
+                best_idx = i
+    
+    return best_idx
+```
+
+Candidate cand_000003: multi_step_lookahead_ttt
+Status: timeout; Gap: 81.7805%
+Thought: For each candidate next customer (including waiting), simulate a greedy sequential insertion of all known customers into all trucks' routes, respecting the immediate first stop for the deciding truck. Use the maximum route time plus current_time as TTT estimate, and pick the candidate with minimum estimate.
+Mean gap: 81.78049204834234
+Mean TTT: 5.383584311217398
+Gap by instance size: {'50': 81.78049204834234}
+TTT by instance size: {'50': 5.383584311217398}
+Error details: timeout on instances_002 seed 100: DVRP policy timed out after 180s (timeout_seconds=180)
+Code:
+```python
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+
+    n_trucks = len(truck_positions)
+    best_index = None
+    best_ttt = float('inf')
+
+    # Identify the index of the deciding truck
+    deciding_truck_idx = None
+    for i, pos in enumerate(truck_positions):
+        if np.allclose(pos, current_position, atol=1e-6):
+            deciding_truck_idx = i
+            break
+    if deciding_truck_idx is None:
+        deciding_truck_idx = 0  # fallback
+
+    # Candidates: indices of available customers plus None for waiting
+    candidates = list(range(len(available_customers))) + [None]
+
+    for cand in candidates:
+        # Initialize routes: each route is a list of positions starting at truck position and ending at depot
+        routes = [ [truck_positions[t].copy(), depot_position] for t in range(n_trucks) ]
+
+        # Build list of unassigned customer positions (excluding the candidate if specified)
+        unassigned = []
+        for i, cust in enumerate(available_customers):
+            if cand is None or i != cand:
+                unassigned.append(cust.copy())
+
+        # If candidate is a customer, insert it as the first stop for the deciding truck
+        if cand is not None:
+            cand_pos = available_customers[cand].copy()
+            route = routes[deciding_truck_idx]
+            # Insert after the start (index 0) and before depot (index 1)
+            routes[deciding_truck_idx] = [route[0], cand_pos, route[1]]
+
+        # Greedily assign remaining customers: sort by distance to depot descending
+        unassigned.sort(key=lambda c: -np.linalg.norm(c - depot_position))
+
+        for cust in unassigned:
+            best_truck = -1
+            best_pos = -1
+            best_inc = float('inf')
+            for t_idx in range(n_trucks):
+                waypoints = routes[t_idx]
+                # Determine allowed insertion positions (gaps between consecutive waypoints)
+                # For the deciding truck with a fixed first stop, only insert after that stop
+                start_gap = 0
+                if cand is not None and t_idx == deciding_truck_idx:
+                    start_gap = 1  # skip the gap between start and first stop
+                for p in range(start_gap, len(waypoints)-1):
+                    prev = waypoints[p]
+                    nxt = waypoints[p+1]
+                    inc = np.linalg.norm(prev - cust) + np.linalg.norm(cust - nxt) - np.linalg.norm(prev - nxt)
+                    if inc < best_inc:
+                        best_inc = inc
+                        best_truck = t_idx
+                        best_pos = p+1  # insert after prev (i.e., at position p+1 in list)
+            # Insert customer at the best position
+            routes[best_truck].insert(best_pos, cust)
+
+        # Compute maximum route time across all trucks
+        max_route_time = 0.0
+        for waypoints in routes:
+            route_time = 0.0
+            for i in range(len(waypoints)-1):
+                route_time += np.linalg.norm(waypoints[i] - waypoints[i+1])
+            if route_time > max_route_time:
+                max_route_time = route_time
+        ttt = current_time + max_route_time
+
+        if ttt < best_ttt:
+            best_ttt = ttt
+            best_index = cand
+
+    return best_index
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

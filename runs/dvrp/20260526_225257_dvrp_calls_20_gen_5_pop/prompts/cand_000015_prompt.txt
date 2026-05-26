@@ -1,0 +1,101 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000007 LLM reflection:
+- Summary: The candidate improved gap by 10.97 points but still 43.7% above optimum due to insufficient dynamic balancing of depot pressure and truck competition.
+- Aim: Improve fleet balance by making the isolation and depot-return penalties depend on the number of remaining customers or current time.
+- Preserve: Distance-to-depot term in score; Isolation penalty from nearest other truck; Edge case handling for single truck
+- Change: Make isolation weight beta decay with fewer remaining customers to reduce over-isolation late in the route; Introduce a time-dependent multiplier on customer_to_depot to increase pressure when time is high
+- Avoid: Adding runtime-heavy computations; Removing isolation term; Overcomplicating with many new parameters
+
+Parent cand_000006 LLM reflection:
+- Summary: Regret filtering with greedy lookahead cut gap from 62% to 53% but still high, runtime ~1s, suggesting need for lighter simulation and better waiting.
+- Aim: Improve TTT by reducing lookahead overhead and adding explicit waiting/return-urgency decisions.
+- Preserve: regret-based candidate filtering; greedy insertion framework for TTT estimation; use of current position and depot as fixed endpoints
+- Change: Simplify lookahead: simulate only a few high-impact customers (e.g., farthest from depot) instead of all remaining; Include waiting as an explicit candidate with anticipated delay cost based on truck balance and return pressure
+- Avoid: Removing regret filtering entirely; Adding heavy nested loops that increase runtime further; Ignoring waiting action or returning None prematurely without cost evaluation
+
+Parent cand_000010 LLM reflection:
+- Summary: The candidate's mutation (position-tolerant isolation) achieved identical gap to parent (54.67%), showing no improvement in last-return time.
+- Aim: Introduce a waiting mechanism that balances fleet progress and reduces the time of the last truck's return by temporarily pausing when early return pressure is low.
+- Preserve: own_score (current→customer + customer→depot); isolation bonus (beta * nearest other truck distance)
+- Change: Add a condition to wait (return None) when own_score is low and other trucks are far from depot, to promote fleet coordination.
+- Avoid: Removing the isolation term which helps reduce future detours; Overcomplicating the score with many unverified heuristics
+
+PARENTS:
+Candidate cand_000007: modified_anticipatory_insertion
+Status: valid; Gap: 43.6983%
+Thought: Refined parent by increasing the isolation weight (beta=1.5) and adding a term that favors customers farther from the depot (gamma=0.3 * customer_to_depot) to encourage serving distant customers early, reducing the longest route. Also handles edge cases where only one truck exists.
+Mean gap: 43.69826803734867
+Mean TTT: 4.218965508649545
+Gap by instance size: {'50': 43.69826803734867}
+TTT by instance size: {'50': 4.218965508649545}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # distances from current to customer and customer to depot
+    current_to_customer = np.linalg.norm(available_customers - current_position, axis=1)
+    customer_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    own_score = current_to_customer + customer_to_depot
+    # distances to nearest other truck (excluding current)
+    other_trucks = np.array([p for p in truck_positions if not np.allclose(p, current_position)])
+    if len(other_trucks) == 0:
+        nearest_other = np.full(len(available_customers), np.inf)
+    else:
+        dist_to_other = np.linalg.norm(available_customers[:, None, :] - other_trucks[None, :, :], axis=2)
+        nearest_other = np.min(dist_to_other, axis=1)
+    beta = 1.5
+    gamma = 0.3
+    score = own_score - beta * nearest_other - gamma * customer_to_depot
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

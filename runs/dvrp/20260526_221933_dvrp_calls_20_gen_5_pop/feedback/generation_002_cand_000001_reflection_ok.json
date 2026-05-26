@@ -1,0 +1,45 @@
+{
+  "candidate_id": "cand_000001",
+  "generation": 2,
+  "gradient": {
+    "aim": "Incorporate a simple competition-aware penalty to balance truck workload and reduce the maximum route length.",
+    "avoid": [
+      "Adding complex learning or waiting logic without evidence",
+      "Overcomplicating the scoring function or losing greedy online simplicity"
+    ],
+    "candidate_id": "cand_000001",
+    "change": [
+      "Add a term that penalizes customers significantly closer to another idle or nearer truck",
+      "Optionally include a depot-return urgency weight that increases over time"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Distance-based scoring: truck-to-customer + customer-to-depot",
+      "Tie-breaking favoring farther customers"
+    ],
+    "problem": "dvrp",
+    "score_name": "gap",
+    "score_value": 57.83337750686987,
+    "source": "llm",
+    "summary": "The candidate's myopic distance minimization leads to a gap of 57.8%, indicating unbalanced truck workloads and excessive last return time.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "dvrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the time until the last truck returns to the depot using only online dispatch state\nDomain focus: customer ranking, waiting behavior, fleet balance, depot-return pressure, spatial clustering, truck competition, per-call cost, and generalization across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef choose_next_customer(\\n    current_position: np.ndarray,\\n    depot_position: np.ndarray,\\n    truck_positions: np.ndarray,\\n    available_customers: np.ndarray,\\n    current_time: float,\\n) -> int | None:\\n    if len(available_customers) == 0:\\n        return None\\n    c = current_position\\n    d = depot_position\\n    dist_to_cust = np.linalg.norm(available_customers - c, axis=1)\\n    cust_to_depot = np.linalg.norm(available_customers - d, axis=1)\\n    total_dist = dist_to_cust + cust_to_depot\\n    score = total_dist - 1e-6 * cust_to_depot\\n    best_idx = int(np.argmin(score))\\n    return best_idx\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000001\",\"metrics\":{\"best_gap\":35.21747958646405,\"budget\":1,\"gap\":57.83337750686987,\"gap_by_instance_size\":{\"50\":57.83337750686987},\"gap_by_instance_source\":{\"data/dvrp/train/instances.pkl\":57.83337750686987},\"gap_by_truck_count\":{\"3\":57.83337750686987},\"history\":{\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"diversity_score\":1.0,\"history_score\":0.8943579479132091,\"in_history\":true,\"primary_bucket\":\"dvrp:size:50\",\"quality_score\":0.3018107042408913,\"robustness_score\":0.8358492676351938},\"history_selection\":{\"bucket_score\":0.3018107042408913,\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"history_score\":0.8443579479132091,\"primary_bucket\":\"dvrp:size:50\",\"role\":\"regime specialist\"},\"invalid_count\":0,\"mean_completed_count\":49.0,\"mean_decisions\":49.0,\"mean_gap\":57.83337750686987,\"mean_runtime\":0.012325067300116644,\"mean_ttt\":4.651370268198964,\"mean_waits\":6.1,\"median_gap\":55.410871192592495,\"penalized_mean_gap\":57.83337750686987,\"penalized_mean_ttt\":4.651370268198964,\"pool\":\"search_instances\",\"problem\":\"dvrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"50\":57.83337750686987},\"score_by_instance_source\":{\"data/dvrp/train/instances.pkl\":57.83337750686987},\"score_by_truck_count\":{\"3\":57.83337750686987},\"score_name\":\"gap\",\"scored_count\":10,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_gap\":57.83337750686987,\"timeout_penalty\":0.0,\"timeout_seconds\":180.0,\"timeout_ttt\":4.651370268198964,\"ttt_by_instance_size\":{\"50\":4.651370268198964},\"ttt_by_instance_source\":{\"data/dvrp/train/instances.pkl\":4.651370268198964},\"ttt_by_truck_count\":{\"3\":4.651370268198964},\"valid_count\":10,\"worst_gap\":79.96545342686494},\"score_name\":\"gap\",\"score_value\":57.83337750686987,\"status\":\"valid\",\"thought\":\"Select customer that minimizes distance from truck to customer plus distance from customer to depot. This reduces the expected route length for the current truck, helping to lower the maximum return time. Tie-break by larger customer-to-depot distance to prioritize far-away customers. Never wait unless no customers.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize the time until the last truck returns to the depot using only online dispatch state\",\"parents\":[],\"problem\":\"dvrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"The candidate's myopic distance minimization leads to a gap of 57.8%, indicating unbalanced truck workloads and excessive last return time.\",\n  \"aim\": \"Incorporate a simple competition-aware penalty to balance truck workload and reduce the maximum route length.\",\n  \"preserve\": [\n    \"Distance-based scoring: truck-to-customer + customer-to-depot\",\n    \"Tie-breaking favoring farther customers\"\n  ],\n  \"change\": [\n    \"Add a term that penalizes customers significantly closer to another idle or nearer truck\",\n    \"Optionally include a depot-return urgency weight that increases over time\"\n  ],\n  \"avoid\": [\n    \"Adding complex learning or waiting logic without evidence\",\n    \"Overcomplicating the scoring function or losing greedy online simplicity\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

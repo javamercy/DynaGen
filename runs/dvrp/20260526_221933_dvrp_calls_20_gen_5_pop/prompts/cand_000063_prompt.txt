@@ -1,0 +1,107 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000012 LLM reflection:
+- Summary: The competition penalty increased gap by 10.4 points versus the parent, indicating that steering trucks away from customers near other trucks harmed last-truck return time.
+- Aim: Reduce gap by replacing the competition penalty with a depot-pressure term that encourages trucks far from depot to serve nearby customers, thereby lowering the maximum route length.
+- Preserve: base distance sum (dist_to_cust + cust_to_depot); tie-break favoring farther customers (negative small coefficient); no waiting logic (dispatch immediately)
+- Change: Remove the competition penalty term entirely; Introduce a small positive penalty for customers far from depot when the current truck's depot distance exceeds the fleet average
+- Avoid: Adding large heuristics that increase total travel distance; Including waiting behavior without evidence it helps max return time; Adding state-dependent terms that require non-online information
+
+Parent cand_000040 LLM reflection:
+- Summary: Candidate achieves gap 34.29 with mean waits 6.2, no improvement over best parent gap of 17.15.
+- Aim: Strengthen depot-return pressure to reduce last-truck return time, possibly by increasing the depot distance coefficient or adding a time-based urgency term.
+- Preserve: Using distance to nearest other truck to avoid contention; Including distance from current position to customer; Depot distance term as a baseline return incentive
+- Change: Increase the depot distance coefficient (e.g., from 0.3 to 0.5 or 1.0) to prioritize early return; Add a multiplicative factor based on current_time or remaining customers to reflect urgency
+- Avoid: Removing the other-truck competition term entirely; Adding complex state that cannot be derived from online dispatch info; Overfitting to 50-customer instances with fixed truck counts
+
+Parent cand_000038 LLM reflection:
+- Summary: Reducing depot coefficient to 0.3 improved gap to 34.3% but remains high; no waiting and constant weighting limit adaptation.
+- Aim: Introduce adaptive waiting or dynamic depot weighting to better balance immediate travel and end-of-route pressure, reducing last-truck return time.
+- Preserve: Linear combination of dist_current, nearest_other, and dist_depot; Use of competition distance to avoid clustering
+- Change: Replace constant depot coefficient with a dynamic weight that increases as the episode progresses or based on remaining customer density
+- Avoid: Full rollout simulation (proven too slow); Removing the competition term (dist_other)
+
+PARENTS:
+Candidate cand_000012: competition_aware_min_detour
+Status: valid; Gap: 68.2123%
+Thought: Select customer minimizing truck-to-customer + customer-to-depot distance, with a penalty for customers close to other trucks to balance workload. Tie-break favoring farther customers. Never wait unless no customers.
+Mean gap: 68.2122611239347
+Mean TTT: 4.932634588494899
+Gap by instance size: {'50': 68.2122611239347}
+TTT by instance size: {'50': 4.932634588494899}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    c = current_position
+    d = depot_position
+    # distances from current truck to customers
+    dist_to_cust = np.linalg.norm(available_customers - c, axis=1)
+    # customers to depot
+    cust_to_depot = np.linalg.norm(available_customers - d, axis=1)
+    # identify current truck index
+    idx_current = np.argmin(np.linalg.norm(truck_positions - c, axis=1))
+    # competition penalty: for each customer, minimum distance to any other truck
+    min_other_dists = np.empty(len(available_customers))
+    for i, cust in enumerate(available_customers):
+        dists_to_trucks = np.linalg.norm(truck_positions - cust, axis=1)
+        dists_to_trucks[idx_current] = np.inf
+        min_other_dists[i] = np.min(dists_to_trucks)
+    competition_weight = 0.5
+    tie_break = 1e-6
+    score = dist_to_cust + cust_to_depot + competition_weight / (min_other_dists + 1e-6) - tie_break * cust_to_depot
+    best_idx = int(np.argmin(score))
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

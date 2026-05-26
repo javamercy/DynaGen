@@ -1,0 +1,97 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000064 LLM reflection:
+- Summary: Reducing depot distance coefficient from 0.4 to 0.2 improved gap by 0.29pp to 35.6%, with no waiting, but still far from optimal.
+- Aim: Tune the depot distance coefficient to better balance return pressure and competition, aiming for lower makespan gap across varying customer counts.
+- Preserve: dist_current - nearest_other competition term; depot distance term; argmin selection over customers
+- Change: Try depot coefficient values in [0.25, 0.35] to strengthen return pressure without over-penalizing distant customers
+- Avoid: Adding waiting logic or idle time; Removing the nearest-truck competition term; Introducing instance-size-specific constants
+
+Parent cand_000034 LLM reflection:
+- Summary: Candidate reduced gap by 12.4% over parent to 34.3% with mean waits 6.2 by using a moderate depot coefficient (0.3) and nearest-other distance balancing.
+- Aim: Further reduce last-truck return time by introducing a waiting condition or dynamic depot-pressure coefficient that adapts to remaining customers or fleet imbalance.
+- Preserve: dist_current, nearest_other, and dist_depot combination; mask for other trucks and min-distance computation; argmin selection on combined score
+- Change: Add a waiting condition when the current truck is much farther than other trucks from all available customers; Make the depot coefficient (currently 0.3) increase when the truck's position is far from the fleet centroid
+- Avoid: Removing nearest_other interaction; Increasing depot coefficient uniformly without context; Adding non-linear or memory-based components not supported by evidence
+
+PARENTS:
+Candidate cand_000064: balanced_return_penalty_02
+Status: valid; Gap: 35.6133%
+Thought: Dispatch rule combining current distance, nearest other truck distance, and depot distance with coefficient 0.2 to balance competition and timely return; no waiting.
+Mean gap: 35.61333450422869
+Mean TTT: 4.002188206877042
+Gap by instance size: {'50': 35.61333450422869}
+TTT by instance size: {'50': 4.002188206877042}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    dist_current = np.linalg.norm(available_customers - current_position, axis=1)
+    dist_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    mask = np.all(truck_positions == current_position, axis=1)
+    if mask.any():
+        other_trucks = truck_positions[~mask]
+    else:
+        other_trucks = truck_positions
+    if len(other_trucks) == 0:
+        score = dist_current + 0.2 * dist_depot
+    else:
+        diff = available_customers[:, np.newaxis, :] - other_trucks[np.newaxis, :, :]
+        dist_other = np.linalg.norm(diff, axis=2)
+        nearest_other = np.min(dist_other, axis=1)
+        score = dist_current - nearest_other + 0.2 * dist_depot
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

@@ -1,0 +1,84 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000001 LLM reflection:
+- Summary: Current minimax dispatch achieves 57.8% gap due to forcing immediate assignment without considering waiting, leading to imbalanced fleet return times.
+- Aim: Introduce a waiting mechanism that skips assignment if serving does not improve the overall max return time.
+- Preserve: Minimax objective: minimize max of (my_return, other_trucks_max); Tie-breaking by own return time; Online point-to-point distance calculations
+- Change: Add conditional return of None (wait) when min_max_time >= current_max_time; Use a small tolerance threshold to avoid premature returns when max is unchanged
+- Avoid: Adding predictive or learned components that break online-only constraint; Changing distance metric to non-Euclidean; Removing tie-breaking or minimax logic
+
+PARENTS:
+Candidate cand_000001: minimax_heuristic
+Status: valid; Gap: 57.8334%
+Thought: For each available customer, compute estimated return time if this truck serves it and returns to depot. Also compute the maximum distance from any other truck to depot. Choose customer that minimizes the maximum of these two values, breaking ties by smallest own estimated return time. Always assign a customer if available.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers, current_time):
+    if len(available_customers) == 0:
+        return None
+    dist_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    mask = np.all(truck_positions == current_position, axis=1)
+    current_idx = np.where(mask)[0][0]
+    current_dist = dist_to_depot[current_idx]
+    other_dists = np.delete(dist_to_depot, current_idx)
+    other_max = np.max(other_dists) if len(other_dists) > 0 else 0
+
+    best_idx = None
+    best_max = np.inf
+    best_candidate = np.inf
+    for i, customer in enumerate(available_customers):
+        candidate = np.linalg.norm(current_position - customer) + np.linalg.norm(customer - depot_position)
+        max_time = max(candidate, other_max)
+        if max_time < best_max:
+            best_max = max_time
+            best_candidate = candidate
+            best_idx = i
+        elif max_time == best_max and candidate < best_candidate:
+            best_candidate = candidate
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

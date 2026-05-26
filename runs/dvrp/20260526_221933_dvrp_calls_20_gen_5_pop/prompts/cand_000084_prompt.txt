@@ -1,0 +1,122 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000075 LLM reflection:
+- Summary: Candidate improved gap by 2.1% over best parent but increased mean waits to 8.1, suggesting waiting mechanism may be too aggressive.
+- Aim: Reduce mean waits while maintaining or improving gap by refining the waiting condition and depot coefficient dynamics.
+- Preserve: Use of nearest_other distance to balance truck competition; Dynamic depot coefficient for return pressure; Waiting as a mechanism to avoid poor assignments
+- Change: Lower the waiting threshold from 1.3 to 1.15 to reduce unnecessary waiting; Make waiting conditional on distance to depot to avoid waiting when close to depot
+- Avoid: Overcomplicating coefficient with spatial clustering; Removing dynamic depot coefficient entirely; Adding context beyond online dispatch state
+
+Parent cand_000076 LLM reflection:
+- Summary: Candidate's gap 32.76 is slightly worse than parent gap 32.19; the shift from fleet centroid to customer centroid did not help.
+- Aim: Reduce gap by adjusting wait threshold or depot coefficient to improve fleet balance and reduce unnecessary waiting.
+- Preserve: dynamic depot coefficient based on spatial context; score = dist_current - nearest_other + coeff*dist_depot; wait condition to avoid futile dispatches
+- Change: lower wait threshold (e.g., 1.1) to reduce unnecessary waiting; revert to fleet centroid for coefficient calculation
+- Avoid: removing wait mechanism entirely; adding complex features like per-call cost without testing; making changes that ignore truck competition
+
+Parent cand_000080 LLM reflection:
+- Summary: Simplified to fixed beta=0.3 reduced gap from 32.19 to 28.55 but still far from optimal last-return time.
+- Aim: Increase depot-return pressure for trucks far from depot to reduce completion time, using a simple adaptive beta based on current truck vs other trucks' depot distances.
+- Preserve: score formula dist_current - nearest_other + beta * dist_depot; waiting condition with threshold 1.3; fast computation without loops
+- Change: Raise beta when current truck is farther from depot than the median other truck; Increase beta range (0.2–0.7) to amplify return incentive
+- Avoid: re-adding complex fleet centroid dynamics; removing wait control; introducing per-call thresholds that hurt generalization
+
+PARENTS:
+Candidate cand_000075: dynamic_depot_and_wait
+Status: valid; Gap: 32.194%
+Thought: Dispatch rule combining current distance, nearest other truck distance, and depot distance with dynamic coefficient based on truck's distance to fleet centroid; wait if current truck is significantly farther from all customers than other trucks.
+Mean gap: 32.19397198854203
+Mean TTT: 3.8852859565350344
+Gap by instance size: {'50': 32.19397198854203}
+TTT by instance size: {'50': 3.8852859565350344}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    dist_current = np.linalg.norm(available_customers - current_position, axis=1)
+    dist_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    mask = np.all(truck_positions == current_position, axis=1)
+    if mask.any():
+        other_trucks = truck_positions[~mask]
+    else:
+        other_trucks = truck_positions
+    
+    if len(other_trucks) == 0:
+        score = dist_current + 0.3 * dist_depot
+        best_idx = np.argmin(score)
+        return int(best_idx)
+    
+    diff = available_customers[:, np.newaxis, :] - other_trucks[np.newaxis, :, :]
+    dist_other = np.linalg.norm(diff, axis=2)
+    nearest_other = np.min(dist_other, axis=1)
+    
+    # Dynamic depot coefficient based on distance to fleet centroid
+    centroid = np.mean(truck_positions, axis=0)
+    truck_to_centroid = np.linalg.norm(current_position - centroid)
+    mean_centroid_dist = np.mean(np.linalg.norm(truck_positions - centroid, axis=1))
+    if mean_centroid_dist < 1e-6:
+        depot_coefficient = 0.3
+    else:
+        depot_coefficient = 0.3 + 0.1 * (truck_to_centroid / mean_centroid_dist)
+        depot_coefficient = min(depot_coefficient, 0.5)
+    
+    # Waiting condition: if current truck is much farther than other trucks for all customers
+    wait_threshold = 1.3
+    if np.all(dist_current > wait_threshold * nearest_other):
+        return None
+    
+    score = dist_current - nearest_other + depot_coefficient * dist_depot
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

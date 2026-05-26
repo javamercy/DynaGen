@@ -1,0 +1,86 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m5_intensify_search: Create a stronger exploitation-focused version of one parent. Improve how it refines promising candidates, allocates effort to high-quality regions, reduces wasted work, or makes more precise local decisions while preserving correctness.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000024: balanced_depot_focused
+Status: valid; Gap: 71.1053%
+Thought: Select customer minimizing weighted sum: distance from current truck, 2.0 * distance to depot, -0.3 * min distance to other trucks (proximity penalty), and +0.5 * max(0, distance to depot - average distance of other trucks to depot) to enforce balance and discourage straying far from depot.
+Mean gap: 71.1053259761658
+Mean TTT: 5.025630215093779
+Gap by instance size: {'50': 71.1053259761658}
+TTT by instance size: {'50': 5.025630215093779}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    dist_current = np.linalg.norm(available_customers - current_position, axis=1)
+    dist_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    # other trucks
+    mask = ~np.all(truck_positions == current_position, axis=1)
+    other_trucks = truck_positions[mask]
+    if len(other_trucks) == 0:
+        nearest_other = np.full(len(available_customers), np.inf)
+        avg_depot_other = 0.0
+    else:
+        diff = available_customers[:, np.newaxis, :] - other_trucks[np.newaxis, :, :]
+        dist_other = np.linalg.norm(diff, axis=2)
+        nearest_other = np.min(dist_other, axis=1)
+        other_depot_dists = np.linalg.norm(other_trucks - depot_position, axis=1)
+        avg_depot_other = np.mean(other_depot_dists)
+    # balance term: penalize if customer depot distance > avg other truck depot distance
+    balance_penalty = np.maximum(0, dist_depot - avg_depot_other)
+    score = dist_current + 2.0 * dist_depot - 0.3 * nearest_other + 0.5 * balance_penalty
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
