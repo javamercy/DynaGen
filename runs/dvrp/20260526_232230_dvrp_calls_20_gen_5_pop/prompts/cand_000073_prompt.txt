@@ -1,0 +1,108 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000066 LLM reflection:
+- Summary: Adding a standard deviation penalty and increasing mean weight did not improve the gap (remains 57.83), indicating that the current return-time balancing approach is insufficient.
+- Aim: Test the effect of directly penalizing customer distance to depot to reduce the last truck's return time, while keeping the max/mean structure simple.
+- Preserve: Customer scoring loop based on estimated fleet return times; Active truck identification via argmin distance; Per-customer computation of return times for all trucks
+- Change: Add a term w_depot * distance(cust, depot) to the scoring function (start with w_depot=0.2); Revert to parent's weights (w_max=1, w_mean=0.2, w_std=0) to isolate depot-distance effect
+- Avoid: Overcomplicating with many new parameters; Adding waiting-time estimates that require unavailable state; Making changes that increase runtime significantly
+
+Parent cand_000033 LLM reflection:
+- Summary: Added fleet imbalance penalty (alpha=0.5) to max-return minimization, but gap slightly worsened (61.82 vs 61.75), suggesting over-regularization.
+- Aim: Replace fixed imbalance penalty with an adaptive mechanism that better balances return times without sacrificing max-return minimization.
+- Preserve: Max-return estimation per truck; Active truck identification by proximity
+- Change: Use dynamic imbalance weight based on current return-time spread or expected delay; Implicitly balance fleet by favoring customers that reduce the gap between the fastest and slowest truck
+- Avoid: Removing max-return core logic; Hardcoding non-adaptive weights; Adding instance-specific parameters that hurt generalization
+
+Parent cand_000035 LLM reflection:
+- Summary: Replacing max-min imbalance penalty with mean return (beta=0.2) improved gap by ~4% over parent, achieving 57.8% gap on 3-truck 50-customer instances.
+- Aim: Refine the balance between worst-case return and overall fleet efficiency by tuning the weighting of the mean return term or adding a small penalty for underutilized trucks.
+- Preserve: max return as primary score component; active truck identification via nearest truck; using mean return instead of range for fleet balance; computing estimated return for each candidate customer
+- Change: Slightly increase beta to 0.3 to test if more emphasis on mean return reduces worst-case; Add a small term penalizing large variance in return times to further balance fleet
+- Avoid: Reverting to range-based imbalance penalty which was less effective; Removing active truck modeling or using all trucks symmetrically; Adding complexity without clear connection to last-return-time objective
+
+PARENTS:
+Candidate cand_000066: weighted_max_mean_std
+Status: valid; Gap: 57.8334%
+Thought: Minimize weighted sum of max, mean, and standard deviation of estimated return times to balance fleet and reduce worst-case return. Increase w_mean relative to parent, add small std penalty.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Identify active truck index
+    active_idx = np.argmin(np.linalg.norm(truck_positions - current_position, axis=1))
+    # Current distances from each truck to depot
+    dist_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    best_idx = None
+    best_score = np.inf
+    w_max = 1.0
+    w_mean = 0.5  # increased from 0.2
+    w_std = 0.1   # penalty for variance
+    for i, cust in enumerate(available_customers):
+        # Active truck's return time if it serves this customer
+        active_return = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        # Build return times: others stay at current distances
+        returns = dist_to_depot.copy()
+        returns[active_idx] = active_return
+        max_r = np.max(returns)
+        mean_r = np.mean(returns)
+        std_r = np.std(returns)
+        score = w_max * max_r + w_mean * mean_r + w_std * std_r
+        if score < best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

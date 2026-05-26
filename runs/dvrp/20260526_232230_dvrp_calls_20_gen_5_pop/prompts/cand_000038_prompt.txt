@@ -1,0 +1,87 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000018 LLM reflection:
+- Summary: The candidate achieved a gap of 61.75% with mean time to serve 4.75, identical to its parent, indicating no improvement from the min-max heuristic.
+- Aim: Incorporate a penalty for truck waiting/idle time to encourage balanced utilization and reduce overall makespan.
+- Preserve: min-max balancing of return times; active truck identification by proximity; per-customer evaluation loop
+- Change: Add a term penalizing customers far from depot when the active truck is behind; Weight the min-max score with fleet imbalance (e.g., max-min return time difference)
+- Avoid: Introducing random or evolutionary components; Adding extra state beyond online dispatch; Ignoring the min-max core
+
+PARENTS:
+Candidate cand_000035: weighted_max_mean
+Status: valid; Gap: 57.8334%
+Thought: For each candidate customer, estimate the return times for all trucks after the active truck serves that customer. Score = max return + 0.2 * mean return, then pick the customer minimizing the score. This balances the worst-case return with overall fleet efficiency.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    active_idx = np.argmin(np.linalg.norm(truck_positions - current_position, axis=1))
+    dist_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    best_idx = None
+    best_score = np.inf
+    beta = 0.2
+    for i, cust in enumerate(available_customers):
+        active_return = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        returns = dist_to_depot.copy()
+        returns[active_idx] = active_return
+        max_r = np.max(returns)
+        mean_r = np.mean(returns)
+        score = max_r + beta * mean_r
+        if score < best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

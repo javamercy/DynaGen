@@ -1,0 +1,108 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m5_intensify_search: Create a stronger exploitation-focused version of one parent. Improve how it refines promising candidates, allocates effort to high-quality regions, reduces wasted work, or makes more precise local decisions while preserving correctness.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000084: balanced_min_max_with_penalty
+Status: valid; Gap: 57.8334%
+Thought: Based on min-max framework, adds a penalty term for the active truck's return exceeding the max return of other trucks (gap penalty with weight 0.5) to encourage catching up and balancing completion times. No waiting logic to avoid complexity.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # distances helper
+    def dist(a, b):
+        return np.linalg.norm(a - b, axis=-1)
+
+    depot = depot_position
+    # find index of active truck (the one at current_position)
+    # truck_positions shape (n_trucks, 2)
+    diffs = truck_positions - current_position
+    active_idx = np.argmin(np.einsum('ij,ij->i', diffs, diffs))  # squared norm minimization
+    # all truck returns to depot
+    all_returns = dist(truck_positions, depot)
+    # other trucks' returns
+    other_returns = np.delete(all_returns, active_idx)
+    other_max_return = np.max(other_returns) if other_returns.size > 0 else 0.0
+
+    # customer distances
+    d_current_cust = dist(current_position, available_customers)  # (n_available,)
+    d_cust_depot = dist(available_customers, depot)  # (n_available,)
+    new_returns = d_current_cust + d_cust_depot
+
+    # compute new_max and penalty
+    new_max = np.maximum(new_returns, other_max_return)
+    gap = np.maximum(new_returns - other_max_return, 0.0)
+    penalty_weight = 0.5
+    scores = new_max + penalty_weight * gap
+
+    # tie-break by new_return
+    # find minimal score; if tie, smallest new_return
+    min_score = np.min(scores)
+    candidates = np.where(scores == min_score)[0]
+    if len(candidates) == 1:
+        best_idx = candidates[0]
+    else:
+        # among ties, pick smallest new_return
+        best_candidate = candidates[np.argmin(new_returns[candidates])]
+        best_idx = best_candidate
+
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

@@ -1,0 +1,102 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000061 LLM reflection:
+- Summary: Adding an imbalance penalty (lambda=0.1) to the min-max heuristic worsened gap from 61.75 to 61.82 on 50-customer instances.
+- Aim: Refine the min-max parent to reduce the maximum return time by penalizing only customers that make the active truck's return the new maximum, rather than penalizing spread.
+- Preserve: Min-max return time selection; Use of current distances to depot for other trucks; Active truck identification by proximity
+- Change: Replace linear spread penalty with a conditional penalty that adds a small cost only if active truck's return exceeds current max; Consider weighting the active truck's return more heavily in the score
+- Avoid: Linear penalties that degrade min-max performance; Changes that ignore the primary objective of minimizing max return; Overcomplicating the scoring function without clear benefit
+
+Parent cand_000001 LLM reflection:
+- Summary: Candidate greedy minimizes new max return time among trucks but achieves 57.8% gap with mean waits 6.1 on 50-customer 3-truck instances.
+- Aim: Improve dispatch by adding a waiting mechanism or spatial clustering to reduce future max return time spikes.
+- Preserve: Minimizing new max return among trucks; Tie-breaking by own return time; Using Euclidean distances
+- Change: Prefer customers that keep fleet balanced by considering remaining customer distribution relative to other trucks; Optionally wait if serving any customer would significantly increase max return
+- Avoid: Adding non-local information (e.g., future customer demands); Introducing complex hyperparameters; Increasing runtime per decision substantially
+
+PARENTS:
+Candidate cand_000061: min_max_with_imbalance_penalty
+Status: valid; Gap: 61.8184%
+Thought: Based on the parent min-max return time heuristic, add a penalty for fleet imbalance to encourage balanced truck usage. For each available customer, compute the maximum return time across all trucks after assigning the customer to the active truck, and the new range (max-min). Score = new_max + lambda * (new_max - new_min), where lambda=0.1. Choose the customer minimizing this score. This penalizes customers that increase the spread, especially when the active truck is behind.
+Mean gap: 61.81838008469258
+Mean TTT: 4.7552480311714564
+Gap by instance size: {'50': 61.81838008469258}
+TTT by instance size: {'50': 4.7552480311714564}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Distances from each truck to depot
+    dist_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    # Active truck index (closest to current_position)
+    active_idx = np.argmin(np.linalg.norm(truck_positions - current_position, axis=1))
+    best_customer = None
+    best_score = np.inf
+    lambda_penalty = 0.1  # weight for imbalance penalty
+    for i, cust in enumerate(available_customers):
+        # Active truck's estimated return if it goes to this customer
+        active_return = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        # Build return times array with active truck's value replaced
+        return_times = dist_to_depot.copy()
+        return_times[active_idx] = active_return
+        max_return = np.max(return_times)
+        min_return = np.min(return_times)
+        imbalance = max_return - min_return
+        score = max_return + lambda_penalty * imbalance
+        if score < best_score:
+            best_score = score
+            best_customer = i
+    return best_customer
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

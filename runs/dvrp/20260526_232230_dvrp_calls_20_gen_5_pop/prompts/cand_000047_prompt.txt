@@ -1,0 +1,112 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+    current_time: float,
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000010 LLM reflection:
+- Summary: Gap remains 57.83% with no improvement over parent; greedy max-return minimization without waiting fails to balance fleet or reduce last-return time.
+- Aim: Add a waiting decision that triggers when the best immediate new max return exceeds the current max return by a threshold, allowing other trucks to finish and reducing overall last-return time.
+- Preserve: Greedy minimization of new max return time; Tie-breaking by own return time; Use of Euclidean distances
+- Change: Introduce a waiting condition based on the relative increase in max return time; If waiting, skip assignment and return None
+- Avoid: Adding many hyperparameters; Removing the core greedy comparison; Introducing randomness without purpose
+
+Parent cand_000018 LLM reflection:
+- Summary: The candidate achieved a gap of 61.75% with mean time to serve 4.75, identical to its parent, indicating no improvement from the min-max heuristic.
+- Aim: Incorporate a penalty for truck waiting/idle time to encourage balanced utilization and reduce overall makespan.
+- Preserve: min-max balancing of return times; active truck identification by proximity; per-customer evaluation loop
+- Change: Add a term penalizing customers far from depot when the active truck is behind; Weight the min-max score with fleet imbalance (e.g., max-min return time difference)
+- Avoid: Introducing random or evolutionary components; Adding extra state beyond online dispatch; Ignoring the min-max core
+
+Parent cand_000001 LLM reflection:
+- Summary: Candidate greedy minimizes new max return time among trucks but achieves 57.8% gap with mean waits 6.1 on 50-customer 3-truck instances.
+- Aim: Improve dispatch by adding a waiting mechanism or spatial clustering to reduce future max return time spikes.
+- Preserve: Minimizing new max return among trucks; Tie-breaking by own return time; Using Euclidean distances
+- Change: Prefer customers that keep fleet balanced by considering remaining customer distribution relative to other trucks; Optionally wait if serving any customer would significantly increase max return
+- Avoid: Adding non-local information (e.g., future customer demands); Introducing complex hyperparameters; Increasing runtime per decision substantially
+
+PARENTS:
+Candidate cand_000010: greedy_min_max_return_fixed
+Status: valid; Gap: 57.8334%
+Thought: For each customer, compute the new max return time (distance from current position to customer to depot) and compare with the maximum return time of other trucks. Choose customer that minimizes the new max return time, breaking ties by the new return time itself. Never wait when customers are available.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+    current_time: float,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # Exclude current truck from other trucks
+    mask = ~np.all(truck_positions == current_position, axis=1)
+    other_positions = truck_positions[mask]
+    # Compute distances to depot for other trucks
+    if other_positions.shape[0] > 0:
+        other_returns = np.linalg.norm(other_positions - depot_position, axis=1)
+        max_other_return = np.max(other_returns)
+    else:
+        max_other_return = -np.inf  # no other trucks
+
+    best_idx = None
+    best_new_max = float('inf')
+    best_new_return = float('inf')
+
+    for i, customer in enumerate(available_customers):
+        d_truck_cust = np.linalg.norm(current_position - customer)
+        d_cust_depot = np.linalg.norm(customer - depot_position)
+        new_return = d_truck_cust + d_cust_depot
+        new_max = max(new_return, max_other_return)
+        # Prefer smaller new_max, then smaller new_return
+        if (new_max < best_new_max) or (new_max == best_new_max and new_return < best_new_return):
+            best_new_max = new_max
+            best_new_return = new_return
+            best_idx = i
+
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
