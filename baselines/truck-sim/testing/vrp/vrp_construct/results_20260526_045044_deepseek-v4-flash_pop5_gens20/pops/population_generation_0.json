@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\"The algorithm first checks if every unvisited node is already targeted by another truck; if so, it waits; otherwise, it selects the node that minimizes a weighted sum of distance from current, number of trucks heading to it, and an inverse depot distance incentive.\"",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # If no unvisited nodes remain, return None\n    if len(unvisited_nodes) == 0:\n        return None\n\n    unvisited = np.asarray(unvisited_nodes)\n    # Count how many trucks (including possibly the current truck?) are heading to each unvisited node\n    conflict_counts = np.array([np.sum(truck_nodes == node) for node in unvisited])\n\n    # If every unvisited node already has at least one truck heading to it, wait\n    if np.all(conflict_counts > 0):\n        return None\n\n    # Distances from current node to each unvisited node\n    dists = distance_matrix[current_node, unvisited]\n    # Distances from each unvisited node to depot\n    depot_dists = distance_matrix[depot_node, unvisited]\n    max_depot_dist = np.max(depot_dists) if len(depot_dists) > 0 else 1.0\n\n    # Weights for the heuristic\n    alpha = 2.0   # penalty for conflict\n    beta = 0.5    # reward for being close to depot (subtracted)\n\n    # Score: lower is better\n    scores = dists + alpha * conflict_counts - beta * (depot_dists / max_depot_dist)\n\n    # Select the node with the smallest score\n    best_index = np.argmin(scores)\n    next_node = unvisited[best_index]\n\n    return next_node",
+          "objective": 44.12324,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Use a greedy nearest neighbor heuristic: from current_node, select the unvisited node with the smallest distance that is not already targeted by another truck; if none, return None to wait.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Get distances from current_node to all unvisited nodes\n    dists = distance_matrix[current_node, unvisited_nodes]\n    # Sort unvisited nodes by distance, then by node ID for tie-breaking\n    sorted_indices = np.lexsort((unvisited_nodes, dists))\n    sorted_nodes = unvisited_nodes[sorted_indices]\n    # Convert truck_nodes to a set for fast lookup\n    target_set = set(truck_nodes)\n    for node in sorted_nodes:\n        if node not in target_set:\n            return int(node)\n    # No suitable node found; return None to indicate waiting\n    return next_node",
+          "objective": 57.10929,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Use nearest neighbor heuristic, selecting the closest unvisited node not already assigned as a target to any other truck, or return None if no such node exists.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Filter out unvisited nodes that are already targeted by any truck\n    available = unvisited_nodes[~np.isin(unvisited_nodes, truck_nodes)]\n    if len(available) == 0:\n        return None\n    # Find the nearest available node\n    distances = distance_matrix[current_node, available]\n    next_node = available[np.argmin(distances)]\n    return next_node",
+          "objective": 57.10929,
+          "other_inf": null
+     },
+     {
+          "algorithm": " From the current node, select the closest unvisited node that is not already the target of another truck; if none are available, return the depot when all nodes are visited, otherwise wait (return None). ",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # { From the current node, select the closest unvisited node that is not already the target of another truck; if none are available, return the depot when all nodes are visited, otherwise wait (return None). }\n    \n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    # Build set of nodes other trucks are heading to (or already at)\n    truck_targets = set()\n    for t in truck_nodes:\n        if t is not None:\n            truck_targets.add(t)\n    \n    # Distances from current node to all unvisited nodes\n    distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Sort unvisited nodes by distance (ascending)\n    sorted_indices = np.argsort(distances)\n    \n    # Select the closest node not already targeted\n    for idx in sorted_indices:\n        candidate = unvisited_nodes[idx]\n        if candidate not in truck_targets:\n            return candidate\n    \n    # All candidates are already targeted -> wait\n    return next_node",
+          "objective": 57.10929,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm greedily selects the nearest unvisited node from the current node using the distance matrix, or returns the depot node if no unvisited nodes remain.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # If no unvisited nodes remain, return the depot to finish the route\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    \n    # Compute distances from current_node to all unvisited nodes\n    distances = distance_matrix[current_node, unvisited_nodes]\n    \n    # Select the unvisited node with minimum distance\n    idx = np.argmin(distances)\n    next_node = unvisited_nodes[idx]\n    \n    return next_node",
+          "objective": 57.10929,
+          "other_inf": null
+     }
+]

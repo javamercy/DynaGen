@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "New algorithm uses a weighted savings function with coefficients 1.2, 0.8, and 1.0 for the three distance components respectively, to prioritize different aspects of the route.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidate nodes not currently targeted by any truck\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n    \n    # Compute weighted savings: 1.2 * d(depot, current) + 0.8 * d(depot, cand) - d(current, cand)\n    depot_current = distance_matrix[depot_node, current_node]\n    depot_cands = distance_matrix[depot_node, candidates]\n    current_cands = distance_matrix[current_node, candidates]\n    \n    # Weighted score\n    score = 1.2 * depot_current + 0.8 * depot_cands - current_cands\n    \n    # Select candidate with maximum score\n    best_idx = np.argmax(score)\n    next_node = candidates[best_idx]\n    return next_node",
+          "objective": 47.06259,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by maximizing a score that combines the classic savings (distance from depot to current and candidate minus distance between them) with a penalty for the average distance from the candidate to all other unvisited nodes, weighted by a parameter lambda=0.5 to encourage visiting central nodes first.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidate nodes not currently targeted by any truck\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n\n    # Compute classic savings: d(depot,current) + d(depot,cand) - d(current,cand)\n    depot_current = distance_matrix[depot_node, current_node]\n    depot_cands = distance_matrix[depot_node, candidates]\n    current_cands = distance_matrix[current_node, candidates]\n    savings = depot_current + depot_cands - current_cands\n\n    # Compute average distance from each candidate to all other unvisited nodes\n    n_unvisited = len(unvisited_nodes)\n    if n_unvisited > 1:\n        # distances from each candidate to every unvisited node\n        dists = distance_matrix[np.ix_(candidates, unvisited_nodes)]\n        # sum distances (including self with distance 0) and divide by (n_unvisited-1)\n        avg_dists = np.sum(dists, axis=1) / (n_unvisited - 1)\n    else:\n        avg_dists = np.zeros(len(candidates))\n\n    # Combined score with density penalty\n    lambda_param = 0.5\n    score = savings - lambda_param * avg_dists\n\n    best_idx = np.argmax(score)\n    next_node = candidates[best_idx]\n    return next_node",
+          "objective": 47.85397,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the candidate node that minimizes the harmonic mean of its distances from the current node and the depot, returning None if no candidates remain.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidates: unvisited nodes not already targeted by other trucks\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n    \n    # Compute distances from current node and from depot to each candidate\n    dist_curr = distance_matrix[current_node, candidates]\n    dist_depot = distance_matrix[depot_node, candidates]\n    \n    # Compute harmonic mean: 2 * d1 * d2 / (d1 + d2)\n    # Use small epsilon to avoid division by zero\n    numerator = 2.0 * dist_curr * dist_depot\n    denominator = dist_curr + dist_depot + 1e-10\n    score = numerator / denominator\n    \n    best_idx = np.argmin(score)\n    next_node = candidates[best_idx]\n    return next_node",
+          "objective": 52.93537,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited node that minimizes the product of its distance from the current node and its distance from the depot, excluding nodes already targeted by other trucks; if no candidates, return None to wait.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Determine candidates: unvisited nodes not already targeted by another truck\n    candidates = np.setdiff1d(unvisited_nodes, truck_nodes)\n    if len(candidates) == 0:\n        return None\n    \n    # Compute distances from current node and from depot to each candidate\n    dist_curr = distance_matrix[current_node, candidates]\n    dist_depot = distance_matrix[depot_node, candidates]\n    \n    # Compute product and select the candidate with smallest product\n    product = dist_curr * dist_depot\n    best_idx = np.argmin(product)\n    next_node = candidates[best_idx]\n    \n    return next_node",
+          "objective": 53.77671,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the unvisited node that maximizes the savings value (distance from depot to current node plus distance from depot to candidate node minus distance from current node to candidate node) among those not already targeted by another truck, and if none exist, returns None.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidate nodes not currently targeted by any truck\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n    \n    # Compute savings for each candidate: savings = d(depot, current) + d(depot, cand) - d(current, cand)\n    depot_current = distance_matrix[depot_node, current_node]\n    depot_cands = distance_matrix[depot_node, candidates]\n    current_cands = distance_matrix[current_node, candidates]\n    savings = depot_current + depot_cands - current_cands\n    \n    # Select candidate with maximum savings\n    best_idx = np.argmax(savings)\n    next_node = candidates[best_idx]\n    return next_node",
+          "objective": 56.5067,
+          "other_inf": null
+     }
+]

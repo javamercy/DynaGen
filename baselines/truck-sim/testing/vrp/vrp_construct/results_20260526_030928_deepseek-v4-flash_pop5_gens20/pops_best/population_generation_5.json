@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nNew algorithm uses an additive savings function that sums distances from depot to current and candidate as numerator and distance between current and candidate as denominator, plus constants to avoid division by zero.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidate nodes not currently targeted by any truck\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n\n    # Compute distances\n    depot_current = distance_matrix[depot_node, current_node]\n    depot_candidates = distance_matrix[depot_node, candidates]\n    current_candidates = distance_matrix[current_node, candidates]\n\n    # Additive score: (d(depot,current) + d(depot,candidate) + 2) / (d(current,candidate) + 1)\n    score = (depot_current + depot_candidates + 2) / (current_candidates + 1)\n\n    # Select candidate with maximum score\n    best_idx = np.argmax(score)\n    next_node = candidates[best_idx]\n    return next_node",
+     "objective": 43.49589,
+     "other_inf": null
+}

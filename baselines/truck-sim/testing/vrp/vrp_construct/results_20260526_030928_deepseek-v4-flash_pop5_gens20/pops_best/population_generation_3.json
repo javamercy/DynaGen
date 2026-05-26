@@ -1,0 +1,6 @@
+{
+     "algorithm": "New algorithm uses a weighted savings function with coefficients 1.2, 0.8, and 1.0 for the three distance components respectively, to prioritize different aspects of the route.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidate nodes not currently targeted by any truck\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n    \n    # Compute weighted savings: 1.2 * d(depot, current) + 0.8 * d(depot, cand) - d(current, cand)\n    depot_current = distance_matrix[depot_node, current_node]\n    depot_cands = distance_matrix[depot_node, candidates]\n    current_cands = distance_matrix[current_node, candidates]\n    \n    # Weighted score\n    score = 1.2 * depot_current + 0.8 * depot_cands - current_cands\n    \n    # Select candidate with maximum score\n    best_idx = np.argmax(score)\n    next_node = candidates[best_idx]\n    return next_node",
+     "objective": 47.06259,
+     "other_inf": null
+}

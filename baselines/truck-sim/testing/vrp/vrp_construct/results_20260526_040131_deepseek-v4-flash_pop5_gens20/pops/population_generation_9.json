@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "The new algorithm selects the next node by scoring each unvisited node as a weighted sum of the negative distance from the current node, half the distance to the nearest other truck's target, and half the distance to the depot, then chooses the node with the highest score.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    # Distance from current node to each candidate\n    dist_current = distance_matrix[current_node, unvisited_nodes]\n\n    # Distance to nearest other truck's target (excluding current node)\n    other_targets = [t for t in truck_nodes if t != current_node]\n    if len(other_targets) > 0:\n        dist_other = np.min(distance_matrix[unvisited_nodes][:, other_targets], axis=1)\n    else:\n        dist_other = np.zeros(len(unvisited_nodes))\n\n    # Distance from each candidate to depot\n    dist_depot = distance_matrix[unvisited_nodes, depot_node]\n\n    # Score: negative distance to current, plus weighted distances to other trucks and depot\n    score = -dist_current + 0.5 * dist_other + 0.5 * dist_depot\n\n    best_idx = np.argmax(score)\n    next_node = unvisited_nodes[best_idx]\n    return next_node",
+          "objective": 26.46818,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    # Distance from current node to candidates\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n\n    # Distance from depot to candidates\n    dist_depot = distance_matrix[depot_node, unvisited_nodes]\n\n    # Distance to nearest other truck's target (excluding current node)\n    other_targets = [t for t in truck_nodes if t != current_node]\n    if len(other_targets) > 0:\n        dist_other = np.min(distance_matrix[unvisited_nodes][:, other_targets], axis=1)\n    else:\n        dist_other = np.zeros(len(unvisited_nodes))\n\n    # Simplified score: linear combination to avoid product overfitting\n    score = dist_depot + dist_other - dist_curr\n\n    best_idx = np.argmax(score)\n    next_node = unvisited_nodes[best_idx]\n    return next_node",
+          "objective": 31.06959,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The algorithm selects the next node by maximizing a weighted linear combination of the distances to the nearest other truck and to the depot, minus the distance from the current node, thereby balancing exploration, proximity to depot, and travel cost.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    # Distance from current node to candidates\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n\n    # Distance from depot to candidates\n    dist_depot = distance_matrix[depot_node, unvisited_nodes]\n\n    # Distance to nearest other truck's target (excluding current node)\n    other_targets = [t for t in truck_nodes if t != current_node]\n    if len(other_targets) > 0:\n        dist_other = np.min(distance_matrix[unvisited_nodes][:, other_targets], axis=1)\n    else:\n        dist_other = np.zeros(len(unvisited_nodes))\n\n    # Score: linear combination (weights can be tuned; here all equal to 1)\n    score = (dist_other + 1.0) + (dist_depot + 1.0) - (dist_curr + 1.0)\n\n    best_idx = np.argmax(score)\n    next_node = unvisited_nodes[best_idx]\n    return next_node",
+          "objective": 31.14615,
+          "other_inf": null
+     },
+     {
+          "algorithm": "The new algorithm selects the next node by maximizing the product of the distances (adjusted by +1) to the nearest other truck's target and to the depot, divided by the distance (adjusted by +1) from the current node, thereby combining proximity, dispersion, and depot return in a multiplicative manner.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    # Distance from current node to candidates\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n\n    # Distance from depot to candidates\n    dist_depot = distance_matrix[depot_node, unvisited_nodes]\n\n    # Distance to nearest other truck's target (excluding current node)\n    other_targets = [t for t in truck_nodes if t != current_node]\n    if len(other_targets) > 0:\n        dist_other = np.min(distance_matrix[unvisited_nodes][:, other_targets], axis=1)\n    else:\n        dist_other = np.zeros(len(unvisited_nodes))\n\n    # Score: product of (other+1) and (depot+1) divided by (current+1)\n    score = (dist_other + 1.0) * (dist_depot + 1.0) / (dist_curr + 1.0)\n\n    best_idx = np.argmax(score)\n    next_node = unvisited_nodes[best_idx]\n    return next_node",
+          "objective": 31.70662,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    # Distance from current node to candidates\n    dist_curr = distance_matrix[current_node, unvisited_nodes]\n\n    # Distance from depot to candidates\n    dist_depot = distance_matrix[depot_node, unvisited_nodes]\n\n    # Distance to nearest other truck's target (excluding current node)\n    other_targets = [t for t in truck_nodes if t != current_node]\n    if len(other_targets) > 0:\n        dist_other = np.min(distance_matrix[unvisited_nodes][:, other_targets], axis=1)\n    else:\n        dist_other = np.zeros(len(unvisited_nodes))\n\n    # Score: product of (other+1) and (depot+1) minus (current+1)\n    score = (dist_other + 1.0) * (dist_depot + 1.0) - (dist_curr + 1.0)\n\n    best_idx = np.argmax(score)\n    next_node = unvisited_nodes[best_idx]\n    return next_node",
+          "objective": 33.95335,
+          "other_inf": null
+     }
+]

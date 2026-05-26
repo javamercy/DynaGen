@@ -1,0 +1,6 @@
+{
+     "algorithm": "Select the candidate node that minimizes the harmonic mean of its distances from the current node and the depot, returning None if no candidates remain.",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # Identify candidates: unvisited nodes not already targeted by other trucks\n    mask = ~np.isin(unvisited_nodes, truck_nodes)\n    candidates = unvisited_nodes[mask]\n    if len(candidates) == 0:\n        return None\n    \n    # Compute distances from current node and from depot to each candidate\n    dist_curr = distance_matrix[current_node, candidates]\n    dist_depot = distance_matrix[depot_node, candidates]\n    \n    # Compute harmonic mean: 2 * d1 * d2 / (d1 + d2)\n    # Use small epsilon to avoid division by zero\n    numerator = 2.0 * dist_curr * dist_depot\n    denominator = dist_curr + dist_depot + 1e-10\n    score = numerator / denominator\n    \n    best_idx = np.argmin(score)\n    next_node = candidates[best_idx]\n    return next_node",
+     "objective": 52.93537,
+     "other_inf": null
+}

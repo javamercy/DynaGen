@@ -194,6 +194,7 @@ if __name__ == "__main__":
                     llm_model=VRP_LLM_MODEL,
                     ec_pop_size=VRP_POP_SIZE,  # number of samples in each population
                     ec_n_pop=VRP_GENS,  # number of generations
+                    ec_operators=['e1', 'e2', 'm1', 'm2', 'm3'],
                     exp_n_proc=n_proc,  # parallel LLM/evaluation workers
                     exp_extended_init=True,
                     exp_strict_init=True,

@@ -1,0 +1,6 @@
+{
+     "algorithm": "\nThe algorithm selects the unvisited node that minimizes a score function where distance and conflict are raised to different powers and depot distance is inversely weighted with an exponent, while returning None if all nodes are under conflict.\n",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    unvisited = np.asarray(unvisited_nodes)\n    conflict_counts = np.array([np.sum(truck_nodes == node) for node in unvisited])\n\n    if np.all(conflict_counts > 0):\n        return None\n\n    dists = distance_matrix[current_node, unvisited]\n    depot_dists = distance_matrix[depot_node, unvisited]\n\n    # New score: (distance+1)^1.5 * (conflict+1)^0.5 / (depot_distance+1)^0.8\n    scores = (dists + 1.0) ** 1.5 * (conflict_counts + 1.0) ** 0.5 / (depot_dists + 1.0) ** 0.8\n\n    best_index = np.argmin(scores)\n    next_node = unvisited[best_index]\n\n    return next_node",
+     "objective": 43.5071,
+     "other_inf": null
+}

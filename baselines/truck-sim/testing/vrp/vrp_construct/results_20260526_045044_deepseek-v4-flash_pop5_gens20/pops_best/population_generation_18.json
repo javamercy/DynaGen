@@ -1,0 +1,6 @@
+{
+     "algorithm": "```",
+     "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    unvisited = np.asarray(unvisited_nodes)\n    conflict_counts = np.array([np.sum(truck_nodes == node) for node in unvisited])\n\n    # Wait if every unvisited node has at least 3 trucks heading to it\n    if np.all(conflict_counts >= 3):\n        return None\n\n    dists = distance_matrix[current_node, unvisited]\n    depot_dists = distance_matrix[depot_node, unvisited]\n    max_depot_dist = np.max(depot_dists) if len(depot_dists) > 0 else 1.0\n\n    # Score: dists * (1 + 0.7 * conflict_counts) - 0.4 * (depot_dists / max_depot_dist)\n    scores = dists * (1 + 0.7 * conflict_counts) - 0.4 * (depot_dists / max_depot_dist)\n\n    best_index = np.argmin(scores)\n    next_node = unvisited[best_index]\n\n    return next_node",
+     "objective": 41.2515,
+     "other_inf": null
+}

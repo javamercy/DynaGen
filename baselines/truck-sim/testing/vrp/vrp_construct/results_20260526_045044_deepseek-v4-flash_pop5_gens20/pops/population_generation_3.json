@@ -1,0 +1,32 @@
+[
+     {
+          "algorithm": "\"The algorithm first checks if every unvisited node is already targeted by another truck; if so, it waits; otherwise, it selects the node that minimizes a weighted sum of distance from current, number of trucks heading to it, and an inverse depot distance incentive.\"",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    # If no unvisited nodes remain, return None\n    if len(unvisited_nodes) == 0:\n        return None\n\n    unvisited = np.asarray(unvisited_nodes)\n    # Count how many trucks (including possibly the current truck?) are heading to each unvisited node\n    conflict_counts = np.array([np.sum(truck_nodes == node) for node in unvisited])\n\n    # If every unvisited node already has at least one truck heading to it, wait\n    if np.all(conflict_counts > 0):\n        return None\n\n    # Distances from current node to each unvisited node\n    dists = distance_matrix[current_node, unvisited]\n    # Distances from each unvisited node to depot\n    depot_dists = distance_matrix[depot_node, unvisited]\n    max_depot_dist = np.max(depot_dists) if len(depot_dists) > 0 else 1.0\n\n    # Weights for the heuristic\n    alpha = 2.0   # penalty for conflict\n    beta = 0.5    # reward for being close to depot (subtracted)\n\n    # Score: lower is better\n    scores = dists + alpha * conflict_counts - beta * (depot_dists / max_depot_dist)\n\n    # Select the node with the smallest score\n    best_index = np.argmin(scores)\n    next_node = unvisited[best_index]\n\n    return next_node",
+          "objective": 44.12324,
+          "other_inf": null
+     },
+     {
+          "algorithm": "\nThe algorithm selects the next node by minimizing a score that is the product of the distance from the current node, a conflict penalty factor (1 + number of trucks heading there), and the inverse of a depot-distance factor (1 + distance to depot), thereby encouraging nodes that are close, less targeted, and far from the depot to be visited early.\n",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return None\n\n    unvisited = np.asarray(unvisited_nodes)\n    conflict_counts = np.array([np.sum(truck_nodes == node) for node in unvisited])\n\n    if np.all(conflict_counts > 0):\n        return None\n\n    dists = distance_matrix[current_node, unvisited]\n    depot_dists = distance_matrix[depot_node, unvisited]\n\n    scores = dists * (1 + conflict_counts) / (1 + depot_dists)\n    best_index = np.argmin(scores)\n    next_node = unvisited[best_index]\n    return next_node",
+          "objective": 52.37033,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the available unvisited node that minimizes the product of its distance from the current node and its distance from the depot; if no unvisited nodes remain, return the depot; if all unvisited nodes are targeted, return None.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n    # Exclude nodes that are already targeted by any truck\n    available = unvisited_nodes[~np.isin(unvisited_nodes, truck_nodes)]\n    if len(available) == 0:\n        return None\n    # Compute distances from current node and depot\n    dist_current = distance_matrix[current_node, available]\n    dist_depot = distance_matrix[depot_node, available]\n    # Minimize product of distances\n    next_node = available[np.argmin(dist_current * dist_depot)]\n    return next_node",
+          "objective": 53.77671,
+          "other_inf": null
+     },
+     {
+          "algorithm": "Select the unvisited node that minimizes the sum of its distance from the current node and a scaled average distance to all other unvisited nodes (excluding itself), with scaling factor 0.2; if no unvisited nodes remain, return depot; if all unvisited nodes are targeted by other trucks, return None.",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    # Nodes not currently targeted by any truck\n    available = unvisited_nodes[~np.isin(unvisited_nodes, truck_nodes)]\n    if len(available) == 0:\n        return None\n\n    n_unv = len(unvisited_nodes)\n    # Distance from current node to each available node\n    dist_cur = distance_matrix[current_node, available]\n\n    if n_unv == 1:\n        # Only one unvisited node exists and it is the only available\n        scores = dist_cur\n    else:\n        # Compute average distance from each available node to all other unvisited nodes\n        # Submatrix: distances from available nodes to all unvisited nodes\n        sub_matrix = distance_matrix[np.ix_(available, unvisited_nodes)]\n        # Sum over all unvisited nodes (includes self with distance 0)\n        sum_dist = np.sum(sub_matrix, axis=1)\n        # Average over other unvisited nodes (exclude self)\n        avg_dist = sum_dist / (n_unv - 1)\n        scores = dist_cur + 0.2 * avg_dist\n\n    next_node = available[np.argmin(scores)]\n    return next_node",
+          "objective": 54.90835,
+          "other_inf": null
+     },
+     {
+          "algorithm": "```",
+          "code": "import numpy as np\n\ndef select_next_node(current_node, truck_nodes, depot_node, unvisited_nodes, distance_matrix):\n    if len(unvisited_nodes) == 0:\n        return depot_node\n\n    available = unvisited_nodes[~np.isin(unvisited_nodes, truck_nodes)]\n    if len(available) == 0:\n        return None\n\n    n_unv = len(unvisited_nodes)\n    dist_cur = distance_matrix[current_node, available]\n\n    if n_unv == 1:\n        scores = dist_cur\n    else:\n        sub_matrix = distance_matrix[np.ix_(available, unvisited_nodes)]\n        sum_dist = np.sum(sub_matrix, axis=1)\n        avg_dist = sum_dist / (n_unv - 1)\n        scores = dist_cur + 0.5 * avg_dist\n\n    next_node = available[np.argmin(scores)]\n    return next_node",
+          "objective": 54.99641,
+          "other_inf": null
+     }
+]
