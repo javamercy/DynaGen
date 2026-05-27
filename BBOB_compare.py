@@ -27,6 +27,7 @@ Outputs (written to ``--out`` directory, default ``bbob_compare_out``):
     summary.json             machine-readable summary
     summary.md               human-readable summary
     convergence.png          best-so-far AOCC vs evaluation index
+    convergence.csv          best-so-far AOCC per eval index (both runs)
     per_function_aocc.png    per-function final AOCC bar chart
     per_function_aocc.csv    per-function final AOCC table
 """
@@ -432,6 +433,29 @@ def write_markdown(summary: dict[str, Any], out_path: Path) -> None:
     out_path.write_text("\n".join(lines))
 
 
+def write_convergence_csv(
+    dynagen: dict[str, Any], llamea: dict[str, Any], out_path: Path
+) -> None:
+    """Write best-so-far AOCC per evaluation index for both runs (long format)."""
+    dg_curve = dynagen["train_best_so_far_curve"]
+    la_curve = llamea["train_best_so_far_curve"]
+    n = max(len(dg_curve), len(la_curve))
+
+    def fmt_val(v: Any) -> str:
+        if v is None:
+            return ""
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return ""
+        return f"{float(v):.6f}"
+
+    lines = ["eval_index,dynagen_best_so_far_aocc,llamea_best_so_far_aocc"]
+    for i in range(n):
+        dg = dg_curve[i] if i < len(dg_curve) else None
+        la = la_curve[i] if i < len(la_curve) else None
+        lines.append(f"{i + 1},{fmt_val(dg)},{fmt_val(la)}")
+    out_path.write_text("\n".join(lines) + "\n")
+
+
 def write_per_function_csv(summary: dict[str, Any], out_path: Path) -> None:
     lines = ["function,dynagen_aocc,llamea_aocc,delta,winner"]
     for row in summary["per_function"]:
@@ -485,6 +509,7 @@ def main() -> None:
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
     write_markdown(summary, out_dir / "summary.md")
     write_per_function_csv(summary, out_dir / "per_function_aocc.csv")
+    write_convergence_csv(dynagen, llamea, out_dir / "convergence.csv")
     plot_convergence(dynagen, llamea, out_dir / "convergence.png")
     plot_per_function(dynagen, llamea, out_dir / "per_function_aocc.png")
 
