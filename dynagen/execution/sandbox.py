@@ -9,6 +9,11 @@ from typing import Any, Callable
 
 import numpy as np
 
+try:
+    import numba as _numba
+except ImportError:
+    _numba = None
+
 from dynagen.candidates.validation import (
     ALLOWED_IMPORTS,
     validate_bbob_generated_code,
@@ -26,6 +31,8 @@ ALLOWED_MODULES = {
     "collections": collections,
     "time": time,
 }
+if _numba is not None:
+    ALLOWED_MODULES["numba"] = _numba
 
 SAFE_BUILTINS = {
     "abs": builtins.abs,
@@ -161,6 +168,10 @@ def _sandbox_namespace(
         "collections": collections,
         "time": time,
     }
+    if _numba is not None:
+        namespace["numba"] = _numba
+        namespace["njit"] = _numba.njit
+        namespace["jit"] = _numba.jit
     return namespace
 
 
@@ -182,6 +193,10 @@ def _safe_import(name: str, globals=None, locals=None, fromlist=(), level: int =
     root = name.split(".", 1)[0]
     if root not in ALLOWED_IMPORTS:
         raise ImportError(f"Import not allowed: {name}")
+    if root == "numba":
+        if _numba is None:
+            raise ImportError("Optional dependency numba is not installed")
+        return __import__(name, globals, locals, fromlist, level)
     if name in ALLOWED_MODULES:
         return ALLOWED_MODULES[name]
     if root == "numpy" and name.startswith("numpy."):

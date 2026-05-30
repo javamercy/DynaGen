@@ -22,6 +22,8 @@ Functional rules:
 - Keep all candidate points inside the bounds, using clipping or bounded sampling.
 - Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
 - Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time, numba.
+- Numba may be used for small hot numeric helper functions only; keep Optimizer methods as Python wrappers around bounded search logic, and do not use Numba caching or object-mode patterns.
 
 Timeout and reporting rules:
 - A global helper report_best(value, x) is available.
@@ -38,7 +40,7 @@ Before producing the final response, internally verify the candidate:
 4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
 5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
 6. seed controls stochastic behavior if randomness is used.
-7. Only allowed imports are used.
+7. Only allowed imports are used; Numba helpers, if any, are limited to hot numeric kernels.
 8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
 9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
 """

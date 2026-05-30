@@ -1,0 +1,193 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000012: regret_insertion_2opt_3opt
+
+Status: timeout; distance: 8.06738
+
+Thought: Start with nearest neighbor tour, then improve with regret-insertion construction. Apply 2-opt until local minimum, then further improve with a limited 3-opt local search (checking only a subset of moves to avoid timeout). Report best tour on each improvement.
+
+Error details: timeout on tsp_construct_100_seed2024_000: Solver timed out after 30.0016s (timeout_seconds=30)
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        return np.arange(n, dtype=int)
+
+    def compute_total_distance(tour):
+        d = 0.0
+        for i in range(n-1):
+            d += distance_matrix[tour[i], tour[i+1]]
+        d += distance_matrix[tour[-1], tour[0]]
+        return d
+
+    # Nearest neighbor initial tour
+    visited = [0]
+    current = 0
+    available = set(range(1, n))
+    while available:
+        next_city = min(available, key=lambda x: distance_matrix[current, x])
+        visited.append(next_city)
+        available.remove(next_city)
+        current = next_city
+    best_tour = np.array(visited)
+    best_dist = compute_total_distance(best_tour)
+    report_best_tour(best_tour)
+
+    # Regret-insertion construction
+    start = 0
+    farthest = np.argmax(distance_matrix[start])
+    tour = [start, farthest]
+    remaining = set(range(n)) - {start, farthest}
+    while remaining:
+        best_costs = {}
+        second_best_costs = {}
+        for city in remaining:
+            costs = []
+            for i in range(len(tour)):
+                prev = tour[i]
+                nxt = tour[(i+1) % len(tour)]
+                cost = distance_matrix[prev, city] + distance_matrix[city, nxt] - distance_matrix[prev, nxt]
+                costs.append(cost)
+            costs.sort()
+            best_costs[city] = costs[0]
+            second_best_costs[city] = costs[1] if len(costs) > 1 else costs[0]
+        regret = {city: second_best_costs[city] - best_costs[city] for city in remaining}
+        chosen = max(regret, key=lambda x: regret[x])
+        best_cost = float('inf')
+        best_idx = -1
+        for i in range(len(tour)):
+            prev = tour[i]
+            nxt = tour[(i+1) % len(tour)]
+            cost = distance_matrix[prev, chosen] + distance_matrix[chosen, nxt] - distance_matrix[prev, nxt]
+            if cost < best_cost:
+                best_cost = cost
+                best_idx = i+1
+        tour.insert(best_idx, chosen)
+        remaining.remove(chosen)
+    tour_regret = np.array(tour)
+    dist_regret = compute_total_distance(tour_regret)
+    if dist_regret < best_dist - 1e-12:
+        best_dist = dist_regret
+        best_tour = tour_regret.copy()
+        report_best_tour(best_tour)
+
+    # 2-opt improvement
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n):
+            for j in range(i+2, n):
+                new_tour = np.concatenate([best_tour[:i+1], best_tour[j:i:-1], best_tour[j+1:]])
+                new_dist = compute_total_distance(new_tour)
+                if new_dist < best_dist - 1e-12:
+                    best_dist = new_dist
+                    best_tour = new_tour
+                    improved = True
+                    report_best_tour(best_tour)
+
+    # 3-opt improvement (limited to avoid timeout)
+    improved = True
+    iter_count = 0
+    while improved and iter_count < n:  # limit iterations
+        improved = False
+        for i in range(n):
+            for j in range(i+2, n):
+                for k in range(j+2, n):
+                    # check only 4 of the 7 possible 3-opt moves (the reversing ones)
+                    # Case 1: reverse segment i+1..j
+                    new_tour = np.concatenate([best_tour[:i+1], best_tour[j:i:-1], best_tour[j+1:]])
+                    new_dist = compute_total_distance(new_tour)
+                    if new_dist < best_dist - 1e-12:
+                        best_dist = new_dist
+                        best_tour = new_tour
+                        improved = True
+                        report_best_tour(best_tour)
+                        break
+                    # Case 2: reverse segment j+1..k
+                    new_tour = np.concatenate([best_tour[:j+1], best_tour[k:j:-1], best_tour[k+1:]])
+                    new_dist = compute_total_distance(new_tour)
+                    if new_dist < best_dist - 1e-12:
+                        best_dist = new_dist
+                        best_tour = new_tour
+                        improved = True
+                        report_best_tour(best_tour)
+                        break
+                    # Case 3: reverse segments i+1..j and j+1..k
+                    new_tour = np.concatenate([best_tour[:i+1], best_tour[j:i:-1], best_tour[k:j:-1], best_tour[k+1:]])
+                    new_dist = compute_total_distance(new_tour)
+                    if new_dist < best_dist - 1e-12:
+                        best_dist = new_dist
+                        best_tour = new_tour
+                        improved = True
+                        report_best_tour(best_tour)
+                        break
+                    # Case 4: reverse i+1..k (complement of case 1)
+                    new_tour = np.concatenate([best_tour[:i+1], best_tour[k:i:-1], best_tour[k+1:]])
+                    new_dist = compute_total_distance(new_tour)
+                    if new_dist < best_dist - 1e-12:
+                        best_dist = new_dist
+                        best_tour = new_tour
+                        improved = True
+                        report_best_tour(best_tour)
+                        break
+            if improved:
+                break
+        iter_count += 1
+
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000012 LLM reflection:
+- Summary: The candidate improved tour distance by 0.003 over the parent but caused timeouts on all 30 instances due to excessive 3-opt runtime.
+- Aim: Reduce 3-opt runtime to consistently finish within the 30-second timeout while preserving or improving tour quality.
+- Preserve: nearest neighbor + regret-insertion construction; 2-opt improvement loop; selective 3-opt move types (4 reversal cases)
+- Change: Limit 3-opt to a single pass with no outer while loop; Cap total 3-opt iterations or improve moves per call
+- Avoid: Removing construction heuristics or 2-opt; Adding additional restarts or diversification that increase runtime
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

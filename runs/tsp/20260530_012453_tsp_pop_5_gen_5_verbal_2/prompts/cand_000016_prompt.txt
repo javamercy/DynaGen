@@ -1,0 +1,102 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000008: cheapest_insertion
+
+Status: valid; distance: 9.02636
+
+Thought: Construct tour by cheapest-insertion heuristic: start with two farthest nodes, iteratively insert the node that incurs the smallest increase in tour length. After building the full tour, report it as best.
+
+History source: yes
+History bucket: tsp:size:100
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    start = 0
+    end = np.argmax(distance_matrix[start])
+    tour = [start, end]
+    in_tour = {start, end}
+    while len(tour) < n:
+        best_candidate = -1
+        best_increase = float('inf')
+        best_pos = -1
+        for node in range(n):
+            if node in in_tour:
+                continue
+            min_increase = float('inf')
+            min_pos = -1
+            for i in range(len(tour)):
+                a = tour[i]
+                b = tour[(i+1)%len(tour)]
+                inc = distance_matrix[a][node] + distance_matrix[node][b] - distance_matrix[a][b]
+                if inc < min_increase:
+                    min_increase = inc
+                    min_pos = i+1
+            if min_increase < best_increase:
+                best_increase = min_increase
+                best_candidate = node
+                best_pos = min_pos
+        tour.insert(best_pos, best_candidate)
+        in_tour.add(best_candidate)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    return tour_arr
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000008 LLM reflection:
+- Summary: Cheapest-insertion starting from two farthest nodes produced 8% longer tours than farthest-insertion parent (9.03 vs 8.35) but remained fast and fully valid.
+- Aim: Reduce average tour length toward or below the parent's distance while preserving validity, speed, and timeout robustness.
+- Preserve: valid permutation construction; fast runtime (~0.23s/instance); insertion-based incremental building; report_best_tour at the end
+- Change: Replace cheapest-insertion with farthest-insertion (as in parent) to select node farthest from current tour; Add a lightweight 2-opt local search after construction to improve tour length
+- Avoid: introducing invalid tours or repeated nodes; excessive runtime that risks timeout; over-complicating the heuristic with unproven mechanisms
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

@@ -18,28 +18,28 @@ class TSPInitialRole:
 TSP_INITIAL_ROLES = [
     TSPInitialRole(
         slot=1,
-        role="Regret-insertion solver",
-        intended_bias="Insert the city whose best insertion is much better than its second-best insertion. Make difficult placement decisions early and minimize future regret."
+        role="Farthest-insertion solver",
+        intended_bias="Build a valid foundational tour by identifying distant nodes to establish a macro geometric hull early, then incrementally insert remaining nodes into positions minimizing edge cost. Serves as a robust deterministic template generator."
     ),
     TSPInitialRole(
         slot=2,
-        role="Cheapest-insertion solver",
-        intended_bias="Build the tour by repeatedly inserting the unvisited city into the position that causes the smallest increase in total tour length."
+        role="Deterministic 2-opt local searcher",
+        intended_bias="Take an existing valid tour and systematically test localized edge-swapping moves, keeping changes only if they result in an immediate decrease in tour length. Explores immediate neighborhoods with pure greedy exploitation."
     ),
     TSPInitialRole(
         slot=3,
-        role="Farthest-insertion solver",
-        intended_bias="Start with distant cities to capture global structure, then insert remaining cities where they minimally increase the tour length."
+        role="Simulated annealing explorer",
+        intended_bias="Traverse the search space as a single trajectory, using a probabilistic acceptance criterion, exp(-delta_E / T), to occasionally accept worse moves. Introduces global temperature parameters and a mechanism to escape local optima."
     ),
     TSPInitialRole(
         slot=4,
-        role="Lin-Kernighan-style improver",
-        intended_bias="Start from a valid constructive tour and aggressively improve it using variable-depth edge exchanges to remove inefficient edge combinations."
+        role="Population-based genetic solver",
+        intended_bias="Maintain a parallel memory bank of multiple distinct valid tours. Utilize fitness-based selection, edge-preserving crossover operations, and mutation operators to evolve the solution space. Introduces parallel state inheritance."
     ),
     TSPInitialRole(
         slot=5,
-        role="Randomized greedy + 2-opt solver",
-        intended_bias="Use a restricted candidate list of short edges or nearby cities to create a diverse greedy tour, then apply 2-opt cleanup to remove crossings and reduce length."
+        role="Spatial divide-and-conquer clusterer",
+        intended_bias="Exploit EUC_2D metric structure from the distance matrix to approximate regional neighborhoods, decompose nodes into distance-based sub-clusters, solve sub-problems independently, and merge boundaries without assuming coordinates are available."
     ),
 ]
 

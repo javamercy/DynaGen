@@ -19,7 +19,8 @@ Rules:
 - Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
 - Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
 - Do not read/write files, use network, spawn subprocesses, or call external solvers.
-- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time, numba.
+- Numba may be used for small hot numeric helper functions only; keep solve_vrp as the Python wrapper that builds valid routes and calls report_best_vrp, and do not use Numba caching or object-mode patterns.
 - No module-level mutable globals; the solver may be called many times across instances.
 """
 
@@ -27,7 +28,8 @@ VRP_INTERNAL_CHECKLIST = """
 Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
 every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
 finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
-incumbents, allowed imports only, no I/O/network/subprocesses.
+incumbents, allowed imports only, Numba helpers only for hot numeric kernels,
+no I/O/network/subprocesses.
 """
 
 VRP_RESPONSE_FORMAT = """

@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000001",
+  "generation": 2,
+  "gradient": {
+    "aim": "Further reduce tour length by incorporating a limited 3-opt local search to escape local optima while preserving timeout robustness.",
+    "avoid": [
+      "Introducing invalid tours",
+      "Increasing runtime beyond timeout",
+      "Overcomplicating code with unnecessary data structures"
+    ],
+    "candidate_id": "cand_000001",
+    "change": [
+      "Add a 3-opt improvement phase after 2-opt converges",
+      "Optionally restrict 3-opt to a limited number of iterations to maintain speed"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Nearest neighbor initialization",
+      "Regret-insertion construction",
+      "2-opt improvement loop",
+      "Report_best_tour on improvements"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 8.070395606470454,
+    "source": "llm",
+    "summary": "Achieved valid tours for all 30 instances with mean distance 8.07 and runtime 0.74s, demonstrating robust construction and local search.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation within the evaluator timeout\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, timeout robustness, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = distance_matrix.shape[0]\\n    if n <= 2:\\n        return np.arange(n, dtype=int)\\n    \\n    def compute_total_distance(tour):\\n        d = 0.0\\n        for i in range(n-1):\\n            d += distance_matrix[tour[i], tour[i+1]]\\n        d += distance_matrix[tour[-1], tour[0]]\\n        return d\\n    \\n    # Nearest neighbor initial tour\\n    visited = [0]\\n    current = 0\\n    available = set(range(1, n))\\n    while available:\\n        next_city = min(available, key=lambda x: distance_matrix[current, x])\\n        visited.append(next_city)\\n        available.remove(next_city)\\n        current = next_city\\n    best_tour = np.array(visited)\\n    best_dist = compute_total_distance(best_tour)\\n    report_best_tour(best_tour)\\n    \\n    # Regret-insertion construction\\n    start = 0\\n    farthest = np.argmax(distance_matrix[start])\\n    tour = [start, farthest]\\n    remaining = set(range(n)) - {start, farthest}\\n    while remaining:\\n        best_costs = {}\\n        second_best_costs = {}\\n        for city in remaining:\\n            costs = []\\n            for i in range(len(tour)):\\n                prev = tour[i]\\n                nxt = tour[(i+1) % len(tour)]\\n                cost = distance_matrix[prev, city] + distance_matrix[city, nxt] - distance_matrix[prev, nxt]\\n                costs.append(cost)\\n            costs.sort()\\n            best_costs[city] = costs[0]\\n            second_best_costs[city] = costs[1] if len(costs) > 1 else costs[0]\\n        regret = {city: second_best_costs[city] - best_costs[city] for city in remaining}\\n        chosen = max(regret, key=lambda x: regret[x])\\n        best_cost = float('inf')\\n        best_idx = -1\\n        for i in range(len(tour)):\\n            prev = tour[i]\\n            nxt = tour[(i+1) % len(tour)]\\n            cost = distance_matrix[prev, chosen] + distance_matrix[chosen, nxt] - distance_matrix[prev, nxt]\\n            if cost < best_cost:\\n                best_cost = cost\\n                best_idx = i+1\\n        tour.insert(best_idx, chosen)\\n        remaining.remove(chosen)\\n    tour_regret = np.array(tour)\\n    dist_regret = compute_total_distance(tour_regret)\\n    if dist_regret < best_dist - 1e-12:\\n        best_dist = dist_regret\\n        best_tour = tour_regret.copy()\\n        report_best_tour(best_tour)\\n    \\n    # 2-opt improvement\\n    improved = True\\n    while improved:\\n        improved = False\\n        for i in range(n):\\n            for j in range(i+2, n):\\n                new_tour = np.concatenate([best_tour[:i+1], best_tour[j:i:-1], best_tour[j+1:]])\\n                new_dist = compute_total_distance(new_tour)\\n                if new_dist < best_dist - 1e-12:\\n                    best_dist = new_dist\\n                    best_tour = new_tour\\n                    improved = True\\n                    report_best_tour(best_tour)\\n    return best_tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000001\",\"metrics\":{\"best_gap\":null,\"distance\":8.070395606470454,\"gap_by_instance_size\":{\"100\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:100\",\"tsp:source:synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\",\"tsp:mechanism:insertion\"],\"diversity_score\":1.0,\"history_score\":1.6258277640135088,\"in_history\":true,\"primary_bucket\":\"tsp:size:100\",\"quality_score\":0.9919942142516592,\"robustness_score\":0.9538101421767129},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.7417735151004308,\"mean_tour_length\":8.070395606470454,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":30,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":8.070395606470454},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":8.070395606470454},\"score_name\":\"distance\",\"scored_count\":30,\"timeout_count\":0,\"timeout_distance\":8.070395606470454,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":30.0,\"tour_length_by_instance_size\":{\"100\":8.070395606470454},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":8.070395606470454},\"unscored_timeout_count\":0,\"valid_count\":30,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":8.070395606470454,\"status\":\"valid\",\"thought\":\"Construct an initial tour with nearest neighbor, then build a tour using regret-insertion heuristic: for each unvisited city, compute best and second-best insertion cost; insert the city with largest regret (difference between second-best and best). Improve the best tour with 2-opt local search, reporting any improvement.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize TSP tour length while always returning a valid permutation within the evaluator timeout\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Achieved valid tours for all 30 instances with mean distance 8.07 and runtime 0.74s, demonstrating robust construction and local search.\",\n  \"aim\": \"Further reduce tour length by incorporating a limited 3-opt local search to escape local optima while preserving timeout robustness.\",\n  \"preserve\": [\n    \"Nearest neighbor initialization\",\n    \"Regret-insertion construction\",\n    \"2-opt improvement loop\",\n    \"Report_best_tour on improvements\"\n  ],\n  \"change\": [\n    \"Add a 3-opt improvement phase after 2-opt converges\",\n    \"Optionally restrict 3-opt to a limited number of iterations to maintain speed\"\n  ],\n  \"avoid\": [\n    \"Introducing invalid tours\",\n    \"Increasing runtime beyond timeout\",\n    \"Overcomplicating code with unnecessary data structures\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

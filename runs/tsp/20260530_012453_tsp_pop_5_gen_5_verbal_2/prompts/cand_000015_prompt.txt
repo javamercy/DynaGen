@@ -1,0 +1,125 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000010: farthest_insertion_2opt
+
+Status: valid; distance: 8.28027
+
+Thought: Construct initial tour using farthest-insertion heuristic, then apply 2-opt local search to minimize distance. Report best tour after initial construction and after each improvement.
+
+Code:
+
+```python
+
+import numpy as np
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    # farthest-insertion construction
+    tour = [0, np.argmax(distance_matrix[0])]
+    in_tour = set(tour)
+    while len(tour) < n:
+        best_node = -1
+        best_dist = -1.0
+        for node in range(n):
+            if node not in in_tour:
+                min_dist = min(distance_matrix[node][t] for t in tour)
+                if min_dist > best_dist:
+                    best_dist = min_dist
+                    best_node = node
+        best_pos = -1
+        best_increase = float('inf')
+        for i in range(len(tour)):
+            a = tour[i]
+            b = tour[(i+1)%len(tour)]
+            increase = distance_matrix[a][best_node] + distance_matrix[best_node][b] - distance_matrix[a][b]
+            if increase < best_increase:
+                best_increase = increase
+                best_pos = i+1
+        tour.insert(best_pos, best_node)
+        in_tour.add(best_node)
+    best_tour = np.array(tour)
+    report_best_tour(best_tour)
+    # 2-opt improvement
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n-1):
+            for j in range(i+1, n):
+                if j-i == 1 or (i==0 and j==n-1):
+                    continue
+                a, b = tour[i], tour[(i+1)%n]
+                c, d = tour[j], tour[(j+1)%n]
+                delta = distance_matrix[a][c] + distance_matrix[b][d] - distance_matrix[a][b] - distance_matrix[c][d]
+                if delta < -1e-10:
+                    tour[i+1:j+1] = reversed(tour[i+1:j+1])
+                    best_tour = np.array(tour)
+                    report_best_tour(best_tour)
+                    improved = True
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000010 LLM reflection:
+- Summary: Adding 2-opt to farthest-insertion reduced tour distance by ~0.83% with modest runtime increase and no errors.
+- Aim: Further reduce tour distance by incorporating a restart mechanism (e.g., double-bridge kick) to escape 2-opt local optima while maintaining full validity and timeout compliance.
+- Preserve: farthest-insertion construction; 2-opt improvement loop; report_best_tour after construction and each improvement; n ≤ 2 shortcut
+- Change: add a restart loop that applies a double-bridge kick before re-running 2-opt; limit restarts to 5-10 iterations to avoid timeout
+- Avoid: introducing tour invalidations (e.g., repeated cities or incorrect ordering); making runtime exceed timeout for larger instances; removing the existing report_best_tour calls
+
+Parent cand_000009 LLM reflection:
+- Summary: Farthest-insertion construction plus steepest 2-opt local search yields good tour quality with fast runtime and no timeouts.
+- Aim: Improve tour quality by adding a diversification mechanism to escape local optima while keeping runtime within timeout.
+- Preserve: farthest-insertion initial tour; steepest 2-opt best-improvement loop; best-tour reporting with report_best_tour
+- Change: add limited random restarts or perturbations (e.g., repeated construction with different seeds); insert a small number of random 2-opt moves before resuming steepest descent
+- Avoid: introducing complex metaheuristics that risk timeout; altering the core 2-opt structure that works well; adding extra loops that increase runtime without clear quality gain
+
+Parent cand_000008 LLM reflection:
+- Summary: Cheapest-insertion starting from two farthest nodes produced 8% longer tours than farthest-insertion parent (9.03 vs 8.35) but remained fast and fully valid.
+- Aim: Reduce average tour length toward or below the parent's distance while preserving validity, speed, and timeout robustness.
+- Preserve: valid permutation construction; fast runtime (~0.23s/instance); insertion-based incremental building; report_best_tour at the end
+- Change: Replace cheapest-insertion with farthest-insertion (as in parent) to select node farthest from current tour; Add a lightweight 2-opt local search after construction to improve tour length
+- Avoid: introducing invalid tours or repeated nodes; excessive runtime that risks timeout; over-complicating the heuristic with unproven mechanisms
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

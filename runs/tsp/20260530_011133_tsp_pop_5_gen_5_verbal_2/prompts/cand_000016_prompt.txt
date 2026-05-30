@@ -1,0 +1,118 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000003: farthest_insertion_2opt
+
+Status: valid; distance: 8.23956
+
+Thought: Construct tour using farthest-insertion heuristic: start with farthest pair, then iteratively insert the farthest unvisited city at the position causing minimal distance increase. Then improve with 2-opt local search until no improvement. Report best tour at construction best and after each improvement step.
+
+History source: yes
+History bucket: tsp:size:100
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n == 1:
+        return np.array([0])
+    # farthest insertion construction
+    # start with farthest pair
+    start, end = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [start, end]
+    unvisited = set(range(n)) - {start, end}
+    while unvisited:
+        # find farthest city from tour
+        farthest_city = None
+        farthest_dist = -1
+        for city in unvisited:
+            min_dist = min(distance_matrix[city][t] for t in tour)
+            if min_dist > farthest_dist:
+                farthest_dist = min_dist
+                farthest_city = city
+        # insert farthest_city at best position
+        best_pos = 0
+        best_increase = float('inf')
+        for i in range(len(tour)):
+            j = (i + 1) % len(tour)
+            increase = distance_matrix[tour[i]][farthest_city] + distance_matrix[farthest_city][tour[j]] - distance_matrix[tour[i]][tour[j]]
+            if increase < best_increase:
+                best_increase = increase
+                best_pos = i + 1
+        tour.insert(best_pos, farthest_city)
+        unvisited.remove(farthest_city)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n-2):
+            for k in range(i+2, n):
+                if k == n-1 and i == 0:
+                    continue  # skip wrap-around? Actually handle by reversing segment
+                new_tour = tour_arr.copy()
+                new_tour[i+1:k+1] = tour_arr[i+1:k+1][::-1]
+                # compute delta
+                a, b = tour_arr[i], tour_arr[i+1]
+                c, d = tour_arr[k], tour_arr[(k+1)%n]
+                delta = distance_matrix[a][new_tour[i+1]] + distance_matrix[new_tour[k]][d] - distance_matrix[a][b] - distance_matrix[c][d]
+                if delta < -1e-10:
+                    tour_arr = new_tour
+                    improved = True
+                    report_best_tour(tour_arr)
+    return tour_arr
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000003 LLM reflection:
+- Summary: Candidate achieved low mean tour length (8.24) with perfect validity and no timeouts across 30 instances of size 100, using farthest-insertion construction and 2-opt local search.
+- Aim: Further reduce mean tour length by enhancing the local search or adding a diversification mechanism, while maintaining zero timeouts and valid permutations.
+- Preserve: Farthest-insertion construction; 2-opt improvement; report_best_tour usage
+- Change: Introduce a restart mechanism (e.g., random perturbation) if 2-opt stalls; Add an additional local search like Or-opt
+- Avoid: Breaking permutation validity; Increasing runtime leading to timeout; Removing report_best_tour calls; Making random changes without structure
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

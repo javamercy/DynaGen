@@ -29,9 +29,7 @@ class OllamaProviderSelectionTests(unittest.TestCase):
                 "strategies": ["e1_radical_exploration"],
             },
             "evaluation": {
-                "budget": 10,
                 "timeout_seconds": 1,
-                "seeds": [1],
                 "metric": "mean_gap",
             },
             "data": {

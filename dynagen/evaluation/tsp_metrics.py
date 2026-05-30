@@ -21,8 +21,9 @@ def compute_gap(tour_length: float, optimal_length: float | None) -> float | Non
 
 def aggregate_tsp_records(records: list[dict[str, Any]], *, timeout_penalty: float = 0.0) -> dict[str, Any]:
     valid = [record for record in records if record["status"] == "valid"]
-    scored = [record for record in records if _has_finite_gap(record)]
-    gaps = [float(record["gap"]) for record in scored]
+    scored = [record for record in records if _primary_score(record) is not None]
+    gap_scored = [record for record in records if _has_finite_gap(record)]
+    gaps = [float(record["gap"]) for record in gap_scored]
     lengths = [
         float(record["tour_length"])
         for record in records
@@ -32,23 +33,29 @@ def aggregate_tsp_records(records: list[dict[str, Any]], *, timeout_penalty: flo
     timeout_count = sum(1 for record in records if record["status"] == "timeout")
     timeout_fraction = timeout_count / len(records) if records else 0.0
     mean_gap = _mean(gaps)
-    unscored_timeout_count = sum(1 for record in records if record["status"] == "timeout" and not _has_finite_gap(record))
+    mean_tour_length = _mean(lengths)
+    unscored_timeout_count = sum(1 for record in records if record["status"] == "timeout" and _primary_score(record) is None)
     penalized_mean_gap = None if mean_gap is None else mean_gap + float(timeout_penalty) * timeout_fraction
+    timeout_distance = penalized_mean_gap if penalized_mean_gap is not None else mean_tour_length
     metrics = {
         "runs": len(records),
         "valid_count": len(valid),
         "scored_count": len(scored),
         "timeout_count": timeout_count,
-        "partial_timeout_count": sum(1 for record in scored if record["status"] == "timeout"),
+        "partial_timeout_count": sum(
+            1
+            for record in records
+            if record["status"] == "timeout" and record.get("partial") and _primary_score(record) is not None
+        ),
         "unscored_timeout_count": unscored_timeout_count,
         "invalid_tour_count": sum(1 for record in records if record["status"] == "invalid"),
         "runtime_error_count": sum(1 for record in records if record["status"] == "error"),
-        "mean_tour_length": _mean(lengths),
+        "mean_tour_length": mean_tour_length,
         "mean_gap": mean_gap,
         "timeout_fraction": timeout_fraction,
         "timeout_penalty": float(timeout_penalty),
         "penalized_mean_gap": penalized_mean_gap,
-        "timeout_distance": penalized_mean_gap if penalized_mean_gap is not None else (
+        "timeout_distance": timeout_distance if timeout_distance is not None else (
             UNSCORED_TIMEOUT_GAP if timeout_count else None
         ),
         "median_gap": _median(gaps),

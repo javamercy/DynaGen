@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000003",
+  "generation": 4,
+  "gradient": {
+    "aim": "Reduce tour length by adding a stronger local search or restart mechanism to escape local optima.",
+    "avoid": [
+      "removing construction heuristic entirely",
+      "changes that increase runtime beyond 60s timeout",
+      "introducing non-valid permutations"
+    ],
+    "candidate_id": "cand_000003",
+    "change": [
+      "add 3-opt move or double-bridge perturbation to diversify search",
+      "optionally restart with different random seeds or shuffled construction"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 4,
+    "parent_ids": [],
+    "preserve": [
+      "farthest insertion construction for initial tours",
+      "2-opt improvement loop",
+      "report_best_tour usage",
+      "deterministic timeout-robust behavior"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 18.01630813240125,
+    "source": "llm",
+    "summary": "Farthest insertion with 2-opt produces valid, timeout-free tours but tour length is moderate for 500-city instances.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation within the evaluator timeout\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, timeout robustness, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = distance_matrix.shape[0]\\n    if n <= 2:\\n        return np.arange(n)\\n    # Initialize tour with two farthest cities\\n    max_dist = -1\\n    start = 0\\n    end = 1\\n    for i in range(n):\\n        for j in range(i+1, n):\\n            if distance_matrix[i, j] > max_dist:\\n                max_dist = distance_matrix[i, j]\\n                start, end = i, j\\n    tour = [start, end]\\n    in_tour = {start, end}\\n    # Farthest insertion construction\\n    while len(tour) < n:\\n        # Find farthest city not in tour\\n        farthest_city = None\\n        max_min_dist = -1\\n        for city in range(n):\\n            if city in in_tour:\\n                continue\\n            # min distance to any city in tour\\n            min_dist = min(distance_matrix[city, tour[i]] for i in range(len(tour)))\\n            if min_dist > max_min_dist:\\n                max_min_dist = min_dist\\n                farthest_city = city\\n        # Insert farthest_city at best position\\n        best_pos = 0\\n        best_increase = float('inf')\\n        for pos in range(len(tour)):\\n            prev = tour[pos]\\n            nxt = tour[(pos+1) % len(tour)]\\n            increase = distance_matrix[prev, farthest_city] + distance_matrix[farthest_city, nxt] - distance_matrix[prev, nxt]\\n            if increase < best_increase:\\n                best_increase = increase\\n                best_pos = pos+1\\n        tour.insert(best_pos, farthest_city)\\n        in_tour.add(farthest_city)\\n    # Simple 2-opt improvement\\n    improved = True\\n    while improved:\\n        improved = False\\n        for i in range(n-2):\\n            for j in range(i+2, n):\\n                a, b, c, d = tour[i], tour[i+1], tour[j], tour[(j+1)%n]\\n                if distance_matrix[a, c] + distance_matrix[b, d] < distance_matrix[a, b] + distance_matrix[c, d]:\\n                    tour[i+1:j+1] = reversed(tour[i+1:j+1])\\n                    improved = True\\n                    break\\n            if improved:\\n                break\\n    report_best_tour(np.array(tour))\\n    return np.array(tour)\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000003\",\"metrics\":{\"best_gap\":null,\"distance\":18.01630813240125,\"gap_by_instance_size\":{\"500\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:500\",\"tsp:source:synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\",\"tsp:runtime:robust\",\"tsp:mechanism:two_opt\",\"tsp:mechanism:insertion\"],\"diversity_score\":1.0,\"history_score\":1.5979417930185813,\"in_history\":true,\"primary_bucket\":\"tsp:size:500\",\"quality_score\":0.9823025348528522,\"robustness_score\":0.9018264519020827},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":9.214179893800429,\"mean_tour_length\":18.01630813240125,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":20,\"runtime_error_count\":0,\"score_by_instance_size\":{\"500\":18.01630813240125},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":18.01630813240125},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":60.0,\"tour_length_by_instance_size\":{\"500\":18.01630813240125},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":18.01630813240125},\"unscored_timeout_count\":0,\"valid_count\":20,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":18.01630813240125,\"status\":\"valid\",\"thought\":\"Start with two farthest cities, then repeatedly insert the city farthest from the current tour at the position that minimally increases tour length. Optionally apply simple 2-opt improvement to refine.\"},\"delta_vs_best_parent\":null,\"generation\":4,\"goal\":\"minimize TSP tour length while always returning a valid permutation within the evaluator timeout\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Farthest insertion with 2-opt produces valid, timeout-free tours but tour length is moderate for 500-city instances.\",\n  \"aim\": \"Reduce tour length by adding a stronger local search or restart mechanism to escape local optima.\",\n  \"preserve\": [\n    \"farthest insertion construction for initial tours\",\n    \"2-opt improvement loop\",\n    \"report_best_tour usage\",\n    \"deterministic timeout-robust behavior\"\n  ],\n  \"change\": [\n    \"add 3-opt move or double-bridge perturbation to diversify search\",\n    \"optionally restart with different random seeds or shuffled construction\"\n  ],\n  \"avoid\": [\n    \"removing construction heuristic entirely\",\n    \"changes that increase runtime beyond 60s timeout\",\n    \"introducing non-valid permutations\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

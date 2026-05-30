@@ -17,17 +17,13 @@ class TSPCandidateEvaluator:
             self,
             instances: list[TSPInstance],
             *,
-            seeds: tuple[int, ...] | list[int],
-            budget: int,
-            timeout_seconds: float,
+            timeout_seconds: float | None,
             pool_name: str,
             timeout_penalty: float
     ) -> None:
         if not instances:
             raise ValueError("At least one instance is required for evaluation")
-        if budget <= 0:
-            raise ValueError("Budget must be a positive integer")
-        if timeout_seconds <= 0:
+        if timeout_seconds is not None and timeout_seconds <= 0:
             raise ValueError("Timeout must be a positive number")
         if timeout_penalty < 0:
             raise ValueError("Timeout penalty must be non-negative")
@@ -35,9 +31,7 @@ class TSPCandidateEvaluator:
             raise ValueError("Pool name cannot be empty")
 
         self.instances = tuple(instances)
-        self.seeds = tuple(int(seed) for seed in seeds)
-        self.budget = int(budget)
-        self.timeout_seconds = float(timeout_seconds)
+        self.timeout_seconds = float(timeout_seconds) if timeout_seconds is not None else None
         self.timeout_penalty = float(timeout_penalty)
         self.pool_name = pool_name
 
@@ -69,17 +63,13 @@ class TSPCandidateEvaluator:
         return EvaluationResult(status, distance, metrics, error_feedback, score_name="distance")
 
     def _run_all_instances(self, code: str) -> list[dict[str, Any]]:
-        tasks = [
-            (instance, seed)
-            for instance in self.instances
-            for seed in self.seeds
-        ]
+        tasks = list(self.instances)
         records: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
 
         with ThreadPoolExecutor(max_workers=min(len(tasks), os.cpu_count() or 1)) as executor:
             future_to_index = {
-                executor.submit(self._run_single_instance, code, instance, seed): index
-                for index, (instance, seed) in enumerate(tasks)
+                executor.submit(self._run_single_instance, code, instance): index
+                for index, instance in enumerate(tasks)
             }
             for future in as_completed(future_to_index):
                 index = future_to_index[future]
@@ -87,12 +77,10 @@ class TSPCandidateEvaluator:
 
         return records
 
-    def _run_single_instance(self, code: str, instance: TSPInstance, seed: int) -> dict[str, Any]:
+    def _run_single_instance(self, code: str, instance: TSPInstance) -> dict[str, Any]:
         run = run_tsp_solver(
             code,
             instance,
-            seed=seed,
-            budget=self.budget,
             timeout_seconds=self.timeout_seconds,
         )
         scored = run.status == "valid" or run.partial
@@ -104,7 +92,6 @@ class TSPCandidateEvaluator:
             "pool": self.pool_name,
             "dimension": instance.dimension,
             "source": instance.metadata.get("source", "unknown"),
-            "seed": seed,
             "status": run.status,
             "tour_length": run.tour_length,
             "partial": run.partial,
@@ -122,8 +109,6 @@ class TSPCandidateEvaluator:
         metrics["score_name"] = "distance"
         metrics.setdefault("distance", math.inf)
         metrics["pool"] = self.pool_name
-        metrics["seeds"] = list(self.seeds)
-        metrics["budget"] = self.budget
         metrics["timeout_seconds"] = self.timeout_seconds
         metrics["timeout_penalty"] = self.timeout_penalty
         return metrics
@@ -149,6 +134,12 @@ def _candidate_distance(status: EvaluationStatus, metrics: dict[str, Any], *, po
             return metrics["mean_gap"]
         return metrics["mean_tour_length"] if metrics["mean_tour_length"] is not None else math.inf
     if status == "timeout":
+        if pool_name == "search_instances" and metrics["mean_tour_length"] is not None:
+            return metrics["mean_tour_length"]
+        if metrics["penalized_mean_gap"] is not None:
+            return metrics["penalized_mean_gap"]
+        if metrics["mean_tour_length"] is not None:
+            return metrics["mean_tour_length"]
         timeout_distance = metrics.get("timeout_distance")
         return float(timeout_distance) if timeout_distance is not None else math.inf
     return math.inf
@@ -158,5 +149,5 @@ def _error_feedback(records: list[dict[str, Any]]) -> str | None:
     for record in records:
         if record["status"] != "valid":
             message = record.get("error") or record["status"]
-            return f"{record['status']} on {record['instance']} seed {record['seed']}: {message}"
+            return f"{record['status']} on {record['instance']}: {message}"
     return None

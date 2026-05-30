@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000004",
+  "generation": 2,
+  "gradient": {
+    "aim": "Improve tour quality by enabling full 2-opt scanning and adding restarts with random perturbation.",
+    "avoid": [
+      "breaking valid permutation",
+      "exceeding timeout",
+      "introducing runtime errors"
+    ],
+    "candidate_id": "cand_000004",
+    "change": [
+      "replace single-move 2-opt with full-scan 2-opt until local minimum",
+      "add outer restart loop with randomized initial tours or perturbation"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "nearest neighbor construction",
+      "valid permutation guarantee",
+      "timeout robustness"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 17.581283859310684,
+    "source": "llm",
+    "summary": "Nearest neighbor plus single-move 2-opt yields valid tours with moderate quality and no timeouts, but local search is limited.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation within the evaluator timeout\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, timeout robustness, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\ndef solve_tsp(distance_matrix):\\n    n = distance_matrix.shape[0]\\n    # nearest neighbor construction\\n    tour = [0]\\n    unvisited = set(range(1,n))\\n    curr = 0\\n    while unvisited:\\n        nxt = min(unvisited, key=lambda c: distance_matrix[curr,c])\\n        tour.append(nxt)\\n        unvisited.remove(nxt)\\n        curr = nxt\\n    tour = np.array(tour, dtype=np.int32)\\n    best_tour = tour.copy()\\n    best_cost = 0.0\\n    for i in range(n):\\n        best_cost += distance_matrix[tour[i], tour[(i+1)%n]]\\n    report_best_tour(best_tour)\\n    improved = True\\n    while improved:\\n        improved = False\\n        # 2-opt improvement\\n        for i in range(n):\\n            for j in range(i+2, n):\\n                a,b = tour[i], tour[(i+1)%n]\\n                c,d = tour[j], tour[(j+1)%n]\\n                if distance_matrix[a,c] + distance_matrix[b,d] < distance_matrix[a,b] + distance_matrix[c,d]:\\n                    # reverse segment from i+1 to j\\n                    tour[i+1:j+1] = tour[i+1:j+1][::-1]\\n                    cost = 0.0\\n                    for k in range(n):\\n                        cost += distance_matrix[tour[k], tour[(k+1)%n]]\\n                    if cost < best_cost:\\n                        best_cost = cost\\n                        best_tour = tour.copy()\\n                        report_best_tour(best_tour)\\n                    improved = True\\n                    break\\n            if improved:\\n                break\\n    return best_tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000004\",\"metrics\":{\"best_gap\":null,\"distance\":17.581283859310684,\"gap_by_instance_size\":{\"500\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:500\",\"tsp:source:synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"diversity_score\":1.0,\"history_score\":1.5963377346692034,\"in_history\":true,\"primary_bucket\":\"tsp:size:500\",\"quality_score\":0.982722477173881,\"robustness_score\":0.8960435928437782},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":25.18844392305,\"mean_tour_length\":17.581283859310684,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":20,\"runtime_error_count\":0,\"score_by_instance_size\":{\"500\":17.581283859310684},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":17.581283859310684},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":60.0,\"tour_length_by_instance_size\":{\"500\":17.581283859310684},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=20:n_cities=500:seed=2024\":17.581283859310684},\"unscored_timeout_count\":0,\"valid_count\":20,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":17.581283859310684,\"status\":\"valid\",\"thought\":\"Start from nearest neighbor constructive tour, then iteratively apply 2-opt edge exchanges (a basic Lin-Kernighan-style variable-depth search limited to depth 1) to improve the tour. Report new best tours as soon as found.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize TSP tour length while always returning a valid permutation within the evaluator timeout\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Nearest neighbor plus single-move 2-opt yields valid tours with moderate quality and no timeouts, but local search is limited.\",\n  \"aim\": \"Improve tour quality by enabling full 2-opt scanning and adding restarts with random perturbation.\",\n  \"preserve\": [\"nearest neighbor construction\", \"valid permutation guarantee\", \"timeout robustness\"],\n  \"change\": [\"replace single-move 2-opt with full-scan 2-opt until local minimum\", \"add outer restart loop with randomized initial tours or perturbation\"],\n  \"avoid\": [\"breaking valid permutation\", \"exceeding timeout\", \"introducing runtime errors\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

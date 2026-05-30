@@ -20,12 +20,15 @@ Rules:
 - The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
 - Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
 - Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time, numba.
+- Numba may be used for small hot numeric helper functions only; keep choose_next_customer as the Python wrapper that returns a valid index or None, and do not use Numba caching or object-mode patterns.
 - No module-level mutable globals; the function may be called many times across instances.
 """
 
 DVRP_INTERNAL_CHECKLIST = """
 Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
-available_customers index, handles empty available_customers no I/O/network/subprocesses.
+available_customers index, handles empty available_customers, allowed imports only,
+Numba helpers only for hot numeric kernels, no I/O/network/subprocesses.
 """
 
 DVRP_RESPONSE_FORMAT = """

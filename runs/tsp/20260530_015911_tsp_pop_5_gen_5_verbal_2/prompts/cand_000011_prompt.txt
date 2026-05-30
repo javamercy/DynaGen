@@ -1,0 +1,160 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000009: farthest_insertion_2opt_sa
+
+Status: valid; distance: 8.21675
+
+Thought: Construct tour using farthest insertion, then apply first-improvement 2-opt until local optimum, then simulated annealing with exponential cooling (100k iterations) to escape local minima, and finally a deterministic 2-opt pass. Keep best tour and report.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    # Farthest insertion construction
+    tour = [0]
+    unvisited = set(range(1, n))
+    # farthest from start
+    start = 0
+    farthest = max(range(1, n), key=lambda x: distance_matrix[start, x])
+    tour.append(farthest)
+    unvisited.remove(farthest)
+    while unvisited:
+        # find farthest unvisited city from current tour
+        best_dist = -1
+        best_city = None
+        for city in unvisited:
+            min_dist = min(distance_matrix[city, t] for t in tour)
+            if min_dist > best_dist:
+                best_dist = min_dist
+                best_city = city
+        # insert best_city in best position
+        best_pos = None
+        best_inc = np.inf
+        for i in range(len(tour)):
+            j = (i + 1) % len(tour)
+            inc = distance_matrix[tour[i], best_city] + distance_matrix[best_city, tour[j]] - distance_matrix[tour[i], tour[j]]
+            if inc < best_inc:
+                best_inc = inc
+                best_pos = j
+        tour.insert(best_pos, best_city)
+        unvisited.remove(best_city)
+    tour = np.array(tour, dtype=np.int32)
+    best_tour = tour.copy()
+    best_dist = np.sum(distance_matrix[best_tour[:-1], best_tour[1:]]) + distance_matrix[best_tour[-1], best_tour[0]]
+    report_best_tour(best_tour)
+    
+    # Deterministic first-improvement 2-opt
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n - 2):
+            for j in range(i + 2, n):
+                a, b = tour[i], tour[(i+1) % n]
+                c, d = tour[j], tour[(j+1) % n]
+                delta = (distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d])
+                if delta < -1e-12:
+                    tour[i+1:j+1] = np.flip(tour[i+1:j+1])
+                    current_dist = np.sum(distance_matrix[tour[:-1], tour[1:]]) + distance_matrix[tour[-1], tour[0]]
+                    if current_dist < best_dist - 1e-12:
+                        best_dist = current_dist
+                        best_tour = tour.copy()
+                        report_best_tour(best_tour)
+                    improved = True
+                    break
+            if improved:
+                break
+    
+    # Simulated annealing
+    T_start = np.max(distance_matrix) * n
+    T_end = 1e-8
+    max_iter = 100000
+    cooling = lambda k: T_start * (T_end / T_start) ** (k / max_iter)
+    current_dist = np.sum(distance_matrix[tour[:-1], tour[1:]]) + distance_matrix[tour[-1], tour[0]]
+    for iteration in range(max_iter):
+        T = cooling(iteration)
+        i = np.random.randint(n)
+        j = np.random.randint(n)
+        if i > j:
+            i, j = j, i
+        if j - i < 2:
+            continue
+        i_next = (i + 1) % n
+        j_next = (j + 1) % n
+        delta = (distance_matrix[tour[i], tour[j]] + distance_matrix[tour[i_next], tour[j_next]] - distance_matrix[tour[i], tour[i_next]] - distance_matrix[tour[j], tour[j_next]])
+        if delta < 0 or np.random.random() < np.exp(-delta / T):
+            tour[i_next:j+1] = np.flip(tour[i_next:j+1])
+            current_dist += delta
+            if current_dist < best_dist - 1e-12:
+                best_dist = current_dist
+                best_tour = tour.copy()
+                report_best_tour(best_tour)
+    
+    # Final deterministic 2-opt pass
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n - 2):
+            for j in range(i + 2, n):
+                a, b = tour[i], tour[(i+1) % n]
+                c, d = tour[j], tour[(j+1) % n]
+                delta = (distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d])
+                if delta < -1e-12:
+                    tour[i+1:j+1] = np.flip(tour[i+1:j+1])
+                    current_dist = np.sum(distance_matrix[tour[:-1], tour[1:]]) + distance_matrix[tour[-1], tour[0]]
+                    if current_dist < best_dist - 1e-12:
+                        best_dist = current_dist
+                        best_tour = tour.copy()
+                        report_best_tour(best_tour)
+                    improved = True
+                    break
+            if improved:
+                break
+    return best_tour
+
+```
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Instances are symmetric Euclidean 2D-style TSPs represented by a distance matrix.
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; coordinates are not provided, but metric/geometric structure can be inferred from distances.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

@@ -13,7 +13,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=160.0,
             timeout_fraction=0.25,
             runtime=4.0,
-            code="def solve_tsp(a,b,c):\n    # nearest exhaustive 2-opt\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # nearest exhaustive 2-opt\n    return []",
         )
         slightly_worse_but_robust = _tsp_candidate(
             "cand_2",
@@ -21,7 +21,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=105.0,
             timeout_fraction=0.0,
             runtime=0.5,
-            code="def solve_tsp(a,b,c):\n    # candidate insertion restart\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # candidate insertion restart\n    return []",
         )
 
         survivors = select_survivors([slightly_better_but_fragile, slightly_worse_but_robust], 1)
@@ -35,7 +35,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=150.0,
             timeout_fraction=0.1,
             runtime=3.0,
-            code="def solve_tsp(a,b,c):\n    return []",
+            code="def solve_tsp(distance_matrix):\n    return []",
         )
         much_worse_score = _tsp_candidate(
             "cand_2",
@@ -43,7 +43,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=105.0,
             timeout_fraction=0.0,
             runtime=0.5,
-            code="def solve_tsp(a,b,c):\n    # unique candidate list\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # unique candidate list\n    return []",
         )
 
         survivors = select_survivors([better_score, much_worse_score], 1)
@@ -87,7 +87,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=100.0,
             timeout_fraction=0.0,
             runtime=1.0,
-            code="def solve_tsp(a,b,c):\n    # nearest 2-opt\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # nearest 2-opt\n    return []",
         )
         duplicate_b = _tsp_candidate(
             "cand_2",
@@ -95,7 +95,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=100.0,
             timeout_fraction=0.0,
             runtime=1.0,
-            code="def solve_tsp(a,b,c):\n    # nearest 2-opt\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # nearest 2-opt\n    return []",
         )
         novel = _tsp_candidate(
             "cand_3",
@@ -103,7 +103,7 @@ class MetricVectorSelectionTests(unittest.TestCase):
             worst_size=100.0,
             timeout_fraction=0.0,
             runtime=1.0,
-            code="def solve_tsp(a,b,c):\n    # insertion restart candidate-list\n    return []",
+            code="def solve_tsp(distance_matrix):\n    # insertion restart candidate-list\n    return []",
         )
 
         survivors = select_survivors([duplicate_a, duplicate_b, novel], 2)

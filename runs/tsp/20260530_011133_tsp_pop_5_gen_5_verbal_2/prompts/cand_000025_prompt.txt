@@ -1,0 +1,193 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000007: regret_oropt_intensify
+
+Status: valid; distance: 8.04052
+
+Thought: Construct tour using regret insertion with tie-breaking (smallest best cost on ties). Then apply 2-opt and Or-opt (node insertion for chain lengths 1-3) until no improvement, repeating 2-opt afterwards. This intensifies local search to find deeper local optima.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        return np.arange(n, dtype=int)
+
+    def total_distance(tour):
+        d = 0.0
+        for i in range(n-1):
+            d += distance_matrix[tour[i], tour[i+1]]
+        d += distance_matrix[tour[-1], tour[0]]
+        return d
+
+    # Regret insertion construction with tie-breaking
+    start = 0
+    farthest = np.argmax(distance_matrix[start])
+    tour = [start, farthest]
+    remaining = set(range(n)) - {start, farthest}
+    while remaining:
+        # For each unvisited city, compute insertion costs
+        best_costs = {}
+        second_best_costs = {}
+        for city in remaining:
+            costs = []
+            for i in range(len(tour)):
+                prev = tour[i]
+                nxt = tour[(i+1) % len(tour)]
+                cost = distance_matrix[prev, city] + distance_matrix[city, nxt] - distance_matrix[prev, nxt]
+                costs.append(cost)
+            costs.sort()
+            best_costs[city] = costs[0]
+            second_best_costs[city] = costs[1] if len(costs) > 1 else costs[0]
+        # Regret: difference between second-best and best; tie-break by smaller best cost
+        regret = {city: second_best_costs[city] - best_costs[city] for city in remaining}
+        max_regret = max(regret.values())
+        candidates = [city for city in remaining if regret[city] == max_regret]
+        # Choose candidate with smallest best cost (tie-break)
+        chosen = min(candidates, key=lambda x: best_costs[x])
+        # Insert at best position
+        best_cost = float('inf')
+        best_idx = -1
+        for i in range(len(tour)):
+            prev = tour[i]
+            nxt = tour[(i+1) % len(tour)]
+            cost = distance_matrix[prev, chosen] + distance_matrix[chosen, nxt] - distance_matrix[prev, nxt]
+            if cost < best_cost:
+                best_cost = cost
+                best_idx = i + 1
+        tour.insert(best_idx, chosen)
+        remaining.remove(chosen)
+    tour = np.array(tour, dtype=int)
+    best_tour = tour.copy()
+    best_dist = total_distance(best_tour)
+    report_best_tour(best_tour)
+
+    # Local search: 2-opt and Or-opt
+    def two_opt(tour, dist):
+        improved = True
+        n = len(tour)
+        while improved:
+            improved = False
+            for i in range(n):
+                for j in range(i+2, n):
+                    if j - i == 1:
+                        continue
+                    new_tour = np.concatenate([tour[:i+1], tour[j:i:-1], tour[j+1:]])
+                    new_dist = total_distance(new_tour)
+                    if new_dist < dist - 1e-12:
+                        tour = new_tour
+                        dist = new_dist
+                        improved = True
+                        report_best_tour(tour)
+        return tour, dist
+
+    def or_opt(tour, dist):
+        improved = True
+        n = len(tour)
+        while improved:
+            improved = False
+            for chain_len in [1, 2, 3]:  # chain lengths 1,2,3
+                for start in range(n):
+                    # Extract chain
+                    chain = []
+                    for k in range(chain_len):
+                        chain.append(tour[(start + k) % n])
+                    # Remove chain from tour
+                    tour_list = tour.tolist()
+                    for city in chain:
+                        tour_list.remove(city)
+                    # Try inserting chain at every position
+                    new_tour_list = tour_list[:]
+                    for pos in range(len(tour_list) + 1):
+                        # Insert chain in original order
+                        cand = tour_list[:pos] + chain + tour_list[pos:]
+                        cand = np.array(cand, dtype=int)
+                        cand_dist = total_distance(cand)
+                        if cand_dist < dist - 1e-12:
+                            tour = cand
+                            dist = cand_dist
+                            improved = True
+                            report_best_tour(tour)
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+        return tour, dist
+
+    # Apply 2-opt first
+    best_tour, best_dist = two_opt(best_tour, best_dist)
+    # Apply Or-opt
+    best_tour, best_dist = or_opt(best_tour, best_dist)
+    # Final 2-opt to polish
+    best_tour, best_dist = two_opt(best_tour, best_dist)
+
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000007 LLM reflection:
+- Summary: Regret insertion with tie-breaking plus 2-opt and Or-opt reduced tour length versus parent with no errors and acceptable runtime.
+- Aim: Further reduce tour length by incorporating a restart/diversification mechanism to escape local optima without causing invalid tours or exceeding timeout.
+- Preserve: Regret insertion with tie-breaking (smallest best cost on ties); Combination of 2-opt and Or-opt local search in sequence; Use of report_best_tour during improvements
+- Change: Add a perturbation (e.g., double-bridge move) after local search, then reapply local search in a loop for a limited number of restarts
+- Avoid: Removing the tie-breaking criterion that improved over greedy regret; Changes that significantly increase runtime or risk invalid permutations; Removing report_best_tour calls
+
+Parent cand_000019 LLM reflection:
+- Summary: Candidate improved tour length (7.94 vs parent 8.04) but incurred 25/30 timeouts due to excessive local search iterations and 5 restart perturbations.
+- Aim: Reduce runtime to consistently finish within timeout while preserving the improved tour length, by limiting the number of restarts and local search passes.
+- Preserve: regret insertion with tie-breaking; double-bridge perturbation; combined two-opt and or-opt sequence
+- Change: Reduce restart loop iterations from 5 to 1 or 2; Replace while-improved local search with single-pass scan to cap iterations
+- Avoid: Removing construction heuristic or perturbation; Adding nested loops or extra function calls that increase runtime; Introducing randomness that could degrade tour quality
+
+Parent cand_000012 LLM reflection:
+- Summary: The candidate improved tour distance by 0.003 over the parent but caused timeouts on all 30 instances due to excessive 3-opt runtime.
+- Aim: Reduce 3-opt runtime to consistently finish within the 30-second timeout while preserving or improving tour quality.
+- Preserve: nearest neighbor + regret-insertion construction; 2-opt improvement loop; selective 3-opt move types (4 reversal cases)
+- Change: Limit 3-opt to a single pass with no outer while loop; Cap total 3-opt iterations or improve moves per call
+- Avoid: Removing construction heuristics or 2-opt; Adding additional restarts or diversification that increase runtime
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement a complete TSP metaheuristic inside this required entrypoint:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Always return a valid tour.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

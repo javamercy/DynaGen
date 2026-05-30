@@ -24,15 +24,11 @@ def run_tsp_solver(
         code: str,
         instance: TSPInstance,
         *,
-        seed: int,
-        budget: int,
-        timeout_seconds: float,
+        timeout_seconds: float | None,
 ) -> TSPSolverRunResult:
     execution = execute_tsp_solver_code(
         code,
         instance.distance_matrix,
-        seed=seed,
-        budget=budget,
         timeout_seconds=timeout_seconds,
     )
 

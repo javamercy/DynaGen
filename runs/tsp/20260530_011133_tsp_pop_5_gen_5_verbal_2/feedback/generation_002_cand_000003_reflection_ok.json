@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000003",
+  "generation": 2,
+  "gradient": {
+    "aim": "Further reduce mean tour length by enhancing the local search or adding a diversification mechanism, while maintaining zero timeouts and valid permutations.",
+    "avoid": [
+      "Breaking permutation validity",
+      "Increasing runtime leading to timeout",
+      "Removing report_best_tour calls",
+      "Making random changes without structure"
+    ],
+    "candidate_id": "cand_000003",
+    "change": [
+      "Introduce a restart mechanism (e.g., random perturbation) if 2-opt stalls",
+      "Add an additional local search like Or-opt"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Farthest-insertion construction",
+      "2-opt improvement",
+      "report_best_tour usage"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 8.23955665786098,
+    "source": "llm",
+    "summary": "Candidate achieved low mean tour length (8.24) with perfect validity and no timeouts across 30 instances of size 100, using farthest-insertion construction and 2-opt local search.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation within the evaluator timeout\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, timeout robustness, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n == 1:\\n        return np.array([0])\\n    # farthest insertion construction\\n    # start with farthest pair\\n    start, end = np.unravel_index(np.argmax(distance_matrix), (n, n))\\n    tour = [start, end]\\n    unvisited = set(range(n)) - {start, end}\\n    while unvisited:\\n        # find farthest city from tour\\n        farthest_city = None\\n        farthest_dist = -1\\n        for city in unvisited:\\n            min_dist = min(distance_matrix[city][t] for t in tour)\\n            if min_dist > farthest_dist:\\n                farthest_dist = min_dist\\n                farthest_city = city\\n        # insert farthest_city at best position\\n        best_pos = 0\\n        best_increase = float('inf')\\n        for i in range(len(tour)):\\n            j = (i + 1) % len(tour)\\n            increase = distance_matrix[tour[i]][farthest_city] + distance_matrix[farthest_city][tour[j]] - distance_matrix[tour[i]][tour[j]]\\n            if increase < best_increase:\\n                best_increase = increase\\n                best_pos = i + 1\\n        tour.insert(best_pos, farthest_city)\\n        unvisited.remove(farthest_city)\\n    tour_arr = np.array(tour)\\n    report_best_tour(tour_arr)\\n    # 2-opt improvement\\n    improved = True\\n    while improved:\\n        improved = False\\n        for i in range(n-2):\\n            for k in range(i+2, n):\\n                if k == n-1 and i == 0:\\n                    continue  # skip wrap-around? Actually handle by reversing segment\\n                new_tour = tour_arr.copy()\\n                new_tour[i+1:k+1] = tour_arr[i+1:k+1][::-1]\\n                # compute delta\\n                a, b = tour_arr[i], tour_arr[i+1]\\n                c, d = tour_arr[k], tour_arr[(k+1)%n]\\n                delta = distance_matrix[a][new_tour[i+1]] + distance_matrix[new_tour[k]][d] - distance_matrix[a][b] - distance_matrix[c][d]\\n                if delta < -1e-10:\\n                    tour_arr = new_tour\\n                    improved = True\\n                    report_best_tour(tour_arr)\\n    return tour_arr\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000003\",\"metrics\":{\"best_gap\":null,\"distance\":8.23955665786098,\"gap_by_instance_size\":{\"100\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:100\",\"tsp:source:synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:two_opt\",\"tsp:mechanism:insertion\"],\"diversity_score\":1.0,\"history_score\":1.6367252426906518,\"in_history\":true,\"primary_bucket\":\"tsp:size:100\",\"quality_score\":0.9918277788215593,\"robustness_score\":0.9854213253402643},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.12234925820036248,\"mean_tour_length\":8.23955665786098,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":30,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":8.23955665786098},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":8.23955665786098},\"score_name\":\"distance\",\"scored_count\":30,\"timeout_count\":0,\"timeout_distance\":8.23955665786098,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":30.0,\"tour_length_by_instance_size\":{\"100\":8.23955665786098},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=30:n_cities=100:seed=2024\":8.23955665786098},\"unscored_timeout_count\":0,\"valid_count\":30,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":8.23955665786098,\"status\":\"valid\",\"thought\":\"Construct tour using farthest-insertion heuristic: start with farthest pair, then iteratively insert the farthest unvisited city at the position causing minimal distance increase. Then improve with 2-opt local search until no improvement. Report best tour at construction best and after each improvement step.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize TSP tour length while always returning a valid permutation within the evaluator timeout\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Candidate achieved low mean tour length (8.24) with perfect validity and no timeouts across 30 instances of size 100, using farthest-insertion construction and 2-opt local search.\",\n  \"aim\": \"Further reduce mean tour length by enhancing the local search or adding a diversification mechanism, while maintaining zero timeouts and valid permutations.\",\n  \"preserve\": [\n    \"Farthest-insertion construction\",\n    \"2-opt improvement\",\n    \"report_best_tour usage\"\n  ],\n  \"change\": [\n    \"Introduce a restart mechanism (e.g., random perturbation) if 2-opt stalls\",\n    \"Add an additional local search like Or-opt\"\n  ],\n  \"avoid\": [\n    \"Breaking permutation validity\",\n    \"Increasing runtime leading to timeout\",\n    \"Removing report_best_tour calls\",\n    \"Making random changes without structure\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

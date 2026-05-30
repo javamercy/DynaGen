@@ -32,7 +32,7 @@ class HistoryTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    # 2-opt nearest insertion restart\n    pass",
+            code="def solve_tsp(distance_matrix):\n    # 2-opt nearest insertion restart\n    pass",
             distance=100.0,
             status=CandidateStatus.VALID,
             metrics={
@@ -162,8 +162,8 @@ class HistoryTests(unittest.TestCase):
 
     def test_history_rejects_duplicate_code_when_weaker(self) -> None:
         history = CandidateHistory(config=_run_config(population_size=1, generations=0).evolution.history, problem="tsp")
-        strong = _candidate("cand_1", score=10.0, code="def solve_tsp(a,b,c):\n    return []")
-        weak = _candidate("cand_2", score=20.0, code="def solve_tsp(a,b,c):\n    return []")
+        strong = _candidate("cand_1", score=10.0, code="def solve_tsp(distance_matrix):\n    return []")
+        weak = _candidate("cand_2", score=20.0, code="def solve_tsp(distance_matrix):\n    return []")
 
         history.update([strong], generation=0, profile_builder=build_tsp_history_profile)
         history.update([weak], generation=0, profile_builder=build_tsp_history_profile)
@@ -258,7 +258,7 @@ class _FakeProvider:
             name=f"solver_{self.calls}",
             thought="fake solver",
             code=(
-                "def solve_tsp(distance_matrix, seed, budget):\n"
+                "def solve_tsp(distance_matrix):\n"
                 f"    tag = {self.calls}\n"
                 "    return list(range(len(distance_matrix)))"
             ),
@@ -344,9 +344,7 @@ def _run_config(
             },
         },
         "evaluation": {
-            "budget": 10,
             "timeout_seconds": 1,
-            "seeds": [1],
             "metric": "mean_gap",
         },
         "data": {

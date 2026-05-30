@@ -2,7 +2,7 @@ import ast
 import inspect
 from dataclasses import dataclass
 
-ALLOWED_IMPORTS = {"numpy", "math", "random", "heapq", "itertools", "collections", "time"}
+ALLOWED_IMPORTS = {"numpy", "math", "random", "heapq", "itertools", "collections", "time", "numba"}
 
 UNSAFE_CALLS = {
     "open",
@@ -79,10 +79,10 @@ def validate_solver_signature(func) -> ValidationResult:
     except (TypeError, ValueError) as exc:
         return ValidationResult(False, f"Invalid solve_tsp signature: {exc}")
     params = list(signature.parameters.values())
-    if len(params) != 3:
-        return ValidationResult(False, "solve_tsp must accept exactly three parameters")
-    if [param.name for param in params] != ["distance_matrix", "seed", "budget"]:
-        return ValidationResult(False, "solve_tsp parameters must be distance_matrix, seed, budget")
+    if len(params) != 1:
+        return ValidationResult(False, "solve_tsp must accept exactly one parameter")
+    if [param.name for param in params] != ["distance_matrix"]:
+        return ValidationResult(False, "solve_tsp parameter must be distance_matrix")
     for param in params:
         if param.kind not in {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.POSITIONAL_ONLY}:
             return ValidationResult(False, "solve_tsp parameters must be positional")
@@ -139,10 +139,10 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
 def _validate_solver_signature_ast(node: ast.FunctionDef) -> ValidationResult:
     args = node.args
     positional = list(args.posonlyargs) + list(args.args)
-    if len(positional) != 3 or args.vararg or args.kwonlyargs or args.kwarg:
-        return ValidationResult(False, "solve_tsp must accept exactly three parameters")
-    if [arg.arg for arg in positional] != ["distance_matrix", "seed", "budget"]:
-        return ValidationResult(False, "solve_tsp parameters must be distance_matrix, seed, budget")
+    if len(positional) != 1 or args.vararg or args.kwonlyargs or args.kwarg:
+        return ValidationResult(False, "solve_tsp must accept exactly one parameter")
+    if [arg.arg for arg in positional] != ["distance_matrix"]:
+        return ValidationResult(False, "solve_tsp parameter must be distance_matrix")
     return ValidationResult(True)
 
 
@@ -230,4 +230,17 @@ def _validate_call(node: ast.Call) -> ValidationResult:
         return ValidationResult(False, f"Unsafe call not allowed: {func.id}")
     if isinstance(func, ast.Attribute) and func.attr in UNSAFE_ATTRIBUTES:
         return ValidationResult(False, f"Unsafe attribute call not allowed: {func.attr}")
+    if _is_numba_jit_call(func):
+        for keyword in node.keywords:
+            cache_disabled = isinstance(keyword.value, ast.Constant) and keyword.value.value is False
+            if keyword.arg == "cache" and not cache_disabled:
+                return ValidationResult(False, "Numba caching is not allowed")
     return ValidationResult(True)
+
+
+def _is_numba_jit_call(func: ast.expr) -> bool:
+    if isinstance(func, ast.Name):
+        return func.id in {"jit", "njit"}
+    if isinstance(func, ast.Attribute):
+        return func.attr in {"jit", "njit"}
+    return False

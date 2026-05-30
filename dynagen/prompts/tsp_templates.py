@@ -2,27 +2,29 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.evolution.history import format_history_parent_context
 
 TSP_SOLVER_CONTRACT = """
-Implement this function only:
+Implement a complete TSP metaheuristic inside this required entrypoint:
 
-def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
 
 Requirements:
+- Instances are symmetric Euclidean 2D-style TSPs represented by a distance matrix.
 - Minimize total TSP tour distance.
 - Return a 1D np.ndarray containing each node exactly once.
 - Do not repeat the start node at the end.
-- Always return a valid tour, even when budget is very small.
-- Use only distance_matrix; do not assume coordinates.
-- Use seed for randomness.
-- Treat budget as a hard cap on search effort.
+- Always return a valid tour.
+- Use only distance_matrix; coordinates are not provided, but metric/geometric structure can be inferred from distances.
 - Create a valid tour early.
 - Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
 - Do not use files, network, subprocesses, or external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time, numba.
+- Numba may be used for small hot numeric helper functions only; keep solve_tsp as the Python wrapper that builds valid tours and calls report_best_tour, and do not use Numba caching or object-mode patterns.
 - Keep the code compact and robust.
 """
 
 TSP_INTERNAL_CHECKLIST = """
 correct signature, valid tour on every return path,
-early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+early report_best_tour, allowed imports only, Numba helpers only for hot numeric kernels,
+no I/O/network/subprocesses.
 """
 
 TSP_RESPONSE_FORMAT = """

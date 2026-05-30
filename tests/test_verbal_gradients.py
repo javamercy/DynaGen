@@ -117,7 +117,7 @@ class VerbalGradientTests(unittest.TestCase):
                         "source": "llm",
                         "summary": " ".join(["long summary about large instances and timeout risk"] * 6),
                         "aim": "Use complementary mechanisms while keeping valid construction.",
-                        "preserve": ["early reporting", "valid incumbent", "seeded construction"],
+                        "preserve": ["early reporting", "valid incumbent", "stable construction"],
                         "change": ["Use only the complementary mechanism and avoid copying slow loops."],
                         "avoid": ["unbounded all-pairs neighborhoods", "late reporting"],
                     },
@@ -142,7 +142,7 @@ class VerbalGradientTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="candidate thought",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            code="def solve_tsp(distance_matrix):\n    return []",
             metrics={
                 "problem": "tsp",
                 "score_name": "distance",
@@ -174,7 +174,7 @@ class VerbalGradientTests(unittest.TestCase):
             self.assertIn("VERBAL GRADIENT", user)
 
     def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
-        full_code = "def solve_tsp(distance_matrix, seed, budget):\n    " + "x = 1\n    " * 600 + "return []\n"
+        full_code = "def solve_tsp(distance_matrix):\n    " + "x = 1\n    " * 600 + "return []\n"
         candidate = Candidate(
             id="cand_full",
             generation=1,
@@ -217,7 +217,7 @@ class VerbalGradientTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="candidate thought",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            code="def solve_tsp(distance_matrix):\n    return []",
             metrics={
                 "problem": "tsp",
                 "score_name": "distance",
@@ -318,7 +318,7 @@ class _FakeProvider:
         return ParsedCandidateResponse(
             name=f"solver_{self.candidate_calls}",
             thought="fake solver",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return list(range(len(distance_matrix)))",
+            code="def solve_tsp(distance_matrix):\n    return list(range(len(distance_matrix)))",
         )
 
     def complete_with_metadata(self, messages, *, temperature):
@@ -401,9 +401,7 @@ def _run_config(*, llm_every_n_generations: int = 1, llm_model: str = "feedback-
             },
         },
         "evaluation": {
-            "budget": 10,
             "timeout_seconds": 1,
-            "seeds": [1],
             "metric": "mean_gap",
         },
         "data": {
