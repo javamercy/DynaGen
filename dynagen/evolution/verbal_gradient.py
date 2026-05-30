@@ -76,10 +76,12 @@ def set_candidate_gradient(candidate: Candidate, gradient: dict[str, Any]) -> No
 
 def format_parent_verbal_gradients(
         parents: list[Candidate],
+        *,
+        fields: set[str] | None = None,
 ) -> str:
     blocks = []
     for parent in parents:
-        block = format_candidate_verbal_gradient(parent)
+        block = format_candidate_verbal_gradient(parent, fields=fields)
         if block:
             blocks.append(block)
     if not blocks:
@@ -89,26 +91,34 @@ def format_parent_verbal_gradients(
 
 def format_candidate_verbal_gradient(
         candidate: Candidate,
+        *,
+        fields: set[str] | None = None,
 ) -> str:
     gradient = get_candidate_gradient(candidate)
     if not gradient or str(gradient.get("source")) != "llm":
         return ""
+    visible = fields or {"summary", "aim", "preserve", "change", "avoid"}
     lines = [f"Parent {candidate.id} LLM reflection:"]
-    summary = _clean_text(gradient.get("summary"))
-    if summary:
-        lines.append(f"- Summary: {summary}")
-    aim = _clean_text(gradient.get("aim"))
-    if aim:
-        lines.append(f"- Aim: {aim}")
-    preserve = _clean_list(gradient.get("preserve"))
-    if preserve:
-        lines.append(f"- Preserve: {'; '.join(preserve)}")
-    change = _clean_list(gradient.get("change"))
-    if change:
-        lines.append(f"- Change: {'; '.join(change)}")
-    avoid = _clean_list(gradient.get("avoid"))
-    if avoid:
-        lines.append(f"- Avoid: {'; '.join(avoid)}")
+    if "summary" in visible:
+        summary = _clean_text(gradient.get("summary"))
+        if summary:
+            lines.append(f"- Summary: {summary}")
+    if "aim" in visible:
+        aim = _clean_text(gradient.get("aim"))
+        if aim:
+            lines.append(f"- Aim: {aim}")
+    if "preserve" in visible:
+        preserve = _clean_list(gradient.get("preserve"))
+        if preserve:
+            lines.append(f"- Preserve: {'; '.join(preserve)}")
+    if "change" in visible:
+        change = _clean_list(gradient.get("change"))
+        if change:
+            lines.append(f"- Change: {'; '.join(change)}")
+    if "avoid" in visible:
+        avoid = _clean_list(gradient.get("avoid"))
+        if avoid:
+            lines.append(f"- Avoid: {'; '.join(avoid)}")
     return "\n".join(lines)
 
 

@@ -2,7 +2,7 @@ import logging
 import math
 import os
 import random
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from dynagen.candidates import CandidateStatus, ParsedCandidateResponse
@@ -24,7 +24,7 @@ from dynagen.evolution.verbal_gradient import (
     parse_llm_verbal_gradient,
     set_candidate_gradient,
 )
-from dynagen.llm.base import LLMProvider
+from dynagen.llm.base import LLMBudgetExceeded, LLMProvider
 from dynagen.persistence.run_store import RunStore
 from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
@@ -87,7 +87,10 @@ class EvolutionEngine:
         )
         self._save_history(0)
         for generation in range(1, self.config.evolution.generations + 1):
-            offspring = self._generate_offspring(generation, population)
+            try:
+                offspring = self._generate_offspring(generation, population)
+            except LLMBudgetExceeded:
+                break
             next_candidates = select_survivors(population.candidates + offspring, self.config.evolution.population_size)
             population = Population(generation=generation, candidates=next_candidates)
             summary = generation_summary(
@@ -134,7 +137,7 @@ class EvolutionEngine:
 
     def _llm_call_summary(self) -> dict:
         provider_summaries = self._provider_summaries()
-        configured_budget = scheduled_llm_calls(self.config)
+        configured_budget = self.config.llm.llm_call_budget or scheduled_llm_calls(self.config)
         main_summary = provider_summaries[0] if provider_summaries else {}
         feedback_summary = provider_summaries[1] if len(provider_summaries) > 1 else main_summary
         main_model = main_summary.get("llm_model") or getattr(self.provider, "model", None)
@@ -209,17 +212,31 @@ class EvolutionEngine:
         self._update_history(offspring, generation=generation)
         return offspring
 
+    def _effective_strategies(self) -> list[Strategy]:
+        weights = (
+            self.config.evolution.archive_mode_strategy_weights
+            or self.config.evolution.strategy_weights
+        )
+        if not weights:
+            return self.config.evolution.strategies
+        active = []
+        for strategy in self.config.evolution.strategies:
+            name = strategy.value if hasattr(strategy, "value") else str(strategy)
+            weight = weights.get(name, 0.0)
+            if self.rng.random() < weight:
+                active.append(strategy)
+        if not active:
+            active = [Strategy.M5_INTENSIFY_SEARCH]
+        return active
+
     def _build_offspring_tasks(
             self,
             generation: int,
             population: Population,
     ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
-        available_strategies = self.config.evolution.strategies
-        num_to_select = min(self.config.evolution.population_size, len(available_strategies))
-        selected_strategies = self.rng.sample(available_strategies, num_to_select)
-        
-        for strategy in selected_strategies:
+        available_strategies = self._effective_strategies()
+        for strategy in available_strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
                 parents = self._select_strategy_parents(strategy, population.candidates)
@@ -253,6 +270,7 @@ class EvolutionEngine:
 
         max_workers = min(len(tasks), os.cpu_count() or 1)
         results: list[Candidate] = [None] * len(tasks)  # type: ignore[list-item]
+        budget_exceeded = False
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
@@ -261,8 +279,20 @@ class EvolutionEngine:
             }
             for future in as_completed(future_to_index):
                 index = future_to_index[future]
-                results[index] = future.result()
+                try:
+                    results[index] = future.result()
+                except LLMBudgetExceeded:
+                    budget_exceeded = True
+                    for f in future_to_index:
+                        if not f.done():
+                            f.cancel()
+                except CancelledError:
+                    pass
 
+        if budget_exceeded:
+            raise LLMBudgetExceeded(
+                "LLM call budget exceeded during candidate generation"
+            )
         return results
 
     def _process_single_task(self, task: _CandidateTask) -> Candidate:
@@ -298,6 +328,8 @@ class EvolutionEngine:
                 candidate.status,
                 candidate.score_value,
             )
+        except LLMBudgetExceeded:
+            raise
         except Exception as exc:
             error_details = _exception_details(exc)
             if candidate is None:
@@ -501,7 +533,11 @@ class EvolutionEngine:
         gradient_config = self.config.evolution.verbal_gradients
         if not gradient_config.enabled:
             return ""
-        return format_parent_verbal_gradients(parents)
+        fields = _reflection_fields_for_strategy(None)
+        return format_parent_verbal_gradients(
+            parents,
+            fields=fields,
+        )
 
     def _provider_summaries(self) -> list[dict[str, object]]:
         providers: list[LLMProvider] = [self.provider]
@@ -557,14 +593,24 @@ class EvolutionEngine:
         return self.config.problem.type.upper()
 
 
+def _reflection_fields_for_strategy(strategy: str | None) -> set[str]:
+    if str(strategy) in ("S2", "m5_intensify_search", "m6_diversify_search"):
+        return {"summary", "aim", "preserve", "change", "avoid"}
+    return {"summary", "aim"}
+
+
 def scheduled_llm_calls(config: RunConfig) -> int:
-    num_selected_strategies = min(config.evolution.population_size, len(config.evolution.strategies))
-    return (
-            config.evolution.population_size
-            + config.evolution.generations
-            * num_selected_strategies
-            * config.evolution.offspring_per_strategy
+    weights = config.evolution.archive_mode_strategy_weights or config.evolution.strategy_weights
+    if weights:
+        expected_strategies = sum(weights.values())
+    else:
+        expected_strategies = len(config.evolution.strategies)
+    expected_calls = int(
+        config.evolution.generations
+        * expected_strategies
+        * config.evolution.offspring_per_strategy
     )
+    return config.evolution.population_size + max(0, expected_calls)
 
 
 def _build_candidate_from_response(

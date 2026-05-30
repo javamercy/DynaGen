@@ -114,7 +114,7 @@ def execute_vrp_solver_code(
         )
     try:
         status, value, child_runtime, error = result_queue.get_nowait()
-    except queue.Empty:
+    except (queue.Empty, EOFError, OSError, BrokenPipeError):
         if process.exitcode == 0:
             return VRPSolverExecutionResult(
                 "error",
@@ -179,7 +179,7 @@ def _get_worker_result_until_deadline(result_queue, process, *, start: float, ti
         while True:
             try:
                 return result_queue.get(timeout=0.05)
-            except queue.Empty:
+            except (queue.Empty, EOFError, OSError, BrokenPipeError):
                 if not process.is_alive():
                     return None
 
@@ -190,7 +190,7 @@ def _get_worker_result_until_deadline(result_queue, process, *, start: float, ti
             return None
         try:
             return result_queue.get(timeout=min(0.05, remaining))
-        except queue.Empty:
+        except (queue.Empty, EOFError, OSError, BrokenPipeError):
             if not process.is_alive():
                 return None
 
@@ -236,6 +236,9 @@ def _worker(code: str, instance: VRPInstance, result_queue, best_routes_queue) -
     except Exception as exc:
         runtime = time.perf_counter() - start
         result_queue.put(("error", None, runtime, _short_error_message(exc)))
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
 
 
 def _reported_routes(best_routes_queue) -> Any | None:

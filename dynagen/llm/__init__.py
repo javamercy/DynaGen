@@ -1,4 +1,4 @@
-from dynagen.llm.base import CountingLLMProvider, LLMProvider, LLMResponse
+from dynagen.llm.base import CountingLLMProvider, LLMBudgetExceeded, LLMProvider, LLMResponse
 from dynagen.llm.ollama_provider import OllamaProvider
 
 try:
@@ -18,6 +18,7 @@ except ImportError:
 
 __all__ = [
     "CountingLLMProvider",
+    "LLMBudgetExceeded",
     "LLMProvider",
     "LLMResponse",
     "OllamaProvider",

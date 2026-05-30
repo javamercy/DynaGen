@@ -94,7 +94,7 @@ def _get_worker_result_until_deadline(result_queue, process, *, start: float, ti
             return None
         try:
             return result_queue.get(timeout=min(0.05, remaining))
-        except queue.Empty:
+        except (queue.Empty, EOFError, OSError, BrokenPipeError):
             if not process.is_alive():
                 return None
 
@@ -142,6 +142,9 @@ def _worker(code: str, distance_matrix: np.ndarray, seed: int, budget: int, resu
     except Exception as exc:
         runtime = time.perf_counter() - start
         result_queue.put(("error", None, runtime, _short_error_message(exc)))
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
 
 
 def _reported_tour(best_tour_a, best_tour_b, active_tour_index) -> Any | None:

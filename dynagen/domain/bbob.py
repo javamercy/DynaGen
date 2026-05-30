@@ -152,7 +152,7 @@ class BudgetedBBOBObjective:
 
     def _evaluate_one(self, x: np.ndarray) -> float:
         if self.evaluations >= self.budget:
-            raise BudgetExceeded("BBOB function evaluation budget exceeded")
+            return float("inf")
         value = self.instance.evaluate_ioh(x, self._ioh_problem)
         self.evaluations += 1
         if value < self.best_value:

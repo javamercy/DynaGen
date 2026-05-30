@@ -22,6 +22,7 @@ class DeepSeekProvider(LLMProvider):
         model: str,
         api_key_env: str = "DEEPSEEK_API_KEY",
         base_url: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         """Initialize DeepSeek provider.
         
@@ -29,6 +30,7 @@ class DeepSeekProvider(LLMProvider):
             model: Model name (e.g., "deepseek-chat", "deepseek-coder")
             api_key_env: Environment variable containing API key
             base_url: Optional custom API endpoint (default: DeepSeek official API)
+            reasoning_effort: Optional reasoning effort level ("high" or "max")
         """
         api_key = os.environ.get(api_key_env)
         if not api_key:
@@ -43,6 +45,13 @@ class DeepSeekProvider(LLMProvider):
             base_url=base_url or self.DEEPSEEK_API_BASE,
         )
         self.model = model
+        self.reasoning_effort = reasoning_effort
+
+    def _api_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {}
+        if self.reasoning_effort is not None:
+            kwargs["reasoning_effort"] = self.reasoning_effort
+        return kwargs
 
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
         """Generate candidate response."""
@@ -54,6 +63,7 @@ class DeepSeekProvider(LLMProvider):
             model=self.model,
             messages=messages,
             temperature=temperature,
+            **self._api_kwargs(),
         )
         return response.choices[0].message.content or ""
 
@@ -65,7 +75,8 @@ class DeepSeekProvider(LLMProvider):
             temperature=temperature,
             response_format={
                 "type": "json_object",
-            }
+            },
+            **self._api_kwargs(),
         )
         content = response.choices[0].message.content or ""
         metadata: dict[str, Any] = {"model": self.model}
