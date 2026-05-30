@@ -163,6 +163,11 @@ def _candidate_mean_aocc_score(status: EvaluationStatus, metrics: dict[str, Any]
         return _finite_or_zero(metrics.get("mean_aocc"))
     if status == "timeout":
         return _finite_or_zero(metrics.get("timeout_mean_aocc"))
+    if status == "error":
+        valid_aocc = metrics.get("mean_aocc")
+        error_fraction = metrics.get("runtime_error_count", 0) / max(1, metrics.get("runs", 1))
+        base = _finite_or_zero(valid_aocc)
+        return max(0.0, base - error_fraction * base * 0.5)
     return 0.0
 
 
