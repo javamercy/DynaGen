@@ -13,6 +13,8 @@ class LLMConfig:
     model: str
     temperature: float
     api_key_env: str | None = None
+    llm_call_budget: int | None = None
+    reasoning_effort: str | None = None
 
     def __post_init__(self) -> None:
         if not self.provider:
@@ -23,6 +25,14 @@ class LLMConfig:
             raise ValueError("temperature must be between 0 and 2")
         if not self.provider.startswith("ollama") and not self.api_key_env:
             raise ValueError("api_key_env must be specified")
+        if self.llm_call_budget is not None:
+            self.llm_call_budget = int(self.llm_call_budget)
+            if self.llm_call_budget < 1:
+                raise ValueError("llm_call_budget must be positive")
+        if self.reasoning_effort is not None:
+            self.reasoning_effort = str(self.reasoning_effort).lower().strip()
+            if self.reasoning_effort not in {"high", "max"}:
+                raise ValueError("reasoning_effort must be 'high' or 'max'")
 
 
 @dataclass
@@ -101,6 +111,8 @@ class EvolutionConfig:
     generations: int
     offspring_per_strategy: int
     strategies: list[Strategy] = field(default_factory=lambda: list(Strategy))
+    strategy_weights: dict[str, float] = field(default_factory=dict)
+    archive_mode_strategy_weights: dict[str, float] | None = None
     verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
     history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
 
@@ -109,6 +121,23 @@ class EvolutionConfig:
         self.generations = int(self.generations)
         self.offspring_per_strategy = int(self.offspring_per_strategy)
         self.strategies = [Strategy(strategy) for strategy in self.strategies]
+        self.strategy_weights = {
+            str(key): float(weight)
+            for key, weight in _ensure_dict(self.strategy_weights).items()
+            if float(weight) >= 0
+        }
+        if isinstance(self.archive_mode_strategy_weights, dict):
+            self.archive_mode_strategy_weights = {
+                str(key): float(weight)
+                for key, weight in self.archive_mode_strategy_weights.items()
+                if float(weight) >= 0
+            }
+        elif isinstance(self.archive_mode_strategy_weights, str):
+            self.archive_mode_strategy_weights = {
+                str(key): float(weight)
+                for key, weight in _parse_simple_dict(self.archive_mode_strategy_weights).items()
+                if float(weight) >= 0
+            }
         if isinstance(self.verbal_gradients, dict):
             self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
@@ -123,6 +152,9 @@ class EvolutionConfig:
             raise ValueError("generations must be non-negative")
         if self.offspring_per_strategy < 0:
             raise ValueError("offspring_per_strategy must be non-negative")
+        active = self.archive_mode_strategy_weights or self.strategy_weights
+        if active and not any(w > 0 for w in active.values()):
+            raise ValueError("at least one strategy weight must be positive")
 
 
 @dataclass
@@ -362,6 +394,8 @@ def _parse_scalar(value: str) -> Any:
         if not inner:
             return []
         return [_parse_scalar(part.strip()) for part in inner.split(",")]
+    if value.startswith("{") and value.endswith("}"):
+        return _parse_simple_dict(value)
     if value in {"true", "True"}:
         return True
     if value in {"false", "False"}:
@@ -378,3 +412,29 @@ def _parse_scalar(value: str) -> Any:
         return float(value)
     except ValueError:
         return value
+
+
+def _parse_simple_dict(text: str) -> dict[str, object]:
+    inner = text.strip()
+    if inner.startswith("{") and inner.endswith("}"):
+        inner = inner[1:-1].strip()
+    if not inner:
+        return {}
+    result: dict[str, object] = {}
+    for pair in inner.split(","):
+        pair = pair.strip()
+        if ":" not in pair:
+            continue
+        key, value = pair.split(":", 1)
+        key = key.strip().strip('"').strip("'")
+        value = value.strip()
+        result[key] = _parse_scalar(value)
+    return result
+
+
+def _ensure_dict(value: object) -> dict[str, object]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        return _parse_simple_dict(value)
+    return {}

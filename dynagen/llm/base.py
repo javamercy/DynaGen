@@ -6,6 +6,10 @@ from typing import Any
 from dynagen.candidates import ParsedCandidateResponse
 
 
+class LLMBudgetExceeded(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class LLMResponse:
     parsed_candidate_response: ParsedCandidateResponse
@@ -69,7 +73,17 @@ class CountingLLMProvider(LLMProvider):
         with self._lock:
             return self._feedback_calls
 
+    def _check_budget(self) -> None:
+        if self.configured_budget is None:
+            return
+        with self._lock:
+            if self._candidate_generation_calls >= self.configured_budget:
+                raise LLMBudgetExceeded(
+                    f"LLM call budget exceeded: {self._candidate_generation_calls} >= {self.configured_budget}"
+                )
+
     def complete(self, messages: list[dict[str, str]], *, temperature: float) -> ParsedCandidateResponse:
+        self._check_budget()
         self._record_call()
         try:
             return self.provider.complete(messages, temperature=temperature)
@@ -83,6 +97,7 @@ class CountingLLMProvider(LLMProvider):
             *,
             temperature: float,
     ) -> LLMResponse:
+        self._check_budget()
         self._record_call()
         try:
             return self.provider.complete_with_metadata(messages, temperature=temperature)

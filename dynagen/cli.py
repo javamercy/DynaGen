@@ -307,7 +307,12 @@ def _provider_from_config(
         configured_budget: int | None | object = _UNSET,
 ):
     model = model_override or config.llm.model
-    budget = scheduled_llm_calls(config) if configured_budget is _UNSET else configured_budget
+    if configured_budget is not _UNSET:
+        budget = configured_budget
+    elif config.llm.llm_call_budget is not None:
+        budget = config.llm.llm_call_budget
+    else:
+        budget = scheduled_llm_calls(config)
     if config.llm.provider == "openai":
         from dynagen.llm.openai_provider import OpenAIProvider
         provider = OpenAIProvider(model=model, api_key_env=config.llm.api_key_env)
@@ -318,7 +323,11 @@ def _provider_from_config(
         return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "deepseek":
         from dynagen.llm.deepseek_provider import DeepSeekProvider
-        provider = DeepSeekProvider(model=model, api_key_env=config.llm.api_key_env)
+        provider = DeepSeekProvider(
+            model=model,
+            api_key_env=config.llm.api_key_env,
+            reasoning_effort=config.llm.reasoning_effort,
+        )
         return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "openrouter":
         from dynagen.llm.openrouter_provider import OpenRouterProvider

@@ -206,7 +206,7 @@ def _get_worker_result_until_deadline(result_queue, process, *, start: float, ti
             return None
         try:
             return result_queue.get(timeout=min(0.05, remaining))
-        except queue.Empty:
+        except (queue.Empty, EOFError, OSError, BrokenPipeError):
             if not process.is_alive():
                 return None
 
@@ -272,6 +272,9 @@ def _worker(code: str, instance: BBOBInstance, seed: int, budget: int, result_qu
         evaluations = 0 if objective is None else int(objective.evaluations)
         value, point = _reported_best(best_x, best_value, has_best)
         result_queue.put(("error", value, point, history, evaluations, runtime, _short_error_message(exc)))
+    finally:
+        result_queue.close()
+        result_queue.join_thread()
 
 
 def _reported_best(best_x, best_value, has_best) -> tuple[float | None, list[float] | None]:
