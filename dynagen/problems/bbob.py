@@ -66,6 +66,13 @@ class BBOBProblem:
     def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
         return build_bbob_history_profile(candidate)
 
+    def per_instance_scores(self, candidate: Candidate) -> dict[str, float]:
+        metrics = candidate.metrics if isinstance(candidate.metrics, dict) else {}
+        by_function = metrics.get("aocc_by_function")
+        if isinstance(by_function, dict):
+            return {str(k): float(v) for k, v in by_function.items()}
+        return {}
+
 
 def create_bbob_initial_roles(count: int) -> list[BBOBInitialRole]:
     roles: list[BBOBInitialRole] = []

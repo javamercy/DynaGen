@@ -112,6 +112,19 @@ class RunStore:
             filename = f"{candidate_id}_{feedback_type}_{suffix}.json"
         dump_json(self.feedback_dir / filename, feedback)
 
+    def save_committee_results(
+            self,
+            *,
+            specialists: list[str],
+            assignments: dict[str, list[str]],
+            test_results: dict[str, object],
+    ) -> None:
+        dump_json(self.root / "committee.json", {
+            "specialists": specialists,
+            "assignments": assignments,
+            "test_results": test_results,
+        })
+
     def write_final_report(self, text: str) -> None:
         (self.root / "final_report.md").write_text(text, encoding="utf-8")
 

@@ -1,0 +1,555 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000057: DE_NM_hybrid
+Status: valid; mean AOCC score: 0.444931 (higher is better)
+Thought: Combines Differential Evolution for global exploration with Nelder-Mead local refinement. DE uses fixed F=0.8, CR=0.9, population size adapted to budget. After DE, a Nelder-Mead search starts from the best point. Budget is strictly enforced with pre-evaluation checks. Randomness controlled by seed.
+Mean AOCC: 0.44493062340304157
+Mean final error: 1.2171553908222803
+AOCC by group: {'high_conditioning_unimodal': 0.5517586785225483, 'low_moderate_conditioning': 0.6502352313914058, 'multimodal_strong_global_structure': 0.2508619429475634, 'multimodal_weak_global_structure': 0.22595800529713592, 'separable': 0.586900180454227}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        # Helper to evaluate a point with budget and bounds check
+        def evaluate(x):
+            nonlocal evals, best_val, best_x
+            if evals >= budget:
+                return None
+            x_clipped = np.clip(x, lb, ub)
+            val = func(x_clipped)
+            evals += 1
+            if val < best_val:
+                best_val = val
+                best_x = x_clipped.copy()
+                report_best(best_val, best_x)
+            return val
+
+        # Reserve evaluations for Nelder-Mead
+        reserve_nm = min(dim + 5, budget // 3)
+        nm_budget_needed = dim + 1 + 2 * dim  # initial simplex + iterations
+        if nm_budget_needed > budget:
+            reserve_nm = max(1, budget // 4)
+        de_budget = budget - reserve_nm
+        if de_budget < 2:
+            de_budget = max(1, budget - 1)
+
+        # If budget too small, just random search
+        if de_budget < 2 or budget <= dim + 1:
+            for _ in range(budget):
+                if evals >= budget:
+                    break
+                x = lb + (ub - lb) * rng.rand(dim)
+                evaluate(x)
+            return best_val, best_x
+
+        # DE parameters
+        F = 0.8
+        CR = 0.9
+        pop_size = max(4, min(20, de_budget // 2))
+        if pop_size * 3 > de_budget:
+            pop_size = max(2, de_budget // 3)
+        max_gens = de_budget // pop_size
+        if max_gens == 0:
+            max_gens = 1
+            pop_size = de_budget
+
+        # Initialize population
+        pop = lb + (ub - lb) * rng.rand(pop_size, dim)
+        pop_fitness = np.full(pop_size, np.inf)
+
+        for i in range(pop_size):
+            if evals >= de_budget:
+                break
+            val = evaluate(pop[i])
+            if val is None:
+                break
+            pop_fitness[i] = val
+
+        # DE generations
+        for gen in range(max_gens):
+            if evals >= de_budget:
+                break
+            for i in range(pop_size):
+                if evals >= de_budget:
+                    break
+                # Mutation
+                indices = [j for j in range(pop_size) if j != i]
+                rng.shuffle(indices)
+                a, b, c = indices[:3]
+                mutant = pop[a] + F * (pop[b] - pop[c])
+                # Crossover
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < CR, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = evaluate(trial)
+                if val is None:
+                    break
+                if val < pop_fitness[i]:
+                    pop[i] = trial
+                    pop_fitness[i] = val
+
+        # Nelder-Mead local search
+        if evals < budget and best_x is not None:
+            # Build simplex around best
+            simplex = np.zeros((dim + 1, dim))
+            simplex[0] = best_x.copy()
+            for i in range(dim):
+                step = 0.05 * (ub[i] - lb[i])
+                if step == 0:
+                    step = 0.01
+                x = best_x.copy()
+                x[i] = min(ub[i], max(lb[i], x[i] + step))
+                simplex[i+1] = x
+
+            simplex_vals = np.full(dim + 1, np.inf)
+            simplex_vals[0] = best_val
+            for i in range(1, dim + 1):
+                if evals >= budget:
+                    break
+                val = evaluate(simplex[i])
+                if val is None:
+                    break
+                simplex_vals[i] = val
+
+            # Nelder-Mead parameters
+            alpha = 1.0
+            gamma = 2.0
+            rho = 0.5
+            sigma = 0.5
+            max_iter = 100
+            for _ in range(max_iter):
+                if evals >= budget:
+                    break
+                # Sort simplex
+                order = np.argsort(simplex_vals)
+                simplex = simplex[order]
+                simplex_vals = simplex_vals[order]
+
+                centroid = np.mean(simplex[:-1], axis=0)
+
+                # Reflection
+                if evals >= budget:
+                    break
+                xr = centroid + alpha * (centroid - simplex[-1])
+                xr = np.clip(xr, lb, ub)
+                yr = evaluate(xr)
+                if yr is None:
+                    break
+                if yr < simplex_vals[0]:
+                    # Expansion
+                    if evals >= budget:
+                        break
+                    xe = centroid + gamma * (xr - centroid)
+                    xe = np.clip(xe, lb, ub)
+                    ye = evaluate(xe)
+                    if ye is None:
+                        break
+                    if ye < yr:
+                        simplex[-1] = xe
+                        simplex_vals[-1] = ye
+                    else:
+                        simplex[-1] = xr
+                        simplex_vals[-1] = yr
+                elif yr < simplex_vals[-2]:
+                    simplex[-1] = xr
+                    simplex_vals[-1] = yr
+                else:
+                    # Contraction
+                    if evals >= budget:
+                        break
+                    if yr < simplex_vals[-1]:
+                        xc = centroid + rho * (xr - centroid)
+                    else:
+                        xc = centroid + rho * (simplex[-1] - centroid)
+                    xc = np.clip(xc, lb, ub)
+                    yc = evaluate(xc)
+                    if yc is None:
+                        break
+                    if yc < simplex_vals[-1]:
+                        simplex[-1] = xc
+                        simplex_vals[-1] = yc
+                    else:
+                        # Shrink
+                        for i in range(1, dim + 1):
+                            if evals >= budget:
+                                break
+                            simplex[i] = simplex[0] + sigma * (simplex[i] - simplex[0])
+                            simplex[i] = np.clip(simplex[i], lb, ub)
+                            val = evaluate(simplex[i])
+                            if val is None:
+                                break
+                            simplex_vals[i] = val
+
+                # Update best after iteration
+                current_best_idx = np.argmin(simplex_vals)
+                if simplex_vals[current_best_idx] < best_val:
+                    best_val = simplex_vals[current_best_idx]
+                    best_x = simplex[current_best_idx].copy()
+                    report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+Candidate cand_000029: simple_coordinate_polling
+Status: valid; mean AOCC score: 0.319779 (higher is better)
+Thought: Simplified coordinate descent with adaptive step sizes and occasional random perturbations for exploration. Init at random feasible point. Iterate over dimensions in random order, polling positive and negative directions with step size. On success, increase step; on failure, decrease step. After a full pass without improvement, with probability 0.1 sample a new random point for exploration. Budget is strictly respected.
+Mean AOCC: 0.3197793712117203
+Mean final error: 10.807623129574715
+AOCC by group: {'high_conditioning_unimodal': 0.17288240318668405, 'low_moderate_conditioning': 0.39181022730951004, 'multimodal_strong_global_structure': 0.11642530466465824, 'multimodal_weak_global_structure': 0.2812814779022988, 'separable': 0.6509036142150083}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        # Initial random point
+        best_x = lb + self.rng.rand(dim) * (ub - lb)
+        best_f = func(best_x)
+        evals = 1
+        report_best(best_f, best_x)
+        # Step sizes
+        step = 0.2 * (ub - lb)
+        # Main loop
+        while evals < self.budget:
+            success = False
+            # Coordinate polling in random order
+            perm = self.rng.permutation(dim)
+            for i in perm:
+                if evals >= self.budget:
+                    break
+                # Positive direction
+                trial = best_x.copy()
+                trial[i] = np.clip(best_x[i] + step[i], lb[i], ub[i])
+                f = func(trial)
+                evals += 1
+                if f < best_f:
+                    best_f = f
+                    best_x = trial
+                    report_best(best_f, best_x)
+                    step[i] *= 1.5
+                    success = True
+                    break
+                # Negative direction
+                trial = best_x.copy()
+                trial[i] = np.clip(best_x[i] - step[i], lb[i], ub[i])
+                f = func(trial)
+                evals += 1
+                if f < best_f:
+                    best_f = f
+                    best_x = trial
+                    report_best(best_f, best_x)
+                    step[i] *= 1.5
+                    success = True
+                    break
+                else:
+                    step[i] *= 0.5
+            # If no success after full cycle, random perturbation with probability 0.1
+            if not success and evals < self.budget and self.rng.rand() < 0.1:
+                trial = lb + self.rng.rand(dim) * (ub - lb)
+                f = func(trial)
+                evals += 1
+                if f < best_f:
+                    best_f = f
+                    best_x = trial
+                    report_best(best_f, best_x)
+                    step = 0.2 * (ub - lb)  # reset steps
+        return best_f, best_x
+```
+
+Candidate cand_000083: simplified_de_nm
+Status: valid; mean AOCC score: 0.455601 (higher is better)
+Thought: Combines a simple Differential Evolution global search with Nelder-Mead local refinement. DE uses fixed population size (max 20, min 4) and standard parameters (F=0.8, CR=0.9). Nelder-Mead starts from the best DE solution with standard coefficients. Budget is split: most for DE, a reserve for NM. All evaluations are clipped to bounds. report_best is called on every improvement. Seed controls randomness via numpy RandomState.
+Mean AOCC: 0.45560106252924015
+Mean final error: 0.6924568280219338
+AOCC by group: {'high_conditioning_unimodal': 0.5486437540108224, 'low_moderate_conditioning': 0.6249207469890921, 'multimodal_strong_global_structure': 0.25798868334483216, 'multimodal_weak_global_structure': 0.25614998425776897, 'separable': 0.6241660809356553}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        def evaluate(x):
+            nonlocal evals, best_val, best_x
+            if evals >= budget:
+                return None
+            x_clipped = np.clip(x, lb, ub)
+            val = func(x_clipped)
+            evals += 1
+            if val < best_val:
+                best_val = val
+                best_x = x_clipped.copy()
+                report_best(best_val, best_x)
+            return val
+
+        # Initial evaluation
+        x0 = lb + (ub - lb) * rng.rand(dim)
+        evaluate(x0)
+
+        # If budget very small, just random search
+        if budget <= dim + 2:
+            for _ in range(budget - evals):
+                if evals >= budget:
+                    break
+                x = lb + (ub - lb) * rng.rand(dim)
+                evaluate(x)
+            return best_val, best_x
+
+        # Differential Evolution phase
+        pop_size = max(4, min(20, (budget * 3) // 4 // 2))
+        if pop_size < 2:
+            pop_size = 2
+        de_max_evals = (budget * 3) // 4
+        if de_max_evals < pop_size:
+            de_max_evals = pop_size
+
+        pop = lb + (ub - lb) * rng.rand(pop_size, dim)
+        pop_fitness = np.full(pop_size, np.inf)
+
+        for i in range(pop_size):
+            if evals >= de_max_evals:
+                break
+            val = evaluate(pop[i])
+            if val is None:
+                break
+            pop_fitness[i] = val
+
+        # DE generations
+        F = 0.8
+        CR = 0.9
+        gen = 0
+        while evals < de_max_evals:
+            for i in range(pop_size):
+                if evals >= de_max_evals:
+                    break
+                indices = [j for j in range(pop_size) if j != i]
+                rng.shuffle(indices)
+                a, b, c = indices[:3]
+                mutant = pop[a] + F * (pop[b] - pop[c])
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < CR, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = evaluate(trial)
+                if val is None:
+                    break
+                if val < pop_fitness[i]:
+                    pop[i] = trial
+                    pop_fitness[i] = val
+            gen += 1
+
+        # Nelder-Mead local search
+        if evals < budget and best_x is not None:
+            simplex = np.zeros((dim + 1, dim))
+            simplex[0] = best_x.copy()
+            for i in range(dim):
+                step = 0.05 * (ub[i] - lb[i])
+                if step == 0:
+                    step = 0.01
+                x = best_x.copy()
+                x[i] = np.clip(x[i] + step, lb[i], ub[i])
+                simplex[i+1] = x
+
+            simplex_vals = np.full(dim + 1, np.inf)
+            simplex_vals[0] = best_val
+            for i in range(1, dim + 1):
+                if evals >= budget:
+                    break
+                val = evaluate(simplex[i])
+                if val is None:
+                    break
+                simplex_vals[i] = val
+
+            alpha = 1.0
+            gamma = 2.0
+            rho = 0.5
+            sigma = 0.5
+            max_iter = 100
+            for _ in range(max_iter):
+                if evals >= budget:
+                    break
+                order = np.argsort(simplex_vals)
+                simplex = simplex[order]
+                simplex_vals = simplex_vals[order]
+
+                centroid = np.mean(simplex[:-1], axis=0)
+
+                # Reflection
+                if evals >= budget:
+                    break
+                xr = centroid + alpha * (centroid - simplex[-1])
+                xr = np.clip(xr, lb, ub)
+                yr = evaluate(xr)
+                if yr is None:
+                    break
+                if yr < simplex_vals[0]:
+                    # Expansion
+                    if evals >= budget:
+                        break
+                    xe = centroid + gamma * (xr - centroid)
+                    xe = np.clip(xe, lb, ub)
+                    ye = evaluate(xe)
+                    if ye is None:
+                        break
+                    if ye < yr:
+                        simplex[-1] = xe
+                        simplex_vals[-1] = ye
+                    else:
+                        simplex[-1] = xr
+                        simplex_vals[-1] = yr
+                elif yr < simplex_vals[-2]:
+                    simplex[-1] = xr
+                    simplex_vals[-1] = yr
+                else:
+                    # Contraction
+                    if evals >= budget:
+                        break
+                    if yr < simplex_vals[-1]:
+                        xc = centroid + rho * (xr - centroid)
+                    else:
+                        xc = centroid + rho * (simplex[-1] - centroid)
+                    xc = np.clip(xc, lb, ub)
+                    yc = evaluate(xc)
+                    if yc is None:
+                        break
+                    if yc < simplex_vals[-1]:
+                        simplex[-1] = xc
+                        simplex_vals[-1] = yc
+                    else:
+                        # Shrink
+                        for i in range(1, dim + 1):
+                            if evals >= budget:
+                                break
+                            simplex[i] = simplex[0] + sigma * (simplex[i] - simplex[0])
+                            simplex[i] = np.clip(simplex[i], lb, ub)
+                            val = evaluate(simplex[i])
+                            if val is None:
+                                break
+                            simplex_vals[i] = val
+
+                current_best_idx = np.argmin(simplex_vals)
+                if simplex_vals[current_best_idx] < best_val:
+                    best_val = simplex_vals[current_best_idx]
+                    best_x = simplex[current_best_idx].copy()
+                    report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

@@ -1,0 +1,114 @@
+# =============================================================================
+# DynaGen BBOB Sample Configuration — ALL available options with defaults
+# =============================================================================
+
+run:
+  name: bbob_sample                    # Run name (used in output directory name)
+  output_dir: runs/bbob                # Base directory for run outputs
+  seed: 100                            # Engine RNG seed (not optimizer seeds)
+
+# ---------------------------------------------------------------------------
+# Problem: BBOB (Black-Box Optimization Benchmarking)
+# ---------------------------------------------------------------------------
+problem:
+  type: bbob                           # bbob | tsp | dvrp | vrp
+  function_ids: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 ]
+  dimension: 5                         # Dimensionality for search instances
+  search_instances: [ 1, 2, 3 ]        # Instance IDs for training/search
+  test_instances: [ 4, 5 ]             # Instance IDs for test/hold-out
+  test_dimensions: [ 5 ]               # Dimensions for test pool (defaults to [dimension])
+  bounds: [ -5.0, 5.0 ]               # Search space bounds [lower, upper]
+  aocc_lower_bound: 0.00000001         # AOCC normalization lower bound (default 1e-8)
+  aocc_upper_bound: 100.0              # AOCC normalization upper bound (default 1e2)
+  comparison_baselines: [ random_search ]  # Baselines for compare-bbob command
+
+# ---------------------------------------------------------------------------
+# LLM: Provider, model, budget, advanced options
+# ---------------------------------------------------------------------------
+llm:
+  provider: deepseek                   # deepseek | openai | ollama | openrouter
+  model: deepseek-v4-flash             # Model name (provider-specific)
+  temperature: 0.7                     # LLM sampling temperature (0.0–2.0)
+  api_key_env: DEEPSEEK_API_KEY        # Environment variable for API key
+
+  # --- Optional: budget enforcement ---
+  # llm_call_budget: 105               # Hard cap on candidate-generation LLM calls
+                                        #   (None = auto-computed from population + generations)
+                                        #   When hit, engine breaks gracefully
+
+  # --- Optional: DeepSeek reasoning depth (deepseek provider only) ---
+  # reasoning_effort: high             # "high" or "max" — passed to DeepSeek API
+
+# ---------------------------------------------------------------------------
+# Evolution: Core loop, strategies, history, verbal gradients, committee
+# ---------------------------------------------------------------------------
+evolution:
+  population_size: 5                   # Number of candidates in the population
+  generations: 20                      # Number of evolution generations
+  offspring_per_strategy: 1            # Candidates generated per strategy per generation
+
+  # --- Strategies — 9 available (3 exploration, 6 mutation) ---
+  # strategies:                        # Explicit strategy list (default: all 9)
+  #   - e1_radical_exploration         #   3 parents — different algorithmic family
+  #   - e2_backbone_exploration        #   3 parents — shared backbone, new structure
+  #   - e3_hybrid_recombination         #   2 parents — combine compatible strengths
+  #   - m1_component_replacement        #   1 parent  — replace one component
+  #   - m2_parameter_schedule_mutation  #   1 parent  — change params/thresholds
+  #   - m3_simplify_generalize          #   1 parent  — remove brittle components
+  #   - m4_contract_repair              #   1 parent  — fix interface/budget issues
+  #   - m5_intensify_search             #   1 parent  — stronger exploitation
+  #   - m6_diversify_search             #   1 parent  — stronger exploration
+
+  # --- Strategy weights — per-strategy sampling probability (0.0–1.0) ---
+  # strategy_weights:                  # Applied when history is empty (default: unweighted)
+  #   m5_intensify_search: 0.8
+  #   m6_diversify_search: 0.5
+  #   e1_radical_exploration: 0.1
+
+  # --- Archive-mode strategy weights — overrides from generation N onward ---
+  # archive_mode_strategy_weights:     # Applied from gen >= after_generation
+  #   m5_intensify_search: 0.9         #   e.g., switch to exploitation-only after gen 3
+  #   m6_diversify_search: 0.3
+  #   m1_component_replacement: 0.1
+  # archive_mode_strategy_weights_after_generation: 3   # when to activate (default 0 = immediate)
+
+  # --- History archive — persistent candidate store for parent sampling ---
+  history:
+    enabled: true                      # Enable/disable history archive
+    max_size: 64                       # Maximum total entries
+    max_per_bucket: 4                  # Max entries per bucket (function/group)
+    add_statuses: [ valid, evaluated, timeout ]   # Which statuses are archived
+    parent_sample_probability: 0.35    # Probability of sampling from history vs population
+    s3_history_parent_min: 1           # Min history parents for E3_HYBRID_RECOMBINATION
+    final_selection_uses_history: true # Whether final best can come from history
+    deduplicate_code: true             # Reject candidates with identical code
+    diversity_weight: 0.25             # Weight for diversity in history scoring
+    recency_weight: 0.05               # Weight for recency in history scoring
+    robustness_weight: 0.35            # Weight for robustness in history scoring
+
+  # --- Verbal gradients — LLM reflection on parent performance ---
+  verbal_gradients:
+    enabled: false                     # Enable/disable LLM reflections
+    llm_every_n_generations: 2         # Reflect every N generations
+    max_llm_calls_per_generation: 5    # Max reflection calls per generation
+    llm_model: deepseek-v4-flash       # Model for reflections (defaults to main model)
+    temperature: 0.3                   # Temperature for reflection prompts
+
+  # --- Committee mode — multi-specialist output ---
+  # output_mode: single                # single (default) | committee_specialist | committee_loop
+  # committee_size: 3                  # Number of specialists to maintain (N >= 1)
+  # committee_test_budget: 1000        # Budget for test-time tryout (committee_loop)
+  # niche:
+  #   cadence_generations: 10          # Guarantee each niche gets 1 gen every N gens
+  #   improvement_weight: true         # Weight niche selection by room-for-improvement
+  #   improvement_power: 0.7           # <1 flattens (helps small niches), >1 sharpens
+
+# ---------------------------------------------------------------------------
+# Evaluation: Budget, timeouts, seeds, metric
+# ---------------------------------------------------------------------------
+evaluation:
+  budget: 10000                        # Function evaluations per optimizer run
+  timeout_seconds: 180                 # Wall-clock timeout per (function×instance×seed)
+  timeout_penalty: 0.0                 # Penalty added to score for timeout fraction
+  seeds: [ 100 ]                       # Optimizer seeds (multiple = averaged)
+  metric: mean_aocc                    # Scoring metric (mean_aocc for BBOB)

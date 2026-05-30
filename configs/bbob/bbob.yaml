@@ -25,6 +25,22 @@ evolution:
   population_size: 5
   generations: 20
   offspring_per_strategy: 1
+  
+  strategy_weights:
+    m5_intensify_search: 0.8
+    m6_diversify_search: 0.5
+    m1_component_replacement: 0.15
+    m2_parameter_schedule_mutation: 0.1
+    e2_backbone_exploration: 0.15
+    e3_hybrid_recombination: 0.15
+  archive_mode_strategy_weights:
+    m5_intensify_search: 0.9
+    m6_diversify_search: 0.3
+    m1_component_replacement: 0.1
+    e2_backbone_exploration: 0.1
+    e3_hybrid_recombination: 0.1
+  archive_mode_strategy_weights_after_generation: 3   # switch to archive weights from gen 3
+
   history:
     enabled: true
     max_size: 64
@@ -43,6 +59,15 @@ evolution:
     max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
     temperature: 0.3
+
+  # === Committee mode (optional) ===
+  output_mode: committee_specialist  # single (default) | committee_specialist | committee_loop
+  committee_size: 3
+  committee_test_budget: 1000
+  niche:
+    cadence_generations: 10
+    improvement_weight: true
+    improvement_power: 0.7
 
 evaluation:
   budget: 10000

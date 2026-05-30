@@ -106,6 +106,22 @@ class HistoryConfig:
 
 
 @dataclass
+class NicheConfig:
+    cadence_generations: int = 10
+    improvement_weight: bool = True
+    improvement_power: float = 0.7
+
+    def __post_init__(self) -> None:
+        self.cadence_generations = int(self.cadence_generations)
+        self.improvement_weight = bool(self.improvement_weight)
+        self.improvement_power = float(self.improvement_power)
+        if self.cadence_generations < 1:
+            raise ValueError("niche.cadence_generations must be at least 1")
+        if self.improvement_power <= 0:
+            raise ValueError("niche.improvement_power must be positive")
+
+
+@dataclass
 class EvolutionConfig:
     population_size: int
     generations: int
@@ -113,8 +129,13 @@ class EvolutionConfig:
     strategies: list[Strategy] = field(default_factory=lambda: list(Strategy))
     strategy_weights: dict[str, float] = field(default_factory=dict)
     archive_mode_strategy_weights: dict[str, float] | None = None
+    archive_mode_strategy_weights_after_generation: int = 0
     verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
     history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
+    output_mode: str = "single"
+    committee_size: int = 3
+    committee_test_budget: int = 1000
+    niche: NicheConfig | dict[str, Any] = field(default_factory=NicheConfig)
 
     def __post_init__(self) -> None:
         self.population_size = int(self.population_size)
@@ -132,12 +153,13 @@ class EvolutionConfig:
                 for key, weight in self.archive_mode_strategy_weights.items()
                 if float(weight) >= 0
             }
-        elif isinstance(self.archive_mode_strategy_weights, str):
+            elif isinstance(self.archive_mode_strategy_weights, str):
             self.archive_mode_strategy_weights = {
                 str(key): float(weight)
                 for key, weight in _parse_simple_dict(self.archive_mode_strategy_weights).items()
                 if float(weight) >= 0
             }
+        self.archive_mode_strategy_weights_after_generation = int(self.archive_mode_strategy_weights_after_generation)
         if isinstance(self.verbal_gradients, dict):
             self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
@@ -146,6 +168,19 @@ class EvolutionConfig:
             self.history = HistoryConfig(**self.history)
         elif not isinstance(self.history, HistoryConfig):
             raise ValueError("evolution.history must be a mapping")
+        self.output_mode = str(self.output_mode).lower().strip()
+        if self.output_mode not in {"single", "committee_specialist", "committee_loop"}:
+            raise ValueError("evolution.output_mode must be 'single', 'committee_specialist', or 'committee_loop'")
+        self.committee_size = int(self.committee_size)
+        if self.committee_size < 1:
+            raise ValueError("evolution.committee_size must be at least 1")
+        self.committee_test_budget = int(self.committee_test_budget)
+        if self.committee_test_budget < 1:
+            raise ValueError("evolution.committee_test_budget must be at least 1")
+        if isinstance(self.niche, dict):
+            self.niche = NicheConfig(**self.niche)
+        elif not isinstance(self.niche, NicheConfig):
+            raise ValueError("evolution.niche must be a mapping")
         if self.population_size < 1:
             raise ValueError("population_size must be at least 1")
         if self.generations < 0:

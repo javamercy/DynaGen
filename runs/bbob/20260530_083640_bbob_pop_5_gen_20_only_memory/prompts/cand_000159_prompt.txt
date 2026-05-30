@@ -1,0 +1,711 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000083: simplified_de_nm
+Status: valid; mean AOCC score: 0.455601 (higher is better)
+Thought: Combines a simple Differential Evolution global search with Nelder-Mead local refinement. DE uses fixed population size (max 20, min 4) and standard parameters (F=0.8, CR=0.9). Nelder-Mead starts from the best DE solution with standard coefficients. Budget is split: most for DE, a reserve for NM. All evaluations are clipped to bounds. report_best is called on every improvement. Seed controls randomness via numpy RandomState.
+Mean AOCC: 0.45560106252924015
+Mean final error: 0.6924568280219338
+AOCC by group: {'high_conditioning_unimodal': 0.5486437540108224, 'low_moderate_conditioning': 0.6249207469890921, 'multimodal_strong_global_structure': 0.25798868334483216, 'multimodal_weak_global_structure': 0.25614998425776897, 'separable': 0.6241660809356553}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        def evaluate(x):
+            nonlocal evals, best_val, best_x
+            if evals >= budget:
+                return None
+            x_clipped = np.clip(x, lb, ub)
+            val = func(x_clipped)
+            evals += 1
+            if val < best_val:
+                best_val = val
+                best_x = x_clipped.copy()
+                report_best(best_val, best_x)
+            return val
+
+        # Initial evaluation
+        x0 = lb + (ub - lb) * rng.rand(dim)
+        evaluate(x0)
+
+        # If budget very small, just random search
+        if budget <= dim + 2:
+            for _ in range(budget - evals):
+                if evals >= budget:
+                    break
+                x = lb + (ub - lb) * rng.rand(dim)
+                evaluate(x)
+            return best_val, best_x
+
+        # Differential Evolution phase
+        pop_size = max(4, min(20, (budget * 3) // 4 // 2))
+        if pop_size < 2:
+            pop_size = 2
+        de_max_evals = (budget * 3) // 4
+        if de_max_evals < pop_size:
+            de_max_evals = pop_size
+
+        pop = lb + (ub - lb) * rng.rand(pop_size, dim)
+        pop_fitness = np.full(pop_size, np.inf)
+
+        for i in range(pop_size):
+            if evals >= de_max_evals:
+                break
+            val = evaluate(pop[i])
+            if val is None:
+                break
+            pop_fitness[i] = val
+
+        # DE generations
+        F = 0.8
+        CR = 0.9
+        gen = 0
+        while evals < de_max_evals:
+            for i in range(pop_size):
+                if evals >= de_max_evals:
+                    break
+                indices = [j for j in range(pop_size) if j != i]
+                rng.shuffle(indices)
+                a, b, c = indices[:3]
+                mutant = pop[a] + F * (pop[b] - pop[c])
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < CR, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = evaluate(trial)
+                if val is None:
+                    break
+                if val < pop_fitness[i]:
+                    pop[i] = trial
+                    pop_fitness[i] = val
+            gen += 1
+
+        # Nelder-Mead local search
+        if evals < budget and best_x is not None:
+            simplex = np.zeros((dim + 1, dim))
+            simplex[0] = best_x.copy()
+            for i in range(dim):
+                step = 0.05 * (ub[i] - lb[i])
+                if step == 0:
+                    step = 0.01
+                x = best_x.copy()
+                x[i] = np.clip(x[i] + step, lb[i], ub[i])
+                simplex[i+1] = x
+
+            simplex_vals = np.full(dim + 1, np.inf)
+            simplex_vals[0] = best_val
+            for i in range(1, dim + 1):
+                if evals >= budget:
+                    break
+                val = evaluate(simplex[i])
+                if val is None:
+                    break
+                simplex_vals[i] = val
+
+            alpha = 1.0
+            gamma = 2.0
+            rho = 0.5
+            sigma = 0.5
+            max_iter = 100
+            for _ in range(max_iter):
+                if evals >= budget:
+                    break
+                order = np.argsort(simplex_vals)
+                simplex = simplex[order]
+                simplex_vals = simplex_vals[order]
+
+                centroid = np.mean(simplex[:-1], axis=0)
+
+                # Reflection
+                if evals >= budget:
+                    break
+                xr = centroid + alpha * (centroid - simplex[-1])
+                xr = np.clip(xr, lb, ub)
+                yr = evaluate(xr)
+                if yr is None:
+                    break
+                if yr < simplex_vals[0]:
+                    # Expansion
+                    if evals >= budget:
+                        break
+                    xe = centroid + gamma * (xr - centroid)
+                    xe = np.clip(xe, lb, ub)
+                    ye = evaluate(xe)
+                    if ye is None:
+                        break
+                    if ye < yr:
+                        simplex[-1] = xe
+                        simplex_vals[-1] = ye
+                    else:
+                        simplex[-1] = xr
+                        simplex_vals[-1] = yr
+                elif yr < simplex_vals[-2]:
+                    simplex[-1] = xr
+                    simplex_vals[-1] = yr
+                else:
+                    # Contraction
+                    if evals >= budget:
+                        break
+                    if yr < simplex_vals[-1]:
+                        xc = centroid + rho * (xr - centroid)
+                    else:
+                        xc = centroid + rho * (simplex[-1] - centroid)
+                    xc = np.clip(xc, lb, ub)
+                    yc = evaluate(xc)
+                    if yc is None:
+                        break
+                    if yc < simplex_vals[-1]:
+                        simplex[-1] = xc
+                        simplex_vals[-1] = yc
+                    else:
+                        # Shrink
+                        for i in range(1, dim + 1):
+                            if evals >= budget:
+                                break
+                            simplex[i] = simplex[0] + sigma * (simplex[i] - simplex[0])
+                            simplex[i] = np.clip(simplex[i], lb, ub)
+                            val = evaluate(simplex[i])
+                            if val is None:
+                                break
+                            simplex_vals[i] = val
+
+                current_best_idx = np.argmin(simplex_vals)
+                if simplex_vals[current_best_idx] < best_val:
+                    best_val = simplex_vals[current_best_idx]
+                    best_x = simplex[current_best_idx].copy()
+                    report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+Candidate cand_000126: contract_repair_best_mutation
+Status: valid; mean AOCC score: 0.428538 (higher is better)
+Thought: Replace DE mutation from rand/1 to best/1 to accelerate convergence by exploiting the global best candidate, while maintaining population diversity through stochastic selection. Adaptive parameters F and CR are retained. Rest of the algorithm unchanged: Latin hypercube initialization, greedy selection, coordinate pattern search refinement, and stagnation restarts. Seed controls all randomness.
+Mean AOCC: 0.42853812167771843
+Mean final error: 33.47433888284012
+AOCC by group: {'high_conditioning_unimodal': 0.3074531639851464, 'low_moderate_conditioning': 0.5431270909628801, 'multimodal_strong_global_structure': 0.31226509657695684, 'multimodal_weak_global_structure': 0.29222207912391, 'separable': 0.7105409715967314}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        if budget == 0:
+            return None, None
+
+        pop_size = min(budget // 2, max(3 * dim, min(15 + int(dim**0.5), budget // 2)))
+        pop_size = max(pop_size, 2 * dim)
+        pop_size = min(pop_size, budget)
+        pop_size = max(pop_size, 1)
+
+        if budget <= 2 * dim + 10 or pop_size < 2:
+            for _ in range(min(budget, max(5, dim))):
+                x = lb + rng.rand(dim) * (ub - lb)
+                val = func(x)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = x.copy()
+                    report_best(best_val, best_x)
+                if evals >= budget:
+                    break
+            self._coordinate_search(func, lb, ub, dim, budget, rng, best_val, best_x, evals)
+            return best_val, best_x
+
+        # Latin Hypercube initial population
+        lhs = self._latin_hypercube(pop_size, dim, rng)
+        pop = lb + (ub - lb) * lhs
+
+        pop_fitness = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            x = np.clip(pop[i], lb, ub)
+            val = func(x)
+            evals += 1
+            pop_fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            if evals >= budget:
+                return best_val, best_x
+
+        reserve = max(2 * dim, 20)
+        reserve = min(reserve, budget - evals)
+        max_gen = (budget - evals - reserve) // pop_size if budget > evals + reserve else 0
+        max_gen = max(0, max_gen)
+
+        stagnation_gen = 0
+        stag_limit = max(5, max_gen // 5) if max_gen > 0 else 1
+        last_best_val = best_val
+
+        for gen in range(max_gen):
+            if evals >= budget:
+                break
+            frac = gen / max_gen if max_gen > 0 else 0.0
+            F = 0.9 - 0.4 * frac
+            CR = 0.5 + 0.4 * frac
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                indices = [j for j in range(pop_size) if j != i]
+                rng.shuffle(indices)
+                a, b, c = indices[:3]
+                # Replace rand/1 with best/1
+                mutant = best_x + F * (pop[b] - pop[c])
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < CR, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < pop_fitness[i]:
+                    pop[i] = trial
+                    pop_fitness[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+            # Stagnation check
+            if best_val < last_best_val:
+                stagnation_gen = 0
+                last_best_val = best_val
+            else:
+                stagnation_gen += 1
+            if stagnation_gen >= stag_limit and evals < budget:
+                worst_idx = np.argsort(pop_fitness)[-max(1, pop_size // 5):]
+                for idx in worst_idx:
+                    if evals >= budget:
+                        break
+                    new_x = lb + rng.rand(dim) * (ub - lb)
+                    new_val = func(new_x)
+                    evals += 1
+                    pop[idx] = new_x
+                    pop_fitness[idx] = new_val
+                    if new_val < best_val:
+                        best_val = new_val
+                        best_x = new_x.copy()
+                        report_best(best_val, best_x)
+                stagnation_gen = 0
+                last_best_val = best_val
+
+        self._coordinate_search(func, lb, ub, dim, budget, rng, best_val, best_x, evals)
+        return best_val, best_x
+
+    def _coordinate_search(self, func, lb, ub, dim, budget, rng, best_val, best_x, evals):
+        remaining = budget - evals
+        if remaining <= 0:
+            return best_val, best_x
+        step = 0.2 * (ub - lb)
+        stagnation_local = 0
+        max_stag_local = max(1, remaining // 10)
+        restart_interval = max(1, remaining // 5)
+        last_restart_evals = evals
+
+        while evals < budget:
+            if evals - last_restart_evals >= restart_interval and evals < budget:
+                new_x = lb + rng.rand(dim) * (ub - lb)
+                new_val = func(new_x)
+                evals += 1
+                if new_val < best_val:
+                    best_val = new_val
+                    best_x = new_x.copy()
+                    report_best(best_val, best_x)
+                step = 0.2 * (ub - lb)
+                stagnation_local = 0
+                last_restart_evals = evals
+                continue
+
+            success = False
+            perm = rng.permutation(dim)
+            for i in perm:
+                if evals >= budget:
+                    break
+                trial = best_x.copy()
+                trial[i] = np.clip(best_x[i] + step[i], lb[i], ub[i])
+                val = func(trial)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = trial
+                    report_best(best_val, best_x)
+                    step[i] = min(step[i] * 2, ub[i] - lb[i])
+                    success = True
+                    stagnation_local = 0
+                    break
+                trial[i] = np.clip(best_x[i] - step[i], lb[i], ub[i])
+                val = func(trial)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = trial
+                    report_best(best_val, best_x)
+                    step[i] = min(step[i] * 2, ub[i] - lb[i])
+                    success = True
+                    stagnation_local = 0
+                    break
+                else:
+                    step[i] = max(step[i] * 0.5, (ub[i] - lb[i]) * 1e-10)
+
+            if not success and evals < budget:
+                direction = rng.randn(dim)
+                norm = np.linalg.norm(direction)
+                if norm > 0:
+                    direction = direction / norm
+                trial = np.clip(best_x + step * direction, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = trial
+                    report_best(best_val, best_x)
+                    step = np.minimum(step * 2, ub - lb)
+                    success = True
+                    stagnation_local = 0
+                else:
+                    stagnation_local += 1
+
+            if evals < budget and rng.uniform() < 0.2:
+                scale = rng.uniform(0.1, 0.5)
+                perturbation = scale * (ub - lb) * rng.randn(dim)
+                trial = np.clip(best_x + perturbation, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = trial
+                    report_best(best_val, best_x)
+                    step = np.minimum(step * 2, ub - lb)
+                    success = True
+                    stagnation_local = 0
+
+            if stagnation_local >= max_stag_local and evals < budget:
+                new_x = lb + rng.rand(dim) * (ub - lb)
+                new_val = func(new_x)
+                evals += 1
+                if new_val < best_val:
+                    best_val = new_val
+                    best_x = new_x.copy()
+                    report_best(best_val, best_x)
+                step = 0.2 * (ub - lb)
+                stagnation_local = 0
+                last_restart_evals = evals
+
+        return best_val, best_x
+
+    def _latin_hypercube(self, n, d, rng):
+        intervals = np.linspace(0, 1, n + 1)
+        lhs = np.zeros((n, d))
+        for j in range(d):
+            perm = rng.permutation(n)
+            for i in range(n):
+                lhs[i, j] = intervals[perm[i]] + rng.uniform(0, 1 / n)
+        return lhs
+```
+
+Candidate cand_000049: aggressive_local_search
+Status: valid; mean AOCC score: 0.434914 (higher is better)
+Thought: A focused exploitation optimizer that uses a short DE phase with small population and low mutation/crossover to locate a promising region, then spends the majority of the budget on a Nelder-Mead local search with a very small initial simplex and adaptive restarts. This intensifies refinement around the best solution. Seed controls all stochastic elements.
+Mean AOCC: 0.43491383559707564
+Mean final error: 0.9604409292933609
+AOCC by group: {'high_conditioning_unimodal': 0.3943506401875606, 'low_moderate_conditioning': 0.5890580389880933, 'multimodal_strong_global_structure': 0.28524631325361827, 'multimodal_weak_global_structure': 0.34818316405478, 'separable': 0.5885598621795295}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Phase 1: DE with small population and low CR/F for exploitation
+        pop_size = max(4, min(10, budget // 10))
+        de_budget = max(2 * (pop_size + 1), budget // 3)
+        de_evals = 0
+
+        pop = lb + (ub - lb) * rng.rand(pop_size, dim)
+        pop_fit = np.full(pop_size, np.inf)
+        best_val = np.inf
+        best_x = None
+
+        for i in range(pop_size):
+            val = func(pop[i])
+            de_evals += 1
+            pop_fit[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = pop[i].copy()
+                report_best(best_val, best_x)
+
+        max_gen = (de_budget - pop_size) // pop_size
+        for gen in range(max_gen):
+            for i in range(pop_size):
+                if de_evals >= de_budget:
+                    break
+                # Mutate
+                idxs = [j for j in range(pop_size) if j != i]
+                a, b, c = rng.choice(idxs, 3, replace=False)
+                mutant = pop[a] + 0.5 * (pop[b] - pop[c])
+                # Crossover
+                cr = 0.5
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < cr, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                de_evals += 1
+                if val < pop_fit[i]:
+                    pop[i] = trial
+                    pop_fit[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+            if de_evals >= de_budget:
+                break
+
+        # Phase 2: Nelder-Mead local search with tiny initial simplex
+        remaining = budget - de_evals
+        if remaining < dim + 2:
+            # Not enough for proper NM, do random perturbations
+            for _ in range(remaining):
+                x = best_x + 0.01 * (ub - lb) * rng.randn(dim)
+                x = np.clip(x, lb, ub)
+                val = func(x)
+                if val < best_val:
+                    best_val = val
+                    best_x = x.copy()
+                    report_best(best_val, best_x)
+        else:
+            while remaining > 0:
+                # Build simplex around best
+                simplex = np.zeros((dim + 1, dim))
+                simplex[0] = best_x.copy()
+                for i in range(dim):
+                    step = 0.01 * (ub[i] - lb[i])
+                    if step == 0:
+                        step = 0.001
+                    x = best_x.copy()
+                    x[i] = min(ub[i], max(lb[i], x[i] + step))
+                    simplex[i+1] = x
+
+                simplex_vals = np.full(dim + 1, np.inf)
+                simplex_vals[0] = best_val
+                # Evaluate initial simplex
+                for i in range(1, dim + 1):
+                    if remaining <= 0:
+                        break
+                    val = func(simplex[i])
+                    remaining -= 1
+                    simplex_vals[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = simplex[i].copy()
+                        report_best(best_val, best_x)
+
+                # Nelder-Mead iterations
+                alpha = 1.0
+                gamma = 2.0
+                rho = 0.5
+                sigma = 0.5
+                max_iter = 100
+                for _ in range(max_iter):
+                    if remaining <= 0:
+                        break
+                    # Sort
+                    order = np.argsort(simplex_vals)
+                    simplex = simplex[order]
+                    simplex_vals = simplex_vals[order]
+
+                    centroid = np.mean(simplex[:-1], axis=0)
+
+                    # Reflection
+                    xr = centroid + alpha * (centroid - simplex[-1])
+                    xr = np.clip(xr, lb, ub)
+                    yr = func(xr)
+                    remaining -= 1
+                    if yr < simplex_vals[0]:
+                        # Expansion
+                        xe = centroid + gamma * (xr - centroid)
+                        xe = np.clip(xe, lb, ub)
+                        ye = func(xe)
+                        remaining -= 1
+                        if ye < yr:
+                            simplex[-1] = xe
+                            simplex_vals[-1] = ye
+                        else:
+                            simplex[-1] = xr
+                            simplex_vals[-1] = yr
+                    elif yr < simplex_vals[-2]:
+                        simplex[-1] = xr
+                        simplex_vals[-1] = yr
+                    else:
+                        # Contraction
+                        if yr < simplex_vals[-1]:
+                            xc = centroid + rho * (xr - centroid)
+                        else:
+                            xc = centroid + rho * (simplex[-1] - centroid)
+                        xc = np.clip(xc, lb, ub)
+                        yc = func(xc)
+                        remaining -= 1
+                        if yc < simplex_vals[-1]:
+                            simplex[-1] = xc
+                            simplex_vals[-1] = yc
+                        else:
+                            # Shrink
+                            for i in range(1, dim + 1):
+                                if remaining <= 0:
+                                    break
+                                simplex[i] = simplex[0] + sigma * (simplex[i] - simplex[0])
+                                simplex[i] = np.clip(simplex[i], lb, ub)
+                                y = func(simplex[i])
+                                remaining -= 1
+                                simplex_vals[i] = y
+                                if y < best_val:
+                                    best_val = y
+                                    best_x = simplex[i].copy()
+                                    report_best(best_val, best_x)
+
+                    # Update best
+                    idx_min = np.argmin(simplex_vals)
+                    if simplex_vals[idx_min] < best_val:
+                        best_val = simplex_vals[idx_min]
+                        best_x = simplex[idx_min].copy()
+                        report_best(best_val, best_x)
+
+                    if remaining <= 0:
+                        break
+
+                # After NM, restart with random perturbation if budget left
+                if remaining > 0:
+                    x = best_x + 0.01 * (ub - lb) * rng.randn(dim)
+                    x = np.clip(x, lb, ub)
+                    val = func(x)
+                    remaining -= 1
+                    if val < best_val:
+                        best_val = val
+                        best_x = x.copy()
+                        report_best(best_val, best_x)
+                else:
+                    break
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

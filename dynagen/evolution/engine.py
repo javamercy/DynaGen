@@ -24,11 +24,16 @@ from dynagen.evolution.verbal_gradient import (
     parse_llm_verbal_gradient,
     set_candidate_gradient,
 )
+from dynagen.evolution.committee import (
+    assign_instances,
+    niche_probabilities,
+    select_committee,
+)
 from dynagen.llm.base import LLMBudgetExceeded, LLMProvider
 from dynagen.persistence.run_store import RunStore
 from dynagen.problems import problem_for_config
 from dynagen.problems.base import Problem
-from dynagen.reporting.summary import build_final_report, generation_summary
+from dynagen.reporting.summary import build_committee_final_report, build_final_report, generation_summary
 
 
 logger = logging.getLogger(__name__)
@@ -71,9 +76,16 @@ class EvolutionEngine:
             "llm_count": 0,
             "llm_error_count": 0,
         }
+        self._committee_specialists: list[Candidate] = []
+        self._committee_assignments: dict[str, list[str]] = {}
+        self._committee_niche_iteration: dict[str, int] = {}
 
     def run(self) -> Population:
+        output_mode = self.config.evolution.output_mode
         population = self._initial_population()
+        if output_mode != "single":
+            self._recompute_committee()
+
         self.store.save_generation(
             0,
             population=population.candidates,
@@ -106,6 +118,14 @@ class EvolutionEngine:
                 summary=summary,
             )
             self._save_history(generation)
+            if output_mode != "single" and generation % self.config.evolution.niche.cadence_generations == 0:
+                self._recompute_committee()
+
+        if output_mode == "single":
+            return self._finalize_single(population)
+        return self._finalize_committee(population)
+
+    def _finalize_single(self, population: Population) -> Population:
         search_best = self._search_best(population)
         self.history.mark_final_selection(
             search_best.id,
@@ -130,6 +150,77 @@ class EvolutionEngine:
                 population.candidates,
                 search_best=search_best,
                 test_result=test_result,
+                llm_calls=llm_calls,
+            )
+        )
+        return population
+
+    def _finalize_committee(self, population: Population) -> Population:
+        self._recompute_committee()
+        specialists = self._committee_specialists
+        if not specialists:
+            return self._finalize_single(population)
+
+        problem_tag = self._problem_tag()
+        search_best = self._search_best(population)
+
+        test_results: dict[str, object] = {}
+        for specialist in specialists:
+            logger.info("[%s] testing specialist %s", problem_tag, specialist.id)
+            result = self.test_evaluator.evaluate_code(specialist.code)
+            test_results[specialist.id] = {
+                "candidate_id": specialist.id,
+                "name": specialist.name,
+                "status": result.status,
+                "score": result.score,
+                "score_name": result.score_name,
+                "metrics": result.metrics,
+            }
+            logger.info(
+                "[%s] test complete | specialist=%s | status=%s | score=%s",
+                problem_tag,
+                specialist.id,
+                result.status,
+                result.score,
+            )
+
+        self.store.save_committee_results(
+            specialists=[c.id for c in specialists],
+            assignments=self._committee_assignments,
+            test_results=test_results,
+        )
+
+        llm_calls = self._llm_call_summary()
+        self.store.save_llm_calls(llm_calls)
+        self.store.save_history_summary(self._history_summary(include_entries=True))
+
+        vbs_scores: dict[str, float] = {}
+        if specialists:
+            all_instances: list[str] = []
+            test_per_function: dict[str, dict[str, float]] = {}
+            for sp in specialists:
+                tr = test_results.get(sp.id)
+                af = {}
+                if isinstance(tr, dict):
+                    metrics = tr.get("metrics") or {}
+                    af = metrics.get("aocc_by_function") or metrics.get("score_by_instance_size") or {}
+                if isinstance(af, dict):
+                    test_per_function[sp.id] = {str(k): float(v) for k, v in af.items()}
+                    all_instances.extend(k for k in test_per_function[sp.id] if k not in all_instances)
+            for instance in all_instances:
+                vbs_scores[instance] = max(
+                    (test_per_function.get(sp.id, {}).get(instance, 0.0))
+                    for sp in specialists
+                )
+
+        self.store.write_final_report(
+            build_committee_final_report(
+                population.candidates,
+                search_best=search_best,
+                specialists=specialists,
+                assignments=self._committee_assignments,
+                test_results=test_results,
+                vbs_scores=vbs_scores,
                 llm_calls=llm_calls,
             )
         )
@@ -206,16 +297,227 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def _generate_offspring(self, generation: int, population: Population) -> list[Candidate]:
+        if self.config.evolution.output_mode == "single":
+            return self._generate_single_offspring(generation, population)
+        return self._generate_committee_offspring(generation, population)
+
+    def _generate_single_offspring(self, generation: int, population: Population) -> list[Candidate]:
         tasks = self._build_offspring_tasks(generation, population)
         offspring = self._execute_tasks_parallel(tasks)
         self._register_candidates(offspring)
         self._update_history(offspring, generation=generation)
         return offspring
 
-    def _effective_strategies(self) -> list[Strategy]:
+    def _generate_committee_offspring(self, generation: int, population: Population) -> list[Candidate]:
+        niche_config = self.config.evolution.niche
+        cadence = niche_config.cadence_generations
+        problem_tag = self._problem_tag()
+
+        if generation % cadence == 0 or not self._committee_specialists:
+            self._recompute_committee()
+            specialists = self._committee_specialists
+            if not specialists:
+                return self._generate_single_offspring(generation, population)
+
+            logger.info("[%s] cadence generation %d — all %d niches", problem_tag, generation, len(specialists))
+            all_offspring: list[Candidate] = []
+            for specialist in specialists:
+                assigned = self._committee_assignments.get(specialist.id, [])
+                scores = self.problem.per_instance_scores(specialist)
+                niche_mean = (
+                    sum(scores.get(k, 0.0) for k in assigned) / len(assigned)
+                    if assigned else 0.0
+                )
+                logger.info(
+                    "[%s]   niche gen | specialist=%s | functions=%s | niche_mean=%.4f",
+                    problem_tag, specialist.id,
+                    ",".join(assigned[:5]) + ("..." if len(assigned) > 5 else ""),
+                    niche_mean,
+                )
+                tasks = self._build_niche_offspring_tasks(generation, population, specialist)
+                if tasks:
+                    offspring = self._execute_tasks_parallel(tasks)
+                    self._register_candidates(offspring)
+                    self._update_history(offspring, generation=generation)
+                    all_offspring.extend(offspring)
+            return all_offspring
+
+        specialists = self._committee_specialists
+        if not specialists:
+            return self._generate_single_offspring(generation, population)
+
+        chosen = self._select_niche(specialists)
+        if chosen is None:
+            return self._generate_single_offspring(generation, population)
+
+        assigned = self._committee_assignments.get(chosen.id, [])
+        scores = self.problem.per_instance_scores(chosen)
+        niche_mean = (
+            sum(scores.get(k, 0.0) for k in assigned) / len(assigned)
+            if assigned else 0.0
+        )
+        logger.info(
+            "[%s] niche gen %d | specialist=%s | functions=%s | niche_mean=%.4f",
+            problem_tag, generation, chosen.id,
+            ",".join(assigned[:5]) + ("..." if len(assigned) > 5 else ""),
+            niche_mean,
+        )
+
+        tasks = self._build_niche_offspring_tasks(generation, population, chosen)
+        if not tasks:
+            return []
+
+        offspring = self._execute_tasks_parallel(tasks)
+        self._register_candidates(offspring)
+        self._update_history(offspring, generation=generation)
+        return offspring
+
+    def _recompute_committee(self) -> None:
+        pool = list(self._candidate_index.values())
+        history_candidates = self.history.candidates(self._candidate_index)
+        for c in history_candidates:
+            if c.id not in self._candidate_index:
+                pool.append(c)
+                self._candidate_index[c.id] = c
+
+        per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
+        specialists, assignments = select_committee(
+            pool,
+            per_instance_scores_fn=per_instance_scores_fn,
+            committee_size=self.config.evolution.committee_size,
+            method="kmeans",
+        )
+        self._committee_specialists = specialists
+        self._committee_assignments = assignments
+
+        problem_tag = self._problem_tag()
+        logger.info("[%s] committee recomputed | specialists=%d", problem_tag, len(specialists))
+        for sp in specialists:
+            assigned = assignments.get(sp.id, [])
+            scores = per_instance_scores_fn(sp)
+            niche_mean = (
+                sum(scores.get(k, 0.0) for k in assigned) / len(assigned)
+                if assigned else 0.0
+            )
+            global_mean = sp.metrics.get("mean_aocc", sp.metrics.get("mean_gap", 0.0)) if isinstance(sp.metrics, dict) else 0.0
+            logger.info(
+                "[%s]   %s: niche=[%s] niche_mean=%.4f global_mean=%.4f",
+                problem_tag,
+                sp.id,
+                ",".join(assigned[:5]) + ("..." if len(assigned) > 5 else ""),
+                niche_mean,
+                global_mean,
+            )
+
+    def _select_niche(self, specialists: list[Candidate]) -> Candidate | None:
+        if not specialists:
+            return None
+
+        per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
+        probs = niche_probabilities(
+            specialists,
+            instance_assignments=self._committee_assignments,
+            per_instance_scores_fn=per_instance_scores_fn,
+            improvement_weight=self.config.evolution.niche.improvement_weight,
+            improvement_power=self.config.evolution.niche.improvement_power,
+        )
+
+        roll = self.rng.random()
+        cumulative = 0.0
+        for sp in specialists:
+            cumulative += probs.get(sp.id, 0.0)
+            if roll < cumulative or cumulative >= 1.0:
+                return sp
+        return specialists[-1] if specialists else None
+
+    def _build_niche_offspring_tasks(
+            self,
+            generation: int,
+            population: Population,
+            specialist: Candidate,
+    ) -> list[_CandidateTask]:
+        assigned = self._committee_assignments.get(specialist.id, [])
+        niche_parents = self._parents_for_niche(assigned, population)
+
+        if not niche_parents:
+            niche_parents = select_parents(population.candidates, min(3, len(population.candidates)), self.rng)
+            if niche_parents:
+                clear_history_selection(niche_parents)
+
+        tasks: list[_CandidateTask] = []
+        available_strategies = self._effective_strategies(generation=generation)
+        for strategy in available_strategies:
+            for _ in range(self.config.evolution.offspring_per_strategy):
+                candidate_id = self.store.next_candidate_id()
+                strategy_parents = self._select_strategy_parents(strategy, niche_parents)
+                self._ensure_parent_verbal_gradients(strategy_parents, generation)
+                feedback_context = self._feedback_context(strategy_parents)
+                prompt_parents = strategy_parents[:1] if feedback_context else strategy_parents
+                messages = self.problem.build_evolution_prompt(
+                    strategy,
+                    prompt_parents,
+                    feedback_context=feedback_context,
+                )
+                prompt = _format_messages(messages)
+                tasks.append(_CandidateTask(
+                    candidate_id=candidate_id,
+                    generation=generation,
+                    strategy=strategy,
+                    parents=strategy_parents,
+                    messages=messages,
+                    prompt=prompt,
+                ))
+        return tasks
+
+    def _parents_for_niche(
+            self,
+            assigned_instances: list[str],
+            population: Population,
+    ) -> list[Candidate]:
+        if not assigned_instances:
+            return list(population.candidates)
+
+        per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
+        scored: list[tuple[Candidate, float]] = []
+        for c in population.candidates:
+            scores = per_instance_scores_fn(c)
+            if not scores:
+                continue
+            relevant = [scores.get(k, 0.0) for k in assigned_instances if k in scores]
+            if not relevant:
+                continue
+            scored.append((c, sum(relevant) / len(relevant)))
+
+        history_entries = list(self.history.entries.values())
+        for entry in sorted(history_entries, key=lambda e: -e.history_score):
+            c = self._candidate_index.get(entry.candidate_id)
+            if c is None or c in population.candidates:
+                continue
+            scores = per_instance_scores_fn(c)
+            if not scores:
+                continue
+            relevant = [scores.get(k, 0.0) for k in assigned_instances if k in scores]
+            if not relevant:
+                continue
+            scored.append((c, sum(relevant) / len(relevant)))
+
+        scored.sort(key=lambda item: -item[1])
+        niche_pool = [c for c, _ in scored[:max(5, self.config.evolution.population_size)]]
+        if not niche_pool:
+            return list(population.candidates)
+
+        return niche_pool
+
+    def _effective_strategies(self, *, generation: int = 0) -> list[Strategy]:
+        threshold = self.config.evolution.archive_mode_strategy_weights_after_generation
+        archive_active = (
+            self.config.evolution.archive_mode_strategy_weights is not None
+            and generation >= threshold
+        )
         weights = (
             self.config.evolution.archive_mode_strategy_weights
-            or self.config.evolution.strategy_weights
+            if archive_active
+            else self.config.evolution.strategy_weights
         )
         if not weights:
             return self.config.evolution.strategies
@@ -235,7 +537,7 @@ class EvolutionEngine:
             population: Population,
     ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
-        available_strategies = self._effective_strategies()
+        available_strategies = self._effective_strategies(generation=generation)
         for strategy in available_strategies:
             for _ in range(self.config.evolution.offspring_per_strategy):
                 candidate_id = self.store.next_candidate_id()
