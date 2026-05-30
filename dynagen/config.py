@@ -153,7 +153,7 @@ class EvolutionConfig:
                 for key, weight in self.archive_mode_strategy_weights.items()
                 if float(weight) >= 0
             }
-            elif isinstance(self.archive_mode_strategy_weights, str):
+        elif isinstance(self.archive_mode_strategy_weights, str):
             self.archive_mode_strategy_weights = {
                 str(key): float(weight)
                 for key, weight in _parse_simple_dict(self.archive_mode_strategy_weights).items()
