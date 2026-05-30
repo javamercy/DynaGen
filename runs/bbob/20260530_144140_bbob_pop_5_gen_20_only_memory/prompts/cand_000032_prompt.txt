@@ -1,0 +1,181 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000014: de_best1_intensify
+Status: valid; mean AOCC score: 0.446698 (higher is better)
+Thought: Exploitation-focused version of DE/best/1/bin. Reduces population size to allocate more budget to local search. Uses decreasing mutation factor F from 0.5 to 0.1 over generations to fine-tune. After DE loop, performs a simple local search around the best solution with decaying step size, evaluating random perturbations. All points clipped to bounds. Seed controls randomness. Budget strictly respected.
+Mean AOCC: 0.4466980802519173
+Mean final error: 1.938095193075773
+AOCC by group: {'high_conditioning_unimodal': 0.45661280746028393, 'low_moderate_conditioning': 0.713449328214839, 'multimodal_strong_global_structure': 0.27725769581413456, 'multimodal_weak_global_structure': 0.22594716017030425, 'separable': 0.6135736591926094}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+        # Smaller population to leave budget for local search
+        self.NP = max(4, min(10*dim, budget // 4))
+        self.CR = 0.9
+        self.F_start = 0.5
+        self.F_end = 0.1
+
+    def __call__(self, func):
+        dim = self.dim
+        budget = self.budget
+        NP = self.NP
+        rng = self.rng
+        bounds_lb = func.bounds.lb
+        bounds_ub = func.bounds.ub
+
+        # Initialization
+        pop = rng.uniform(bounds_lb, bounds_ub, size=(NP, dim))
+        fitness = np.full(NP, np.inf)
+        best_idx = -1
+        best_val = np.inf
+        best_x = None
+
+        for i in range(NP):
+            if budget <= 0:
+                break
+            x = np.clip(pop[i], bounds_lb, bounds_ub)
+            val = func(x)
+            budget -= 1
+            fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            pop[i] = x
+
+        # DE loop with decreasing F
+        gen = 0
+        while budget > 0 and NP > 1:
+            # Current F linearly decreasing
+            F = self.F_start + (self.F_end - self.F_start) * gen / max(1, (self.budget // NP))
+            gen += 1
+            for i in range(NP):
+                if budget <= 0:
+                    break
+                # Choose two distinct indices different from i
+                indices = [j for j in range(NP) if j != i]
+                if len(indices) < 2:
+                    break
+                r1, r2 = rng.choice(indices, size=2, replace=False)
+                # Mutation: DE/best/1
+                mutant = best_x + F * (pop[r1] - pop[r2])
+                mutant = np.clip(mutant, bounds_lb, bounds_ub)
+                # Crossover binomial
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < self.CR, mutant, pop[i])
+                trial[j_rand] = mutant[j_rand]
+                # Evaluate
+                val = func(trial)
+                budget -= 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+
+        # Local search intensification around best
+        if budget > 0 and best_x is not None:
+            step = 0.1 * (bounds_ub - bounds_lb)  # initial step size
+            while budget > 0:
+                # Random perturbation in bounded box
+                perturbation = rng.uniform(-step, step, size=dim)
+                candidate = best_x + perturbation
+                candidate = np.clip(candidate, bounds_lb, bounds_ub)
+                val = func(candidate)
+                budget -= 1
+                if val < best_val:
+                    best_val = val
+                    best_x = candidate.copy()
+                    report_best(best_val, best_x)
+                # Decay step size
+                step *= 0.95
+                # Optional: early stopping if step becomes too small
+                if np.max(step) < 1e-12:
+                    break
+
+        if best_x is None:
+            x = rng.uniform(bounds_lb, bounds_ub)
+            best_val = func(x)
+            best_x = x
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

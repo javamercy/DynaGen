@@ -147,6 +147,15 @@ def _select_committee_kmeans(
                 best_cluster = i
         cluster_assignments[best_cluster].append(inst)
 
+    # Safety: ensure no cluster is empty after initial assignment
+    for i in range(effective_size):
+        if not cluster_assignments[i] and all_instances:
+            instance = rng.choice(all_instances)
+            cluster_assignments[i].append(instance)
+            for j in range(effective_size):
+                if j != i and instance in cluster_assignments[j]:
+                    cluster_assignments[j].remove(instance)
+
     for _ in range(max_iterations):
         changed = False
 
@@ -154,9 +163,12 @@ def _select_committee_kmeans(
             assigned = cluster_assignments[i]
             if not assigned:
                 continue
+            used_ids = {cluster_candidates[j].id for j in range(effective_size) if j != i}
             best_c = None
             best_mean = -1.0
             for c in candidates:
+                if c.id in used_ids:
+                    continue
                 scores = candidate_scores.get(c.id, {})
                 relevant = [scores.get(k, 0.0) for k in assigned if k in scores]
                 if not relevant:
