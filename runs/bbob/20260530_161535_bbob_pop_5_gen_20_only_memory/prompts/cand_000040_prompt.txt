@@ -1,0 +1,442 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000028: exploration_cma_nelder_hybrid
+Status: valid; mean AOCC score: 0.485698 (higher is better)
+Thought: Initial LHS sampling for good starting point, then CMA-ES with exploration (larger population, lower learning rates, larger sigma) for global search, followed by Nelder-Mead local refinement with restarts to exploit promising regions. Bounds clipped, seed controls randomness, budget allocated adaptively.
+Mean AOCC: 0.48569758105267774
+Mean final error: 0.7659615291174763
+AOCC by group: {'high_conditioning_unimodal': 0.6189255163827406, 'low_moderate_conditioning': 0.651710870892696, 'multimodal_strong_global_structure': 0.3796913314524712, 'multimodal_weak_global_structure': 0.23517655712684915, 'separable': 0.576186287376635}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        domain_range = ub - lb
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        best_x = None
+        best_f = np.inf
+        count = 0
+
+        def evaluate(x):
+            nonlocal count, best_x, best_f
+            x = np.clip(x, lb, ub)
+            f = func(x)
+            count += 1
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(f, best_x)
+            return f
+
+        # Initial LHS
+        n_init = min(2 * dim, max(2, budget // 10))
+        points = np.empty((n_init, dim))
+        for i in range(dim):
+            points[:, i] = rng.uniform(lb[i], ub[i], size=n_init)
+        for i in range(dim):
+            rng.shuffle(points[:, i])
+        for i in range(n_init):
+            if count >= budget:
+                break
+            evaluate(points[i])
+
+        # CMA-ES parameters (exploration oriented)
+        lam = 8 + int(4 * np.log(dim))
+        mu = lam // 2
+        weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+        weights /= weights.sum()
+        mu_eff = 1.0 / np.sum(weights ** 2)
+        cc = (4 + mu_eff / dim) / (dim + 4 + 2 * mu_eff / dim)
+        cs = (mu_eff + 2) / (dim + mu_eff + 5)
+        c1 = 2 / ((dim + 1.3) ** 2 + mu_eff) * 0.75
+        cmu = min(1 - c1, 2 * (mu_eff - 2 + 1/mu_eff) / ((dim + 2) ** 2 + mu_eff)) * 0.75
+        damps = 1 + 2 * max(0, np.sqrt((mu_eff - 1) / (dim + 1)) - 1) + cs
+
+        # Allocate budget for CMA-ES (80% of remaining after LHS)
+        max_restarts = max(1, int(budget / (lam * dim)))
+        cma_budget = int((budget - count) * 0.8)
+        if cma_budget < lam:
+            cma_budget = budget - count
+        cma_used = 0
+
+        for restart in range(max_restarts + 1):
+            if count >= budget:
+                break
+            if cma_used >= cma_budget:
+                break
+            sigma = 0.4 * np.mean(domain_range)
+            xmean = best_x.copy() if best_x is not None else rng.uniform(lb, ub, size=dim)
+            pc = np.zeros(dim)
+            ps = np.zeros(dim)
+            C = np.eye(dim)
+            B = np.eye(dim)
+            D = np.ones(dim)
+            invsqrtC = np.eye(dim)
+            eigen_eval = 0
+
+            # Ensure first point evaluated
+            if count < budget:
+                evaluate(xmean)
+
+            while count + lam <= budget and cma_used + lam <= cma_budget:
+                arx = []
+                arf = []
+                for k in range(lam):
+                    if count >= budget or cma_used + k >= cma_budget:
+                        break
+                    z = rng.normal(0, 1, dim)
+                    y = B @ (D * z)
+                    x = xmean + sigma * y
+                    x = np.clip(x, lb, ub)
+                    arx.append(x)
+                    f = evaluate(x)
+                    arf.append(f)
+                if not arx:
+                    break
+                count_used = len(arx)
+                cma_used += count_used
+                if count_used < lam:
+                    break
+
+                idx = np.argsort(arf)
+                xold = xmean.copy()
+                xmean = np.sum(weights[:, None] * np.array(arx)[idx[:mu]], axis=0)
+
+                dmean = xmean - xold
+                ps = (1 - cs) * ps + np.sqrt(cs * (2 - cs) * mu_eff) * (invsqrtC @ dmean / sigma)
+                pc = (1 - cc) * pc + np.sqrt(cc * (2 - cc) * mu_eff) * (dmean / sigma)
+
+                C *= (1 - c1 - cmu)
+                C += c1 * np.outer(pc, pc)
+                for i in range(mu):
+                    diff = (np.array(arx)[idx[i]] - xold) / sigma
+                    C += cmu * weights[i] * np.outer(diff, diff)
+
+                sigma *= np.exp((cs / damps) * (np.linalg.norm(ps) / (np.sqrt(dim) * (1 - 1/(4*dim) + 1/(21*dim**2))) - 1))
+
+                if count - eigen_eval > dim:
+                    eigen_eval = count
+                    C = np.triu(C) + np.triu(C, 1).T
+                    D, B = np.linalg.eigh(C)
+                    D = np.abs(D)
+                    D = np.maximum(D, 1e-30)
+                    D = np.sqrt(D)
+                    invsqrtC = B @ np.diag(1/D) @ B.T
+
+                if sigma < 1e-4 * np.mean(domain_range):
+                    break
+
+        # Nelder-Mead local refinement from best found
+        while count < budget:
+            step = 0.02 * domain_range
+            step = np.where(step == 0, 1e-8, step)
+            simplex = np.zeros((dim + 1, dim))
+            simplex[0] = best_x if best_x is not None else rng.uniform(lb, ub, size=dim)
+            for i in range(dim):
+                x = simplex[0].copy()
+                x[i] += step[i]
+                x = np.clip(x, lb, ub)
+                simplex[i+1] = x
+
+            f_vals = np.full(dim + 1, np.inf)
+            for i in range(dim + 1):
+                if count >= budget:
+                    break
+                f_vals[i] = evaluate(simplex[i])
+
+            max_iter = min(100, (budget - count) // (dim + 1) + 1)
+            for _ in range(max_iter):
+                if count >= budget:
+                    break
+                order = np.argsort(f_vals)
+                simplex = simplex[order]
+                f_vals = f_vals[order]
+
+                if f_vals[-1] - f_vals[0] < 1e-12:
+                    break
+
+                centroid = np.mean(simplex[:-1], axis=0)
+
+                xr = centroid + 1.0 * (centroid - simplex[-1])
+                xr = np.clip(xr, lb, ub)
+                fr = evaluate(xr)
+                if count >= budget:
+                    break
+                if fr < f_vals[0]:
+                    xe = centroid + 2.0 * (centroid - simplex[-1])
+                    xe = np.clip(xe, lb, ub)
+                    fe = evaluate(xe)
+                    if fe < fr:
+                        simplex[-1] = xe
+                        f_vals[-1] = fe
+                    else:
+                        simplex[-1] = xr
+                        f_vals[-1] = fr
+                elif fr < f_vals[-2]:
+                    simplex[-1] = xr
+                    f_vals[-1] = fr
+                else:
+                    xc = centroid + 0.5 * (simplex[-1] - centroid)
+                    xc = np.clip(xc, lb, ub)
+                    fc = evaluate(xc)
+                    if fc < f_vals[-1]:
+                        simplex[-1] = xc
+                        f_vals[-1] = fc
+                    else:
+                        for i in range(1, dim + 1):
+                            simplex[i] = simplex[0] + 0.5 * (simplex[i] - simplex[0])
+                            simplex[i] = np.clip(simplex[i], lb, ub)
+                            f_vals[i] = evaluate(simplex[i])
+                            if count >= budget:
+                                break
+                idx_min = np.argmin(f_vals)
+                if f_vals[idx_min] < best_f:
+                    best_f = f_vals[idx_min]
+                    best_x = simplex[idx_min].copy()
+                    report_best(best_f, best_x)
+
+            # Restart with perturbation
+            if count < budget:
+                pert = rng.uniform(-0.1, 0.1, size=dim) * domain_range
+                new_x = np.clip(best_x + pert, lb, ub)
+                evaluate(new_x)
+
+        return best_f, best_x
+```
+
+Candidate cand_000017: intensified_local_refinement
+Status: valid; mean AOCC score: 0.410715 (higher is better)
+Thought: This optimizer builds on the parent's CMA-ES with high learning rates and local refinement. It reduces CMA-ES population further, uses a smaller initial step-size, and increases learning rates to speed up convergence. The main improvement is a more aggressive local search after CMA-ES: a shrinking-radius random sampling that repeatedly attempts to improve the best solution, using a decreasing step-size schedule. This allocates more budget to refining the best point, leading to lower final errors on unimodal and moderate conditioning problems. All points are clipped to bounds, seed controls randomness, and budget is strictly enforced.
+Mean AOCC: 0.4107151429844085
+Mean final error: 5.382467194479229
+AOCC by group: {'high_conditioning_unimodal': 0.6476025231269049, 'low_moderate_conditioning': 0.5337376738837161, 'multimodal_strong_global_structure': 0.15546241240949316, 'multimodal_weak_global_structure': 0.1603392027847622, 'separable': 0.5810384088970275}
+History source: yes
+History bucket: bbob:group:high_conditioning_unimodal
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        domain_range = ub - lb
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # CMA-ES parameters (smaller population for exploitation)
+        lam = max(4, int(2 * np.log(dim)))
+        mu = lam // 2
+        if mu < 1:
+            mu = 1
+        weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+        weights /= weights.sum()
+        mu_eff = 1.0 / np.sum(weights ** 2)
+        cc = (4 + mu_eff / dim) / (dim + 4 + 2 * mu_eff / dim)
+        cs = (mu_eff + 2) / (dim + mu_eff + 5)
+        c1 = 2 / ((dim + 1.3) ** 2 + mu_eff) * 2.0  # increased
+        cmu = min(1 - c1, 2 * (mu_eff - 2 + 1/mu_eff) / ((dim + 2) ** 2 + mu_eff)) * 2.0
+        damps = 1 + 2 * max(0, np.sqrt((mu_eff - 1) / (dim + 1)) - 1) + cs
+
+        best_x = None
+        best_f = np.inf
+        count = 0
+
+        def evaluate(x):
+            nonlocal count, best_x, best_f
+            x = np.clip(x, lb, ub)
+            f = func(x)
+            count += 1
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(f, best_x)
+            return f
+
+        # Evaluate a random point first
+        x0 = rng.uniform(lb, ub, size=dim)
+        evaluate(x0)
+
+        # Restart loop (fewer restarts to save budget for local refinement)
+        max_restarts = max(1, int(budget / (20 * dim)))
+        for restart in range(max_restarts + 1):
+            if count >= budget:
+                break
+            # Initialization with smaller step-size
+            sigma = 0.05 * np.mean(domain_range)
+            xmean = rng.uniform(lb, ub, size=dim)
+            pc = np.zeros(dim)
+            ps = np.zeros(dim)
+            C = np.eye(dim)
+            B = np.eye(dim)
+            D = np.ones(dim)
+            invsqrtC = np.eye(dim)
+            eigen_eval = 0
+
+            if restart > 0:
+                evaluate(xmean)
+                if count >= budget:
+                    break
+
+            # Main CMA-ES loop (spend only a fraction of budget here)
+            max_cma_calls = int(budget * 0.3)
+            while count + lam <= budget and count < max_cma_calls:
+                arx = []
+                arf = []
+                for k in range(lam):
+                    z = rng.normal(0, 1, dim)
+                    y = B @ (D * z)
+                    x = xmean + sigma * y
+                    x = np.clip(x, lb, ub)
+                    arx.append(x)
+                    f = evaluate(x)
+                    arf.append(f)
+                    if count >= budget:
+                        break
+                if count >= budget:
+                    break
+
+                idx = np.argsort(arf)
+                xold = xmean.copy()
+                xmean = np.sum(weights[:, None] * np.array(arx)[idx[:mu]], axis=0)
+
+                dmean = xmean - xold
+                ps = (1 - cs) * ps + np.sqrt(cs * (2 - cs) * mu_eff) * (invsqrtC @ dmean / sigma)
+                pc = (1 - cc) * pc + np.sqrt(cc * (2 - cc) * mu_eff) * (dmean / sigma)
+
+                C *= (1 - c1 - cmu)
+                C += c1 * np.outer(pc, pc)
+                for i in range(mu):
+                    diff = (np.array(arx)[idx[i]] - xold) / sigma
+                    C += cmu * weights[i] * np.outer(diff, diff)
+
+                sigma *= np.exp((cs / damps) * (np.linalg.norm(ps) / (np.sqrt(dim) * (1 - 1/(4*dim) + 1/(21*dim**2))) - 1))
+
+                if count - eigen_eval > dim:
+                    eigen_eval = count
+                    C = np.triu(C) + np.triu(C, 1).T
+                    D, B = np.linalg.eigh(C)
+                    D = np.abs(D)
+                    D = np.maximum(D, 1e-30)
+                    D = np.sqrt(D)
+                    invsqrtC = B @ np.diag(1/D) @ B.T
+
+                if sigma < 1e-8 * np.mean(domain_range):
+                    break
+
+        # Aggressive local refinement phase with decreasing step-size
+        if best_x is not None:
+            local_sigma = 0.01 * np.mean(domain_range)
+            while count < budget:
+                # Try a few samples with current sigma
+                improved = False
+                for _ in range(max(1, int(0.1 * budget - count))):
+                    if count >= budget:
+                        break
+                    x = best_x + rng.normal(0, local_sigma, size=dim)
+                    evaluate(x)
+                # If no improvement, reduce sigma
+                if best_x is not None:  # check if improved
+                    # sigma reduction
+                    local_sigma *= 0.95
+        else:
+            while count < budget:
+                x = rng.uniform(lb, ub, size=dim)
+                evaluate(x)
+
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e3_hybrid_recombination
+
+GOAL: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

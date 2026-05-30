@@ -1,0 +1,160 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000016: intensified_pattern_search
+Status: valid; mean AOCC score: 0.297785 (higher is better)
+Thought: Start with a small initial random sample (5% of budget) to locate a promising region. Then perform a thorough pattern search (Hooke-Jeeves) with coordinate sweeps until no improvement, using adaptive step size (double on success, halve on failure). This intensifies exploitation by spending more budget on local refinement. Remaining budget is used for fine-tuning with Gaussian perturbations of decreasing radius. Seed controls all randomness.
+Mean AOCC: 0.29778506564304774
+Mean final error: 13.916974500582931
+AOCC by group: {'high_conditioning_unimodal': 0.14929548813633337, 'low_moderate_conditioning': 0.37064697733402835, 'multimodal_strong_global_structure': 0.1652385100985924, 'multimodal_weak_global_structure': 0.21342737958529392, 'separable': 0.6048893553991869}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        self.evals = 0
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        best_x = None
+        best_f = None
+        # initial random sampling: 5% of budget
+        n_init = max(2, int(0.05 * self.budget))
+        for _ in range(min(n_init, self.budget)):
+            x = np.random.uniform(lb, ub, size=self.dim)
+            f = func(x)
+            self.evals += 1
+            if best_f is None or f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+        # pattern search (Hooke-Jeeves style) with coordinate sweeps
+        step_init = 0.05 * (ub - lb).mean()
+        step = step_init
+        shrink = 0.5
+        while self.evals < self.budget and step > 1e-14:
+            improved = False
+            # full sweep over coordinates
+            for i in range(self.dim):
+                if self.evals >= self.budget:
+                    break
+                # try positive direction
+                x_try = best_x.copy()
+                x_try[i] += step
+                x_try[i] = np.clip(x_try[i], lb[i], ub[i])
+                f_try = func(x_try)
+                self.evals += 1
+                if f_try < best_f:
+                    best_f = f_try
+                    best_x = x_try.copy()
+                    report_best(best_f, best_x)
+                    improved = True
+                    break
+                # try negative direction
+                x_try2 = best_x.copy()
+                x_try2[i] -= step
+                x_try2[i] = np.clip(x_try2[i], lb[i], ub[i])
+                f_try2 = func(x_try2)
+                self.evals += 1
+                if f_try2 < best_f:
+                    best_f = f_try2
+                    best_x = x_try2.copy()
+                    report_best(best_f, best_x)
+                    improved = True
+                    break
+            if improved:
+                step *= 2.0
+            else:
+                step *= shrink
+        # remaining budget: small random perturbations with decaying radius
+        radius = step_init * 0.01
+        while self.evals < self.budget:
+            scale = radius * (1.0 - (self.evals / self.budget))
+            if scale < 1e-14:
+                break
+            x_try = best_x + np.random.normal(0, scale, size=self.dim)
+            x_try = np.clip(x_try, lb, ub)
+            f_try = func(x_try)
+            self.evals += 1
+            if f_try < best_f:
+                best_f = f_try
+                best_x = x_try.copy()
+                report_best(best_f, best_x)
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m5_intensify_search
+
+GOAL: Create a stronger exploitation-focused version of one parent. Improve how it refines promising candidates, allocates effort to high-quality regions, reduces wasted work, or makes more precise local decisions while preserving correctness.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

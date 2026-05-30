@@ -200,7 +200,36 @@ def _select_committee_kmeans(
         if not changed:
             break
 
-    specialists = [cluster_candidates[i] for i in range(effective_size)]
+    # Prune weak clusters: if a centroid scores below threshold on its own
+    # assigned functions, the pool can't support that many specialists.
+    # Redistribute those functions to the closest remaining cluster.
+    weak_cluster_threshold = 0.3
+    keep_indices: list[int] = []
+    orphaned_instances: list[str] = []
+    for i in range(effective_size):
+        assigned = cluster_assignments[i]
+        if not assigned:
+            continue
+        c = cluster_candidates[i]
+        scores = candidate_scores.get(c.id, {})
+        relevant = [scores.get(k, 0.0) for k in assigned if k in scores]
+        if relevant and (sum(relevant) / len(relevant)) >= weak_cluster_threshold:
+            keep_indices.append(i)
+        else:
+            orphaned_instances.extend(assigned)
+
+    if orphaned_instances and keep_indices:
+        for inst in orphaned_instances:
+            best_i = keep_indices[0]
+            best_val = -1.0
+            for i in keep_indices:
+                val = candidate_scores.get(cluster_candidates[i].id, {}).get(inst, 0.0)
+                if val > best_val:
+                    best_val = val
+                    best_i = i
+            cluster_assignments.setdefault(best_i, []).append(inst)
+
+    specialists = [cluster_candidates[i] for i in (keep_indices or range(effective_size))]
     assignments: dict[str, list[str]] = {c.id: cluster_assignments.get(i, []) for i, c in enumerate(specialists)}
     return specialists, assignments
 

@@ -1,0 +1,226 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000022: intensified_local_search_DE_v2
+Status: valid; mean AOCC score: 0.462375 (higher is better)
+Thought: Enhanced version with success-history adaptation for DE parameters and adaptive local refinement with line search. Maintains DE/best/1/bin for global exploration. Local refinement uses population covariance with exponential decay of step size and a line search step when improvement occurs. Also replaces worst population members with the best solution periodically to focus search. Budget strictly managed with early stopping.
+Mean AOCC: 0.4623749763897863
+Mean final error: 1.4479355587886977
+AOCC by group: {'high_conditioning_unimodal': 0.668772994676854, 'low_moderate_conditioning': 0.6346889118330182, 'multimodal_strong_global_structure': 0.26362660191582676, 'multimodal_weak_global_structure': 0.18005110213847242, 'separable': 0.5991980584734063}
+Code:
+```python
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.pop_size = max(3, min(budget // 4, 5 * dim))
+
+    def __call__(self, func):
+        np.random.seed(self.seed)
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        budget = self.budget
+        dim = self.dim
+        pop_size = self.pop_size
+        F0 = 0.8
+        CR0 = 0.9
+        sigma0 = 0.2 * (ub - lb).mean()
+
+        # Success-history memory
+        memory_size = 5
+        F_memory = [F0] * memory_size
+        CR_memory = [CR0] * memory_size
+        memory_idx = 0
+
+        # Initialization
+        pop = np.random.uniform(lb, ub, (pop_size, dim))
+        fitness = np.full(pop_size, np.inf)
+        best_x = None
+        best_val = np.inf
+        evals = 0
+
+        for i in range(pop_size):
+            if evals >= budget:
+                break
+            x = pop[i]
+            val = func(x)
+            evals += 1
+            fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+
+        # Main loop
+        while evals < budget:
+            # Sample F and CR from memory
+            F = np.random.choice(F_memory)
+            CR = np.random.choice(CR_memory)
+            # DE/best/1/bin
+            success_F = []
+            success_CR = []
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                idxs = [j for j in range(pop_size) if j != i]
+                a, b = np.random.choice(idxs, 2, replace=False)
+                mutant = best_x + F * (pop[a] - pop[b])
+                mutant = np.clip(mutant, lb, ub)
+                j_rand = np.random.randint(dim)
+                trial = np.where(np.random.rand(dim) < CR, mutant, pop[i])
+                trial[j_rand] = mutant[j_rand]
+                val = func(trial)
+                evals += 1
+                if val < fitness[i]:
+                    pop[i] = trial
+                    fitness[i] = val
+                    success_F.append(F)
+                    success_CR.append(CR)
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+
+            # Update memory with successful parameters
+            if success_F:
+                F_memory[memory_idx] = np.mean(success_F)
+                CR_memory[memory_idx] = np.mean(success_CR)
+                memory_idx = (memory_idx + 1) % memory_size
+
+            # Local refinement with adaptive step and line search
+            if evals < budget:
+                ratio = 1.0 - evals / budget
+                sigma = sigma0 * ratio ** 0.5
+                n_local = min(20, (budget - evals) // 2 + 1)
+                if pop_size > 1:
+                    center = pop.mean(axis=0)
+                    C = np.cov(pop.T) + 1e-8 * np.eye(dim)
+                else:
+                    C = np.eye(dim)
+                for _ in range(n_local):
+                    if evals >= budget:
+                        break
+                    delta = np.random.multivariate_normal(np.zeros(dim), sigma ** 2 * C)
+                    trial = best_x + delta
+                    trial = np.clip(trial, lb, ub)
+                    val = func(trial)
+                    evals += 1
+                    if val < best_val:
+                        # Line search along direction of improvement
+                        direction = trial - best_x
+                        line_length = 0.5
+                        for _ in range(3):
+                            if evals >= budget:
+                                break
+                            step = best_x + line_length * direction
+                            step = np.clip(step, lb, ub)
+                            v = func(step)
+                            evals += 1
+                            if v < best_val:
+                                best_val = v
+                                best_x = step.copy()
+                                report_best(best_val, best_x)
+                                line_length *= 2
+                            else:
+                                line_length *= 0.5
+                                break
+                        # Also replace a random population member
+                        idx = np.random.randint(pop_size)
+                        pop[idx] = trial
+                        fitness[idx] = val
+                    else:
+                        sigma *= 0.9
+
+            # Periodic replacement of worst members with best
+            if evals % max(1, budget // 10) < pop_size:
+                if evals < budget:
+                    num_repl = max(1, pop_size // 5)
+                    worst_idx = np.argsort(fitness)[-num_repl:]
+                    for idx in worst_idx:
+                        if evals >= budget:
+                            break
+                        new_x = best_x + 0.05 * np.random.randn(dim) * (ub - lb)
+                        new_x = np.clip(new_x, lb, ub)
+                        val = func(new_x)
+                        evals += 1
+                        if val < fitness[idx]:
+                            pop[idx] = new_x
+                            fitness[idx] = val
+                        if val < best_val:
+                            best_val = val
+                            best_x = new_x.copy()
+                            report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.
