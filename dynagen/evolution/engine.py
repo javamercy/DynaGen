@@ -104,7 +104,16 @@ class EvolutionEngine:
                 offspring = self._generate_offspring(generation, population)
             except LLMBudgetExceeded:
                 break
-            next_candidates = select_survivors(population.candidates + offspring, self.config.evolution.population_size)
+            if output_mode != "single":
+                pool = list(population.candidates) + offspring
+                pool_ids = {c.id for c in pool}
+                for c in self.history.candidates(self._candidate_index):
+                    if c.id not in pool_ids and c.status != CandidateStatus.ERROR:
+                        pool.append(c)
+                        pool_ids.add(c.id)
+                next_candidates = self._committee_survivors(pool, self.config.evolution.population_size)
+            else:
+                next_candidates = select_survivors(population.candidates + offspring, self.config.evolution.population_size)
             population = Population(generation=generation, candidates=next_candidates)
             summary = generation_summary(
                 generation,
@@ -375,6 +384,9 @@ class EvolutionEngine:
         self._register_candidates(offspring)
         self._update_history(offspring, generation=generation)
 
+        if not self.config.evolution.niche_population_mix and self.config.evolution.archive_niche_replacement:
+            self._replace_if_better(chosen, assigned, offspring, population)
+
         if self._exploration_burst_functions and generation == 1:
             offspring += self._burst_exploration(generation, population)
             self._exploration_burst_functions.clear()
@@ -409,7 +421,9 @@ class EvolutionEngine:
             self._exploration_burst_functions = sorted(all_instances - all_assigned)
 
         problem_tag = self._problem_tag()
-        logger.info("[%s] committee recomputed | specialists=%d", problem_tag, len(specialists))
+        all_instances_count = len(set(k for c in pool for k in per_instance_scores_fn(c).keys()))
+        logger.info("[%s] committee recomputed | specialists=%d | total_instances=%d",
+                     problem_tag, len(specialists), all_instances_count)
         for sp in specialists:
             assigned = assignments.get(sp.id, [])
             scores = per_instance_scores_fn(sp)
@@ -417,15 +431,47 @@ class EvolutionEngine:
                 sum(scores.get(k, 0.0) for k in assigned) / len(assigned)
                 if assigned else 0.0
             )
+            niche_contrib = niche_mean * len(assigned) / max(1, all_instances_count)
             global_mean = sp.metrics.get("mean_aocc", sp.metrics.get("mean_gap", 0.0)) if isinstance(sp.metrics, dict) else 0.0
             logger.info(
-                "[%s]   %s: niche=[%s] niche_mean=%.4f global_mean=%.4f",
+                "[%s]   %s: niche=[%s](%d) niche_mean=%.4f contrib=%.4f global_mean=%.4f",
                 problem_tag,
                 sp.id,
                 ",".join(assigned[:5]) + ("..." if len(assigned) > 5 else ""),
+                len(assigned),
                 niche_mean,
+                niche_contrib,
                 global_mean,
             )
+
+    def _replace_if_better(
+            self,
+            specialist: Candidate,
+            assigned: list[str],
+            offspring: list[Candidate],
+            population: Population,
+    ) -> None:
+        if not assigned:
+            return
+        per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
+        current_scores = per_instance_scores_fn(specialist)
+        current_mean = sum(current_scores.get(k, 0.0) for k in assigned) / len(assigned)
+        for c in offspring:
+            if c.status == CandidateStatus.ERROR:
+                continue
+            scores = per_instance_scores_fn(c)
+            new_mean = sum(scores.get(k, 0.0) for k in assigned) / len(assigned)
+            if new_mean > current_mean:
+                for i, sp in enumerate(self._committee_specialists):
+                    if sp.id == specialist.id:
+                        self._committee_specialists[i] = c
+                        self._candidate_index[c.id] = c
+                        problem_tag = self._problem_tag()
+                        logger.info(
+                            "[%s] archive replaced | %s → %s | niche_mean %.4f → %.4f",
+                            problem_tag, specialist.id, c.id, current_mean, new_mean,
+                        )
+                        break
 
     def _burst_exploration(self, generation: int, population: Population) -> list[Candidate]:
         problem_tag = self._problem_tag()
@@ -457,6 +503,52 @@ class EvolutionEngine:
         self._register_candidates(offspring)
         self._update_history(offspring, generation=generation)
         return offspring
+
+    def _committee_survivors(self, pool: list[Candidate], population_size: int) -> list[Candidate]:
+        if not self.config.evolution.niche_population_mix or not self._committee_specialists:
+            return select_survivors(pool, population_size)
+
+        global_best = list(select_survivors(pool, population_size))
+
+        per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
+        niche_best: dict[str, Candidate] = {}
+        for sp in self._committee_specialists:
+            assigned = self._committee_assignments.get(sp.id, [])
+            if not assigned:
+                continue
+            best = None
+            best_niche_mean = -1.0
+            for c in pool:
+                if c.status == CandidateStatus.ERROR:
+                    continue
+                scores = per_instance_scores_fn(c)
+                relevant = [scores.get(k, 0.0) for k in assigned if k in scores]
+                if not relevant:
+                    continue
+                niche_mean = sum(relevant) / len(relevant)
+                if niche_mean > best_niche_mean:
+                    best_niche_mean = niche_mean
+                    best = c
+            if best is not None:
+                niche_best[sp.id] = best
+
+        result: list[Candidate] = []
+        picked_niches: set[str] = set()
+        global_idx = 0
+
+        while len(result) < population_size:
+            unpicked = [sp for sp in self._committee_specialists if sp.id in niche_best and sp.id not in picked_niches]
+            if unpicked:
+                sp = unpicked[0]
+                result.append(niche_best[sp.id])
+                picked_niches.add(sp.id)
+            elif global_idx < len(global_best):
+                result.append(global_best[global_idx])
+                global_idx += 1
+            else:
+                break
+
+        return result
 
     def _select_niche(self, specialists: list[Candidate]) -> Candidate | None:
         if not specialists:

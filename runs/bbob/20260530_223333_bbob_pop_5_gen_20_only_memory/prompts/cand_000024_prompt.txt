@@ -1,0 +1,154 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000002: DifferentialEvolution
+Status: valid; mean AOCC score: 0.269334 (higher is better)
+Thought: Differential Evolution with rand/1/bin strategy. Population size scales with dimension and budget (max(5, min(10*dim, budget//2))). Initial points sampled uniformly within bounds. Mutation using F=0.8 and crossover with CR=0.9. Greedy replacement if trial improves fitness. Best solution tracked and reported via report_best. Random seed ensures reproducibility. Budget is monitored strictly to avoid exceeding calls.
+Mean AOCC: 0.2693344266426939
+Mean final error: 1.9144057104826233
+AOCC by group: {'high_conditioning_unimodal': 0.22242126166896103, 'low_moderate_conditioning': 0.311145480682046, 'multimodal_strong_global_structure': 0.18445532172608675, 'multimodal_weak_global_structure': 0.2070935313340499, 'separable': 0.42991874861019624}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+        # Population size: at least 5, at most 10*dim, but limited by budget/2 to allow evolution
+        self.pop_size = max(5, min(10 * dim, budget // 2))
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop = self.rng.uniform(lb, ub, size=(self.pop_size, self.dim))
+        fit = np.full(self.pop_size, np.inf)
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        # Initial evaluation
+        for i in range(self.pop_size):
+            x = np.clip(pop[i], lb, ub)
+            val = func(x)
+            evals += 1
+            fit[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(val, x)
+            if evals >= self.budget:
+                break
+
+        # Main DE loop
+        while evals < self.budget:
+            for i in range(self.pop_size):
+                if evals >= self.budget:
+                    break
+                # Mutation: select three distinct random indices different from i
+                indices = [j for j in range(self.pop_size) if j != i]
+                if len(indices) < 3:
+                    break
+                r1, r2, r3 = self.rng.choice(indices, size=3, replace=False)
+                # Rand/1 mutation
+                F = 0.8
+                mutant = pop[r1] + F * (pop[r2] - pop[r3])
+                mutant = np.clip(mutant, lb, ub)
+                # Binomial crossover
+                CR = 0.9
+                cross_points = self.rng.random(self.dim) < CR
+                # Ensure at least one dimension from mutant
+                cross_points[self.rng.integers(0, self.dim)] = True
+                trial = np.where(cross_points, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < fit[i]:
+                    pop[i] = trial
+                    fit[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(val, trial)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000002 LLM reflection:
+- Summary: Standard DE with fixed F=0.8, CR=0.9 achieves moderate mean AOCC but struggles on multimodal and ill-conditioned functions.
+- Aim: Improve performance on multimodal and high-conditioning problems by introducing an adaptive mechanism for step-size or crossover to enhance exploration and local refinement.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

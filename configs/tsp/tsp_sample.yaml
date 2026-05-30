@@ -60,6 +60,8 @@ evolution:
   #   m1_component_replacement: 0.1
   # archive_mode_strategy_weights_after_generation: 3   # when to activate (default 0 = immediate)
   # committee_recovery_strategies: [ e1_radical_exploration, e2_backbone_exploration, e3_hybrid_recombination ]
+  # niche_population_mix: false
+  # archive_niche_replacement: true
 
   # --- History archive — persistent candidate store for parent sampling ---
   history:
@@ -78,6 +80,8 @@ evolution:
   # --- Verbal gradients — LLM reflection on parent performance ---
   verbal_gradients:
     enabled: true                      # Enable/disable LLM reflections
+                                        #   WARNING: disable with committee_specialist
+                                        #   (global parent feedback contradicts niche focus)
     llm_every_n_generations: 2         # Reflect every N generations
     max_llm_calls_per_generation: 5    # Max reflection calls per generation
     llm_model: deepseek-v4-flash       # Model for reflections (defaults to main model)
