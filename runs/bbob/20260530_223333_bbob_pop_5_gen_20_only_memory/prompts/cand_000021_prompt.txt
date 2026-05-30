@@ -1,0 +1,176 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000001: cma_es_optimizer
+Status: valid; mean AOCC score: 0.433181 (higher is better)
+Thought: Implement CMA-ES with rank-mu update and cumulative step-size adaptation. Initialize population mean uniformly in bounds. Use default population size lambda=4+floor(3*ln(dim)). Each generation sample lambda points, clip to bounds, evaluate, sort by value, update mean with top mu weights, update covariance via rank-mu, update step-size via cumulative path. Report improvements. Use seed for reproducibility. Ensure budget not exceeded by checking remaining evaluations each generation.
+Mean AOCC: 0.4331810561286633
+Mean final error: 5.15276263679496
+AOCC by group: {'high_conditioning_unimodal': 0.6296155676795572, 'low_moderate_conditioning': 0.6161423364489163, 'multimodal_strong_global_structure': 0.22071111943605282, 'multimodal_weak_global_structure': 0.20804470626362234, 'separable': 0.5279838068792186}
+History source: yes
+History bucket: bbob:group:high_conditioning_unimodal
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        # CMA-ES parameters
+        self.lam = int(4 + 3 * np.log(dim))
+        self.mu = self.lam // 2
+        self.weights = np.log(self.mu + 0.5) - np.log(np.arange(1, self.mu + 1))
+        self.weights /= self.weights.sum()
+        self.mu_eff = 1.0 / np.sum(self.weights**2)
+        self.cc = (4 + self.mu_eff / dim) / (dim + 4 + 2 * self.mu_eff / dim)
+        self.cs = (self.mu_eff + 2) / (dim + self.mu_eff + 5)
+        self.c1 = 2 / ((dim + 1.3)**2 + self.mu_eff)
+        self.cmu = min(1 - self.c1, 2 * (self.mu_eff - 2 + 1/self.mu_eff) / ((dim + 2)**2 + self.mu_eff))
+        self.damps = 1 + 2 * max(0, np.sqrt((self.mu_eff - 1)/(dim + 1)) - 1) + self.cs
+        # Initialize mean in bounds
+        self.mean = np.random.uniform(0, 1, size=dim)  # will be scaled later
+        self.sigma = 0.5 * (np.random.uniform(0,1) + 0.5)  # step size
+        self.C = np.eye(dim)
+        self.pc = np.zeros(dim)
+        self.ps = np.zeros(dim)
+        self.best_x = None
+        self.best_val = np.inf
+        # For initial scaling, we need bounds, but they are not available here.
+        # We'll store them when func is called in __call__
+        self.lb = None
+        self.ub = None
+
+    def __call__(self, func):
+        self.lb = func.bounds.lb
+        self.ub = func.bounds.ub
+        # Scale mean to bounds
+        self.mean = self.lb + (self.ub - self.lb) * np.random.uniform(0, 1, size=self.dim)
+        # Initial evaluations: evaluate mean
+        val = func(self.mean)
+        self.best_val = val
+        self.best_x = self.mean.copy()
+        report_best(self.best_val, self.best_x)
+        evals = 1
+        generation = 0
+        while evals + self.lam <= self.budget:
+            generation += 1
+            # Sample lambda points
+            eigvals, eigvecs = np.linalg.eigh(self.C)
+            # Ensure positive definite
+            eigvals = np.maximum(eigvals, 1e-20)
+            D = np.diag(np.sqrt(eigvals))
+            B = eigvecs
+            # Generate z vectors
+            Z = np.random.randn(self.dim, self.lam)
+            X = self.mean[:, np.newaxis] + self.sigma * (B @ D @ Z)
+            # Clip to bounds
+            X = np.clip(X, self.lb[:, np.newaxis], self.ub[:, np.newaxis])
+            # Evaluate each point
+            F = np.zeros(self.lam)
+            for i in range(self.lam):
+                F[i] = func(X[:, i])
+                evals += 1
+            # Sort by fitness
+            idx = np.argsort(F)
+            F = F[idx]
+            X = X[:, idx]
+            # Check for improvement
+            if F[0] < self.best_val:
+                self.best_val = F[0]
+                self.best_x = X[:, 0].copy()
+                report_best(self.best_val, self.best_x)
+            # Update mean
+            old_mean = self.mean.copy()
+            self.mean = X[:, :self.mu] @ self.weights
+            # Update evolution paths
+            zmean = np.linalg.solve(B @ D, self.mean - old_mean) / self.sigma
+            self.ps = (1 - self.cs) * self.ps + np.sqrt(self.cs * (2 - self.cs) * self.mu_eff) * zmean
+            hsig = (np.linalg.norm(self.ps) / np.sqrt(1 - (1 - self.cs)**(2*(evals/self.lam))) < (1.4 + 2/(self.dim+1))) * 1.0
+            self.pc = (1 - self.cc) * self.pc + hsig * np.sqrt(self.cc * (2 - self.cc) * self.mu_eff) * (self.mean - old_mean) / self.sigma
+            # Update covariance matrix
+            artmp = (X[:, :self.mu] - old_mean[:, np.newaxis]) / self.sigma
+            self.C = (1 - self.c1 - self.cmu) * self.C + self.c1 * (np.outer(self.pc, self.pc) + (1 - hsig) * self.cc * (2 - self.cc) * self.C) + self.cmu * (artmp @ np.diag(self.weights) @ artmp.T)
+            # Enforce symmetry (numerical safety)
+            self.C = (self.C + self.C.T) / 2
+            # Update step size
+            self.sigma *= np.exp((self.cs / self.damps) * (np.linalg.norm(self.ps) / np.sqrt(self.dim) - 1))
+        return self.best_val, self.best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000001 LLM reflection:
+- Summary: CMA-ES with rank-mu and cumulative step-size achieved mean AOCC 0.433, but performed poorly on multimodal (0.208-0.221) and separable functions.
+- Aim: Improve multimodal diversification and local refinement to boost AOCC on weakly structured multimodal functions.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

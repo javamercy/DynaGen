@@ -1,0 +1,186 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000004: coordinate_pattern_search
+Status: valid; mean AOCC score: 0.300786 (higher is better)
+Thought: Coordinate and pattern-search solver that explores coordinate directions with adaptive step sizes. Starts with a random point, then repeatedly performs exploratory moves along each dimension, accepting any improvement. After a successful cycle, a pattern move extends the direction of improvement. Step size halves upon failure. Seeded random number generation controls initial point and coordinate order. Budget is rigorously tracked.
+Mean AOCC: 0.30078574369451777
+Mean final error: 10.448401520206353
+AOCC by group: {'high_conditioning_unimodal': 0.16922999058946894, 'low_moderate_conditioning': 0.3594635766397393, 'multimodal_strong_global_structure': 0.11717432889043561, 'multimodal_weak_global_structure': 0.25003033264461233, 'separable': 0.619766056297377}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Initial point
+        x = rng.uniform(lb, ub)
+        evals = 1
+        best_x = x.copy()
+        best_val = func(x)
+        report_best(best_val, best_x)
+
+        # Initial step sizes (10% of range)
+        step = 0.1 * (ub - lb)
+        min_step = 1e-10 * (ub - lb)  # per-dim threshold
+
+        # Placeholder for previous best before exploratory moves
+        prev_x = x.copy()
+        prev_val = best_val
+
+        while evals < budget and np.any(step > min_step):
+            # Exploratory moves: coordinate search from current x
+            improved = False
+            # Randomize order of coordinates
+            order = rng.permutation(dim)
+            for d in order:
+                if evals >= budget:
+                    break
+                # Try positive direction
+                x_new = x.copy()
+                x_new[d] = np.clip(x[d] + step[d], lb[d], ub[d])
+                if x_new[d] != x[d]:
+                    val_new = func(x_new)
+                    evals += 1
+                    if val_new < best_val:
+                        best_val = val_new
+                        best_x = x_new.copy()
+                        x = x_new.copy()
+                        improved = True
+                        report_best(best_val, best_x)
+                        continue
+                # Try negative direction
+                x_new = x.copy()
+                x_new[d] = np.clip(x[d] - step[d], lb[d], ub[d])
+                if x_new[d] != x[d]:
+                    val_new = func(x_new)
+                    evals += 1
+                    if val_new < best_val:
+                        best_val = val_new
+                        best_x = x_new.copy()
+                        x = x_new.copy()
+                        improved = True
+                        report_best(best_val, best_x)
+
+            if improved:
+                # Pattern move: extend in direction of improvement
+                direction = x - prev_x
+                x_pattern = x + direction
+                x_pattern = np.clip(x_pattern, lb, ub)
+                if np.any(x_pattern != x):
+                    val_pattern = func(x_pattern)
+                    evals += 1
+                    if val_pattern < best_val:
+                        best_val = val_pattern
+                        best_x = x_pattern.copy()
+                        x = x_pattern.copy()
+                        improved = True
+                        report_best(best_val, best_x)
+                # Update previous point for next pattern move
+                prev_x = x.copy()
+                prev_val = best_val
+            else:
+                # No improvement: shrink step
+                step *= 0.5
+                # Reset x to best (optional, but helps in rugged landscapes)
+                x = best_x.copy()
+                prev_x = x.copy()
+                prev_val = best_val
+
+        # Exhaust remaining budget with random sampling if any left
+        while evals < budget:
+            x_rand = rng.uniform(lb, ub)
+            val_rand = func(x_rand)
+            evals += 1
+            if val_rand < best_val:
+                best_val = val_rand
+                best_x = x_rand.copy()
+                report_best(best_val, best_x)
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

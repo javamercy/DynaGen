@@ -261,20 +261,18 @@ def niche_probabilities(
             continue
         scores = per_instance_scores_fn(c)
         total = 0.0
-        count = 0
         for instance in assigned:
             s = scores.get(instance, 0.0)
             potential = max(0.0, 1.0 - max(0.0, min(1.0, s)))
             total += potential ** improvement_power
-            count += 1
-        potentials[c.id] = total / max(1, count) if count else 0.0
+        potentials[c.id] = total
 
     total_potential = sum(potentials.values())
     if total_potential <= 0:
         return {c.id: 1.0 / len(specialists) for c in specialists}
 
     return {
-        cid: max(0.0, prob)
+        cid: max(0.0, prob / total_potential)
         for cid, prob in potentials.items()
     }
 

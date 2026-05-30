@@ -1,0 +1,282 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000024: AdaptiveDE
+Status: valid; mean AOCC score: 0.317336 (higher is better)
+Thought: Adaptive Differential Evolution with self-adaptive F and CR parameters based on success history. Population size scales with dimension and budget (pop_size = max(4, min(5*dim, budget//10))). Uses rand/1/bin mutation and crossover. F and CR are sampled from normal distributions centered on historical means of successful parameters, with initial F=0.5, CR=0.9. Means are updated after each generation. Clipping ensures bounds. Random seed controls stochastic behavior. Budget is strictly monitored.
+Mean AOCC: 0.31733643515295884
+Mean final error: 1.4966240550855436
+AOCC by group: {'high_conditioning_unimodal': 0.28156875709777046, 'low_moderate_conditioning': 0.26488224607633437, 'multimodal_strong_global_structure': 0.27791377082070784, 'multimodal_weak_global_structure': 0.22506797457374852, 'separable': 0.5267585893809084}
+History source: yes
+History bucket: bbob:group:separable
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+        self.pop_size = max(4, min(5 * dim, budget // 10))
+        self.mean_F = 0.5
+        self.mean_CR = 0.9
+        self.F_history = []
+        self.CR_history = []
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        pop = self.rng.uniform(lb, ub, size=(self.pop_size, self.dim))
+        fit = np.full(self.pop_size, np.inf)
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        for i in range(self.pop_size):
+            x = np.clip(pop[i], lb, ub)
+            val = func(x)
+            evals += 1
+            fit[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(val, x)
+            if evals >= self.budget:
+                return best_val, best_x
+
+        while evals < self.budget:
+            # Sample F and CR for each individual from adaptive distributions
+            # Use normal with std 0.1, truncated to [0.1, 0.9] for F, [0.1, 1.0] for CR
+            # If history not empty, use historical means
+            if len(self.F_history) > 0:
+                mean_F = np.mean(self.F_history)
+                mean_CR = np.mean(self.CR_history)
+            else:
+                mean_F = self.mean_F
+                mean_CR = self.mean_CR
+
+            new_F_list = []
+            new_CR_list = []
+            for i in range(self.pop_size):
+                if evals >= self.budget:
+                    break
+                # Generate F and CR
+                F = np.clip(self.rng.normal(mean_F, 0.1), 0.1, 0.9)
+                CR = np.clip(self.rng.normal(mean_CR, 0.1), 0.1, 1.0)
+                # Mutation
+                indices = [j for j in range(self.pop_size) if j != i]
+                if len(indices) < 3:
+                    break
+                r1, r2, r3 = self.rng.choice(indices, size=3, replace=False)
+                mutant = pop[r1] + F * (pop[r2] - pop[r3])
+                mutant = np.clip(mutant, lb, ub)
+                # Crossover
+                cross_points = self.rng.random(self.dim) < CR
+                cross_points[self.rng.integers(0, self.dim)] = True
+                trial = np.where(cross_points, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < fit[i]:
+                    pop[i] = trial
+                    fit[i] = val
+                    new_F_list.append(F)
+                    new_CR_list.append(CR)
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(val, trial)
+            # Update histories
+            self.F_history.extend(new_F_list)
+            self.CR_history.extend(new_CR_list)
+            # Keep history size manageable
+            if len(self.F_history) > 50:
+                self.F_history = self.F_history[-50:]
+                self.CR_history = self.CR_history[-50:]
+        return best_val, best_x
+```
+
+Candidate cand_000025: restart_cma_es
+Status: valid; mean AOCC score: 0.399253 (higher is better)
+Thought: Adaptive CMA-ES with restarts to improve multimodal performance. Initializes a random mean within bounds, samples lambda points, updates mean via weighted recombination, updates covariance via rank-mu and cumulative step-size. Restarts with a new random mean if no improvement for a number of generations, resetting evolution paths and covariance. Uses seed for reproducibility and clips all points to bounds. Evaluates initial point and reports best. Stops when budget exhausted.
+Mean AOCC: 0.3992529652256869
+Mean final error: 4.989969685783324
+AOCC by group: {'high_conditioning_unimodal': 0.4513957184716272, 'low_moderate_conditioning': 0.5973208539480305, 'multimodal_strong_global_structure': 0.18551034628532564, 'multimodal_weak_global_structure': 0.32400178072673563, 'separable': 0.4776497044411844}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        np.random.seed(seed)
+        self.lam = int(4 + 3 * np.log(dim))
+        self.mu = self.lam // 2
+        self.weights = np.log(self.mu + 0.5) - np.log(np.arange(1, self.mu + 1))
+        self.weights /= self.weights.sum()
+        self.mu_eff = 1.0 / np.sum(self.weights**2)
+        self.cc = (4 + self.mu_eff / dim) / (dim + 4 + 2 * self.mu_eff / dim)
+        self.cs = (self.mu_eff + 2) / (dim + self.mu_eff + 5)
+        self.c1 = 2 / ((dim + 1.3)**2 + self.mu_eff)
+        self.cmu = min(1 - self.c1, 2 * (self.mu_eff - 2 + 1/self.mu_eff) / ((dim + 2)**2 + self.mu_eff))
+        self.damps = 1 + 2 * max(0, np.sqrt((self.mu_eff - 1)/(dim + 1)) - 1) + self.cs
+        self.mean = None
+        self.sigma = 0.5
+        self.C = np.eye(dim)
+        self.pc = np.zeros(dim)
+        self.ps = np.zeros(dim)
+        self.best_val = np.inf
+        self.best_x = None
+        self.stagnation_count = 0
+        self.max_stagnation = 10 + int(5 * np.log(dim))
+        self.restart_count = 0
+
+    def __call__(self, func):
+        self.lb = func.bounds.lb.copy()
+        self.ub = func.bounds.ub.copy()
+        np.random.seed(self.seed)
+        self._init_restart()
+        self.best_val = np.inf
+        self.best_x = np.empty(self.dim)
+        evals = 0
+        while evals < self.budget:
+            if self.mean is None:
+                self._init_restart()
+            # evaluate current mean if not yet
+            if self.best_x is None:
+                val = func(self.mean)
+                evals += 1
+                self.best_val = val
+                self.best_x = self.mean.copy()
+                report_best(self.best_val, self.best_x)
+            # check budget for a generation
+            if evals + self.lam > self.budget:
+                break
+            # sample
+            try:
+                eigvals, eigvecs = np.linalg.eigh(self.C)
+                eigvals = np.maximum(eigvals, 1e-20)
+                D = np.diag(np.sqrt(eigvals))
+                B = eigvecs
+            except np.linalg.LinAlgError:
+                # fallback to identity
+                B = np.eye(self.dim)
+                D = np.eye(self.dim)
+            Z = np.random.randn(self.dim, self.lam)
+            X = self.mean[:, np.newaxis] + self.sigma * (B @ D @ Z)
+            X = np.clip(X, self.lb[:, np.newaxis], self.ub[:, np.newaxis])
+            F = np.empty(self.lam)
+            for i in range(self.lam):
+                F[i] = func(X[:, i])
+                evals += 1
+            idx = np.argsort(F)
+            F = F[idx]
+            X = X[:, idx]
+            if F[0] < self.best_val:
+                self.best_val = F[0]
+                self.best_x = X[:, 0].copy()
+                report_best(self.best_val, self.best_x)
+                self.stagnation_count = 0
+            else:
+                self.stagnation_count += 1
+            old_mean = self.mean.copy()
+            self.mean = X[:, :self.mu] @ self.weights
+            zmean = np.linalg.solve(B @ D, self.mean - old_mean) / self.sigma
+            self.ps = (1 - self.cs) * self.ps + np.sqrt(self.cs * (2 - self.cs) * self.mu_eff) * zmean
+            hsig = (np.linalg.norm(self.ps) / np.sqrt(1 - (1 - self.cs)**(2*(evals/self.lam))) < (1.4 + 2/(self.dim+1))) * 1.0
+            self.pc = (1 - self.cc) * self.pc + hsig * np.sqrt(self.cc * (2 - self.cc) * self.mu_eff) * (self.mean - old_mean) / self.sigma
+            artmp = (X[:, :self.mu] - old_mean[:, np.newaxis]) / self.sigma
+            self.C = (1 - self.c1 - self.cmu) * self.C + self.c1 * (np.outer(self.pc, self.pc) + (1 - hsig) * self.cc * (2 - self.cc) * self.C) + self.cmu * (artmp @ np.diag(self.weights) @ artmp.T)
+            self.C = (self.C + self.C.T) / 2
+            self.sigma *= np.exp((self.cs / self.damps) * (np.linalg.norm(self.ps) / np.sqrt(self.dim) - 1))
+            if self.stagnation_count >= self.max_stagnation and evals < self.budget - self.lam:
+                self._init_restart()
+        return self.best_val, self.best_x
+
+    def _init_restart(self):
+        self.mean = self.lb + (self.ub - self.lb) * np.random.rand(self.dim)
+        self.sigma = 0.5 * (np.random.uniform(0.2, 0.8))
+        self.C = np.eye(self.dim)
+        self.pc = np.zeros(self.dim)
+        self.ps = np.zeros(self.dim)
+        self.stagnation_count = 0
+        self.restart_count += 1
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e3_hybrid_recombination
+
+GOAL: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

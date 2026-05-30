@@ -133,6 +133,8 @@ class EvolutionConfig:
     committee_recovery_strategies: list[str] = field(default_factory=lambda: [
         "e1_radical_exploration", "e2_backbone_exploration", "e3_hybrid_recombination",
     ])
+    niche_population_mix: bool = False
+    archive_niche_replacement: bool = True
     verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
     history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
     output_mode: str = "single"
@@ -183,6 +185,7 @@ class EvolutionConfig:
         self.committee_recovery_strategies = [
             Strategy(strategy) for strategy in self.committee_recovery_strategies
         ]
+        self.niche_population_mix = bool(self.niche_population_mix)
         if isinstance(self.niche, dict):
             self.niche = NicheConfig(**self.niche)
         elif not isinstance(self.niche, NicheConfig):
