@@ -1,0 +1,235 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000022: SA_with_Local_Search
+Status: valid; mean AOCC score: 0.249818 (higher is better)
+Thought: Simulated annealing for global exploration followed by a greedy local search phase to refine the best solution. The SA phase uses exponential cooling and Gaussian perturbations. The local search performs iterative random perturbations from the best point, accepting only improvements, with step size decaying exponentially to zero. Budget split: 80% SA, 20% local search. Seed controls randomness.
+Mean AOCC: 0.24981837641359825
+Mean final error: 32.42440506852827
+AOCC by group: {'high_conditioning_unimodal': 0.14150666917700694, 'low_moderate_conditioning': 0.3880676676921852, 'multimodal_strong_global_structure': 0.2113168037157171, 'multimodal_weak_global_structure': 0.20350889582682014, 'separable': 0.3323417039119791}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Phase 1: Simulated Annealing
+        budget_sa = max(1, int(0.8 * budget))
+        # Initial random point
+        best_x = rng.uniform(lb, ub)
+        best_val = func(best_x)
+        calls = 1
+        report_best(best_val, best_x)
+
+        current_x = best_x.copy()
+        current_val = best_val
+
+        max_iter_sa = budget_sa - 1
+        if max_iter_sa > 0:
+            T0 = 1.0
+            T_end = 1e-4
+            step0_sa = 0.1 * (ub - lb)
+            step_end_sa = 1e-6 * (ub - lb)
+
+            for i in range(max_iter_sa):
+                t = i / max_iter_sa
+                T = T0 * (T_end / T0) ** t
+                step = step0_sa * (step_end_sa / step0_sa) ** t
+
+                candidate = current_x + step * rng.randn(dim)
+                candidate = np.clip(candidate, lb, ub)
+                val = func(candidate)
+                calls += 1
+
+                delta = val - current_val
+                if delta < 0:
+                    current_x = candidate
+                    current_val = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = candidate.copy()
+                        report_best(best_val, best_x)
+                else:
+                    if rng.rand() < np.exp(-delta / T):
+                        current_x = candidate
+                        current_val = val
+
+                if calls >= budget:
+                    return best_val, best_x
+
+        # Phase 2: Local Search (greedy, random perturbations)
+        remaining = budget - calls
+        if remaining > 0:
+            step0_local = 0.05 * (ub - lb)
+            step_end_local = 1e-6 * (ub - lb)
+            for i in range(remaining):
+                t = i / remaining
+                step = step0_local * (step_end_local / step0_local) ** t
+                candidate = best_x + step * rng.randn(dim)
+                candidate = np.clip(candidate, lb, ub)
+                val = func(candidate)
+                calls += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = candidate.copy()
+                    report_best(best_val, best_x)
+                if calls >= budget:
+                    break
+
+        return best_val, best_x
+```
+
+Candidate cand_000021: simulated_annealing_repair
+Status: valid; mean AOCC score: 0.236519 (higher is better)
+Thought: Simulated annealing with exponential cooling and Gaussian perturbations. Initial random point. Step size and temperature decay exponentially with iteration count. Accept worse solutions with probability exp(-delta/T) to escape local optima. Seed controls numpy random state for reproducibility. The repaired version uses a while loop with explicit call counting to guarantee budget compliance and avoid division by zero.
+Mean AOCC: 0.23651870466457986
+Mean final error: 31.530734246777698
+AOCC by group: {'high_conditioning_unimodal': 0.137802779343058, 'low_moderate_conditioning': 0.3309965306789449, 'multimodal_strong_global_structure': 0.22362103898362642, 'multimodal_weak_global_structure': 0.18261525076190668, 'separable': 0.32645348875823615}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Initial random point
+        best_x = rng.uniform(lb, ub)
+        best_val = func(best_x)
+        calls = 1
+        report_best(best_val, best_x)
+
+        current_x = best_x.copy()
+        current_val = best_val
+
+        # Temperature and step size parameters
+        T0 = 1.0
+        T_end = 1e-4
+        step0 = 0.1 * (ub - lb)
+        step_end = 1e-6 * (ub - lb)
+
+        while calls < budget:
+            # Compute progress
+            t = (calls - 1) / (budget - 1) if budget > 1 else 1.0
+            T = T0 * (T_end / T0) ** t
+            step = step0 * (step_end / step0) ** t
+
+            # Generate perturbation
+            candidate = current_x + step * rng.randn(dim)
+            candidate = np.clip(candidate, lb, ub)
+            val = func(candidate)
+            calls += 1
+
+            delta = val - current_val
+            if delta < 0:
+                current_x = candidate
+                current_val = val
+                if val < best_val:
+                    best_val = val
+                    best_x = candidate.copy()
+                    report_best(best_val, best_x)
+            else:
+                if rng.rand() < np.exp(-delta / T):
+                    current_x = candidate
+                    current_val = val
+
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: e3_hybrid_recombination
+
+GOAL: Combine compatible strengths from multiple parents into one coherent algorithm. Select only components that work well together, resolve conflicts between their design choices, and avoid merely concatenating all parent mechanisms.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

@@ -69,6 +69,33 @@ class VRPProblem:
     def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
         return build_vrp_history_profile(candidate)
 
+    def per_instance_scores(self, candidate: Candidate) -> dict[str, float]:
+        metrics = candidate.metrics if isinstance(candidate.metrics, dict) else {}
+        scores: dict[str, float] = {}
+        by_size = metrics.get("score_by_instance_size")
+        if isinstance(by_size, dict):
+            for k, v in by_size.items():
+                scores[f"size:{k}"] = _invert_vrp_score(v)
+        by_trucks = metrics.get("score_by_truck_count")
+        if isinstance(by_trucks, dict):
+            for k, v in by_trucks.items():
+                scores[f"trucks:{k}"] = _invert_vrp_score(v)
+        by_source = metrics.get("score_by_instance_source")
+        if isinstance(by_source, dict):
+            for k, v in by_source.items():
+                scores[f"source:{k}"] = _invert_vrp_score(v)
+        return scores
+
+
+def _invert_vrp_score(value: object) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not number == number or number in {float("inf"), float("-inf")}:
+        return 0.0
+    return max(0.0, min(1.0, 1.0 / (1.0 + max(0.0, number) / 25.0)))
+
 
 def create_vrp_initial_roles(count: int) -> list[VRPInitialRole]:
     roles: list[VRPInitialRole] = []

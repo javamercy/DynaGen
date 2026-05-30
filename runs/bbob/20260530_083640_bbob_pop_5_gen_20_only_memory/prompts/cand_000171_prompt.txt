@@ -1,0 +1,203 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000107: hybrid_adaptive_de_pattern_search
+Status: valid; mean AOCC score: 0.432949 (higher is better)
+Thought: Combines Latin Hypercube initialization, adaptive DE (decreasing F, increasing CR) with population size scaling, and a pattern search (Hooke-Jeeves) local refinement that iteratively reduces step size. This hybrid leverages the global exploration of DE and the robust local optimization of pattern search, blending coordinate descent and pattern search strategies. All points are clipped to bounds. Seed controls stochastic behavior.
+Mean AOCC: 0.4329493600335401
+Mean final error: 0.942254808766044
+AOCC by group: {'high_conditioning_unimodal': 0.2874763691227449, 'low_moderate_conditioning': 0.4785332489049987, 'multimodal_strong_global_structure': 0.24049610421585388, 'multimodal_weak_global_structure': 0.37600480111945117, 'separable': 0.7913530545789437}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        pop_size = min(budget // 2, max(3 * dim, min(15 + int(dim**0.5), budget // 2)))
+        pop_size = max(pop_size, 2 * dim)
+        pop_size = min(pop_size, budget)
+
+        lhs = self._latin_hypercube(pop_size, dim, rng)
+        bounds = np.array([lb, ub]).T
+        pop = bounds[:, 0] + (bounds[:, 1] - bounds[:, 0]) * lhs
+
+        best_val = np.inf
+        best_x = None
+        evals = 0
+
+        pop_fitness = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            x = np.clip(pop[i], lb, ub)
+            val = func(x)
+            evals += 1
+            pop_fitness[i] = val
+            if val < best_val:
+                best_val = val
+                best_x = x.copy()
+                report_best(best_val, best_x)
+            if evals >= budget:
+                return best_val, best_x
+
+        reserve = max(2 * dim, 20)
+        reserve = min(reserve, budget - evals)
+        max_gen = (budget - evals - reserve) // pop_size
+        max_gen = max(0, max_gen)
+
+        for gen in range(max_gen):
+            frac = gen / max_gen if max_gen > 0 else 0.0
+            F = 0.9 - 0.4 * frac
+            CR = 0.5 + 0.4 * frac
+            for i in range(pop_size):
+                indices = [j for j in range(pop_size) if j != i]
+                rng.shuffle(indices)
+                a, b, c = indices[:3]
+                mutant = pop[a] + F * (pop[b] - pop[c])
+                j_rand = rng.randint(dim)
+                trial = np.where(rng.rand(dim) < CR, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                val = func(trial)
+                evals += 1
+                if val < pop_fitness[i]:
+                    pop[i] = trial
+                    pop_fitness[i] = val
+                    if val < best_val:
+                        best_val = val
+                        best_x = trial.copy()
+                        report_best(best_val, best_x)
+                if evals >= budget:
+                    return best_val, best_x
+
+        remaining = budget - evals
+        if remaining > 0:
+            x_curr = best_x.copy()
+            f_curr = best_val
+            step_size = 0.1 * (ub - lb)
+            min_step = 1e-5 * (ub - lb)
+            max_iter = remaining
+            iter_count = 0
+            while evals < budget and iter_count < max_iter and np.any(step_size > min_step):
+                improved = False
+                for i in range(dim):
+                    if evals >= budget:
+                        break
+                    x_new = x_curr.copy()
+                    x_new[i] = min(ub[i], max(lb[i], x_new[i] + step_size[i]))
+                    val_new = func(x_new)
+                    evals += 1
+                    if val_new < f_curr:
+                        x_curr = x_new
+                        f_curr = val_new
+                        improved = True
+                        if f_curr < best_val:
+                            best_val = f_curr
+                            best_x = x_curr.copy()
+                            report_best(best_val, best_x)
+                        continue
+                    x_new = x_curr.copy()
+                    x_new[i] = min(ub[i], max(lb[i], x_new[i] - step_size[i]))
+                    val_new = func(x_new)
+                    evals += 1
+                    if val_new < f_curr:
+                        x_curr = x_new
+                        f_curr = val_new
+                        improved = True
+                        if f_curr < best_val:
+                            best_val = f_curr
+                            best_x = x_curr.copy()
+                            report_best(best_val, best_x)
+                if not improved:
+                    step_size *= 0.5
+                iter_count += 1
+        return best_val, best_x
+
+    def _latin_hypercube(self, n, d, rng):
+        intervals = np.linspace(0, 1, n + 1)
+        lhs = np.zeros((n, d))
+        for j in range(d):
+            perm = rng.permutation(n)
+            for i in range(n):
+                lhs[i, j] = intervals[perm[i]] + rng.uniform(0, 1 / n)
+        return lhs
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

@@ -39,3 +39,15 @@ class Problem(Protocol):
 
     def build_history_profile(self, candidate: Candidate) -> dict[str, Any]:
         ...
+
+    def per_instance_scores(self, candidate: Candidate) -> dict[str, float]:
+        """
+        Return per-instance/function scores for this candidate.
+
+        Returns:
+            dict mapping instance key -> score value
+            - BBOB: {"1": 0.92, "2": 0.86, ..., "24": 0.08}
+            - TSP:   {"size:50": 0.12, ...} or {"instance:eil51": 0.15, ...}
+            - DVRP:  {"size:10": 0.20, "trucks:3": 0.18, ...}
+            - VRP:   {"size:10": 0.20, "trucks:3": 0.18, ...}
+        """

@@ -1,0 +1,107 @@
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Initial feasible point
+        x = lb + rng.rand(dim) * (ub - lb)
+        f = func(x)
+        best_x = x.copy()
+        best_f = f
+        evals = 1
+        report_best(best_f, best_x)
+
+        step = 0.2 * (ub - lb)
+        stagnation = 0
+        max_stag = max(1, budget // 10)
+
+        while evals < budget:
+            success = False
+            perm = rng.permutation(dim)
+            for i in perm:
+                if evals >= budget:
+                    break
+                # Positive direction
+                trial = x.copy()
+                trial[i] = np.clip(x[i] + step[i], lb[i], ub[i])
+                f_trial = func(trial)
+                evals += 1
+                if f_trial < f:
+                    x = trial
+                    f = f_trial
+                    step[i] = min(step[i] * 2, ub[i] - lb[i])
+                    if f < best_f:
+                        best_f = f
+                        best_x = x.copy()
+                        report_best(best_f, best_x)
+                    success = True
+                    stagnation = 0
+                    break
+                # Negative direction
+                trial[i] = np.clip(x[i] - step[i], lb[i], ub[i])
+                f_trial = func(trial)
+                evals += 1
+                if f_trial < f:
+                    x = trial
+                    f = f_trial
+                    step[i] = min(step[i] * 2, ub[i] - lb[i])
+                    if f < best_f:
+                        best_f = f
+                        best_x = x.copy()
+                        report_best(best_f, best_x)
+                    success = True
+                    stagnation = 0
+                    break
+                else:
+                    step[i] = max(step[i] * 0.5, (ub[i] - lb[i]) * 1e-10)
+
+            if not success and evals < budget:
+                # Random direction
+                direction = rng.randn(dim)
+                norm = np.linalg.norm(direction)
+                if norm > 0:
+                    direction = direction / norm
+                trial = np.clip(x + step * direction, lb, ub)
+                f_trial = func(trial)
+                evals += 1
+                if f_trial < f:
+                    x = trial
+                    f = f_trial
+                    step = np.minimum(step * 2, ub - lb)
+                    if f < best_f:
+                        best_f = f
+                        best_x = x.copy()
+                        report_best(best_f, best_x)
+                    stagnation = 0
+                else:
+                    stagnation += 1
+            else:
+                if success:
+                    stagnation = 0
+                else:
+                    stagnation += 1
+
+            if stagnation >= max_stag and evals < budget:
+                # Restart from new random point, keep best
+                x = lb + rng.rand(dim) * (ub - lb)
+                f = func(x)
+                evals += 1
+                if f < best_f:
+                    best_f = f
+                    best_x = x.copy()
+                    report_best(best_f, best_x)
+                step = 0.2 * (ub - lb)
+                stagnation = 0
+
+        return best_f, best_x

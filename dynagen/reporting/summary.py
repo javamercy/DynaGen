@@ -217,6 +217,73 @@ def _population_score_name(candidates: list[Candidate]) -> str:
     return "fitness"
 
 
+def build_committee_final_report(
+        population: list[Candidate],
+        *,
+        search_best: Candidate | None = None,
+        specialists: list[Candidate] | None = None,
+        assignments: dict[str, list[str]] | None = None,
+        test_results: dict[str, object] | None = None,
+        vbs_scores: dict[str, float] | None = None,
+        llm_calls: dict | None = None,
+) -> str:
+    base_report = build_final_report(
+        population,
+        search_best=search_best,
+        llm_calls=llm_calls,
+    )
+    specialists = specialists or []
+    assignments = assignments or {}
+    test_results = test_results or {}
+    vbs_scores = vbs_scores or {}
+
+    if not specialists:
+        return base_report
+
+    lines = [base_report.rstrip()]
+
+    lines.extend([
+        "",
+        "## Committee",
+        "",
+        f"- Output mode: committee_specialist",
+        f"- Committee size: {len(specialists)}",
+        "",
+        "### Specialists",
+        "",
+    ])
+
+    for sp in specialists:
+        assigned = assignments.get(sp.id, [])
+        specs = test_results.get(sp.id)
+        sp_score = None
+        sp_status = "unknown"
+        if isinstance(specs, dict):
+            sp_score = specs.get("score")
+            sp_status = specs.get("status", "unknown")
+        lines.extend([
+            f"**{sp.id}** ({sp.name})",
+            f"- Status: {sp_status}",
+            f"- Score: {sp_score}",
+            f"- Assigned instances: {len(assigned)} — {', '.join(assigned[:10])}{' ...' if len(assigned) > 10 else ''}",
+            f"- Code: {sp.code[:200]}{'...' if len(sp.code) > 200 else ''}",
+            "",
+        ])
+
+    if vbs_scores:
+        vbs_values = [v for v in vbs_scores.values() if isinstance(v, (int, float))]
+        vbs_mean = sum(vbs_values) / len(vbs_values) if vbs_values else 0.0
+        lines.extend([
+            "### VBS (Virtual Best Solver)",
+            "",
+            f"- VBS mean score: {vbs_mean:.6g}",
+            f"- VBS per-instance scores: {vbs_scores}",
+            "",
+        ])
+
+    return "\n".join(lines) + "\n"
+
+
 def _score_title(score_name: str) -> str:
     if score_name == "distance":
         return "Distance"
