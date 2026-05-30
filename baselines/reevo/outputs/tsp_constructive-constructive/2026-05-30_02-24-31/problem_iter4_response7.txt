@@ -1,0 +1,72 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using regret and weighted scoring, with adaptive normalization.
+    
+    For each candidate node, three components are computed:
+      - immediate_cost: distance from current_node to candidate.
+      - regret_cost: difference between the second-best and best future cost from the candidate,
+                     considering all other unvisited nodes (higher regret is better).
+      - destination_cost: distance from candidate to destination_node.
+    
+    Each component is normalized across candidates (min-max scaling) to avoid scale dominance.
+    The final score is a weighted sum: w_imm * immediate_norm - w_reg * regret_norm + w_dest * dest_norm.
+    The candidate with the lowest score is chosen. Ties are broken by node index.
+    
+    Parameters
+    ----------
+    current_node : int
+        The node we are currently at.
+    destination_node : int
+        The final node to return to (depot).
+    unvisited_nodes : set of int
+        Set of nodes not yet visited (non-empty).
+    distance_matrix : np.ndarray
+        Square matrix of pairwise distances.
+    
+    Returns
+    -------
+    int
+        The selected next node.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    # Precompute arrays for normalization
+    candidates = list(unvisited_nodes)
+    immediate = np.array([distance_matrix[current_node][u] for u in candidates], dtype=float)
+    dest_dist = np.array([distance_matrix[u][destination_node] for u in candidates], dtype=float)
+    
+    # Regret: for each candidate, consider future costs to all other unvisited nodes
+    regret = np.empty(len(candidates))
+    for i, u in enumerate(candidates):
+        others = [distance_matrix[u][v] for v in candidates if v != u]
+        if len(others) >= 2:
+            sorted_others = sorted(others)
+            regret[i] = sorted_others[1] - sorted_others[0]
+        else:
+            regret[i] = 0.0
+    
+    # Min-max normalization for each component (avoid division by zero)
+    def normalize(arr):
+        min_val, max_val = arr.min(), arr.max()
+        if max_val == min_val:
+            return np.zeros_like(arr)
+        return (arr - min_val) / (max_val - min_val)
+    
+    imm_norm = normalize(immediate)
+    reg_norm = normalize(regret)
+    dest_norm = normalize(dest_dist)
+    
+    # Weights; can be tuned per problem instance but these are generally effective
+    w_imm = 0.4
+    w_reg = 0.3
+    w_dest = 0.3
+    
+    # Score: lower is better (note regret is beneficial, so subtract)
+    scores = w_imm * imm_norm - w_reg * reg_norm + w_dest * dest_norm
+    
+    # Tie-breaking by node index
+    idx = np.lexsort((candidates, scores))[0]
+    return candidates[idx]
+```

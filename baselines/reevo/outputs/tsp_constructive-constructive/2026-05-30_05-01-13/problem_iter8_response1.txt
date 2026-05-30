@@ -1,0 +1,76 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic combining Clarke-Wright savings, regret (including destination),
+    proximity, and future cost with adaptive weights based on remaining nodes.
+    Uses vectorized computation and min‑max normalization for robust scoring.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Convert to sorted numpy array for stable indexing
+    nodes = np.array(sorted(unvisited_nodes))
+    m = len(nodes)
+
+    # Base distances
+    d_cur = distance_matrix[current_node, nodes]                       # (m,)
+    d_dest = distance_matrix[nodes, destination_node]                  # (m,)
+    base_saving = distance_matrix[current_node, destination_node]
+    savings = base_saving - (d_cur + d_dest)                           # higher is better
+
+    # Regret and future cost: for each candidate u, consider distances to
+    # all other unvisited nodes and to the destination node.
+    # Build a matrix of size (m, m+1): columns 0..m-1 = distances to other candidates,
+    # column m = distance to destination.
+    cand_dist = distance_matrix[nodes[:, None], nodes]                 # (m, m)
+    np.fill_diagonal(cand_dist, np.inf)                               # ignore self
+    extra_col = d_dest[:, None]                                        # (m, 1)
+    all_dist = np.concatenate([cand_dist, extra_col], axis=1)          # (m, m+1)
+
+    # Efficiently get the two smallest values per row using np.partition
+    # Partition such that the two smallest go to first two positions
+    partitioned = np.partition(all_dist, 1, axis=1)
+    first_min = partitioned[:, 0]
+    second_min = partitioned[:, 1]
+    regret = second_min - first_min                                     # higher is better
+    future_min = first_min                                              # smaller future distance is better
+
+    # Min‑max normalize each criterion to [0,1] where 1 is best
+    # d_cur and future_min: smaller -> better
+    def norm_best_when_small(val):
+        mn, mx = np.min(val), np.max(val)
+        if mx == mn:
+            return np.full_like(val, 0.5)
+        return (mx - val) / (mx - mn)
+
+    # savings and regret: larger -> better
+    def norm_best_when_large(val):
+        mn, mx = np.min(val), np.max(val)
+        if mx == mn:
+            return np.full_like(val, 0.5)
+        return (val - mn) / (mx - mn)
+
+    d_cur_norm = norm_best_when_small(d_cur)
+    future_norm = norm_best_when_small(future_min)
+    savings_norm = norm_best_when_large(savings)
+    regret_norm = norm_best_when_large(regret)
+
+    # Adaptive weights depending on remaining fraction
+    total_nodes = distance_matrix.shape[0]
+    remaining_ratio = m / (total_nodes - 1)   # 0 when none left, ~1 when many
+
+    w_cur = 0.15
+    w_fut = 0.15
+    w_sav = 0.7 * (1.0 - remaining_ratio)
+    w_reg = 0.7 * remaining_ratio
+    # total weight = 1.0
+
+    score = (w_cur * d_cur_norm + w_sav * savings_norm +
+             w_reg * regret_norm + w_fut * future_norm)
+
+    best_idx = np.argmax(score)
+    return nodes[best_idx]
+```

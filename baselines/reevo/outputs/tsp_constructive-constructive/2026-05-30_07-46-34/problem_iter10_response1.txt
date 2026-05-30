@@ -1,0 +1,62 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved selection using adaptive weights, two-step lookahead, normalized distances,
+    and a genuine regret term (second-best minus best distance to other unvisited nodes).
+    """
+    # If only one unvisited node remains, return it directly
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited_list = list(unvisited_nodes)
+    n = len(unvisited_list)
+    total_nodes = distance_matrix.shape[0]
+    r = n / total_nodes                      # fraction of nodes remaining
+
+    d_max = distance_matrix.max()
+    if d_max == 0:
+        d_max = 1.0                          # avoid division by zero
+
+    # Normalized distances from current node and to destination
+    d_cur = distance_matrix[current_node, unvisited_list] / d_max
+    d_dest = distance_matrix[unvisited_list, destination_node] / d_max
+
+    # Two-step lookahead: best second‑step cost from each candidate
+    two_step = np.zeros(n)
+    for i, j in enumerate(unvisited_list):
+        others = [k for k in unvisited_list if k != j]
+        if others:
+            # minimum distance from j to any other unvisited node
+            min_next = distance_matrix[j, others].min() / d_max
+            two_step[i] = d_cur[i] + min_next
+        else:
+            two_step[i] = d_cur[i]           # fallback
+
+    # Regret: second‑best minus best distance to other unvisited nodes
+    regret = np.zeros(n)
+    for i, j in enumerate(unvisited_list):
+        dists = sorted([distance_matrix[j, k] for k in unvisited_list if k != j])
+        if len(dists) >= 2:
+            best, second_best = dists[0], dists[1]
+            regret[i] = (second_best - best) / d_max   # normalize
+        else:
+            regret[i] = 0.0
+
+    # Adaptive weights
+    w_cur = 1.0 - r
+    w_dest = 0.5 * (1.0 - r)
+    w_lookahead = r
+    w_regret = 0.2                             # constant weight for regret
+
+    # Composite score (lower is better); subtract regret to favor high‑regret nodes
+    scores = (w_cur * d_cur +
+              w_dest * d_dest +
+              w_lookahead * two_step -
+              w_regret * regret)
+
+    best_idx = np.argmin(scores)
+    return unvisited_list[best_idx]
+```

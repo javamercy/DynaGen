@@ -1,0 +1,114 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node using a composite heuristic that adapts weights
+    as the number of unvisited nodes decreases.
+
+    Components:
+      - Clarke-Wright savings: s(u) = d(current, dest) - (d(current, u) + d(u, dest))
+      - Regret: minimum extra cost if we visit some other v before u instead of u now.
+      - Look-ahead: average distance from u to its two nearest other unvisited nodes.
+      - Direct distance (normalized) – penalized.
+      - Destination distance (normalized) – penalized more heavily when few nodes remain.
+
+    Weights shift smoothly: savings and regret dominate for many nodes;
+    destination proximity becomes more important for few nodes.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes to choose from")
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    n = len(candidates)
+
+    # Adaptive weights: as remaining nodes decrease, emphasize destination and direct cost.
+    # The denominator ensures a smooth transition.
+    alpha = n / (n + 5)          # exploration weight factor
+    w_sav = 0.5 * alpha
+    w_reg = 0.3 * alpha
+    w_look = 0.2
+    w_dir = 0.05 + 0.05 * (1 - alpha)
+    w_dest = 0.05 + 0.25 * (1 - alpha)
+
+    # Precompute direct and destination distances for normalization
+    direct_costs = np.array([distance_matrix[current_node, u] for u in candidates])
+    dest_costs   = np.array([distance_matrix[u, destination_node] for u in candidates])
+
+    min_direct, max_direct = direct_costs.min(), direct_costs.max()
+    min_dest, max_dest = dest_costs.min(), dest_costs.max()
+    direct_range = max_direct - min_direct if max_direct > min_direct else 1.0
+    dest_range   = max_dest - min_dest if max_dest > min_dest else 1.0
+
+    # Precompute distances among candidates for fast look‑ahead
+    # Only needed when n > 1
+    if n > 2:
+        # Build a small distance matrix for candidates
+        sub_matrix = distance_matrix[np.ix_(candidates, candidates)]
+    else:
+        sub_matrix = None
+
+    scores = {}
+    for idx, u in enumerate(candidates):
+        direct = direct_costs[idx]
+        dest   = dest_costs[idx]
+
+        # 1) Clarke‑Wright savings
+        saving = distance_matrix[current_node, destination_node] - (direct + dest)
+
+        # 2) Regret: minimum extra cost if we visit some other v first
+        if n > 1:
+            extra_costs = []
+            for j, v in enumerate(candidates):
+                if v == u:
+                    continue
+                # cost of going current -> v -> u instead of current -> u
+                extra = distance_matrix[current_node, v] + distance_matrix[v, u] - direct
+                extra_costs.append(extra)
+            regret = max(0.0, min(extra_costs))
+        else:
+            regret = 0.0
+
+        # 3) Look‑ahead: average of two smallest distances from u to other candidates
+        if n > 2:
+            # Use precomputed sub_matrix; distances from u to others
+            row = sub_matrix[idx, :]
+            # Exclude self (distance 0)
+            others = row[row > 0] if row[row > 0].size > 0 else np.array([0.0])
+            if len(others) >= 2:
+                sorted_dists = np.sort(others)
+                look_ahead = (sorted_dists[0] + sorted_dists[1]) / 2.0
+            elif len(others) == 1:
+                look_ahead = others[0]
+            else:
+                look_ahead = 0.0
+        elif n == 2:
+            # only one other candidate
+            other = [v for v in candidates if v != u][0]
+            look_ahead = distance_matrix[u, other]
+        else:
+            look_ahead = 0.0
+
+        # Normalized direct and destination distances (0 = best, 1 = worst)
+        dir_norm = (direct - min_direct) / direct_range
+        dest_norm = (dest - min_dest) / dest_range
+
+        # Composite score – higher is better (savings, regret, look‑ahead contribute positively;
+        # normalized distances contribute negatively).
+        score = (w_sav * saving +
+                 w_reg * regret +
+                 w_look * look_ahead -
+                 w_dir * dir_norm -
+                 w_dest * dest_norm)
+
+        scores[u] = score
+
+    return max(scores, key=scores.get)
+```

@@ -1,0 +1,44 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Regret-based constructive heuristic with look-ahead on future costs.
+
+    For each candidate node u, compute:
+        - direct_cost = distance_matrix[current_node][u]
+        - regret = (distance from u to its nearest neighbor among unvisited nodes except u)
+                 - (distance from u to its second nearest neighbor among unvisited nodes except u)
+        - future_penalty = distance_matrix[u][destination_node] / (len(unvisited_nodes) + 1)
+
+    Score = direct_cost - 0.5 * regret + 0.2 * future_penalty
+    Select the node with minimal score.
+    """
+    best_score = float('inf')
+    best_node = None
+
+    for u in unvisited_nodes:
+        # direct cost
+        direct = distance_matrix[current_node][u]
+
+        # distances from u to all other unvisited nodes (including destination if not in unvisited, but we exclude u and current_node? Actually we consider unvisited except u)
+        others = [v for v in unvisited_nodes if v != u]
+        if others:
+            dists = [distance_matrix[u][v] for v in others]
+            dists.sort()
+            nearest = dists[0]
+            second_nearest = dists[1] if len(dists) > 1 else nearest
+            regret = nearest - second_nearest  # negative or zero, high regret means second_nearest much larger
+        else:
+            regret = 0.0
+
+        # mild look-ahead: penalty based on distance to final destination
+        future = distance_matrix[u][destination_node] / (len(unvisited_nodes) + 1.0)
+
+        score = direct - 0.5 * regret + 0.2 * future
+
+        if score < best_score:
+            best_score = score
+            best_node = u
+
+    return best_node
+```

@@ -1,0 +1,45 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a depth-2 lookahead heuristic.
+    For each candidate, it computes the cost of moving to that node, then the best
+    greedy next step, and approximates the remaining path cost using average distances
+    plus a final hop to the destination.
+    """
+    best_node = None
+    best_estimate = float('inf')
+    
+    for node in unvisited_nodes:
+        # cost to candidate
+        cost1 = distance_matrix[current_node][node]
+        remaining = unvisited_nodes - {node}
+        
+        if not remaining:
+            # only this node left; after it go directly to destination
+            total_estimate = cost1 + distance_matrix[node][destination_node]
+        else:
+            # best next node from candidate among remaining
+            best_second = min(remaining, key=lambda x: distance_matrix[node][x])
+            cost2 = distance_matrix[node][best_second]
+            # nodes still unvisited after taking node and best_second
+            remaining2 = remaining - {best_second}
+            
+            if not remaining2:
+                # only two nodes left in this branch; final hop from best_second to destination
+                cost3 = distance_matrix[best_second][destination_node]
+            else:
+                # approximate remaining cost: average distance from best_second to each remaining2
+                avg_dist = np.mean([distance_matrix[best_second][r] for r in remaining2])
+                # multiply by number of remaining nodes, then add final hop to destination
+                cost3 = avg_dist * len(remaining2) + distance_matrix[best_second][destination_node]
+            
+            total_estimate = cost1 + cost2 + cost3
+        
+        if total_estimate < best_estimate:
+            best_estimate = total_estimate
+            best_node = node
+    
+    return best_node
+```

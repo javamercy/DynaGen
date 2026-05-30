@@ -1,0 +1,62 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Improved heuristic that balances immediate cost, regret, look-ahead connectivity,
+    and distance to final destination. Uses average look-ahead to enhance future connectivity.
+
+    Score = w1 * immediate - w2 * regret + w3 * avg_look_ahead - w4 * dest_dist
+    Lower score is better.
+
+    Weights: w1=0.3, w2=0.3, w3=0.2, w4=0.2
+    Tie-breaking: smallest index.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = list(unvisited_nodes)
+    w1, w2, w3, w4 = 0.3, 0.3, 0.2, 0.2
+
+    scores = {}
+    for u in unvisited:
+        # immediate cost from current node
+        imm = distance_matrix[current_node, u]
+
+        # regret: best alternative two-step path visiting u later
+        best_alt = float('inf')
+        for v in unvisited:
+            if v == u:
+                continue
+            alt = distance_matrix[current_node, v] + distance_matrix[v, u]
+            if alt < best_alt:
+                best_alt = alt
+        regret = best_alt - imm if best_alt != float('inf') else 0.0
+
+        # look-ahead: average distance to all other unvisited nodes
+        other_nodes = [v for v in unvisited if v != u]
+        if other_nodes:
+            avg_look_ahead = np.mean([distance_matrix[u, v] for v in other_nodes])
+        else:
+            # only u remains; use distance to destination
+            avg_look_ahead = distance_matrix[u, destination_node]
+
+        # distance to final destination
+        dest_dist = distance_matrix[u, destination_node]
+
+        # composite score (lower is better)
+        score = w1 * imm - w2 * regret + w3 * avg_look_ahead - w4 * dest_dist
+        scores[u] = score
+
+    # deterministic tie-breaking: smallest index among minimal score
+    min_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == min_score]
+    return min(candidates)
+```

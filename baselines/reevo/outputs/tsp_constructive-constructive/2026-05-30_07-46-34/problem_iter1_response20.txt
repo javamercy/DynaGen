@@ -1,0 +1,42 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a 2-step look-ahead heuristic with regret."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_score = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Immediate cost from current to candidate
+        immediate = distance_matrix[current_node][candidate]
+
+        # Remaining nodes after picking candidate
+        remaining = unvisited_nodes - {candidate}
+
+        # Estimate future cost: best next step from candidate
+        if not remaining:
+            # Last node: must return to destination
+            future = distance_matrix[candidate][destination_node]
+        else:
+            future = min(distance_matrix[candidate][v] for v in remaining)
+
+        # Regret: difference between second best and best from candidate to remaining
+        if len(remaining) >= 2:
+            dists = [distance_matrix[candidate][v] for v in remaining]
+            dists.sort()
+            regret = dists[1] - dists[0]  # second best - best
+        else:
+            regret = 0.0
+
+        # Score: minimize two-step cost, but favor high regret (to keep options)
+        score = immediate + future - 0.5 * regret
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

@@ -1,0 +1,95 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node using a composite heuristic that combines:
+    - Clarke-Wright savings (saving = dist[curr][dest] - (dist[curr][u] + dist[u][dest]))
+    - Regret: minimum additional cost if we delay visiting u by visiting another v first
+    - Look-ahead: average of two smallest distances from u to other unvisited nodes
+    - Direct cost from current node (normalized within unvisited)
+    - Destination proximity (normalized within unvisited)
+
+    Weights adapt smoothly based on the number of remaining nodes:
+    savings and regret dominate when many nodes remain; destination proximity
+    becomes more important when few nodes remain; look-ahead provides additional guidance.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes")
+
+    n_remaining = len(unvisited_nodes)
+    if n_remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    scores = {}
+
+    # Adaptive weights (tuned empirically)
+    # As remaining decreases, shift emphasis toward destination and direct cost
+    w_sav = 0.4 * (n_remaining / (n_remaining + 3))
+    w_reg = 0.3 * (n_remaining / (n_remaining + 3))
+    w_look = 0.2
+    w_dir = 0.05 + 0.05 * (3 / (n_remaining + 3))
+    w_dest = 0.05 + 0.15 * (3 / (n_remaining + 3))
+
+    # Precompute direct costs for normalization within the set of candidates
+    direct_costs = np.array([distance_matrix[current_node, u] for u in candidates])
+    min_direct = np.min(direct_costs)
+    max_direct = np.max(direct_costs)
+    direct_range = max_direct - min_direct if max_direct > min_direct else 1.0
+
+    # Precompute destination distances for normalization within the set of candidates
+    dest_costs = np.array([distance_matrix[u, destination_node] for u in candidates])
+    min_dest = np.min(dest_costs)
+    max_dest = np.max(dest_costs)
+    dest_range = max_dest - min_dest if max_dest > min_dest else 1.0
+
+    for u in candidates:
+        direct = distance_matrix[current_node, u]
+        dest = distance_matrix[u, destination_node]
+
+        # Savings
+        saving = distance_matrix[current_node, destination_node] - (direct + dest)
+
+        # Regret: minimum additional cost if we visit some other v first instead of u now
+        other = [v for v in candidates if v != u]
+        if other:
+            costs_if_delayed = np.array([
+                distance_matrix[current_node, v] + distance_matrix[v, u] - direct
+                for v in other
+            ])
+            # Regret is the negative impact of delaying: we want high regret => visit now
+            regret = max(0.0, np.min(costs_if_delayed))
+        else:
+            regret = 0.0
+
+        # Look-ahead: average of two smallest distances from u to other candidates
+        if len(other) >= 2:
+            dists = np.array([distance_matrix[u, v] for v in other])
+            sorted_dists = np.sort(dists)
+            look_ahead = (sorted_dists[0] + sorted_dists[1]) / 2.0
+        elif len(other) == 1:
+            look_ahead = distance_matrix[u, other[0]]
+        else:
+            look_ahead = 0.0
+
+        # Normalized components (lower is better for dir_norm and dest_norm)
+        dir_norm = (direct - min_direct) / direct_range
+        dest_norm = (dest - min_dest) / dest_range
+
+        # Composite score: maximize savings, regret, look-ahead; minimize normalized distances
+        score = (w_sav * saving +
+                 w_reg * regret +
+                 w_look * look_ahead -
+                 w_dir * dir_norm -
+                 w_dest * dest_norm)
+
+        scores[u] = score
+
+    return max(scores, key=scores.get)
+```

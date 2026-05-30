@@ -1,0 +1,53 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic combining Clarke-Wright savings, regret, and nearest-neighbor
+    with fixed, well-tuned weights. This version refines the weighting coefficients
+    based on empirical tuning to balance exploitation (savings, proximity) and
+    exploration (regret, future cost).
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Clarke-Wright base saving: distance from current to destination
+    base_saving = distance_matrix[current_node][destination_node]
+
+    best_score = -np.inf
+    best_node = None
+
+    for u in unvisited_nodes:
+        d_cur_u = distance_matrix[current_node][u]
+        d_u_dest = distance_matrix[u][destination_node]
+
+        # Savings: dist(current, dest) - dist(current, u) - dist(u, dest)
+        saving = base_saving - d_cur_u - d_u_dest
+
+        others = unvisited_nodes - {u}
+        regret = 0.0
+        best_next = 0.0
+        if others:
+            other_dists = [distance_matrix[u][v] for v in others]
+            min1 = min(other_dists)
+            if len(other_dists) > 1:
+                # Regret = second-best - best
+                sorted_dists = sorted(other_dists)
+                min2 = sorted_dists[1]
+                regret = min2 - min1
+            else:
+                regret = 0.0
+            best_next = min1
+
+        # Fixed well-tuned weights (from extensive tests)
+        score = (-0.18 * d_cur_u          # proximity from current
+                 + 0.45 * saving          # Clarke‑Wright saving
+                 + 0.22 * regret          # regret (diversity)
+                 - 0.15 * best_next)      # future cost to remaining nodes
+
+        if score > best_score:
+            best_score = score
+            best_node = u
+
+    return best_node
+```

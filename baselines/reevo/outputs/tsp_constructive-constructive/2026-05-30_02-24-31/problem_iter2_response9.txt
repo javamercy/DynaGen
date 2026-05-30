@@ -1,0 +1,51 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a 3-step look-ahead heuristic that directly incorporates
+    destination cost into the continuation path.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_score = float('inf')
+    best_immediate = None
+
+    for i in unvisited_nodes:
+        # cost from current to i
+        cost_ci = distance_matrix[current_node][i]
+        future = unvisited_nodes - {i}
+
+        if len(future) == 0:
+            continuation = distance_matrix[i][destination_node]
+        elif len(future) == 1:
+            j = next(iter(future))
+            continuation = distance_matrix[i][j] + distance_matrix[j][destination_node]
+        else:
+            # 2-step lookahead from i: find best j in future, then best k from j to dest
+            best_continuation = float('inf')
+            for j in future:
+                future2 = future - {j}
+                # best k from j to dest
+                best_next = float('inf')
+                for k in future2:
+                    cost = distance_matrix[i][j] + distance_matrix[j][k] + distance_matrix[k][destination_node]
+                    if cost < best_next:
+                        best_next = cost
+                # if future2 empty (should not happen because len(future)>=2)
+                if best_next < best_continuation:
+                    best_continuation = best_next
+            continuation = best_continuation
+
+        score = cost_ci + continuation
+
+        # tie-breaking: prefer smaller immediate cost
+        if score < best_score or (score == best_score and distance_matrix[current_node][i] < best_immediate):
+            best_score = score
+            best_node = i
+            best_immediate = distance_matrix[current_node][i]
+
+    return best_node
+```

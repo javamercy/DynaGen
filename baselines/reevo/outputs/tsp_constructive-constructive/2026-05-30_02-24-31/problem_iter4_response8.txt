@@ -1,0 +1,64 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """Select next node using a two-step lookahead with regret and adaptive weighting.
+
+    The heuristic evaluates each candidate u by:
+        immediate cost: distance(current, u)
+        two-step cost to destination: min_{v in unvisited, v != u} [dist(u, v) + dist(v, destination)]
+        regret: difference between the candidate's two-step cost and the best two-step cost among all candidates
+        destination distance: dist(destination, u)
+
+    Adaptive weights shift emphasis as the number of unvisited nodes decreases.
+    """
+    n = len(unvisited_nodes)
+    if n == 0:
+        raise ValueError("No unvisited nodes to choose from")
+
+    # Precompute immediate and two-step destination costs for each candidate
+    immediate_costs = {}
+    two_step_dest_costs = {}
+    candidate_list = list(unvisited_nodes)
+
+    for u in candidate_list:
+        immediate = distance_matrix[current_node, u]
+        remaining = unvisited_nodes - {u}
+        if remaining:
+            # minimum two-step path: u -> v -> destination
+            min_next = min(
+                distance_matrix[u, v] + distance_matrix[v, destination_node]
+                for v in remaining
+            )
+        else:
+            min_next = distance_matrix[u, destination_node]
+        immediate_costs[u] = immediate
+        two_step_dest_costs[u] = immediate + min_next
+
+    # Best two-step cost (to destination) among all candidates
+    best_two_step = min(two_step_dest_costs.values())
+
+    # Compute regret for each candidate: difference from best
+    regrets = {u: two_step_dest_costs[u] - best_two_step for u in candidate_list}
+
+    # Adaptive weights: early phase emphasizes lookahead, later phase emphasizes staying close to destination
+    w_immediate = 1.0
+    w_regret = 0.5 * (n / (n + 1))          # regret weight increases slightly with fewer nodes
+    w_dest = 0.3 * (1.0 / (n + 1))         # destination weight increases as nodes become scarce
+
+    # Score each candidate: lower is better
+    scores = {}
+    for u in candidate_list:
+        score = (w_immediate * immediate_costs[u] +
+                 w_regret * regrets[u] +
+                 w_dest * distance_matrix[destination_node, u])
+        scores[u] = score
+
+    # Deterministic tie-breaking: smallest index among minimal score
+    return min(scores, key=lambda x: (scores[x], x))
+```

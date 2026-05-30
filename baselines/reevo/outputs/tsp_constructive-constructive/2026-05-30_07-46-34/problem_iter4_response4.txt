@@ -1,0 +1,82 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set,
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Improved selection using average future distance and diversity (std).
+    
+    For each candidate:
+    - immediate: cost to go from current node.
+    - lookahead: immediate + min distance from candidate to any remaining node.
+    - avg_future: average distance from candidate to all other unvisited nodes.
+    - std_future: standard deviation of those distances (diversity).
+    - regret: difference between second smallest and smallest future distance.
+    - dest_dist: distance from candidate to destination.
+    
+    The score is a weighted combination. We minimize the score, so:
+    - immediate + lookahead are penalized (positive).
+    - avg_future penalized (positive) – we want low average future distance.
+    - high std (diversity) is rewarded (negative) to spread choices.
+    - high regret (much to lose by postponing) rewarded (negative).
+    - dest_dist penalized (positive) to keep path toward destination.
+    
+    Weights are tuned for balance.
+    """
+    unvisited = list(unvisited_nodes)
+    n = len(unvisited)
+    if n == 0:
+        return destination_node
+    if n == 1:
+        return unvisited[0]
+
+    weights = {
+        'immediate': 0.15,
+        'lookahead': 0.25,
+        'avg_future': 0.25,
+        'std_future': -0.15,   # negative => encourage diversity
+        'regret': -0.10,       # negative => encourage high regret
+        'dest_dist': 0.10
+    }
+
+    scores = {}
+    for cand in unvisited:
+        # Distances from candidate to all other unvisited nodes
+        other = [distance_matrix[cand, i] for i in unvisited if i != cand]
+        # Distances from current node to candidate
+        d_curr = distance_matrix[current_node, cand]
+        # Distance from candidate to destination
+        d_dest = distance_matrix[cand, destination_node]
+
+        if other:
+            min_future = min(other)
+            avg_future = np.mean(other)
+            std_future = np.std(other, ddof=0)  # population std
+            sorted_other = sorted(other)
+            if len(sorted_other) >= 2:
+                regret = sorted_other[1] - sorted_other[0]
+            else:
+                regret = 0.0
+        else:
+            # No other nodes: next step must go to destination
+            min_future = distance_matrix[cand, destination_node]
+            avg_future = 0.0
+            std_future = 0.0
+            regret = 0.0
+
+        # Lookahead: immediate + best continuation (min future)
+        lookahead = d_curr + min_future
+
+        # Weighted score (lower is better)
+        score = (weights['immediate'] * d_curr +
+                 weights['lookahead'] * lookahead +
+                 weights['avg_future'] * avg_future +
+                 weights['std_future'] * std_future +
+                 weights['regret'] * regret +
+                 weights['dest_dist'] * d_dest)
+
+        scores[cand] = score
+
+    return min(scores, key=scores.get)
+```

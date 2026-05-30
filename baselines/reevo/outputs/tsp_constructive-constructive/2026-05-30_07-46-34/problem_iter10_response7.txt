@@ -1,0 +1,113 @@
+```python
+import numpy as np
+from typing import Set, List
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: Set[int],
+                        distance_matrix: np.ndarray) -> int:
+    """Select next node using adaptive weights, regret, two‑step lookahead,
+    savings, and hubness.  Designed for constructive heuristics solving TSP."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    total_nodes = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+    # progress: 0 when all visited, 1 when none visited
+    progress = remaining / (total_nodes - 1)
+
+    # Adaptive weights – tuned with a sigmoidal transition
+    w_look   = 0.40 - 0.25 * progress          # lookahead more important early
+    w_dest   = 0.05 + 0.35 * progress          # destination more important late
+    w_regret = 0.15 + 0.20 * (1 - progress)    # regret critical early
+    w_sav    = 0.20 - 0.10 * progress          # savings important in mid‑phase
+    w_avg    = 0.10 + 0.10 * progress          # hubness helpful late
+    # Normalize weights to sum to 1
+    total = w_look + w_dest + w_regret + w_sav + w_avg
+    w_look   /= total
+    w_dest   /= total
+    w_regret /= total
+    w_sav    /= total
+    w_avg    /= total
+
+    nodes = sorted(unvisited_nodes)  # deterministic order
+    n = len(nodes)
+    lookahead = [0.0] * n
+    d_dest    = [0.0] * n
+    regret    = [0.0] * n
+    savings   = [0.0] * n
+    hubness   = [0.0] * n
+
+    # Precompute all distances from current to help with regret
+    dist_curr = np.array([distance_matrix[current_node, node] for node in nodes])
+
+    for i, node in enumerate(nodes):
+        d_curr = dist_curr[i]
+        d_dest[i] = distance_matrix[node, destination_node]
+
+        # Two‑step lookahead
+        # We consider the best continuation from node to any other unvisited
+        # or to the destination if it is still unvisited.
+        best_next = float('inf')
+        for other in unvisited_nodes:
+            if other != node:
+                best_next = min(best_next, distance_matrix[node, other])
+        if destination_node not in unvisited_nodes:
+            best_next = min(best_next, distance_matrix[node, destination_node])
+        lookahead[i] = d_curr + best_next
+
+        # Regret: penalty for NOT choosing node now (difference between second best
+        # and best distance from current to any other unvisited node)
+        # This is the extra cost we would incur if we postpone this node.
+        other_dists = [dist_curr[j] for j in range(n) if j != i]
+        if len(other_dists) >= 2:
+            sorted_others = sorted(other_dists)
+            second_best = sorted_others[1]  # second smallest distance from current
+            regret[i] = max(0.0, second_best - d_curr)
+        else:
+            regret[i] = 0.0
+
+        # Savings: simplified Clarke‑Wright savings.
+        # Going from current to node and later node to destination instead of direct current->dest.
+        # sav = dist(current, dest) - (dist(current, node) + dist(node, dest))
+        # Higher is better (positive means path via node is cheaper)
+        savings[i] = distance_matrix[current_node, destination_node] - (d_curr + d_dest[i])
+
+        # Hubness: average distance from node to all other unvisited nodes (lower is better)
+        other_unvisited = unvisited_nodes - {node}
+        if other_unvisited:
+            hubness[i] = np.mean([distance_matrix[node, j] for j in other_unvisited])
+        else:
+            hubness[i] = 0.0
+
+    # Min‑max normalization of each criterion to [0,1] (0 = best, 1 = worst)
+    def normalize(vals: List[float], lower_is_better: bool = True) -> List[float]:
+        mn = min(vals)
+        mx = max(vals)
+        if mx == mn:
+            return [0.5] * len(vals)
+        if lower_is_better:
+            return [(v - mn) / (mx - mn) for v in vals]
+        else:
+            return [(mx - v) / (mx - mn) for v in vals]
+
+    norm_look    = normalize(lookahead)          # lower better
+    norm_d_dest  = normalize(d_dest)            # lower better
+    norm_regret  = normalize(regret)            # higher better -> invert
+    norm_sav     = normalize(savings, lower_is_better=False)  # higher is better -> invert
+    norm_hub     = normalize(hubness)           # lower better
+
+    best_node = None
+    best_score = -float('inf')   # we will maximise because regret/savings are benefit
+    for i, node in enumerate(nodes):
+        # For criteria where lower is better, we use (1 - norm) so that 1 is best
+        score = (w_look * (1 - norm_look[i]) +
+                 w_dest * (1 - norm_d_dest[i]) +
+                 w_regret * norm_regret[i] +          # already 1 = best
+                 w_sav * norm_sav[i] +                # already 1 = best
+                 w_avg * (1 - norm_hub[i]))
+        if score > best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

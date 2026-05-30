@@ -1,0 +1,40 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a 2-step lookahead insertion heuristic."""
+    unvisited_list = list(unvisited_nodes)
+    n_unvisited = len(unvisited_list)
+
+    if n_unvisited == 0:
+        raise ValueError("No unvisited nodes")
+    if n_unvisited == 1:
+        return unvisited_list[0]
+
+    best_candidate = None
+    best_cost = float('inf')
+
+    for cand in unvisited_list:
+        # base cost: go from current to candidate
+        base_cost = distance_matrix[current_node][cand]
+        remaining = [node for node in unvisited_list if node != cand]
+
+        if len(remaining) == 0:
+            # only candidate left, we must then go to destination
+            total = base_cost + distance_matrix[cand][destination_node]
+        else:
+            # find best second node: minimize dist(cand, second) + dist(second, destination)
+            best_second_cost = float('inf')
+            for second in remaining:
+                second_cost = distance_matrix[cand][second] + distance_matrix[second][destination_node]
+                if second_cost < best_second_cost:
+                    best_second_cost = second_cost
+            # total cost for two-step path: current -> cand -> second_best -> destination
+            total = base_cost + best_second_cost
+
+        if total < best_cost:
+            best_cost = total
+            best_candidate = cand
+
+    return best_candidate
+```

@@ -1,0 +1,10 @@
+Balance immediate cost, regret, and destination distance with tuned weights.
+
+Include destination term and tune regret coefficient for better future cost estimation.
+Weight immediate cost, look-ahead, and destination distance; avoid complex averaging.
+Prioritize regret-based look-ahead to avoid costly forced future connections over immediate greedy choices.
+Use exact two-step lookahead instead of averaging remaining path costs.
+Combine immediate cost, look-ahead to next node, and destination proximity with weighted scoring.
+Prioritize minimizing immediate plus future cost, not maximizing savings. Use deterministic tie-breaking.
+Prioritize simpler one-step lookahead; avoid deep lookahead that adds noise.
+Use deeper look-ahead that directly incorporates destination cost instead of weighting separate terms.

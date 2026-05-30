@@ -1,0 +1,98 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    total_nodes = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+    if remaining == 0:
+        return None
+    if remaining == 1:
+        return list(unvisited_nodes)[0]
+
+    progress = 1.0 - remaining / total_nodes   # visited ratio (0 at start, near 1 at end)
+
+    candidates = list(unvisited_nodes)
+    n = len(candidates)
+
+    # Precompute per-candidate values
+    d_cur_list = np.array([distance_matrix[current_node][c] for c in candidates])
+    d_dest_list = np.array([distance_matrix[c][destination_node] for c in candidates])
+
+    # Average and std of distances from candidate to other unvisited nodes
+    mean_list = np.zeros(n)
+    std_list = np.zeros(n)
+    for i, c in enumerate(candidates):
+        other_dists = [distance_matrix[c][o] for o in candidates if o != c]
+        if len(other_dists) == 0:
+            mean_list[i] = 0.0
+            std_list[i] = 0.0
+        else:
+            mean_list[i] = np.mean(other_dists)
+            std_list[i] = np.std(other_dists)
+
+    # Regret: for each candidate, difference between second best and best distance to other unvisited nodes
+    regret_list = np.zeros(n)
+    for i, c in enumerate(candidates):
+        other_dists = sorted([distance_matrix[c][o] for o in candidates if o != c])
+        if len(other_dists) >= 2:
+            regret_list[i] = other_dists[1] - other_dists[0]
+        # else regret stays 0
+
+    # Two-step lookahead: min distance from current -> c -> o -> destination, where o is another unvisited node
+    # If only one candidate, we treat o as destination node (or handle separately)
+    lookahead_list = np.zeros(n)
+    for i, c in enumerate(candidates):
+        other_unvisited = [o for o in candidates if o != c]
+        if len(other_unvisited) == 0:
+            lookahead_list[i] = distance_matrix[c][destination_node]
+        else:
+            best_next = min(distance_matrix[c][o] + distance_matrix[o][destination_node] for o in other_unvisited)
+            lookahead_list[i] = distance_matrix[current_node][c] + best_next
+
+    # Normalize each list to [0,1] (0 = best, 1 = worst)
+    def normalize(arr):
+        min_val = np.min(arr)
+        max_val = np.max(arr)
+        if max_val - min_val < 1e-12:
+            return np.zeros_like(arr)
+        return (arr - min_val) / (max_val - min_val)
+
+    norm_d_cur = normalize(d_cur_list)
+    norm_d_dest = normalize(d_dest_list)
+    norm_mean = normalize(mean_list)
+    norm_std = normalize(std_list)
+    norm_regret = normalize(regret_list)
+    # For regret we want high regret to be good -> invert normalization
+    norm_regret_inv = 1.0 - norm_regret
+    norm_lookahead = normalize(lookahead_list)
+
+    # Adaptive weights based on progress
+    # Raw weights (not normalized)
+    w_cur = 0.2
+    w_dest = 0.1 + 0.3 * progress
+    w_regret = 0.1 + 0.4 * progress
+    w_lookahead = 0.5 * (1.0 - progress) + 0.1
+    w_mean = 0.05
+    w_std = 0.05
+
+    # Normalize weights to sum to 1
+    total_weight = w_cur + w_dest + w_regret + w_lookahead + w_mean + w_std
+    w_cur /= total_weight
+    w_dest /= total_weight
+    w_regret /= total_weight
+    w_lookahead /= total_weight
+    w_mean /= total_weight
+    w_std /= total_weight
+
+    # Combined score (lower is better)
+    scores = (w_cur * norm_d_cur +
+              w_dest * norm_d_dest +
+              w_regret * norm_regret_inv +
+              w_lookahead * norm_lookahead +
+              w_mean * norm_mean +
+              w_std * norm_std)
+
+    # Select candidate with minimum score
+    best_idx = np.argmin(scores)
+    return candidates[best_idx]
+```

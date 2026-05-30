@@ -1,0 +1,68 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node with two-step lookahead, normalization, regret, and summary stats."""
+    if not unvisited_nodes:
+        return current_node
+
+    candidates = list(unvisited_nodes)
+    n_c = len(candidates)
+
+    # 1. Immediate costs: distance from current node
+    immediate_costs = np.array([distance_matrix[current_node][c] for c in candidates])
+
+    # 2. Future costs: best distance from candidate to next unvisited node (two-step lookahead)
+    future_costs = np.zeros(n_c)
+    for i, c in enumerate(candidates):
+        remaining = unvisited_nodes - {c}
+        if remaining:
+            future_costs[i] = min(distance_matrix[c][n] for n in remaining)
+        else:
+            future_costs[i] = 0.0
+
+    # 3. Destination costs: distance to final destination node
+    destination_costs = np.array([distance_matrix[destination_node][c] for c in candidates])
+
+    # 4. Regret: difference from best immediate cost
+    best_imm = immediate_costs.min()
+    regret = immediate_costs - best_imm
+
+    # 5. Summary statistics: mean and std of distances from candidate to other unvisited nodes
+    mean_others = np.zeros(n_c)
+    std_others = np.zeros(n_c)
+    for i, c in enumerate(candidates):
+        others = [distance_matrix[c][n] for n in unvisited_nodes if n != c]
+        if others:
+            mean_others[i] = np.mean(others)
+            std_others[i] = np.std(others)
+
+    # Normalization helper: min-max scale to [0,1] (0 = best, 1 = worst)
+    def normalize(arr):
+        mn, mx = arr.min(), arr.max()
+        if mx == mn:
+            return np.zeros_like(arr)
+        return (arr - mn) / (mx - mn)
+
+    imm_norm = normalize(immediate_costs)
+    fut_norm = normalize(future_costs)
+    dest_norm = normalize(destination_costs)
+    regret_norm = normalize(regret)
+    mean_norm = normalize(mean_others)
+    std_norm = normalize(std_others)
+
+    # Weights (tuned for diversification and return-path preservation)
+    c1, c2, c3 = 0.30, 0.25, 0.15   # immediate, future, destination
+    c4, c5, c6 = 0.10, 0.10, 0.10   # regret, mean, std (positive std weight → lower score)
+
+    # Lower score is better (minimization)
+    scores = (c1 * imm_norm + 
+              c2 * fut_norm + 
+              c3 * dest_norm + 
+              c4 * regret_norm + 
+              c5 * mean_norm - 
+              c6 * std_norm)
+
+    best_idx = np.argmin(scores)
+    return candidates[best_idx]
+```

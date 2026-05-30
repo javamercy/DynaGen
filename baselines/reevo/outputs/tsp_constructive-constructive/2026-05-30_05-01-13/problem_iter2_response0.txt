@@ -1,0 +1,40 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    base_saving = distance_matrix[current_node][destination_node]
+    best_score = -np.inf
+    best_node = None
+
+    for u in unvisited_nodes:
+        d_cur_u = distance_matrix[current_node][u]
+        d_u_dest = distance_matrix[u][destination_node]
+        saving = base_saving - d_cur_u - d_u_dest
+
+        others = unvisited_nodes - {u}
+        if others:
+            other_dists = [distance_matrix[u][v] for v in others]
+            best1 = np.min(other_dists)
+            if len(other_dists) > 1:
+                sorted_dists = np.sort(other_dists)
+                best2 = sorted_dists[1]
+            else:
+                best2 = best1
+            regret = best2 - best1
+            best_next = best1
+        else:
+            regret = 0.0
+            best_next = 0.0
+
+        # Emphasized savings and regret with proper weighting
+        score = -0.2 * d_cur_u + 0.5 * saving + 0.3 * regret - 0.2 * best_next
+
+        if score > best_score:
+            best_score = score
+            best_node = u
+
+    return best_node
+```

@@ -1,0 +1,50 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using immediate cost, two-step regret, and destination distance.
+    Prioritizes regret (two-step) and destination distance over immediate cost.
+    Deterministic tie-breaking via node index.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Deterministic ordering for tie-breaking
+    candidates = sorted(unvisited_nodes)
+
+    # Weights: immediate cost, two-step regret, destination distance
+    w_imm = 0.2
+    w_two = 0.5
+    w_dest = 0.3
+
+    best_score = float('inf')
+    best_node = None
+
+    for i in candidates:
+        # Immediate distance from current node to i
+        imm = distance_matrix[current_node, i]
+
+        # Two-step lookahead regret: best indirect path via any other j
+        best_two_step = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_two_step:
+                best_two_step = cost
+        regret_two = best_two_step - imm if best_two_step != float('inf') else 0.0
+
+        # Distance to the final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Combined score (lower is better) – regret is subtracted (high regret preferred)
+        score = w_imm * imm - w_two * regret_two - w_dest * dest_dist
+
+        # Deterministic tie-breaking: smaller node index wins
+        if score < best_score or (np.isclose(score, best_score) and i < (best_node if best_node is not None else float('inf'))):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

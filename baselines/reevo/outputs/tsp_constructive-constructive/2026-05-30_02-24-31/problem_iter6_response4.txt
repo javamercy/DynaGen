@@ -1,0 +1,50 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using immediate cost, regret (difference between best and second-best
+    successor from the candidate), and distance to destination.
+    Priorities: high regret and large destination distance reduce score.
+    Lower score is better. Deterministic tie-breaking by node index.
+    """
+    n = len(unvisited_nodes)
+    if n == 0:
+        raise ValueError("No unvisited nodes left")
+
+    # Single node left – must take it
+    if n == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)   # deterministic order
+
+    # Weights: tune for the problem instance
+    w_imm = 0.35
+    w_reg = 0.40
+    w_dst = 0.25
+
+    best_score = float('inf')
+    best_node = unvisited[0]
+
+    for i in unvisited:
+        immediate = distance_matrix[current_node, i]
+
+        # Regret = second-best successor distance – best successor distance from i
+        distances_from_i = [distance_matrix[i, j] for j in unvisited if j != i]
+        if len(distances_from_i) >= 2:
+            sorted_dists = sorted(distances_from_i)
+            regret = sorted_dists[1] - sorted_dists[0]
+        elif len(distances_from_i) == 1:
+            regret = 0.0
+        else:
+            regret = 0.0
+
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Lower score is better: subtract regret and dest_dist to favour high values
+        score = w_imm * immediate - w_reg * regret - w_dst * dest_dist
+
+        if score < best_score or (score == best_score and i < best_node):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

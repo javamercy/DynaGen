@@ -1,0 +1,42 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved regret-based heuristic with stronger emphasis on regret to avoid costly future connections.
+    Dynamically adjusts destination weight based on remaining nodes.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_remaining = len(unvisited_nodes)
+
+    # Dynamic weighting: destination becomes more important as fewer nodes remain
+    gamma = 0.05 + 0.25 * (1.0 / n_remaining)   # low when many remaining, high when few
+    alpha = max(0.15, 0.35 - 0.02 * n_remaining) # immediate cost weight slightly higher when many
+    beta = 0.7  # strong regret weight (regret is subtracted, so high regret → low score)
+
+    best_node = None
+    best_score = float('inf')
+
+    for node in unvisited_nodes:
+        dist_curr = distance_matrix[current_node][node]
+        dist_dest = distance_matrix[node][destination_node]
+
+        # Compute regret: difference between best and second best distance from node to remaining nodes + destination
+        future_nodes = [n for n in unvisited_nodes if n != node] + [destination_node]
+        if len(future_nodes) >= 2:
+            dists = sorted(distance_matrix[node][n] for n in future_nodes)
+            regret = dists[1] - dists[0]  # larger regret means postponing this node is costly
+        else:
+            regret = 0.0
+
+        # Score: lower is better
+        score = alpha * dist_curr - beta * regret + gamma * dist_dest
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

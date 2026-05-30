@@ -1,0 +1,83 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved constructive heuristic for TSP:
+    - Normalizes all features to [0,1] (min‑max)
+    - Includes destination in regret computation
+    - Adapts weights dynamically based on remaining node fraction
+    - Combines: direct distance, Clarke‑Wright savings, regret,
+      connectivity (average distance to other unvisited), and future minimum cost
+    """
+    n = len(unvisited_nodes)
+    if n == 0:
+        return current_node
+    if n == 1:
+        return next(iter(unvisited_nodes))
+
+    nodes = np.array(sorted(unvisited_nodes))
+    m = n
+
+    # Base distances
+    d_cur = distance_matrix[current_node, nodes]                   # distance from current
+    d_dest = distance_matrix[nodes, destination_node]              # distance to destination
+    savings = distance_matrix[current_node, destination_node] - (d_cur + d_dest)
+
+    # Build matrix: distances from each candidate to all other candidates (self excluded)
+    cand_dist = distance_matrix[nodes[:, None], nodes]            # (m, m)
+    diag_indices = np.arange(m)
+    cand_dist[diag_indices, diag_indices] = np.inf               # ignore self
+
+    # Append destination column for regret computation
+    dest_col = d_dest[:, None]                                   # (m, 1)
+    all_dist = np.concatenate([cand_dist, dest_col], axis=1)     # (m, m+1)
+
+    # Efficiently get two smallest distances per candidate
+    partitioned = np.partition(all_dist, 1, axis=1)
+    first_min = partitioned[:, 0]
+    second_min = partitioned[:, 1]
+    regret = second_min - first_min                              # larger is better
+    future_min = first_min                                       # smaller is better
+
+    # Connectivity: average distance to other unvisited nodes (excluding self)
+    # Re‑compute cand_dist without inf on diagonal for mean calculation
+    cand_dist2 = distance_matrix[nodes[:, None], nodes]          # (m, m)
+    sum_dist = np.sum(cand_dist2, axis=1)
+    diag_vals = cand_dist2[diag_indices, diag_indices]
+    conn = (sum_dist - diag_vals) / (m - 1)                      # average distance to others
+
+    # Min‑max normalization: best value maps to 1
+    def norm_best_when_large(val):
+        mn, mx = np.min(val), np.max(val)
+        if mx == mn:
+            return np.full_like(val, 0.5)
+        return (val - mn) / (mx - mn)
+
+    def norm_best_when_small(val):
+        mn, mx = np.min(val), np.max(val)
+        if mx == mn:
+            return np.full_like(val, 0.5)
+        return (mx - val) / (mx - mn)
+
+    d_cur_norm = norm_best_when_small(d_cur)
+    future_norm = norm_best_when_small(future_min)
+    savings_norm = norm_best_when_large(savings)
+    regret_norm = norm_best_when_large(regret)
+    conn_norm = norm_best_when_large(conn)
+
+    # Adaptive weights based on remaining fraction
+    total_nodes = distance_matrix.shape[0]
+    remaining_ratio = m / (total_nodes - 1)                      # 0 when nearly done, 1 at start
+    w_sav = 0.35 * (1 - remaining_ratio) + 0.15 * remaining_ratio
+    w_reg = 0.20 * (1 - remaining_ratio) + 0.30 * remaining_ratio
+    w_con = 0.25 * (1 - remaining_ratio) + 0.10 * remaining_ratio
+    w_direct = 0.10 * (1 - remaining_ratio) + 0.20 * remaining_ratio
+    w_dest = 0.10 * (1 - remaining_ratio) + 0.25 * remaining_ratio
+
+    # Composite score (maximize)
+    score = (w_direct * d_cur_norm + w_sav * savings_norm +
+             w_reg * regret_norm + w_con * conn_norm + w_dest * future_norm)
+
+    best_idx = int(np.argmax(score))
+    return int(nodes[best_idx])
+```

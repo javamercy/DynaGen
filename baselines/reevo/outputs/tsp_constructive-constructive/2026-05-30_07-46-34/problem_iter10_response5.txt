@@ -1,0 +1,59 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using simplified criteria: future connectivity,
+    regret, and destination proximity. Emphasizes future connectivity
+    and regret early in the tour, destination late.
+    """
+    unvisited = list(unvisited_nodes)
+    n = len(unvisited)
+
+    if n == 0:
+        return destination_node
+    if n == 1:
+        return unvisited[0]
+
+    # Precompute distances for each candidate
+    d_dest = np.array([distance_matrix[u, destination_node] for u in unvisited])
+
+    avg_fut = np.zeros(n)
+    regret_fut = np.zeros(n)
+
+    for i, u in enumerate(unvisited):
+        # distances to all other unvisited nodes
+        others = [v for j, v in enumerate(unvisited) if j != i]
+        if len(others) >= 2:
+            dists = np.sort(distance_matrix[u, others])
+            avg_fut[i] = np.mean(dists)
+            regret_fut[i] = dists[1] - dists[0]
+        elif len(others) == 1:
+            avg_fut[i] = distance_matrix[u, others[0]]
+            regret_fut[i] = 0.0
+        else:
+            avg_fut[i] = 0.0
+            regret_fut[i] = 0.0
+
+    # Min‑max normalization
+    def minmax(arr):
+        mn, mx = arr.min(), arr.max()
+        if mx == mn:
+            return np.zeros_like(arr)
+        return (arr - mn) / (mx - mn)
+
+    avg_fut_norm = minmax(avg_fut)
+    regret_fut_norm = minmax(regret_fut)
+    d_dest_norm = minmax(d_dest)
+
+    # Adaptive weight based on remaining fraction
+    total_nodes = distance_matrix.shape[0]
+    alpha = n / total_nodes               # 1 early, 0 late
+    # Early: high weight on future connectivity and regret; Late: high on destination
+    scores = (alpha * avg_fut_norm
+              - alpha * regret_fut_norm
+              + (1.0 - alpha) * d_dest_norm)
+
+    best_idx = int(np.argmin(scores))
+    return unvisited[best_idx]
+```

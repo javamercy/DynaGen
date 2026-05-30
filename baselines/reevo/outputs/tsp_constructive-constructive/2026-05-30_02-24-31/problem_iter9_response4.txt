@@ -1,0 +1,78 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using immediate cost, two-step regret (best vs second-best),
+    future edge regret, destination distance, and lookahead savings.
+    Weights are tuned to emphasize regret and future benefits.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Deterministic ordering for tie-breaking
+    candidates = sorted(unvisited_nodes)
+
+    # Weights: immediate cost, two-step regret, future regret, destination distance, lookahead savings
+    w_imm, w_two, w_future, w_dest, w_sav = 0.2, 0.4, 0.2, 0.1, 0.1
+
+    best_score = float('inf')
+    best_node = None
+
+    for i in candidates:
+        # Immediate distance from current node to i
+        imm = distance_matrix[current_node, i]
+
+        # Two-step lookahead: best and second-best indirect paths (current -> j -> i)
+        first_cost = float('inf')
+        second_cost = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < first_cost:
+                second_cost = first_cost
+                first_cost = cost
+            elif cost < second_cost:
+                second_cost = cost
+        # Regret: difference between best and second-best (if both exist)
+        if first_cost != float('inf') and second_cost != float('inf'):
+            regret_two = second_cost - first_cost
+        else:
+            regret_two = 0.0
+
+        # Future regret: difference between second-best and best edge from i to other unvisited nodes
+        future_costs = [distance_matrix[i, v] for v in unvisited_nodes if v != i]
+        if len(future_costs) >= 2:
+            sorted_future = sorted(future_costs)
+            regret_future = sorted_future[1] - sorted_future[0]
+        else:
+            regret_future = 0.0
+
+        # Distance to the final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Lookahead savings: benefit of going i -> destination via the best future step
+        # Savings = distance(i, destination) - min_{j != i} (distance(i, j) + distance(j, destination))
+        # A high positive savings means going through another node before destination is beneficial.
+        other_nodes = [v for v in candidates if v != i]
+        if other_nodes:
+            best_two_dest = min(distance_matrix[i, j] + distance_matrix[j, destination_node] for j in other_nodes)
+            savings = dest_dist - best_two_dest  # positive if direct is worse, negative if direct is better
+        else:
+            savings = 0.0
+
+        # Combined score (lower is better)
+        score = (w_imm * imm
+                 - w_two * regret_two
+                 - w_future * regret_future
+                 - w_dest * dest_dist
+                 - w_sav * savings)
+
+        # Deterministic tie-breaking: smaller node index wins
+        if score < best_score or (np.isclose(score, best_score) and (best_node is None or i < best_node)):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

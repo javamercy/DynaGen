@@ -1,0 +1,64 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using two-step lookahead and regret.
+    - Normalize distances per row.
+    - Adapt weights via sigmoid based on remaining nodes: early emphasize future connectivity, late emphasize destination.
+    - Use internal regret (gap between best and second-best next step after candidate).
+    """
+    if not unvisited_nodes:
+        return destination_node
+
+    total_nodes = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+    # progress: 0 at start (many unvisited), ~1 at end (only destination left)
+    progress = (total_nodes - remaining) / total_nodes
+    # Sigmoid weight for destination: high when progress > 0.5
+    w_dest = 1.0 / (1.0 + np.exp(- (progress - 0.5) * 6.0))
+    w_future = 1.0 - w_dest
+    gamma = 0.3  # strength of regret term
+
+    def normalize_dist(src, dst):
+        row = distance_matrix[src, :]
+        min_val = row.min()
+        max_val = row.max()
+        if max_val == min_val:
+            return 0.5
+        return (distance_matrix[src, dst] - min_val) / (max_val - min_val)
+
+    best_score = float('inf')
+    best_node = None
+
+    for cand in unvisited_nodes:
+        # Immediate distance (normalized)
+        imm_norm = normalize_dist(current_node, cand)
+
+        # Two-step lookahead: best and second best future from cand
+        others = unvisited_nodes - {cand}
+        if others:
+            future_dists = [normalize_dist(cand, other) for other in others]
+            future_dists.sort()
+            best_future = future_dists[0]
+            second_best_future = future_dists[1] if len(future_dists) > 1 else best_future
+        else:
+            # Last node before destination
+            best_future = normalize_dist(cand, destination_node)
+            second_best_future = best_future
+
+        internal_regret = second_best_future - best_future
+
+        # Destination component
+        dest_norm = normalize_dist(cand, destination_node)
+
+        # Combined cost (lower is better)
+        two_step = imm_norm + best_future
+        cost = w_future * two_step + w_dest * dest_norm - gamma * internal_regret
+
+        if cost < best_score:
+            best_score = cost
+            best_node = cand
+
+    return best_node
+```

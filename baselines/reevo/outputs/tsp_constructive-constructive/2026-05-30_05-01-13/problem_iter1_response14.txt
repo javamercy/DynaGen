@@ -1,0 +1,48 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a regret-based look-ahead heuristic.
+    For each candidate, compute the cost of moving to it immediately (first_step),
+    then the regret of not visiting it now (difference between the best and second-best
+    next edge from that candidate to the remaining unvisited nodes). The score
+    is first_step - alpha * regret, where alpha controls the influence of the look-ahead.
+    The node with the smallest score is chosen.
+    """
+    alpha = 0.5  # weight for regret component
+    best_score = float('inf')
+    best_node = None
+
+    for candidate in unvisited_nodes:
+        # cost of moving from current to candidate
+        first_step = distance_matrix[current_node][candidate]
+
+        # remaining nodes after candidate is visited
+        remaining = unvisited_nodes - {candidate}
+
+        # compute regret: difference between second-best and best next edge from candidate
+        if len(remaining) >= 2:
+            # distances from candidate to all remaining nodes
+            dists = [distance_matrix[candidate][n] for n in remaining]
+            dists.sort()
+            best = dists[0]
+            second_best = dists[1]
+            regret = second_best - best
+        elif len(remaining) == 1:
+            # only one option, no regret
+            regret = 0.0
+        else:
+            # last node: next step is to destination (start node)
+            # no regret for single step, but we can consider distance to destination implicitly
+            regret = 0.0
+
+        # score: minimize first_step, maximize regret (so subtract)
+        score = first_step - alpha * regret
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

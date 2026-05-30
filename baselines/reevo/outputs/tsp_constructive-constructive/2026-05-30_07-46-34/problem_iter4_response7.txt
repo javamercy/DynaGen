@@ -1,0 +1,77 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved selection using dynamic multi-criteria scoring with normalized metrics.
+    
+    Criteria:
+    - Immediate distance (d_curr)
+    - Average future distance (avg_future): encourages visiting isolated nodes early.
+    - Regret (difference between smallest and second smallest future distance): discourages postponing costly nodes.
+    - Standard deviation of future distances (std_future): introduces diversification.
+    - Distance to destination (d_dest): preserves return path.
+    
+    The weights are adapted based on the number of remaining nodes: earlier stages focus more on
+    future costs and regret, later stages focus on immediate cost and return path.
+    Each criterion is normalized across candidates to avoid scale dominance.
+    """
+    unvisited = list(unvisited_nodes)
+    n_remaining = len(unvisited)
+    if n_remaining == 0:
+        return destination_node
+    if n_remaining == 1:
+        return unvisited[0]
+
+    # Precompute metrics for all candidates
+    metrics = {}
+    for node in unvisited:
+        d_curr = distance_matrix[current_node, node]
+        other_distances = [distance_matrix[node, v] for v in unvisited if v != node]
+        if other_distances:
+            avg_future = np.mean(other_distances)
+            std_future = np.std(other_distances)
+            sorted_d = sorted(other_distances)
+            regret_future = sorted_d[1] - sorted_d[0] if len(sorted_d) >= 2 else 0.0
+        else:
+            avg_future = 0.0
+            std_future = 0.0
+            regret_future = 0.0
+        d_dest = distance_matrix[node, destination_node]
+        metrics[node] = (d_curr, avg_future, regret_future, std_future, d_dest)
+
+    # Normalize each criterion across candidates to [0,1]
+    arrays = {k: [metrics[node][idx] for node in unvisited] for idx, k in enumerate(['d_curr','avg_future','regret_future','std_future','d_dest'])}
+    norm = {}
+    for k, vals in arrays.items():
+        min_v, max_v = min(vals), max(vals)
+        if max_v - min_v == 0:
+            norm[k] = {node: 0.0 for node in unvisited}
+        else:
+            norm[k] = {node: (metrics[node][k] - min_v) / (max_v - min_v) for node in unvisited}
+
+    # Dynamic weights based on stage (progress)
+    # We approximate progress by the number of remaining nodes (larger = earlier)
+    if n_remaining > 10:
+        # Early stage: emphasize future costs and regret
+        w1, w2, w3, w4, w5 = 0.15, 0.30, 0.25, 0.10, 0.20
+    elif n_remaining > 5:
+        # Middle stage: balanced
+        w1, w2, w3, w4, w5 = 0.25, 0.25, 0.20, 0.10, 0.20
+    else:
+        # Late stage: emphasize immediate and destination distance
+        w1, w2, w3, w4, w5 = 0.40, 0.10, 0.10, 0.05, 0.35
+
+    # Choose node with minimum weighted score
+    best_node = None
+    best_score = float('inf')
+    for node in unvisited:
+        score = (w1 * norm['d_curr'][node]
+                 - w2 * norm['avg_future'][node]
+                 - w3 * norm['regret_future'][node]
+                 + w4 * norm['std_future'][node]
+                 - w5 * norm['d_dest'][node])
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

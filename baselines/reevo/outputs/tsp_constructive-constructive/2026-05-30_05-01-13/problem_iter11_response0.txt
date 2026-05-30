@@ -1,0 +1,83 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a composite score based on savings, regret,
+    connectivity, and 2-step lookahead, with z-score normalization and
+    adaptive weights that shift from exploration to exploitation.
+    """
+    n_nodes = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+    if remaining == 0:
+        raise ValueError("No unvisited nodes")
+    if remaining == 1:
+        return list(unvisited_nodes)[0]
+
+    candidates = list(unvisited_nodes)
+    savings_vals = []
+    regret_vals = []
+    conn_vals = []
+    lookahead_vals = []
+
+    # Helper to gather other distances (excluding the candidate itself)
+    for n in candidates:
+        d_c_n = distance_matrix[current_node, n]
+        d_n_d = distance_matrix[n, destination_node]
+        # Savings (Clarke-Wright style)
+        savings = distance_matrix[current_node, destination_node] + d_n_d - d_c_n
+        savings_vals.append(savings)
+
+        # Distances from n to other unvisited nodes
+        other_dist = [distance_matrix[n, m] for m in candidates if m != n]
+        if other_dist:
+            min_other = min(other_dist)
+            avg_other = np.mean(other_dist)
+        else:
+            min_other = 0.0
+            avg_other = 0.0
+
+        # Regret: extra cost if we skip n now (connect it later via its nearest neighbor)
+        regret = min_other - d_c_n
+        regret_vals.append(regret)
+
+        # Connectivity: negative average distance to other unvisited (higher = better connected)
+        conn_vals.append(-avg_other)
+
+        # Lookahead: negative 2-step cost (immediate + best next from n)
+        lookahead_vals.append(-(d_c_n + min_other))
+
+    # Convert to arrays for z-score normalization
+    arr_sav = np.array(savings_vals)
+    arr_reg = np.array(regret_vals)
+    arr_conn = np.array(conn_vals)
+    arr_look = np.array(lookahead_vals)
+
+    # Compute z-scores with protection against zero variance
+    eps = 1e-8
+    z_sav = (arr_sav - np.mean(arr_sav)) / (np.std(arr_sav) + eps)
+    z_reg = (arr_reg - np.mean(arr_reg)) / (np.std(arr_reg) + eps)
+    z_conn = (arr_conn - np.mean(arr_conn)) / (np.std(arr_conn) + eps)
+    z_look = (arr_look - np.mean(arr_look)) / (np.std(arr_look) + eps)
+
+    # Adaptive weights based on remaining nodes (exploration vs exploitation)
+    progress = 1.0 - remaining / n_nodes  # 0 when all remain, 1 when only one left
+    # Base weights for exploitation (savings) vs exploration (regret, connectivity, lookahead)
+    w_sav = 0.4 * progress
+    w_reg = 0.3 * (1.0 - progress)
+    w_conn = 0.2 * (1.0 - progress)
+    w_look = 0.1 * (1.0 - progress)
+    # Normalize so that weights sum to 1
+    total_w = w_sav + w_reg + w_conn + w_look
+    w_sav /= total_w
+    w_reg /= total_w
+    w_conn /= total_w
+    w_look /= total_w
+
+    # Compute composite score (higher is better)
+    scores = w_sav * z_sav + w_reg * z_reg + w_conn * z_conn + w_look * z_look
+
+    # Select node with maximum score
+    best_idx = int(np.argmax(scores))
+    return candidates[best_idx]
+```

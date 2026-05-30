@@ -1,0 +1,80 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set,
+                        distance_matrix: np.ndarray) -> int:
+    # If only one node remains, return it
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    total_nodes = distance_matrix.shape[0]
+    frac_remaining = len(unvisited_nodes) / total_nodes
+
+    # Adaptive weights that depend on the remaining fraction
+    w_direct = 0.4
+    w_dest = 0.1 + 0.4 * (1.0 - frac_remaining)           # more weight when few nodes left
+    w_connect = 0.1 + 0.1 * frac_remaining                # stronger connectivity early
+    w_savings = 0.25 * frac_remaining                      # savings important when many nodes
+    w_regret = 0.25 * (1.0 - frac_remaining)               # regret important when few nodes
+    w_random = 0.05 * (1.0 - frac_remaining)               # controlled randomness for exploration
+
+    dist_curr_dest = distance_matrix[current_node][destination_node]
+
+    # Precompute the 2‑step look‑ahead cost for each candidate
+    cost2 = {}
+    for node in unvisited_nodes:
+        imm = distance_matrix[current_node][node]
+        others = unvisited_nodes - {node}
+        if others:
+            # best continuation from node to a remaining city and then to destination
+            best_next = min(
+                distance_matrix[node][j] + distance_matrix[j][destination_node]
+                for j in others
+            )
+            cost2[node] = imm + best_next
+        else:
+            cost2[node] = imm + distance_matrix[node][destination_node]
+
+    # Find best and second best 2‑step costs (for regret)
+    sorted_costs = sorted(cost2.values())
+    best_cost = sorted_costs[0]
+    second_best_cost = sorted_costs[1] if len(sorted_costs) > 1 else best_cost
+
+    scores = {}
+    for node in unvisited_nodes:
+        imm = distance_matrix[current_node][node]
+        dest = distance_matrix[node][destination_node]
+
+        # Connectivity: average distance to other unvisited nodes (penalize high values)
+        others = unvisited_nodes - {node}
+        if others:
+            avg_dist_others = np.mean([distance_matrix[node][j] for j in others])
+        else:
+            avg_dist_others = 0.0
+
+        # Savings (Clarke‑Wright style)
+        savings = dist_curr_dest + dest - imm
+
+        # Regret based on the 2‑step look‑ahead gap
+        if cost2[node] == best_cost:
+            regret = second_best_cost - best_cost
+        else:
+            regret = cost2[node] - best_cost
+
+        # Random perturbation (seeded via hash of node for determinism)
+        random_factor = np.random.rand() * 2 - 1   # uniform in [-1,1]
+
+        # Composite score (higher is better)
+        score = (- w_direct * imm
+                 - w_dest * dest
+                 - w_connect * avg_dist_others      # negative because we want low avg distance
+                 + w_savings * savings
+                 + w_regret * regret
+                 + w_random * random_factor)
+
+        scores[node] = score
+
+    # Return node with maximum score
+    return max(scores, key=scores.get)
+```

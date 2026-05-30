@@ -1,0 +1,55 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    # If only one unvisited node left, return it directly
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    total_nodes = distance_matrix.shape[0]
+    r = len(unvisited_nodes) / total_nodes  # fraction of nodes remaining (0 to 1)
+
+    # Global maximum distance for normalization
+    d_max = distance_matrix.max()
+    if d_max == 0:
+        d_max = 1.0  # avoid division by zero
+
+    # Precompute distances from current and to destination for all candidates
+    unvisited_list = list(unvisited_nodes)
+    d_current = distance_matrix[current_node, unvisited_list] / d_max
+    d_dest = distance_matrix[unvisited_list, destination_node] / d_max
+
+    # Two-step lookahead: best next from each candidate
+    two_step = np.zeros(len(unvisited_list))
+    for idx, j in enumerate(unvisited_list):
+        # find nearest unvisited node different from j
+        other_indices = [k for k in unvisited_list if k != j]
+        if other_indices:
+            best_next = min(distance_matrix[j, other_indices])
+            two_step[idx] = d_current[idx] + best_next / d_max
+        else:
+            two_step[idx] = d_current[idx]  # fallback
+
+    # Immediate regret normalization (based on d_current)
+    min_immediate = d_current.min()
+    max_immediate = d_current.max()
+    epsilon = 1e-10
+    regret = (d_current - min_immediate) / (max_immediate - min_immediate + epsilon)
+
+    # Adaptive weights based on remaining fraction r
+    # Early (r high) -> more weight on lookahead; later -> more on immediate and destination
+    w_immediate = 1.0 - r
+    w_lookahead = r
+    w_dest = 0.5 * (1.0 - r)   # destination importance increases later
+    w_regret = 0.2              # constant small regret term
+
+    # Composite score (lower is better)
+    scores = (w_immediate * d_current +
+              w_lookahead * two_step +
+              w_dest * d_dest +
+              w_regret * regret)
+
+    # Select the candidate with minimal score
+    best_idx = np.argmin(scores)
+    return unvisited_list[best_idx]
+```

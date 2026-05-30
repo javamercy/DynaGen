@@ -1,0 +1,115 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved constructive heuristic for TSP combining multiple criteria with
+    adaptive weighting and normalization for balanced selection.
+
+    Criteria:
+        - immediate cost (dist from current)
+        - regret: best alternative via another unvisited node minus immediate cost
+        - nearest neighbor distance from candidate (encourages early visiting of isolated nodes)
+        - lookahead savings: best_outgoing from current minus best_outgoing from candidate
+        - distance to destination
+
+    Each criterion is normalized by its maximum among candidates to avoid scale bias.
+    Weights are tuned to emphasize regret and savings.
+
+    Parameters
+    ----------
+    current_node : int
+        The node we are currently at.
+    destination_node : int
+        The final node we must return to.
+    unvisited_nodes : set of int
+        Set of unvisited nodes (non-empty).
+    distance_matrix : np.ndarray
+        Square matrix of pairwise distances.
+
+    Returns
+    -------
+    int
+        The selected next node to visit.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)  # deterministic order
+
+    # Precompute best_outgoing from current among unvisited
+    best_out_current = min(distance_matrix[current_node, j] for j in unvisited)
+
+    # Gather raw values for all criteria
+    immediate_list = []
+    regret_list = []
+    nearest_list = []
+    savings_list = []
+    dest_list = []
+
+    for i in unvisited:
+        # Immediate cost
+        imm = distance_matrix[current_node, i]
+
+        # Regret: best alternative cost via another unvisited node
+        best_alt = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            alt_cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if alt_cost < best_alt:
+                best_alt = alt_cost
+        regret = best_alt - imm if best_alt < float('inf') else 0.0
+
+        # Nearest neighbor distance from i (among other unvisited)
+        nn_i = min(distance_matrix[i, j] for j in unvisited if j != i)
+
+        # Lookahead savings: how much cheaper is the best outgoing edge from i
+        best_out_i = min(distance_matrix[i, j] for j in unvisited if j != i)
+        savings = best_out_current - best_out_i  # positive if i offers cheaper continuation
+
+        # Distance to destination
+        dest = distance_matrix[i, destination_node]
+
+        immediate_list.append(imm)
+        regret_list.append(regret)
+        nearest_list.append(nn_i)
+        savings_list.append(savings)
+        dest_list.append(dest)
+
+    # Normalize each criterion to [0,1] (handle zero max cases)
+    def normalize(vals):
+        max_val = max(vals) if vals else 1.0
+        return [v / max_val if max_val > 0 else 0.0 for v in vals]
+
+    imm_norm = normalize(immediate_list)
+    regret_norm = normalize(regret_list)
+    nearest_norm = normalize(nearest_list)
+    savings_norm = normalize(savings_list)
+    dest_norm = normalize(dest_list)
+
+    # Weights: emphasize regret and savings; nearest neighbor encourages connectivity
+    w_imm = 0.10
+    w_regret = 0.35
+    w_nearest = 0.15
+    w_savings = 0.25
+    w_dest = 0.15
+
+    scores = {}
+    for idx, i in enumerate(unvisited):
+        # Score: lower is better. Immediate, nearest, distance to dest are penalties;
+        # regret and savings are benefits (subtract).
+        score = (w_imm * imm_norm[idx]
+                 - w_regret * regret_norm[idx]
+                 + w_nearest * nearest_norm[idx]
+                 - w_savings * savings_norm[idx]
+                 + w_dest * dest_norm[idx])
+        scores[i] = score
+
+    # Deterministic tie‑breaking: smallest index among minimum score
+    min_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == min_score]
+    return min(candidates)
+```

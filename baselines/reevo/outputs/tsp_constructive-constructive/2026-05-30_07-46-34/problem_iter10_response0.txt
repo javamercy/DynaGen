@@ -1,0 +1,70 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a regret-based heuristic with adaptive weights."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    n = len(candidates)
+
+    # Immediate distances from current node
+    imm = np.array([distance_matrix[current_node, i] for i in candidates])
+
+    # Distances to destination (final goal)
+    to_dest = np.array([distance_matrix[i, destination_node] for i in candidates])
+
+    # For each candidate, compute best and second best next step (from that candidate to another unvisited node)
+    best_next = np.full(n, np.inf)
+    second_best_next = np.full(n, np.inf)
+    for idx, node in enumerate(candidates):
+        others = [j for j in candidates if j != node]
+        if len(others) > 0:
+            dists = np.array([distance_matrix[node, j] for j in others])
+            sorted_dists = np.sort(dists)
+            best_next[idx] = sorted_dists[0]
+            if len(sorted_dists) > 1:
+                second_best_next[idx] = sorted_dists[1]
+            else:
+                second_best_next[idx] = sorted_dists[0]  # dummy, won't be used for regret
+
+    # Regret for each candidate: difference between second best and best next-step cost
+    regret = second_best_next - best_next  # high regret is desirable (big penalty for not choosing this node as next)
+
+    # Average distance to all other unvisited nodes (future potential)
+    avg_dist = np.array([
+        np.mean([distance_matrix[node, j] for j in candidates if j != node]) if len(candidates) > 1 else 0.0
+        for node in candidates
+    ])
+
+    # Normalize each component to [0,1] across candidates
+    def normalize(arr):
+        mn, mx = arr.min(), arr.max()
+        if mx - mn < 1e-12:
+            return np.ones_like(arr) * 0.5
+        return (arr - mn) / (mx - mn)
+
+    norm_imm = normalize(imm)
+    norm_dest = normalize(to_dest)
+    norm_regret = normalize(regret)
+    norm_avg = normalize(avg_dist)
+
+    # Adaptive weights based on number of remaining nodes
+    if n > 10:
+        w_imm, w_dest, w_reg, w_avg = 0.25, 0.10, 0.50, 0.15
+    elif n > 5:
+        w_imm, w_dest, w_reg, w_avg = 0.20, 0.20, 0.40, 0.20
+    else:
+        w_imm, w_dest, w_reg, w_avg = 0.15, 0.40, 0.25, 0.20
+
+    # Score: minimize immediate cost, maximize regret (high regret means good early choice),
+    # minimize distance to destination, and minimize average distance to other unvisited nodes.
+    scores = (w_imm * norm_imm +
+              w_dest * norm_dest +
+              -w_reg * norm_regret +   # negative because high regret is good
+              w_avg * norm_avg)
+
+    next_node = candidates[np.argmin(scores)]
+    return next_node
+```

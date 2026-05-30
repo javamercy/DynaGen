@@ -1,0 +1,62 @@
+```python
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """Select the next node with adaptive weighting that smoothly transitions
+    from prioritising local connectivity to destination proximity as the path
+    nears completion. Weights are normalised to avoid scale dominance."""
+
+    n_remaining = len(unvisited_nodes)
+    if n_remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    # Compute distances from current and to destination for all candidates
+    candidates = list(unvisited_nodes)
+    d_curr = [distance_matrix[current_node][v] for v in candidates]
+    d_dest = [distance_matrix[v][destination_node] for v in candidates]
+
+    # Compute connectivity: minimal distance to any other unvisited node (excluding self)
+    conn = []
+    for v in candidates:
+        others = [u for u in candidates if u != v]
+        if others:
+            conn.append(min(distance_matrix[v][u] for u in others))
+        else:
+            conn.append(0.0)
+
+    # Normalise each term to [0,1] across candidates to avoid scale bias
+    def normalize(values):
+        mn, mx = min(values), max(values)
+        if mx == mn:
+            return [0.0] * len(values)
+        return [(v - mn) / (mx - mn) for v in values]
+
+    d_curr_norm = normalize(d_curr)
+    d_dest_norm = normalize(d_dest)
+    conn_norm = normalize(conn)
+
+    # Adaptive weights: as remaining nodes shrink, move weight from connectivity
+    # to destination proximity. Immediate distance weight stays moderate but declines.
+    progress = n_remaining / (n_remaining + 5)  # 0..1-like
+    w_curr = 1.0 - 0.3 * progress
+    w_dest = 0.2 + 0.6 * (1.0 - progress)
+    w_conn = 0.8 * progress
+
+    best_idx = None
+    best_score = float("inf")
+
+    for i, v in enumerate(candidates):
+        score = (
+            w_curr * d_curr_norm[i]
+            + w_dest * d_dest_norm[i]
+            + w_conn * conn_norm[i]
+        )
+        if score < best_score:
+            best_score = score
+            best_idx = i
+
+    return candidates[best_idx]
+```

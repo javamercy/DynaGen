@@ -1,0 +1,71 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set,
+                        distance_matrix: np.ndarray) -> int:
+    """Select next node using two-step lookahead and regret with adaptive weights."""
+    total_nodes = distance_matrix.shape[0]
+
+    # row-wise normalize distances to [0,1]
+    row_max = distance_matrix.max(axis=1, keepdims=True)
+    row_max[row_max == 0] = 1.0  # avoid division by zero
+    norm_dist = distance_matrix / row_max
+
+    # remaining fraction
+    f = len(unvisited_nodes) / total_nodes
+
+    # sigmoid helper
+    def sigmoid(x: float) -> float:
+        return 1.0 / (1.0 + np.exp(-x))
+
+    # adaptive weights (via sigmoid)
+    w_current = sigmoid(5.0 * (0.5 - f))   # high late
+    w_future = sigmoid(5.0 * (f - 0.5))    # high early
+    w_regret = sigmoid(5.0 * (f - 0.5))    # high early
+    w_dest   = sigmoid(5.0 * (0.5 - f))    # high late
+
+    # normalize weights to sum to 1
+    total_w = w_current + w_future + w_regret + w_dest
+    w_current /= total_w
+    w_future  /= total_w
+    w_regret  /= total_w
+    w_dest    /= total_w
+
+    best_node = None
+    best_score = float('inf')
+
+    unvisited_list = list(unvisited_nodes)
+
+    for j in unvisited_list:
+        # first step cost (normalized)
+        first_cost = norm_dist[current_node, j]
+
+        # remaining nodes after picking j
+        remaining = [k for k in unvisited_list if k != j]
+
+        if remaining:
+            # distances from j to each remaining node
+            dists = norm_dist[j, remaining]
+            sorted_dists = np.sort(dists)
+            future_cost = sorted_dists[0]
+            regret = sorted_dists[1] - future_cost if len(sorted_dists) > 1 else 0.0
+        else:
+            future_cost = 0.0
+            regret = 0.0
+
+        # distance from candidate to destination
+        dest_cost = norm_dist[destination_node, j]
+
+        # composite score (lower is better)
+        score = (w_current * first_cost +
+                 w_future * future_cost -
+                 w_regret * regret +
+                 w_dest * dest_cost)
+
+        if score < best_score:
+            best_score = score
+            best_node = j
+
+    return best_node
+```

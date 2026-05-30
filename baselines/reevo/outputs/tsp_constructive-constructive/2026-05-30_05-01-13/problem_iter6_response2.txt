@@ -1,0 +1,105 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node to visit using an adaptive composite heuristic.
+    Combines normalized scores for:
+        - Clarke-Wright savings (reward)
+        - Regret (difference between best and second-best insertion cost)
+        - Proximity to destination (penalize)
+        - Direct distance from current (penalize)
+        - Connectivity cost (mean distance to other unvisited nodes, penalize)
+        - Diversity (std of distances to other unvisited nodes, reward)
+    Weights adapt based on the fraction of unvisited nodes remaining.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes to select from.")
+
+    candidates = list(unvisited_nodes)
+    if len(candidates) == 1:
+        return candidates[0]
+
+    n_unvisited = len(candidates)
+    total_nodes = distance_matrix.shape[0]
+    frac_remaining = n_unvisited / total_nodes  # 0..1
+
+    # Adaptive weights: savings important early, regret and connectivity important late
+    w_sav = 0.5 * (1 - frac_remaining)
+    w_reg = 0.3 * frac_remaining
+    w_dest = -0.2
+    w_dir = -0.1 * (1 - frac_remaining)
+    w_conn_avg = -0.15 * frac_remaining
+    w_conn_std = 0.1 * frac_remaining
+
+    # Precompute arrays
+    direct = np.array([distance_matrix[current_node, u] for u in candidates])
+    dest = np.array([distance_matrix[u, destination_node] for u in candidates])
+    savings = distance_matrix[current_node, destination_node] - (direct + dest)
+
+    # Normalization factors (robust to scale)
+    max_direct = direct.max() if direct.max() > 0 else 1
+    max_dest = dest.max() if dest.max() > 0 else 1
+    max_sav = max(0, savings.max()) if savings.max() > 0 else 1
+    # For regret and connectivity we compute per candidate, will normalize after
+
+    scores = np.zeros(len(candidates))
+    # Precompute pairwise distances among candidates to avoid recomputation
+    cand_indices = {u: idx for idx, u in enumerate(candidates)}
+    # Distance matrix among candidates (not needed all at once, but handy)
+    dist_mat = np.array([[distance_matrix[u, v] for v in candidates] for u in candidates])
+
+    for i, u in enumerate(candidates):
+        # --- Regret: difference between best and second-best insertion cost ---
+        # Insertion cost if we go to u now: direct[i] + dist to dest? Actually we are
+        # constructing a path, not inserting into a tour. We compute cost of visiting u
+        # now vs. later. "Later" means after visiting another unvisited node v.
+        # The extra cost of postponing u after visiting v is:
+        #   cost_v_then_u = direct[j] + dist_mat[j][i]  (go to v first, then to u)
+        #   vs. cost_now = direct[i]
+        # The saving of doing u now relative to v-first is: direct[i] - (direct[j] + dist_mat[j][i])
+        # But we want regret as positive urgency: the maximum extra cost if we postpone u.
+        # Alternative: define regret = max(0, min over v of (direct[j] + dist_mat[j][i] - direct[i]))
+        # That is the minimum additional cost we incur by not taking u immediately.
+        # This is similar to the better code but using all v.
+        other_indices = [j for j in range(len(candidates)) if j != i]
+        if other_indices:
+            costs_delayed = direct[other_indices] + dist_mat[other_indices, i]
+            regret_val = max(0.0, np.min(costs_delayed) - direct[i])
+            # Normalize regret by average direct distance (heuristic)
+            norm_reg = regret_val / np.mean(direct) if np.mean(direct) > 0 else 0.0
+
+            # Connectivity: mean and std of distances to other unvisited nodes
+            dists_other = dist_mat[i, other_indices]
+            conn_avg = np.mean(dists_other)
+            conn_std = np.std(dists_other)
+            # Normalize
+            norm_conn_avg = conn_avg / np.mean(dist_mat) if np.mean(dist_mat) > 0 else 0
+            norm_conn_std = conn_std / np.mean(dist_mat) if np.mean(dist_mat) > 0 else 0
+        else:
+            norm_reg = 0.0
+            norm_conn_avg = 0.0
+            norm_conn_std = 0.0
+
+        # Normalize other components
+        norm_direct = direct[i] / max_direct
+        norm_dest = dest[i] / max_dest
+        norm_sav = savings[i] / max_sav if savings[i] > 0 else 0.0  # savings can be negative
+
+        score = (
+            w_dir * norm_direct
+            + w_dest * norm_dest
+            + w_sav * norm_sav
+            + w_reg * norm_reg
+            + w_conn_avg * norm_conn_avg
+            + w_conn_std * norm_conn_std
+        )
+        scores[i] = score
+
+    return candidates[np.argmax(scores)]
+```

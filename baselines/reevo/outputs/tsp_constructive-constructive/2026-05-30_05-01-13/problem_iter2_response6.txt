@@ -1,0 +1,29 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix) -> int:
+    """
+    Select the next node using a simple two-step look‑ahead heuristic.
+    For each candidate, compute the sum of:
+      - direct distance from current to candidate,
+      - minimum over remaining nodes of (candidate to that node + that node to destination).
+    The candidate with the smallest total is chosen.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    dest_dist = distance_matrix[destination_node]
+    best_score = float('inf')
+    best_node = None
+
+    for candidate in unvisited_nodes:
+        direct = distance_matrix[current_node][candidate]
+        remaining = unvisited_nodes - {candidate}
+        # Look ahead: best continuation from candidate to destination via one intermediate node
+        look_ahead = min(distance_matrix[candidate][n] + dest_dist[n] for n in remaining)
+        score = direct + look_ahead
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

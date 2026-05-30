@@ -1,0 +1,48 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a deep lookahead heuristic.
+    For each candidate, evaluate the total cost of visiting it next, then following a
+    greedy nearest‑neighbor tour of the remaining nodes before returning to the destination.
+    Returns the candidate with the smallest total cost.
+    """
+    unvisited_list = list(unvisited_nodes)
+    n = len(unvisited_list)
+    if n == 0:
+        raise ValueError("No unvisited nodes")
+    if n == 1:
+        return unvisited_list[0]
+
+    best_candidate = None
+    best_total = float('inf')
+
+    for cand in unvisited_list:
+        # cost to go from current node to candidate
+        cost_so_far = distance_matrix[current_node][cand]
+
+        # nodes left after choosing cand
+        remaining = [node for node in unvisited_list if node != cand]
+
+        # simulate a greedy nearest‑neighbor path from cand through all remaining nodes
+        current = cand
+        future_cost = 0.0
+        rem = remaining[:]  # copy because we modify it
+        while rem:
+            # find closest unvisited node
+            nearest = min(rem, key=lambda x: distance_matrix[current][x])
+            future_cost += distance_matrix[current][nearest]
+            current = nearest
+            rem.remove(nearest)
+
+        # finally return from the last visited node to the destination
+        future_cost += distance_matrix[current][destination_node]
+
+        total = cost_so_far + future_cost
+        if total < best_total:
+            best_total = total
+            best_candidate = cand
+
+    return best_candidate
+```

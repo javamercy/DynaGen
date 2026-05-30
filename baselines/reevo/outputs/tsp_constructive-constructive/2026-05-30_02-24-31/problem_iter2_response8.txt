@@ -1,0 +1,31 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using a one‑step lookahead heuristic.
+    
+    For each candidate node, the selection score is the sum of the immediate
+    distance from the current node to the candidate and the minimum distance
+    from the candidate to any other unvisited node (or to the destination if
+    it is the last unvisited node). A small tie‑breaker favours nodes that are
+    closer to the final destination.
+    """
+    best_node = None
+    best_score = float('inf')
+    for node in unvisited_nodes:
+        immediate_cost = distance_matrix[current_node][node]
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            # Lookahead: best edge from candidate to any other unvisited node
+            lookahead = min(distance_matrix[node][n] for n in remaining)
+        else:
+            # Last unvisited node: go directly to destination
+            lookahead = distance_matrix[node][destination_node]
+        total = immediate_cost + lookahead
+        # Tie‑breaker (small weight) encourages earlier selection of nodes near destination
+        score = total + 0.2 * distance_matrix[node][destination_node]
+        if score < best_score:
+            best_score = score
+            best_node = node
+    return best_node
+```

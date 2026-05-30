@@ -1,0 +1,91 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node to visit using an adaptive composite heuristic.
+    Combines normalized scores for:
+        - Clarke-Wright savings (reward)
+        - Regret (cost of postponing this node)
+        - Proximity to destination (penalize)
+        - Direct distance from current (penalize)
+        - Connectivity cost (mean distance to other unvisited nodes, penalize)
+        - Diversity (std of distances to other unvisited nodes, reward)
+    Weights adapt based on the fraction of unvisited nodes remaining.
+    This vectorized version efficiently computes all components.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes to select from.")
+
+    candidates = np.array(list(unvisited_nodes))
+    n = len(candidates)
+    if n == 1:
+        return candidates[0]
+
+    total_nodes = distance_matrix.shape[0]
+    frac_remaining = n / total_nodes  # 0..1
+
+    # Adaptive weights
+    w_sav = 0.5 * (1 - frac_remaining)
+    w_reg = 0.3 * frac_remaining
+    w_dest = -0.2
+    w_dir = -0.1 * (1 - frac_remaining)
+    w_conn_avg = -0.15 * frac_remaining
+    w_conn_std = 0.1 * frac_remaining
+
+    # Vector of distances from current node to each candidate
+    direct = distance_matrix[current_node, candidates]           # shape (n,)
+    # Distances from each candidate to destination
+    dest = distance_matrix[candidates, destination_node]         # shape (n,)
+    # Savings: c(current, dest) - (c(current, u) + c(u, dest))
+    savings = distance_matrix[current_node, destination_node] - (direct + dest)
+
+    # Pairwise distances among candidates
+    dist_mat = distance_matrix[np.ix_(candidates, candidates)]   # shape (n, n)
+
+    # Normalization denominators (robust to zero range)
+    max_direct = max(direct.max(), 1e-9)
+    max_dest = max(dest.max(), 1e-9)
+    max_sav = max(savings.max(), 1e-9)
+    mean_dist_mat = max(dist_mat.mean(), 1e-9)
+
+    # --- Regret: extra cost if we postpone this node ---
+    # For each candidate i, compute min_{j != i} (direct[j] + dist_mat[j,i])
+    tmp = dist_mat + direct[:, np.newaxis]        # shape (n, n)
+    np.fill_diagonal(tmp, np.inf)
+    cost_delayed = np.min(tmp, axis=0)            # shape (n,) column-wise min
+    regret = np.maximum(0.0, cost_delayed - direct)
+
+    # --- Connectivity: mean and std of distances to other candidates ---
+    # Create mask for upper triangle excluding diagonal to avoid double counting and self
+    mask = np.ones((n, n), dtype=bool)
+    np.fill_diagonal(mask, False)
+    conn_avg = np.sum(dist_mat * mask, axis=1) / (n - 1)      # mean over others
+    conn_std = np.std(dist_mat, axis=1, where=mask, ddof=0)   # std over others
+
+    # Normalize all components to [0,1] range (approximately)
+    norm_direct = direct / max_direct
+    norm_dest = dest / max_dest
+    norm_sav = np.where(savings > 0, savings / max_sav, 0.0)
+    norm_reg = regret / mean_dist_mat  # scaled by typical distance
+    norm_conn_avg = conn_avg / mean_dist_mat
+    norm_conn_std = conn_std / mean_dist_mat
+
+    # Composite score
+    scores = (
+        w_dir * norm_direct
+        + w_dest * norm_dest
+        + w_sav * norm_sav
+        + w_reg * norm_reg
+        + w_conn_avg * norm_conn_avg
+        + w_conn_std * norm_conn_std
+    )
+
+    best_idx = np.argmax(scores)
+    return candidates[best_idx]
+```

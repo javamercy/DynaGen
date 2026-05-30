@@ -1,0 +1,60 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic: combines Clarke-Wright savings, regret (including destination),
+    and future cost with adaptive weights. Omits current distance from score.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    nodes = np.array(list(unvisited_nodes))
+    n = len(nodes)
+    total_nodes = distance_matrix.shape[0]
+
+    # Remaining fraction: 0 when only one node left, close to 1 when many left
+    remaining = n / (total_nodes - 1) if total_nodes > 1 else 1.0
+
+    # Adaptive weights: savings dominate early, regret and future cost more later
+    w_sav = 0.6 * (1 - remaining) + 0.3          # 0.3 to 0.9
+    w_reg = 0.4 * remaining + 0.1                # 0.1 to 0.5
+    w_fut = 0.2 + 0.2 * remaining                # 0.2 to 0.4
+
+    # ----- vectorized computations -----
+    # Clarke‑Wright savings
+    d_cur = distance_matrix[current_node, nodes]
+    d_dest = distance_matrix[destination_node, nodes]
+    base = distance_matrix[current_node, destination_node]
+    savings = base - d_cur - d_dest               # larger is better
+
+    # For each candidate u, distances to all other unvisited nodes + destination
+    sub = distance_matrix[nodes[:, None], nodes]  # (n,n)
+    np.fill_diagonal(sub, np.inf)
+    dest_col = distance_matrix[nodes, destination_node][:, None]  # (n,1)
+    all_dist = np.concatenate([sub, dest_col], axis=1)            # (n, n+1)
+
+    # Two smallest distances per row
+    part = np.partition(all_dist, 1, axis=1)
+    best = part[:, 0]          # shortest distance (typically to the nearest node or destination)
+    second = part[:, 1]        # second shortest
+    regret = second - best     # larger is better (higher regret for skipping)
+
+    # ----- normalization to [0,1] (robust to constant values) -----
+    def minmax(x):
+        mn, mx = np.min(x), np.max(x)
+        if mx == mn:
+            return np.full_like(x, 0.5)  # neutral value when no variation
+        return (x - mn) / (mx - mn)
+
+    savings_norm = minmax(savings)
+    regret_norm = minmax(regret)
+    # future cost: smaller is better → we want to maximize -norm (or subtract norm after mapping 0→best)
+    # minmax gives 0 to smallest, 1 to largest; subtract from 1 so that best gets high value
+    future_best = minmax(best)            # 0 = smallest (best), 1 = largest (worst)
+    future_norm = 1 - future_best         # 1 = best future, 0 = worst future
+
+    # ----- final score (higher is better) -----
+    scores = w_sav * savings_norm + w_reg * regret_norm + w_fut * future_norm
+
+    best_idx = np.argmax(scores)
+    return nodes[best_idx]
+```

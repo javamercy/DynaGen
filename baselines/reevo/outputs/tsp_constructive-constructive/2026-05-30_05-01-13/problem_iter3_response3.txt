@@ -1,0 +1,87 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """Select the next node to visit using adaptive multi-step look‑ahead
+    that balances savings, regret, direct cost, destination proximity, and connectivity."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_remaining = len(unvisited_nodes)
+    # Adaptive weights based on remaining nodes
+    if n_remaining > 5:
+        w_sav = 0.30
+        w_reg = 0.25
+        w_conn = 0.20
+        w_direct = 0.15
+        w_dest = 0.10
+    else:
+        w_sav = 0.20
+        w_reg = 0.30
+        w_conn = 0.10
+        w_direct = 0.20
+        w_dest = 0.20
+
+    # Set of future nodes (including destination) for regret computation
+    future_nodes = unvisited_nodes | {destination_node}
+
+    scores = {}
+    for node in unvisited_nodes:
+        # Direct cost (lower is better -> negative contribution to maximize)
+        direct_cost = -distance_matrix[current_node][node]
+
+        # Destination proximity (lower is better -> negative contribution)
+        dest_prox = -distance_matrix[node][destination_node]
+
+        # Insertion savings: dist(current,dest) - (dist(current,node)+dist(node,dest))
+        savings = (
+            distance_matrix[current_node][destination_node]
+            - distance_matrix[current_node][node]
+            - distance_matrix[node][destination_node]
+        )
+
+        # Connectivity: average distance from node to all other unvisited nodes
+        # (larger means node is isolated -> better to visit early)
+        others = unvisited_nodes - {node}
+        if others:
+            avg_dist = np.mean([distance_matrix[node][o] for o in others])
+        else:
+            avg_dist = 0.0
+
+        # Regret: difference between the two shortest distances from node
+        # to any future node (unvisited or destination)
+        distances_to_future = [
+            distance_matrix[node][f]
+            for f in future_nodes
+            if f != node
+        ]
+        sorted_dists = sorted(distances_to_future)
+        if len(sorted_dists) >= 2:
+            regret = sorted_dists[1] - sorted_dists[0]
+        elif len(sorted_dists) == 1:
+            regret = sorted_dists[0]  # only one neighbor
+        else:
+            regret = 0.0
+
+        # Look‑ahead component: the minimum distance to another future node
+        # (smaller is easier to continue → reward by subtracting it)
+        min_next = sorted_dists[0] if sorted_dists else 0.0
+
+        score = (
+            w_sav * savings
+            + w_reg * regret
+            + w_conn * avg_dist
+            + w_direct * direct_cost
+            + w_dest * dest_prox
+            - 0.1 * min_next
+        )
+        scores[node] = score
+
+    # Select the node with the highest composite score
+    return max(scores, key=scores.get)
+```

@@ -1,0 +1,41 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a greedy look-ahead: simulate a nearest‑neighbour tour
+    from the candidate node through the remaining unvisited nodes and back to the destination,
+    then choose the candidate that minimises this simulated total cost."""
+    # Base case: only one node left
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_total = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Initial step: go from current node to candidate
+        simulated_cost = distance_matrix[current_node][candidate]
+
+        # Remaining nodes to visit after candidate
+        remaining = set(unvisited_nodes)
+        remaining.remove(candidate)
+
+        # Simulate a nearest‑neighbour path from the candidate
+        current_sim = candidate
+        while remaining:
+            # Find the nearest unvisited node
+            nearest = min(remaining, key=lambda n: distance_matrix[current_sim, n])
+            simulated_cost += distance_matrix[current_sim, nearest]
+            current_sim = nearest
+            remaining.remove(nearest)
+
+        # Finally, close the tour: go from the last visited node to the destination
+        simulated_cost += distance_matrix[current_sim, destination_node]
+
+        # Keep the best candidate
+        if simulated_cost < best_total:
+            best_total = simulated_cost
+            best_node = candidate
+
+    return best_node
+```

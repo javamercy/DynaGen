@@ -1,0 +1,41 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using a regret-based lookahead heuristic.
+
+    For each candidate unvisited node u, compute the regret of not visiting it now:
+        regret = (cost of visiting u later) - (cost of visiting u now)
+    where:
+        cost_now = distance(current, u) + min_{v != u} distance(u, v)
+        cost_later = min_{w != u} (distance(current, w) + distance(w, u))
+    The node with the highest regret is selected, with ties broken by shorter first step.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_regret = -float('inf')
+    best_first_dist = float('inf')
+
+    for u in unvisited_nodes:
+        remaining = unvisited_nodes - {u}
+        # cost if u is visited now
+        cost_now = distance_matrix[current_node][u] + min(
+            distance_matrix[u][v] for v in remaining
+        )
+        # cost if u is visited later (after some other node w)
+        cost_later = min(
+            distance_matrix[current_node][w] + distance_matrix[w][u]
+            for w in remaining
+        )
+        regret = cost_later - cost_now
+
+        # select node with max regret, tie-breaking by smaller first step distance
+        if (regret > best_regret) or (regret == best_regret and distance_matrix[current_node][u] < best_first_dist):
+            best_regret = regret
+            best_first_dist = distance_matrix[current_node][u]
+            best_node = u
+
+    return best_node
+```

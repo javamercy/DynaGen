@@ -1,0 +1,48 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic combining Clarke-Wright savings, regret (including destination),
+    proximity, and future cost with adaptive weights based on remaining nodes.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n = len(unvisited_nodes)
+    base_saving = distance_matrix[current_node][destination_node]
+    best_score = -np.inf
+    best_node = None
+
+    # Adaptive weights: when many nodes remain, savings dominate;
+    # when few nodes remain, regret and future cost become more important.
+    if n > 10:
+        w_cur, w_sav, w_reg, w_fut = 0.15, 0.55, 0.15, 0.15
+    else:
+        w_cur, w_sav, w_reg, w_fut = 0.20, 0.30, 0.30, 0.20
+
+    for u in unvisited_nodes:
+        d_cur_u = distance_matrix[current_node][u]
+        d_u_dest = distance_matrix[u][destination_node]
+        saving = base_saving - d_cur_u - d_u_dest
+
+        # Collect distances to all other unvisited nodes and to the destination
+        others = [distance_matrix[u][v] for v in unvisited_nodes if v != u]
+        others.append(distance_matrix[u][destination_node])
+        others.sort()
+
+        min1 = others[0]
+        if len(others) > 1:
+            min2 = others[1]
+            regret = min2 - min1
+        else:
+            regret = min1  # only one alternative left
+
+        best_next = min1  # smallest distance from u to any future node
+
+        score = -w_cur * d_cur_u + w_sav * saving + w_reg * regret - w_fut * best_next
+
+        if score > best_score:
+            best_score = score
+            best_node = u
+
+    return best_node
+```

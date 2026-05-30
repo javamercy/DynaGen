@@ -1,0 +1,41 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a look-ahead heuristic.
+    For each candidate node, compute the total estimated tour length if that candidate is chosen next,
+    then continue with a nearest-neighbor heuristic for the remaining unvisited nodes and finally
+    return to the destination. Choose the candidate with the smallest estimated total cost.
+    """
+    best_node = None
+    best_total = float('inf')
+    
+    for candidate in unvisited_nodes:
+        # Cost to move from current to candidate
+        first_step_cost = distance_matrix[current_node][candidate]
+        
+        # Simulate the remainder of the tour using nearest neighbor
+        remaining = set(unvisited_nodes) - {candidate}
+        current_sim = candidate
+        simulated_cost = 0.0
+        
+        # Nearest neighbor for remaining nodes
+        while remaining:
+            # Find nearest unvisited node
+            nearest = min(remaining, key=lambda n: distance_matrix[current_sim][n])
+            simulated_cost += distance_matrix[current_sim][nearest]
+            remaining.remove(nearest)
+            current_sim = nearest
+        
+        # Finally return to destination
+        simulated_cost += distance_matrix[current_sim][destination_node]
+        
+        total_cost = first_step_cost + simulated_cost
+        
+        if total_cost < best_total:
+            best_total = total_cost
+            best_node = candidate
+    
+    return best_node
+```

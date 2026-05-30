@@ -1,0 +1,61 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a regret-based heuristic that combines direct cost
+    and a two-step look-ahead to the destination.
+    
+    For each candidate node, we compute:
+        cost_now = dist(current, candidate) + best_continuation(candidate)
+        cost_later = min_{j != candidate} [ dist(current, j) + dist(j, candidate) + best_continuation(candidate) ]
+        regret = cost_later - cost_now
+    The candidate with the largest regret (most costly to postpone) is chosen.
+    
+    The best_continuation(candidate) estimates the cheapest way to go from the
+    candidate to the destination through the remaining unvisited nodes. It is
+    computed as the minimum of (dist(candidate, next) + dist(next, destination))
+    over all remaining nodes (including the case where only the destination is left).
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    dest_dist = distance_matrix[destination_node]
+    best_node = None
+    best_regret = -float('inf')
+    
+    # Precompute for each node the distance to destination for fast lookup
+    for candidate in unvisited_nodes:
+        remaining = unvisited_nodes - {candidate}
+        
+        # Compute best_continuation from candidate
+        if remaining:
+            best_cont = float('inf')
+            for next_node in remaining:
+                cont_cost = distance_matrix[candidate][next_node] + dest_dist[next_node]
+                if cont_cost < best_cont:
+                    best_cont = cont_cost
+        else:
+            best_cont = dest_dist[candidate]
+        
+        # cost_now if we go to candidate immediately
+        cost_now = distance_matrix[current_node][candidate] + best_cont
+        
+        # cost_later if we postpone candidate and go to some other node j first
+        cost_later = float('inf')
+        for j in remaining:   # other unvisited nodes
+            # cost to go current->j, then j->candidate, then best_cont from candidate
+            total = distance_matrix[current_node][j] + distance_matrix[j][candidate] + best_cont
+            if total < cost_later:
+                cost_later = total
+        
+        # If no other nodes (remaining empty), cost_later is not defined; use cost_now as regret=0
+        if remaining:
+            regret = cost_later - cost_now
+        else:
+            regret = 0.0
+        
+        if regret > best_regret:
+            best_regret = regret
+            best_node = candidate
+    
+    return best_node
+```

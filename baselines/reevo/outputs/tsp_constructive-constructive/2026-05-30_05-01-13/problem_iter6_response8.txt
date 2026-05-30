@@ -1,0 +1,58 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a composite score of multiple distance components, minimizing."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_rem = len(unvisited_nodes)
+    # adaptive weights – can be tuned further
+    w_dcur = 0.4
+    w_ddest = 0.3
+    w_avg = 0.2
+    w_std = 0.1
+    w_sav = -0.1   # negative because we minimise (higher savings → lower score)
+    w_reg = 0.05
+
+    candidates = list(unvisited_nodes)
+    dcur = np.array([distance_matrix[current_node][n] for n in candidates])
+    ddest = np.array([distance_matrix[n][destination_node] for n in candidates])
+
+    # average and std of distances to other unvisited nodes
+    avg = []
+    std = []
+    for n in candidates:
+        others = [o for o in candidates if o != n]
+        if others:
+            dists = [distance_matrix[n][o] for o in others]
+            avg.append(np.mean(dists))
+            std.append(np.std(dists))
+        else:
+            avg.append(0.0)
+            std.append(0.0)
+    avg = np.array(avg)
+    std = np.array(std)
+
+    # insertion cost and savings
+    insertion = dcur + ddest - distance_matrix[current_node][destination_node]
+    savings = -insertion   # larger savings is better
+
+    # regret: penalty for not picking the best insertion
+    best_ins = np.min(insertion)
+    # second best: use the smallest insertion strictly greater than best (if exists)
+    unique_ins = np.unique(insertion)
+    sec_best_ins = unique_ins[1] if len(unique_ins) > 1 else best_ins
+    best_mask = (insertion == best_ins)
+    regret = np.where(best_mask, sec_best_ins - best_ins, insertion - best_ins)
+
+    # composite score (minimise)
+    scores = (w_dcur * dcur +
+              w_ddest * ddest +
+              w_avg * avg +
+              w_std * std +
+              w_sav * savings +
+              w_reg * regret)
+
+    return candidates[int(np.argmin(scores))]
+```

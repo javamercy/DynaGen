@@ -1,0 +1,71 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node to visit using:
+    - Normalized immediate cost
+    - Two-step lookahead (best second step)
+    - Summary statistics (mean, std) of distances to remaining unvisited nodes
+    - Distance to final destination (return path preservation)
+    - Tuned weights balancing immediate, future, and diversification
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Precompute lists of distances for each candidate for later normalization
+    candidates = list(unvisited_nodes)
+    immediate = np.array([distance_matrix[current_node, c] for c in candidates])
+    lookahead = np.empty_like(immediate)
+    mean_dist = np.empty_like(immediate)
+    std_dist = np.empty_like(immediate)
+    dest_dist = np.array([distance_matrix[c, destination_node] for c in candidates])
+
+    unvisited_set = set(unvisited_nodes)
+    for i, c in enumerate(candidates):
+        # Two-step lookahead: best second node from c among remaining unvisited (excluding c)
+        remaining = unvisited_set - {c}
+        if remaining:
+            lookahead[i] = min(distance_matrix[c, j] for j in remaining)
+        else:
+            lookahead[i] = 0.0  # no further nodes, not used
+
+        # Summary statistics of distances from c to other unvisited nodes
+        dists = [distance_matrix[c, j] for j in remaining]
+        if len(dists) > 0:
+            mean_dist[i] = np.mean(dists)
+            std_dist[i] = np.std(dists)
+        else:
+            mean_dist[i] = 0.0
+            std_dist[i] = 0.0
+
+    # Normalize each criterion to [0, 1] across candidates
+    eps = 1e-9
+    def normalize(x):
+        mn, mx = np.min(x), np.max(x)
+        if mx - mn < eps:
+            return np.zeros_like(x)
+        return (x - mn) / (mx - mn)
+
+    imm_norm = normalize(immediate)
+    la_norm = normalize(lookahead)
+    mean_norm = normalize(mean_dist)
+    std_norm = normalize(std_dist)
+    dest_norm = normalize(dest_dist)
+
+    # Weights: tuned for diversification (negative std weight), immediate, lookahead, avg, destination
+    w_imm = 0.35
+    w_la = 0.25
+    w_mean = 0.20
+    w_std = -0.10   # encourage diversification (higher std preferred)
+    w_dest = 0.30   # return path preservation
+
+    scores = (w_imm * imm_norm +
+              w_la * la_norm +
+              w_mean * mean_norm +
+              w_std * std_norm +
+              w_dest * dest_norm)
+
+    best_idx = np.argmin(scores)
+    return candidates[best_idx]
+```

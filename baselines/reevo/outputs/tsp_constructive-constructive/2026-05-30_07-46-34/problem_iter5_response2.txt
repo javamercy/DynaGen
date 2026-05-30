@@ -1,0 +1,72 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using normalized two-step lookahead, regret, and summary statistics."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Precompute components for each candidate
+    nodes = list(unvisited_nodes)
+    imm = np.array([distance_matrix[current_node][n] for n in nodes])
+    dest = np.array([distance_matrix[destination_node][n] for n in nodes])
+    future_avg = np.zeros(len(nodes))
+    future_std = np.zeros(len(nodes))
+    regret = np.zeros(len(nodes))
+    two_step = np.zeros(len(nodes))
+
+    for idx, n in enumerate(nodes):
+        other = [v for v in unvisited_nodes if v != n]
+        if other:
+            dists = distance_matrix[n][other]
+            future_avg[idx] = np.mean(dists)
+            future_std[idx] = np.std(dists)
+            min_dist = np.min(dists)
+            two_step[idx] = imm[idx] + min_dist
+            if len(dists) >= 2:
+                sorted_dists = np.sort(dists)
+                regret[idx] = sorted_dists[1] - sorted_dists[0]
+            else:
+                regret[idx] = 0.0
+        else:
+            future_avg[idx] = 0.0
+            future_std[idx] = 0.0
+            regret[idx] = 0.0
+            two_step[idx] = imm[idx]
+
+    # Normalize each component to [0,1] across candidates
+    eps = 1e-9
+    def normalize(arr):
+        mn = np.min(arr)
+        mx = np.max(arr)
+        if mx - mn < eps:
+            return np.zeros_like(arr)
+        return (arr - mn) / (mx - mn)
+
+    norm_imm = normalize(imm)
+    norm_dest = normalize(dest)
+    norm_future_avg = normalize(future_avg)
+    norm_future_std = normalize(future_std)
+    norm_regret = normalize(regret)
+    norm_two_step = normalize(two_step)
+
+    # Weights (tuned for balance)
+    w_imm = 0.3
+    w_dest = 0.15
+    w_future = 0.2
+    w_std = 0.05
+    w_regret = 0.1
+    w_two_step = 0.2
+
+    # Score: higher is better (costs negative, benefits positive)
+    scores = (
+        - w_imm * norm_imm
+        - w_dest * norm_dest
+        - w_future * norm_future_avg
+        + w_std * norm_future_std
+        + w_regret * norm_regret
+        - w_two_step * norm_two_step
+    )
+    best_idx = np.argmax(scores)
+    return nodes[best_idx]
+```

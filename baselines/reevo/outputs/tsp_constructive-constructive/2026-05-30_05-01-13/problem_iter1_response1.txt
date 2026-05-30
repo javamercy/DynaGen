@@ -1,0 +1,51 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a regret‑based look‑ahead heuristic.
+    For each candidate, computes a score that rewards:
+    - short distance from current node,
+    - a cheap best continuation from that candidate (1‑step look‑ahead),
+    - large regret (penalty for not choosing it now),
+    - proximity to the destination node.
+    The candidate with the highest composite score is selected.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Parameters
+    alpha = 0.5          # weight for look‑ahead distance
+    beta  = 1.0          # weight for regret
+    gamma = 0.2          # weight for distance to destination
+
+    n_unvisited = len(unvisited_nodes)
+    unvisited_list = list(unvisited_nodes)
+
+    # Pre‑compute best next distance from each candidate
+    look_ahead_costs = {}
+    for i in unvisited_list:
+        d_current = distance_matrix[current_node, i]
+        # find the best continuation from i (excluding i itself)
+        others = [j for j in unvisited_list if j != i]
+        if others:
+            best_next = min(distance_matrix[i, j] for j in others)
+        else:
+            best_next = 0.0
+        look_ahead_costs[i] = d_current + alpha * best_next
+
+    # Best overall look‑ahead cost
+    best_cost = min(look_ahead_costs.values())
+
+    # Compute scores
+    scores = {}
+    for i in unvisited_list:
+        d_cur = distance_matrix[current_node, i]
+        d_dest = distance_matrix[i, destination_node]
+        regret = look_ahead_costs[i] - best_cost
+        # Score: higher is better
+        scores[i] = -look_ahead_costs[i] + beta * regret - gamma * d_dest
+
+    # Pick the node with maximum score
+    return max(scores, key=scores.get)
+```

@@ -1,0 +1,10 @@
+Weigh immediate cost, regret, and destination distance; tune weights for performance.
+Prefer exact look-ahead heuristics. Simpler, deterministic designs often beat complex weighted scores.
+Add look-ahead (best future edge) and subtract destination distance to avoid prematurely returning.
+Combine multiple criteria with tuned weights, emphasizing regret and future savings.
+Prioritize high regret from best vs second-best successor; subtract regret and destination distance from score.
+Incorporate two-step lookahead and subtract destination distance for better performance.
+Incorporate lookahead savings and two-step regret; tune weights for future benefits.
+Tune weighted combination of immediate cost, regret, and destination distance for better selection.
+Prioritize two-step regret lookahead and assign higher weight to regret in scoring.
+Define regret as cost of visiting node later via another node, not just immediate alternatives.

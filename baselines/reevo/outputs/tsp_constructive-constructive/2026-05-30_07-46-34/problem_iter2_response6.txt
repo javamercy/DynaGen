@@ -1,0 +1,39 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """Select the next node to visit using simple balanced criteria.
+
+    The heuristic scores each candidate as:
+        score = d(current, candidate) + d(candidate, destination)
+                - min_distance(candidate, other unvisited nodes)
+    The node with the smallest score is chosen.
+    """
+    unvisited = list(unvisited_nodes)
+    if len(unvisited) == 1:
+        return unvisited[0]
+
+    best_score = float("inf")
+    best_node = None
+
+    for node in unvisited:
+        d_cur = distance_matrix[current_node][node]
+        d_dest = distance_matrix[node][destination_node]
+
+        # Distance to the nearest other unvisited node (to keep the path compact)
+        others = [n for n in unvisited if n != node]
+        d_min_other = min(distance_matrix[node][n] for n in others) if others else 0.0
+
+        score = d_cur + d_dest - d_min_other
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

@@ -1,0 +1,110 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node from unvisited_nodes using a composite heuristic
+    with smooth weight adaptation. The score for each candidate u is:
+
+        score(u) = w_sav * savings(u)
+                 + w_reg * regret(u)
+                 + w_look * look_ahead(u)
+                 - w_dir * direct_norm(u)
+                 - w_dest * dest_norm(u)
+
+    where:
+      - savings(u) = d(current, dest) - (d(current, u) + d(u, dest))
+      - regret(u)  = min_{v != u} (d(current, v) + d(v, u) - d(current, u))
+      - look_ahead = average of the two shortest distances from u to other unvisited nodes
+      - direct_norm, dest_norm are min-max normalized distances to current and destination.
+
+    Weights adapt smoothly based on the fraction of remaining nodes:
+      - Early: savings and regret dominate (exploration)
+      - Late: destination proximity becomes more important (exploitation)
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes.")
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    n = len(candidates)
+    total_nodes = distance_matrix.shape[0]
+    progress = 1.0 - n / total_nodes       # 0 at start, 1 near end
+
+    # Precompute direct and destination distances
+    direct = np.array([distance_matrix[current_node, u] for u in candidates])
+    dest   = np.array([distance_matrix[u, destination_node] for u in candidates])
+
+    # Normalize using min‑max (avoid division by zero)
+    d_min, d_max = direct.min(), direct.max()
+    dst_min, dst_max = dest.min(), dest.max()
+    dir_range = d_max - d_min if d_max > d_min else 1.0
+    dst_range = dst_max - dst_min if dst_max > dst_min else 1.0
+    direct_norm = (direct - d_min) / dir_range
+    dest_norm   = (dest - dst_min) / dst_range
+
+    # Smooth weight adaptation
+    w_sav  = 0.6 * (1.0 - progress)        # strong early
+    w_reg  = 0.3 * (1.0 - progress)        # moderate early
+    w_look = 0.2                           # constant base
+    w_dir  = 0.05 + 0.05 * progress        # slight increase
+    w_dest = 0.05 + 0.35 * progress        # strong increase
+
+    # Precompute sub‑matrix for look‑ahead if many candidates
+    if n > 2:
+        sub = distance_matrix[np.ix_(candidates, candidates)]
+    else:
+        sub = None
+
+    scores = np.empty(n)
+    for i, u in enumerate(candidates):
+        cur_d = direct[i]
+        cur_dest = dest[i]
+
+        # 1) Clarke‑Wright savings
+        saving = distance_matrix[current_node, destination_node] - (cur_d + cur_dest)
+
+        # 2) Regret: smallest extra cost if another node is visited before u
+        if n > 1:
+            extra = []
+            for j, v in enumerate(candidates):
+                if v == u:
+                    continue
+                extra.append(distance_matrix[current_node, v] + distance_matrix[v, u] - cur_d)
+            regret = max(0.0, min(extra))
+        else:
+            regret = 0.0
+
+        # 3) Look‑ahead: average distance to two nearest other candidates
+        if n > 2:
+            row = sub[i, :]
+            others = row[row > 0]          # exclude self (distance 0)
+            if len(others) >= 2:
+                nearest = np.partition(others, 1)[:2]  # two smallest
+                look_ahead = nearest.mean()
+            elif len(others) == 1:
+                look_ahead = others[0]
+            else:
+                look_ahead = 0.0
+        elif n == 2:
+            other = [v for v in candidates if v != u][0]
+            look_ahead = distance_matrix[u, other]
+        else:
+            look_ahead = 0.0
+
+        scores[i] = (w_sav * saving +
+                     w_reg * regret +
+                     w_look * look_ahead -
+                     w_dir * direct_norm[i] -
+                     w_dest * dest_norm[i])
+
+    # Node with the highest composite score
+    best_idx = int(np.argmax(scores))
+    return candidates[best_idx]
+```

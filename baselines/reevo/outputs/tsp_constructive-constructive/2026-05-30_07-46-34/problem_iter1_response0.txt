@@ -1,0 +1,83 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: Set[int], distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a one-step look-ahead heuristic.
+    For each candidate node, estimate the total tour cost by simulating a
+    nearest neighbor path from that candidate through the remaining nodes
+    to the destination. Choose the candidate that minimizes this estimate.
+    """
+    best_candidate = None
+    best_estimate = float('inf')
+
+    # Convert set to list for indexing
+    candidates = list(unvisited_nodes)
+    n_candidates = len(candidates)
+
+    for candidate in candidates:
+        # Direct cost from current to candidate
+        direct_cost = distance_matrix[current_node, candidate]
+
+        # Remaining nodes after visiting candidate
+        remaining = [node for node in candidates if node != candidate]
+        # Include destination as final required node
+        nodes_left = remaining + [destination_node]
+
+        # Estimate the cost from candidate to destination covering all remaining nodes
+        estimate_rest = 0.0
+        if nodes_left:
+            # Simple nearest neighbor heuristic starting from candidate
+            current = candidate
+            # Copy list to avoid modification
+            available = nodes_left.copy()
+            while available:
+                # Find nearest node among available (including destination)
+                distances = [distance_matrix[current, next_node] for next_node in available]
+                nearest_index = int(np.argmin(distances))
+                next_node = available.pop(nearest_index)
+                estimate_rest += distances[nearest_index]
+                current = next_node
+                # If we reached destination early, we must still visit all remaining? 
+                # Actually the path must end at destination, so if we hit destination before visiting all,
+                # it's invalid. So we should not allow taking destination early unless all others visited.
+                # To handle correctly, we force destination to be last: we can simply sort nodes_left so that
+                # destination is always last. But simpler: if current == destination_node, then the remaining
+                # nodes are all visited? Actually we assume destination must be last. So we can enforce
+                # that we do not pick destination until it's the only node left.
+                # Let's redo: we want a tour that ends at destination after visiting all remaining.
+                # So we should process all remaining first, then go to destination.
+                # Simpler: compute MST lower bound? But let's just do a quick nearest neighbor that
+                # always leaves destination as last.
+                # We'll implement a separate loop: first visit all remaining (excluding destination),
+                # then go to destination.
+                # Actually the above loop may pick destination early, giving an overly optimistic estimate.
+                # Let's adjust: we will first visit all nodes in 'remaining' (non-destination) using nearest neighbor,
+                # then finally go to destination.
+        # Reset estimate_rest and compute correctly:
+        estimate_rest = 0.0
+        current = candidate
+        # Nodes that are not destination
+        non_dest = [node for node in remaining]  # remaining already excludes candidate, but may include dest? No, nodes_left included dest separately.
+        # Actually nodes_left = remaining + [destination_node]. So remaining does not include dest.
+        # We'll process all non-destination nodes first, then dest.
+        # Use nearest neighbor to visit all non-dest nodes
+        non_dest_copy = non_dest.copy()
+        while non_dest_copy:
+            distances = [distance_matrix[current, nn] for nn in non_dest_copy]
+            nn_index = int(np.argmin(distances))
+            next_node = non_dest_copy.pop(nn_index)
+            estimate_rest += distances[nn_index]
+            current = next_node
+        # Finally, go to destination
+        estimate_rest += distance_matrix[current, destination_node]
+
+        total_estimate = direct_cost + estimate_rest
+
+        if total_estimate < best_estimate:
+            best_estimate = total_estimate
+            best_candidate = candidate
+
+    return best_candidate
+```

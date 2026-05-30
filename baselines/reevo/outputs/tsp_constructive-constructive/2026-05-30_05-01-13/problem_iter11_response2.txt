@@ -1,0 +1,88 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """Select the next node to visit using adaptive, normalized multi‑component scores."""
+    unvisited = list(unvisited_nodes)
+    n_rem = len(unvisited)
+    if n_rem == 1:
+        return unvisited[0]
+
+    # Precompute values for all candidates
+    savings = []
+    connectivity = []
+    regret = []
+    future_cost = []
+
+    for node in unvisited:
+        d_cur = distance_matrix[current_node][node]
+        d_dest = distance_matrix[node][destination_node]
+
+        # Savings of inserting node between current and destination
+        saving = distance_matrix[current_node][destination_node] - (d_cur + d_dest)
+        savings.append(saving)
+
+        # Connectivity: negative average distance to other unvisited nodes
+        dist_to_others = [distance_matrix[node][oth] for oth in unvisited if oth != node]
+        avg_dist = np.mean(dist_to_others) if dist_to_others else 0.0
+        connectivity.append(-avg_dist)
+
+        # Regret: how much cheaper (or more expensive) it is to insert *now* vs.
+        # the best alternative insertion after another unvisited node.
+        cost_now = d_cur + d_dest
+        alt_costs = []
+        for j in unvisited:
+            if j == node:
+                continue
+            alt = distance_matrix[current_node][j] + distance_matrix[j][node] + d_dest
+            alt_costs.append(alt)
+        if alt_costs:
+            min_alt = min(alt_costs)
+            regret_val = cost_now - min_alt   # negative → now is cheaper
+        else:
+            regret_val = 0.0
+        regret.append(-regret_val)           # higher is better
+
+        # Look‑ahead: one‑step greedy cost from node to destination via nearest other
+        remaining = [n for n in unvisited if n != node]
+        if remaining:
+            nearest = min(remaining, key=lambda n: distance_matrix[node][n])
+            future = distance_matrix[node][nearest] + distance_matrix[nearest][destination_node]
+        else:
+            future = d_dest
+        future_cost.append(-future)          # higher is better (smaller future cost)
+
+    # Z‑score normalization for each component
+    components = {
+        'savings': np.array(savings),
+        'connectivity': np.array(connectivity),
+        'regret': np.array(regret),
+        'future': np.array(future_cost),
+    }
+    normalized = {}
+    for name, vec in components.items():
+        mean = vec.mean()
+        std = vec.std()
+        if std == 0:
+            normalized[name] = np.zeros_like(vec)
+        else:
+            normalized[name] = (vec - mean) / std
+
+    # Adaptive weights – shift from exploration (large n_rem) to exploitation (small n_rem)
+    alpha = min(1.0, n_rem / 20.0)  # tunable slope
+    exploration_weights = {'savings': 0.1, 'connectivity': 0.3, 'regret': 0.4, 'future': 0.2}
+    exploitation_weights = {'savings': 0.4, 'connectivity': 0.1, 'regret': 0.1, 'future': 0.4}
+    w = {}
+    for name in exploration_weights:
+        w[name] = alpha * exploration_weights[name] + (1 - alpha) * exploitation_weights[name]
+
+    # Final score (higher is better)
+    score = sum(w[name] * normalized[name] for name in w)
+    best_idx = int(np.argmax(score))
+    return unvisited[best_idx]
+```

@@ -1,0 +1,40 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using regret-based look-ahead and weighted multi-criteria scoring."""
+    # weights for: immediate cost, future cost, regret, destination proximity
+    c1, c2, c3, c4 = 0.30, 0.20, 0.35, 0.15
+
+    unvisited_list = list(unvisited_nodes)
+    scores = {}
+    for node in unvisited_list:
+        # Distances from node to all other unvisited nodes (excluding itself)
+        others = [n for n in unvisited_list if n != node]
+        neighbors = []
+        if others:
+            neighbors = [distance_matrix[node][n] for n in others]
+        else:
+            # only one node left, no "other" unvisited nodes
+            neighbors = [0]  # placeholder, regret will be 0
+
+        best = np.min(neighbors)
+        # second best: handle case where only one neighbor
+        if len(neighbors) > 1:
+            second_best = np.partition(neighbors, 1)[1]
+        else:
+            second_best = best
+        regret = second_best - best
+        avg_future = np.mean(neighbors)
+
+        immediate = distance_matrix[current_node][node]
+        dest_dist = distance_matrix[destination_node][node]
+
+        # Score: we want to minimize immediate, future, and dest_dist, but maximize regret
+        # So subtract regret contributes lower score if regret is large
+        score = c1 * immediate + c2 * avg_future - c3 * regret + c4 * dest_dist
+        scores[node] = score
+
+    # Return node with minimum score
+    return min(scores, key=scores.get)
+```

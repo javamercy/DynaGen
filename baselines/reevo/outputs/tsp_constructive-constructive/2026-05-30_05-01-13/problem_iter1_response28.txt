@@ -1,0 +1,46 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using a regret-based look-ahead heuristic."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    best_node = None
+    best_regret = -np.inf
+    
+    for v in unvisited_nodes:
+        # Cost of going from current to v
+        cost_v = distance_matrix[current_node][v]
+        
+        # Best next step after v (includes destination as a possible step)
+        best_next_v = np.inf
+        # Among unvisited except v
+        for w in unvisited_nodes:
+            if w != v:
+                best_next_v = min(best_next_v, distance_matrix[v][w])
+        # Also consider going directly to destination
+        best_next_v = min(best_next_v, distance_matrix[v][destination_node])
+        
+        total_if_chosen = cost_v + best_next_v
+        
+        # Best alternative: choose some other node w now, then v next
+        best_alternative = np.inf
+        for w in unvisited_nodes:
+            if w != v:
+                cost_alt = distance_matrix[current_node][w] + distance_matrix[w][v]
+                best_alternative = min(best_alternative, cost_alt)
+            # Note: we do not consider destination as first alt because v must still be visited later
+            # (destination is not in unvisited, but we could go destination first? That would skip v, so invalid)
+        
+        # If no alternative exists (should not happen because len>1)
+        if best_alternative == np.inf:
+            continue
+        
+        regret = total_if_chosen - best_alternative
+        if regret > best_regret:
+            best_regret = regret
+            best_node = v
+    
+    return best_node
+```

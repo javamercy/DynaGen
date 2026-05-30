@@ -1,0 +1,65 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit using adaptive two-step lookahead, regret, and destination heuristics."""
+    n = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+    if remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    # Extract candidate values
+    candidates = list(unvisited_nodes)
+    d_cur_vals = []
+    two_step_vals = []
+    regret_vals = []
+    d_dest_vals = []
+
+    for u in candidates:
+        d_cur = distance_matrix[current_node][u]
+        d_dest = distance_matrix[u][destination_node]
+        # Distances from u to other unvisited nodes
+        other_dists = [distance_matrix[u][v] for v in unvisited_nodes if v != u]
+        if other_dists:
+            min_next = min(other_dists)
+            sorted_other = sorted(other_dists)
+            regret = sorted_other[1] - sorted_other[0] if len(sorted_other) >= 2 else 0
+        else:
+            min_next = 0
+            regret = 0
+        two_step = d_cur + min_next
+
+        d_cur_vals.append(d_cur)
+        two_step_vals.append(two_step)
+        regret_vals.append(regret)
+        d_dest_vals.append(d_dest)
+
+    # Normalize each set of values to [0,1]
+    def normalize(vals):
+        arr = np.array(vals, dtype=float)
+        mn, mx = np.min(arr), np.max(arr)
+        if mx - mn < 1e-12:
+            return np.zeros_like(arr)
+        return (arr - mn) / (mx - mn)
+
+    d_cur_norm = normalize(d_cur_vals)
+    two_step_norm = normalize(two_step_vals)
+    regret_norm = normalize(regret_vals)
+    d_dest_norm = normalize(d_dest_vals)
+
+    # Adaptive weights based on fraction of remaining nodes
+    alpha = remaining / n  # early -> alpha high, late -> alpha low
+    w_lookahead = 0.5 * alpha
+    w_regret = 0.2 + 0.3 * (1 - alpha)
+    w_dest = 0.1 + 0.2 * (1 - alpha)
+    w_immediate = 0.2  # constant
+
+    # Score: minimize immediate, two-step, and destination; maximize regret -> subtract it
+    scores = (w_immediate * d_cur_norm +
+              w_lookahead * two_step_norm -
+              w_regret * regret_norm +
+              w_dest * d_dest_norm)
+
+    best_idx = int(np.argmin(scores))
+    return candidates[best_idx]
+```

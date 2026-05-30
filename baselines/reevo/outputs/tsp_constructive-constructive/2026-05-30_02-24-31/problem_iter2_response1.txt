@@ -1,0 +1,48 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: Set[int], distance_matrix: np.ndarray) -> int:
+    """
+    Improved version: dynamically weights immediate distance, regret, and closing distance
+    based on the number of remaining unvisited nodes.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_remaining = len(unvisited_nodes)
+    # Dynamic weights: regret is more important when many nodes remain,
+    # closing distance becomes critical when few nodes are left.
+    beta = min(0.6, 0.1 + 0.5 * (n_remaining / 10.0))    # regret weight
+    gamma = max(0.1, 0.4 - 0.03 * n_remaining)            # destination weight
+    alpha = 1.0 - beta - gamma                             # immediate distance weight
+    alpha = max(alpha, 0.0)                                # ensure non-negative
+
+    best_node = None
+    best_score = float('inf')
+
+    for candidate in unvisited_nodes:
+        immediate = distance_matrix[current_node][candidate]
+        remaining = unvisited_nodes - {candidate}
+        if remaining:
+            # distances from candidate to all other unvisited nodes
+            dists = [distance_matrix[candidate][n] for n in remaining]
+            dists.sort()
+            best_future = dists[0]
+            second_best = dists[1] if len(dists) > 1 else best_future
+            regret = second_best - best_future
+        else:
+            # only candidate left, must go to destination
+            regret = 0.0
+
+        to_dest = distance_matrix[candidate][destination_node]
+
+        # Score: lower is better
+        score = alpha * immediate - beta * regret + gamma * to_dest
+        # Tie-breaking by node index (stable)
+        if score < best_score or (score == best_score and candidate < best_node):
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

@@ -1,0 +1,47 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Mutated version: combines immediate cost, regret, destination distance,
+    and a lookahead savings term (cheapness of continuing from candidate).
+    Weights are adjusted to emphasize regret and future savings.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)  # deterministic order
+    # Tuned weights: higher regret emphasis, plus lookahead savings
+    w1, w2, w3, w4 = 0.25, 0.35, 0.25, 0.15
+
+    scores = {}
+    for i in unvisited:
+        immediate = distance_matrix[current_node, i]
+
+        # Regret (second-best minus best) via two-step lookahead (skip i then go to i)
+        best_alternative = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_alternative:
+                best_alternative = cost
+        regret = best_alternative - immediate if best_alternative != float('inf') else 0.0
+
+        # Destination distance
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Lookahead savings: best next step from i (excluding current) minus best next from current
+        best_next_from_i = min(distance_matrix[i, j] for j in unvisited if j != i)
+        best_next_from_current = min(distance_matrix[current_node, j] for j in unvisited)
+        lookahead_savings = best_next_from_current - best_next_from_i
+
+        # Combined score (lower is better): subtract regret and lookahead savings to prioritize high regret and cheap continuations
+        score = w1 * immediate - w2 * regret - w3 * dest_dist - w4 * lookahead_savings
+        scores[i] = score
+
+    # Deterministic tie-breaking
+    min_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == min_score]
+    return min(candidates)
+```

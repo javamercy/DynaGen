@@ -1,0 +1,101 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node to visit using a composite heuristic that combines
+    multiple distance statistics with adaptive weights.
+
+    The score is designed to be minimised and includes:
+    - Distance to current node (dcur)
+    - Distance to destination node (ddest)
+    - Average distance to all other unvisited nodes (avg_others)
+    - Standard deviation of distances to other unvisited nodes (std_others)
+    - Clarke-Wright savings (saving): dist(current, dest) - dist(current, u) - dist(u, dest)
+    - Regret (regret): difference between the two smallest insertion costs
+      (insertion cost = dcur + ddest - dist(current, dest))
+    - Proximity factor (prox): negative of dcur (so min means larger proximity)
+
+    Weights are adapted based on the number of remaining unvisited nodes:
+    - early: higher weight on savings and proximity
+    - late: higher weight on regret and average distance to avoid isolating nodes
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_rem = len(unvisited_nodes)
+    # Adaptive weights: linear transition
+    alpha = n_rem / max(len(unvisited_nodes), 1)  # decreases as n_rem decreases
+    w_cur   = 0.4 * alpha + 0.2 * (1 - alpha)
+    w_dest  = 0.3 * alpha + 0.2 * (1 - alpha)
+    w_avg   = 0.1 * alpha + 0.3 * (1 - alpha)
+    w_std   = 0.05
+    w_sav   = 0.2 * alpha + 0.10 * (1 - alpha)
+    w_reg   = 0.05 * alpha + 0.20 * (1 - alpha)
+    w_prox  = 0.05
+
+    candidates = list(unvisited_nodes)
+    n_cand = len(candidates)
+    dcur = np.array([distance_matrix[current_node][n] for n in candidates])
+    ddest = np.array([distance_matrix[n][destination_node] for n in candidates])
+
+    # Distances to other unvisited nodes (excluding self)
+    avg_others = np.zeros(n_cand)
+    std_others = np.zeros(n_cand)
+    for idx, n in enumerate(candidates):
+        others = [o for o in candidates if o != n]
+        if others:
+            dists = [distance_matrix[n][o] for o in others]
+            avg_others[idx] = np.mean(dists)
+            std_others[idx] = np.std(dists)
+
+    # Insertion cost and Clarke‑Wright savings
+    base = distance_matrix[current_node][destination_node]
+    insertion = dcur + ddest - base
+    savings = -insertion   # larger savings is better, so additive with negative weight
+
+    # Regret: second‑best insertion minus best insertion
+    best_ins = np.min(insertion)
+    # To get second best, we can use nsmallest approach
+    sorted_ins = np.sort(insertion)
+    sec_best_ins = sorted_ins[1] if n_cand > 1 else best_ins
+    regret = np.where(insertion == best_ins, sec_best_ins - best_ins, insertion - best_ins)
+    # For the node that is best, regret is the gap to second best; for others, it's the gap to best
+    # Larger regret indicates that not picking this node now would be costly.
+
+    # Proximity: negative of dcur (minimise score -> prefer close nodes)
+    proximity = -dcur
+
+    # Normalise all components to [0,1] to avoid scale domination
+    max_d = np.max(distance_matrix) if np.max(distance_matrix) > 0 else 1.0
+    # Use max of each component for normalisation (approximate)
+    norm_cur   = dcur / max_d
+    norm_dest  = ddest / max_d
+    norm_avg   = avg_others / max_d if np.max(avg_others) > 0 else avg_others
+    norm_std   = std_others / (max_d / 2) if np.max(std_others) > 0 else std_others
+    # savings is not necessarily bounded; we use insertion range for normalisation
+    ins_range = np.max(insertion) - np.min(insertion) if np.max(insertion) != np.min(insertion) else 1.0
+    norm_sav   = (savings - np.min(savings)) / ins_range  # now [0,1], 1 = best saving
+    # regret normalisation similarly
+    reg_range = np.max(regret) - np.min(regret) if np.max(regret) != np.min(regret) else 1.0
+    norm_reg   = regret / reg_range if reg_range > 0 else regret
+    # proximity (already negative); normalise by max of absolute value
+    prox_range = np.max(np.abs(proximity)) if np.max(np.abs(proximity)) > 0 else 1.0
+    norm_prox  = proximity / prox_range
+
+    # Composite score (minimise)
+    score = (w_cur * norm_cur +
+             w_dest * norm_dest +
+             w_avg * norm_avg +
+             w_std * norm_std +
+             w_sav * (1 - norm_sav) +    # because savings are better when larger, we want small score for large savings -> 1-norm_sav
+             w_reg * norm_reg +
+             w_prox * norm_prox)
+
+    return candidates[int(np.argmin(score))]
+```

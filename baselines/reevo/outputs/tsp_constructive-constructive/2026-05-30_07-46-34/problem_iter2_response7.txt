@@ -1,0 +1,30 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a 2-step look-ahead heuristic with adjusted weights.
+    The score penalizes distance from the candidate to the destination (to prefer nodes
+    that keep a good return path) while also considering immediate cost and best next step.
+    """
+    best_node = None
+    best_score = float('inf')
+    
+    for candidate in unvisited_nodes:
+        immediate = distance_matrix[current_node, candidate]
+        remaining = unvisited_nodes - {candidate}
+        
+        if remaining:
+            # Best distance from candidate to any other unvisited node
+            next_min = min(distance_matrix[candidate, j] for j in remaining)
+            dest_dist = distance_matrix[candidate, destination_node]
+            # Weights: immediate (1.0), look-ahead (0.6), destination penalty (0.4, positive penalty)
+            score = immediate + 0.6 * next_min + 0.4 * dest_dist
+        else:
+            # Last node: must go directly to destination
+            score = immediate + distance_matrix[candidate, destination_node]
+        
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+    
+    return best_node
+```

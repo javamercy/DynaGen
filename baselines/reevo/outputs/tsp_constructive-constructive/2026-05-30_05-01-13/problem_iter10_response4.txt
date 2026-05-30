@@ -1,0 +1,87 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Improved heuristic for TSP next-node selection.
+    Combines:
+      - path quality (distance to candidate + one-step lookahead)
+      - Clarke‑Wright savings (current–destination saving)
+      - regret (opportunity cost of not choosing a candidate)
+    Uses z‑score normalization and an adaptive weight that shifts
+    from path quality (few nodes left) to savings+regret (many nodes left).
+    """
+    # Ensure we don't accidentally consider the current node
+    unvisited = unvisited_nodes - {current_node}
+    if len(unvisited) == 0:
+        return current_node
+    if len(unvisited) == 1:
+        return next(iter(unvisited))
+
+    candidates = list(unvisited)
+    n = len(candidates)
+    # Number of nodes in the complete problem (used for weight normalisation)
+    total_nodes = distance_matrix.shape[0]
+
+    # ----- distances -------------------------------------------------
+    dist_curr = np.array([distance_matrix[current_node][c] for c in candidates])
+    dist_dest = np.array([distance_matrix[c][destination_node] for c in candidates])
+    curr_dest = distance_matrix[current_node][destination_node]
+
+    # ----- Clarke‑Wright saving (higher is better) -------------------
+    saving = curr_dest - dist_curr - dist_dest
+
+    # ----- insertion cost for regret ---------------------------------
+    insert_cost = dist_curr + dist_dest
+
+    # ----- regret: difference between best and second‑best insertion cost
+    #            (larger regret → candidate is clearly superior)
+    sorted_idx = np.argsort(insert_cost)
+    min_cost = insert_cost[sorted_idx[0]]
+    second_min_cost = insert_cost[sorted_idx[1]]
+
+    regret = np.empty(n)
+    for i in range(n):
+        if i == sorted_idx[0]:
+            best_other = second_min_cost
+        else:
+            best_other = min_cost
+        regret[i] = best_other - insert_cost[i]   # positive if candidate is best
+
+    # ----- path quality: distance + one-step lookahead (lower is better)
+    lookahead = np.empty(n)
+    for i, c in enumerate(candidates):
+        others = [distance_matrix[c][o] for o in candidates if o != c]
+        lookahead[i] = min(others) if others else np.inf
+    path_quality = dist_curr + lookahead
+
+    # ----- z‑score normalisation (robust to constant arrays) --------
+    def z_score(arr):
+        mu = np.mean(arr)
+        sigma = np.std(arr)
+        if sigma == 0:
+            return np.zeros_like(arr)
+        return (arr - mu) / sigma
+
+    z_saving = z_score(saving)          # larger -> better
+    z_regret = z_score(regret)          # larger -> better
+    z_path   = z_score(path_quality)    # smaller -> better (negative preferred)
+
+    # ----- adaptive weight -------------------------------------------
+    # w ∈ (0.2, 0.95) roughly for n ≥ 2; larger w -> more emphasis on
+    # savings & regret (exploration), smaller -> path quality (exploitation)
+    w = n / (n + 15)
+
+    # ----- combined score (minimise) ----------------------------------
+    # path quality: we want low z_path -> add (1-w)*z_path (negative good)
+    # savings & regret: we want high z -> subtract w*(z_saving + z_regret)
+    score = (1 - w) * z_path - w * (z_saving + z_regret)
+
+    best_idx = int(np.argmin(score))
+    return candidates[best_idx]
+```

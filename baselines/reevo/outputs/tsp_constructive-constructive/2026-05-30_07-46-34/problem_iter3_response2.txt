@@ -1,0 +1,47 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    # If only one node remains, return it immediately
+    if len(unvisited_nodes) == 1:
+        return list(unvisited_nodes)[0]
+
+    # Weights for multi-criteria scoring
+    w_immediate = 0.3   # cost to go to candidate now
+    w_future    = 0.25  # average distance from candidate to remaining unvisited nodes
+    w_dest      = 0.2   # distance from candidate to final destination
+    w_regret    = 0.25  # regret (difference between second best and best distance to others)
+
+    best_node = None
+    best_score = float('inf')
+
+    for node in unvisited_nodes:
+        # Immediate cost
+        immediate = distance_matrix[current_node][node]
+
+        # Future cost and regret based on distances to other unvisited nodes
+        others = [o for o in unvisited_nodes if o != node]
+        if others:
+            dists_to_others = [distance_matrix[node][o] for o in others]
+            future = np.mean(dists_to_others)
+            dists_sorted = sorted(dists_to_others)
+            best = dists_sorted[0]
+            second_best = dists_sorted[1] if len(dists_sorted) > 1 else best
+            regret = second_best - best
+        else:
+            future = 0.0
+            regret = 0.0
+
+        # Destination cost
+        dest = distance_matrix[node][destination_node]
+
+        # Total score: minimize immediate, future, dest; maximize regret
+        score = (w_immediate * immediate +
+                 w_future * future +
+                 w_dest * dest -
+                 w_regret * regret)
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

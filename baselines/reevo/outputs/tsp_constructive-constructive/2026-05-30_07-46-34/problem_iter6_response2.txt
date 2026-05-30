@@ -1,0 +1,101 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using adaptive multi‑criteria scoring with dynamic weights
+    that vary continuously based on the fraction of remaining nodes.
+
+    The score for each candidate is a weighted sum of:
+      - immediate distance from current node (penalty)
+      - average distance to all other unvisited nodes (penalty)
+      - standard deviation of those distances (penalty)
+      - regret (benefit = high regret means urgent selection)
+      - distance to the destination node (penalty)
+
+    Weights are adjusted as a function of alpha = len(unvisited) / total_nodes:
+      - exploration phase (high alpha): emphasize immediate cost, future connectivity, regret
+      - exploitation phase (low alpha): emphasize reaching the destination
+
+    Parameters
+    ----------
+    current_node : int
+        Index of the current node.
+    destination_node : int
+        Index of the final destination (starting node in TSP).
+    unvisited_nodes : set
+        Set of unvisited node indices.
+    distance_matrix : np.ndarray
+        Square matrix of pairwise distances.
+
+    Returns
+    -------
+    int
+        Index of the next node to visit.
+    """
+    unvisited = list(unvisited_nodes)
+    n_unvisited = len(unvisited)
+    if n_unvisited == 0:
+        return destination_node
+    if n_unvisited == 1:
+        return unvisited[0]
+
+    total_nodes = distance_matrix.shape[0]
+    alpha = n_unvisited / total_nodes  # fraction of remaining nodes
+
+    # Dynamic weight adjustments (base values tuned for balance)
+    base_w_imm = 0.35
+    base_w_fut = 0.25
+    base_w_reg = 0.20
+    base_w_std = 0.10
+    base_w_dest = 0.10
+
+    # Weights vary linearly with alpha
+    w_imm = base_w_imm * (0.5 + 0.5 * alpha)          # higher when many nodes remain
+    w_fut = base_w_fut * (0.5 + 0.5 * alpha)          # higher when many nodes remain
+    w_reg = base_w_reg * (0.5 + 0.5 * alpha)          # higher when many nodes remain
+    w_std = base_w_std                                 # constant
+    w_dest = base_w_dest * (1.0 - 0.5 * alpha)        # higher when few nodes remain
+
+    # Normalize distances to [0,1] using the global maximum
+    max_dist = np.max(distance_matrix)
+    if max_dist == 0:
+        max_dist = 1.0  # prevent division by zero
+
+    # Precompute destination distances for all candidates
+    dest_dists = distance_matrix[unvisited, destination_node] / max_dist
+
+    scores = {}
+    for i, node in enumerate(unvisited):
+        d_curr = distance_matrix[current_node, node] / max_dist
+
+        # Distances from candidate to other unvisited nodes
+        other_indices = [j for j in range(n_unvisited) if j != i]
+        if other_indices:
+            other_dists = distance_matrix[node, [unvisited[j] for j in other_indices]] / max_dist
+            avg_fut = np.mean(other_dists)
+            std_fut = np.std(other_dists) if len(other_dists) > 1 else 0.0
+            # Future regret: second smallest - smallest (urgency to take this candidate now)
+            sorted_dists = np.sort(other_dists)
+            best = sorted_dists[0]
+            second_best = sorted_dists[1] if len(sorted_dists) >= 2 else best
+            regret_fut = second_best - best
+        else:
+            avg_fut = 0.0
+            std_fut = 0.0
+            regret_fut = 0.0
+
+        d_dest = dest_dists[i]
+
+        # Composite score (minimization)
+        score = (w_imm * d_curr
+                 + w_fut * avg_fut
+                 + w_std * std_fut
+                 - w_reg * regret_fut      # high regret reduces score (better)
+                 + w_dest * d_dest)
+
+        scores[node] = score
+
+    return min(scores, key=scores.get)
+```

@@ -1,0 +1,37 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit using a depth-2 look-ahead heuristic."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_score = float('inf')
+    best_dest_dist = None  # tiebreaker
+
+    for candidate in unvisited_nodes:
+        # Immediate cost to move to candidate
+        cost1 = distance_matrix[current_node][candidate]
+
+        # Look ahead: estimate the best next step from candidate
+        remaining = unvisited_nodes - {candidate}
+        if remaining:
+            best_next = min(distance_matrix[candidate][n] for n in remaining)
+        else:
+            # After candidate, only the destination remains
+            best_next = distance_matrix[candidate][destination_node]
+
+        # Primary score: two-step total distance
+        score = cost1 + best_next
+
+        # Tiebreaker: prefer nodes closer to the final destination (optional)
+        dest_dist = distance_matrix[candidate][destination_node]
+
+        if score < best_score or (score == best_score and (best_dest_dist is None or dest_dist < best_dest_dist)):
+            best_score = score
+            best_node = candidate
+            best_dest_dist = dest_dist
+
+    return best_node
+```

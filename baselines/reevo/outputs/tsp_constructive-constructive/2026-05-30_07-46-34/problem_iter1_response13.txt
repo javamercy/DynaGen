@@ -1,0 +1,38 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using a 2-step lookahead with destination penalty."""
+    # Convert set to list for indexing and avoid modification
+    unvisited = list(unvisited_nodes)
+    if len(unvisited) == 1:
+        return unvisited[0]
+    
+    best_score = float('inf')
+    best_node = None
+    
+    for candidate in unvisited:
+        # Step 1: cost to reach candidate
+        d1 = distance_matrix[current_node, candidate]
+        
+        # Step 2: look ahead to the best next node after candidate
+        others = [j for j in unvisited if j != candidate]
+        if others:
+            # Minimum distance from candidate to any other unvisited node
+            d2 = min(distance_matrix[candidate, j] for j in others)
+        else:
+            # No other nodes left -> next step must go to destination
+            d2 = distance_matrix[candidate, destination_node]
+        
+        # Penalty: distance from candidate to final destination
+        d3 = distance_matrix[candidate, destination_node]
+        
+        # Composite score (lower is better)
+        score = d1 + d2 + 0.5 * d3
+        
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+    
+    return best_node
+```

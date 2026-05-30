@@ -1,0 +1,72 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node using two-step lookahead, regret, and adaptive weights."""
+    if not unvisited_nodes:
+        return current_node
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    num_unvisited = len(candidates)
+
+    # Components for each candidate
+    immediate_costs = []
+    dest_costs = []
+    two_step_costs = []
+    regrets = []
+
+    for node in candidates:
+        imm = distance_matrix[current_node, node]
+        immediate_costs.append(imm)
+
+        dest = distance_matrix[node, destination_node]
+        dest_costs.append(dest)
+
+        # Remaining nodes after visiting node
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            dists_from_node = [distance_matrix[node, j] for j in remaining]
+            min_dist = min(dists_from_node)
+            two_step_costs.append(imm + min_dist)  # cost of next two edges
+
+            # Regret: difference between second best and best future cost
+            if len(dists_from_node) >= 2:
+                sorted_dists = sorted(dists_from_node)
+                regret = sorted_dists[1] - sorted_dists[0]
+            else:
+                regret = 0.0
+            regrets.append(regret)
+        else:
+            two_step_costs.append(imm + 0.0)
+            regrets.append(0.0)
+
+    # Adaptive weights based on remaining count
+    if num_unvisited > 10:
+        # Early phase: emphasize look-ahead and regret
+        w_imm, w_dest, w_two, w_reg = 0.2, 0.2, 0.4, 0.2
+    else:
+        # Later phase: emphasize immediate and destination
+        w_imm, w_dest, w_two, w_reg = 0.4, 0.3, 0.2, 0.1
+
+    # Normalize each component per candidate list
+    def normalize(vals):
+        vals_arr = np.array(vals, dtype=float)
+        vmin, vmax = vals_arr.min(), vals_arr.max()
+        if vmax == vmin:
+            return np.zeros_like(vals_arr)
+        return (vals_arr - vmin) / (vmax - vmin)
+
+    n_imm = normalize(immediate_costs)
+    n_dest = normalize(dest_costs)
+    n_two = normalize(two_step_costs)
+    n_reg = normalize(regrets)
+
+    # Combined score (lower is better)
+    # For regret, high -> good, so we use (1 - n_reg) to penalize low regret
+    scores = w_imm * n_imm + w_dest * n_dest + w_two * n_two + w_reg * (1.0 - n_reg)
+
+    best_idx = int(np.argmin(scores))
+    return candidates[best_idx]
+```

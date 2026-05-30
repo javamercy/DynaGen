@@ -1,0 +1,62 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using an adaptive regret heuristic.
+    
+    For each candidate u in unvisited_nodes, compute:
+        - direct cost from current_node to u: d_cur_u
+        - best and second-best distances from u to any other unvisited node 
+          (including a virtual return to destination_node if it is not already in the set)
+        - regret = second_best - best   (opportunity cost of not taking the best edge now)
+        
+    Score = d_cur_u - alpha * regret,
+    where alpha is dynamically adjusted based on the number of remaining nodes:
+        alpha = 0.3 * (1 + (n_remaining - 1) / (n_total - 1))   (inverse of remaining ratio)
+    This gives higher importance to urgency when few nodes remain.
+    
+    The candidate with the smallest score is returned.
+    If only one node remains, it is returned immediately.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_remaining = len(unvisited_nodes)
+    # Estimate the total number of nodes (including destination) from the distance matrix
+    n_total = distance_matrix.shape[0] if distance_matrix.ndim == 2 else len(unvisited_nodes) + 2
+    # Adaptive alpha: increases as fewer nodes remain
+    alpha = 0.3 * (1 + (n_remaining - 1) / max(1, n_total - 1))
+
+    best_score = float('inf')
+    best_node = None
+
+    for u in unvisited_nodes:
+        d_cur_u = distance_matrix[current_node][u]
+
+        # Build list of distances from u to other nodes (including destination)
+        other_nodes = [v for v in unvisited_nodes if v != u]
+        if not other_nodes:
+            # u is the last unvisited node; only the return to destination matters
+            best = distance_matrix[u][destination_node]
+            second_best = best
+        else:
+            dist_list = [distance_matrix[u][v] for v in other_nodes]
+            # Add the return to destination as a virtual node
+            dist_list.append(distance_matrix[u][destination_node])
+            dist_list.sort()
+            best = dist_list[0]
+            second_best = dist_list[1] if len(dist_list) > 1 else best
+
+        regret = second_best - best
+        score = d_cur_u - alpha * regret
+
+        # Tie-breaking: prefer nodes with smaller regret if scores are very close
+        if score < best_score - 1e-9 or (abs(score - best_score) < 1e-9 and regret > (second_best_u if 'second_best_u' in locals() else 0)):
+            best_score = score
+            best_node = u
+            # Store regret for tie-breaking
+            best_regret = regret
+
+    return best_node
+```

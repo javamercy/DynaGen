@@ -1,0 +1,97 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """Improved heuristic combining savings, regret, connectivity, and look‑ahead."""
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes to select from.")
+
+    candidates = np.array(list(unvisited_nodes))
+    n = len(candidates)
+    if n == 1:
+        return candidates[0]
+
+    # ---- Base distances ----
+    direct = distance_matrix[current_node, candidates]  # dist(current, u)
+    dest = distance_matrix[candidates, destination_node]  # dist(u, destination)
+    savings = distance_matrix[current_node, destination_node] - (direct + dest)
+
+    # ---- Full matrix and derived metrics ----
+    D = distance_matrix[np.ix_(candidates, candidates)]  # D[i,j] = dist(candidate_i, candidate_j)
+
+    # Connectivity: average distance to other candidates (lower is better -> central)
+    sum_d = D.sum(axis=1) - np.diag(D)                  # sum over j != i
+    mean_conn = sum_d / (n - 1)
+
+    # Connectivity variance (higher is better -> diverse connections)
+    sum_sq_d = (D ** 2).sum(axis=1) - np.diag(D) ** 2
+    var_conn = np.maximum(sum_sq_d / (n - 1) - mean_conn ** 2, 0.0)
+    std_conn = np.sqrt(var_conn)
+
+    # Look‑ahead: minimum distance to any other unvisited node (smaller better)
+    min_next = np.min(D + np.eye(n) * np.inf, axis=1)
+
+    # Regret (v1 style): cost of skipping u and going to v first, then u
+    cost_via_v = direct[np.newaxis, :] + D.T - direct[:, np.newaxis]  # shape (n, n)
+    np.fill_diagonal(cost_via_v, np.inf)
+    regret_v1 = np.maximum(np.min(cost_via_v, axis=1), 0.0)
+
+    # Regret (v0 style): insertion cost minus best insertion cost – urgency
+    insertion_cost = direct + dest
+    min_ic = np.min(insertion_cost)
+    regret_v0 = insertion_cost - min_ic
+
+    # ---- Normalise all metrics to [0,1] where 1 is best ----
+    eps = 1e-12
+
+    def normalize_benefit(values: np.ndarray, lower_is_better: bool = False) -> np.ndarray:
+        """Normalise to [0,1]; if lower_is_better, invert so 1=best."""
+        mn, mx = values.min(), values.max()
+        if mx - mn < eps:
+            return np.ones_like(values) * 0.5
+        normed = (values - mn) / (mx - mn)
+        return 1.0 - normed if lower_is_better else normed
+
+    # metrics requiring inversion (lower is better)
+    norm_direct = normalize_benefit(direct, lower_is_better=True)
+    norm_dest = normalize_benefit(dest, lower_is_better=True)
+    norm_mean_conn = normalize_benefit(mean_conn, lower_is_better=True)
+    norm_min_next = normalize_benefit(min_next, lower_is_better=True)
+
+    # metrics where higher is better
+    norm_savings = normalize_benefit(savings, lower_is_better=False)
+    norm_std_conn = normalize_benefit(std_conn, lower_is_better=False)
+    norm_regret_v1 = normalize_benefit(regret_v1, lower_is_better=False)
+    norm_regret_v0 = normalize_benefit(regret_v0, lower_is_better=False)
+
+    # ---- Weighted composite score (all weights positive, larger score = better) ----
+    weights = {
+        'savings':      0.25,
+        'regret_v1':    0.20,
+        'regret_v0':    0.10,
+        'direct':       0.10,
+        'dest':         0.05,
+        'mean_conn':    0.10,
+        'std_conn':     0.05,
+        'min_next':     0.15,
+    }
+
+    score = (
+        weights['savings']   * norm_savings +
+        weights['regret_v1'] * norm_regret_v1 +
+        weights['regret_v0'] * norm_regret_v0 +
+        weights['direct']    * norm_direct +
+        weights['dest']      * norm_dest +
+        weights['mean_conn'] * norm_mean_conn +
+        weights['std_conn']  * norm_std_conn +
+        weights['min_next']  * norm_min_next
+    )
+
+    best_idx = int(np.argmax(score))
+    return candidates[best_idx]
+```

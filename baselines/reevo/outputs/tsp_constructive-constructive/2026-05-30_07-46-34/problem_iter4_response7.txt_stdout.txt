@@ -1,0 +1,33 @@
+[*] Running ...
+[*] Dataset loaded: /home/oguzcodes/git/DynaGen/baselines/reevo/problems/tsp_constructive/dataset/train500_dataset.npy with 20 instances.
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/oguzcodes/git/DynaGen/baselines/reevo/problems/tsp_constructive/eval.py", line 42, in eval_heuristic
+    next_node = select_next_node(
+        current_node=solution[-1],
+    ...<2 lines>...
+        distance_matrix=dist_mat.copy(),
+    )
+  File "/home/oguzcodes/git/DynaGen/baselines/reevo/problems/tsp_constructive/gpt.py", line 49, in select_next_node_v2
+    avg_vals.append(np.mean(dists))
+                      ^^^^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/oguzcodes/git/DynaGen/baselines/reevo/problems/tsp_constructive/eval.py", line 91, in <module>
+    objs = pool.map(eval_heuristic, node_positions)
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 774, in get
+    raise self._value
+TypeError: tuple indices must be integers or slices, not str

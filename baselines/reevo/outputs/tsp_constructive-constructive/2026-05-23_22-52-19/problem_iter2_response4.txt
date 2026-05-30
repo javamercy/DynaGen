@@ -1,0 +1,50 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit by balancing immediate cost, future connectivity,
+    and proximity to the final destination.
+
+    The score for each candidate node combines:
+    - Direct distance from current node (local cost)
+    - Minimum distance from candidate to another unvisited node (nearest-neighbor lookahead)
+    - Average distance from candidate to all other unvisited nodes (centrality)
+    - Inverse of distance to destination (encourages early return planning)
+
+    All weights are tuned to achieve a good trade-off between greedy progress
+    and long-term path quality.
+    """
+    if not unvisited_nodes:
+        return None
+
+    # Weights for each component
+    w_immediate = 0.5
+    w_min_future = 0.3
+    w_avg_future = 0.1
+    w_dest = 0.2
+
+    best_node = None
+    best_score = float('inf')
+
+    for node in unvisited_nodes:
+        # Distances from the candidate to other unvisited nodes
+        other = [i for i in unvisited_nodes if i != node]
+        if not other:
+            # Last unvisited node; must go to destination afterwards
+            min_future = distance_matrix[node][destination_node]
+            avg_future = min_future
+        else:
+            min_future = min(distance_matrix[node][i] for i in other)
+            avg_future = np.mean([distance_matrix[node][i] for i in other])
+
+        # Composite score (lower is better)
+        score = (w_immediate * distance_matrix[current_node][node]
+                 + w_min_future * min_future
+                 + w_avg_future * avg_future
+                 - w_dest * distance_matrix[node][destination_node])
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

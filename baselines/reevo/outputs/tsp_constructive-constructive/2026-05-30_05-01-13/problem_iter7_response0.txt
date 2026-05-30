@@ -1,0 +1,78 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit using savings, regret, proximity, and look-ahead."""
+    unvisited = list(unvisited_nodes)
+    if len(unvisited) == 1:
+        return unvisited[0]
+
+    nodes = np.array(unvisited, dtype=int)
+
+    # Base distances
+    dist_cur = distance_matrix[current_node, nodes].astype(float)   # proximity component (smaller better)
+    dist_dest = distance_matrix[nodes, destination_node].astype(float) # used in savings
+
+    # Insertion cost: dist_cur + dist_dest (smaller better -> lower regret)
+    insertion_cost = dist_cur + dist_dest
+    min_ic = np.min(insertion_cost)
+    max_ic = np.max(insertion_cost)
+
+    # Regret: how much worse than the best (larger regret -> more urgent)
+    regret = insertion_cost - min_ic
+    max_regret = np.max(regret)
+
+    # Savings: relative savings = dist_dest - dist_cur (larger better)
+    savings = dist_dest - dist_cur
+    min_sav = np.min(savings)
+    max_sav = np.max(savings)
+
+    # Look-ahead: min distance from candidate to any other unvisited node (smaller better)
+    n = len(unvisited)
+    pair_dist = distance_matrix[np.ix_(unvisited, unvisited)].astype(float)
+    np.fill_diagonal(pair_dist, np.inf)
+    min_next = np.min(pair_dist, axis=1)
+    min_next_val = np.min(min_next)
+    max_next_val = np.max(min_next)
+
+    # Normalize each component to [0,1]
+    eps = 1e-9
+
+    # Proximity: norm_cur = (dist_cur - min_cur) / range, lower is better -> 0 is best
+    min_cur = np.min(dist_cur)
+    max_cur = np.max(dist_cur)
+    if max_cur - min_cur > eps:
+        norm_cur = (dist_cur - min_cur) / (max_cur - min_cur)
+    else:
+        norm_cur = np.ones(n) * 0.5
+
+    # Savings: norm_sav = (savings - min_sav) / range, larger is better -> use (1 - norm_sav) to make it a cost
+    if max_sav - min_sav > eps:
+        norm_sav = (savings - min_sav) / (max_sav - min_sav)
+    else:
+        norm_sav = np.ones(n) * 0.5
+
+    # Look-ahead: norm_next = (min_next - min_next_val) / range, smaller is better
+    if max_next_val - min_next_val > eps:
+        norm_next = (min_next - min_next_val) / (max_next_val - min_next_val)
+    else:
+        norm_next = np.ones(n) * 0.5
+
+    # Regret: norm_regret = regret / max_regret, larger is better -> use -norm_regret in score (benefit)
+    if max_regret > eps:
+        norm_regret = regret / max_regret
+    else:
+        norm_regret = np.zeros(n)  # all equal, no effect
+
+    # Adaptive weights (simple static; could be made iteration-dependent)
+    w_prox = 0.4
+    w_sav = 0.2
+    w_look = 0.2
+    w_regret = 0.2
+
+    # Overall score (minimize)
+    score = w_prox * norm_cur + w_sav * (1 - norm_sav) + w_look * norm_next - w_regret * norm_regret
+
+    best_idx = int(np.argmin(score))
+    return unvisited[best_idx]
+```

@@ -1,0 +1,84 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Improved constructive heuristic for TSP with:
+    - Per‑row normalization of distances
+    - Two‑step lookahead (immediate + best future)
+    - Regret (gap between best and second best future step)
+    - Sigmoid‑based adaptive weights
+    - Destination bias increases near the end
+    """
+    if not unvisited_nodes:
+        return current_node
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    n_remaining = len(unvisited_nodes)
+    total_nodes = distance_matrix.shape[0]
+    # progress: 0 at start, 1 when only destination remains
+    progress = 1.0 - (n_remaining / total_nodes)
+
+    # Sigmoid for smooth weight transition
+    sig = 1.0 / (1.0 + np.exp(-6.0 * (progress - 0.5)))
+    w_imm = 0.5 - 0.3 * sig          # 0.5 → 0.2
+    w_look = 0.3 - 0.2 * sig         # 0.3 → 0.1
+    w_dest = 0.2 + 0.5 * sig         # 0.2 → 0.7
+    w_reg = 0.2 + 0.2 * sig          # 0.2 → 0.4
+
+    best_node = None
+    best_score = float("inf")
+
+    # Precompute per‑row maximums for normalization
+    row_max = distance_matrix.max(axis=1)
+    row_max[row_max == 0] = 1.0  # avoid division by zero
+
+    for node in unvisited_nodes:
+        # --- Immediate cost (normalized by current's row max) ---
+        imm = distance_matrix[current_node, node] / row_max[current_node]
+
+        # --- Two‑step lookahead and regret ---
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            # Distances from candidate to all other unvisited nodes
+            cand_dists = [distance_matrix[node, u] for u in remaining]
+            cand_dists.sort()
+            min_future = cand_dists[0]
+            regret = cand_dists[1] - cand_dists[0] if len(cand_dists) >= 2 else 0.0
+            # Normalize lookahead by sum of max and future max
+            look = (distance_matrix[current_node, node] + min_future) / (
+                row_max[current_node] + row_max[node]
+            )
+            # Normalize regret by row max of candidate
+            regret /= row_max[node]
+        else:
+            # Only destination remains -> go directly
+            min_future = distance_matrix[node, destination_node]
+            regret = 0.0
+            look = (distance_matrix[current_node, node] + min_future) / (
+                row_max[current_node] + row_max[node]
+            )
+
+        # --- Destination cost (normalized by candidate's row max) ---
+        dest_cost = distance_matrix[node, destination_node] / row_max[node]
+
+        # --- Score (minimise) ---
+        score = (
+            w_imm * imm
+            + w_look * look
+            + w_dest * dest_cost
+            - w_reg * regret
+        )
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

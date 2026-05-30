@@ -1,0 +1,10 @@
+Prioritize nodes with high regret to avoid costly future connections.
+
+Use exact two-step look-ahead; avoid complex weighting and regret. Simpler heuristics often outperform.
+Prioritize nodes with high regret (postponement cost) and far destinations; subtract regret from score.
+Prefer immediate cost plus edge-level regret; avoid two-step cost. Tune alpha and beta carefully.
+Use regret as urgency (second best - best) and subtract destination distance.
+Use regret (difference of best & second best) instead of pure minimum look-ahead. Tune weights carefully.
+Use regret and weighted scoring instead of exact multi-step look-ahead for better heuristic performance.
+
+

@@ -1,0 +1,33 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Improved constructive heuristic for TSP with adaptive weights, savings, and lookahead."""
+    if not unvisited_nodes:
+        return destination_node  # safety fallback
+
+    n = distance_matrix.shape[0]
+    m = len(unvisited_nodes)
+    # Adaptive weights based on remaining nodes
+    alpha = 0.3 * (m / n)          # lookahead importance grows with more unvisited
+    beta = 0.2 * (1 - m / n)       # savings importance grows as we near end
+
+    scores = {}
+    for node in unvisited_nodes:
+        d_curr = distance_matrix[current_node, node]
+
+        # Two-step lookahead: min distance from candidate to another unvisited node
+        others = [i for i in unvisited_nodes if i != node]
+        lookahead = min(distance_matrix[node, i] for i in others) if others else 0.0
+
+        # Savings relative to going directly to destination
+        d_dest = distance_matrix[node, destination_node]
+        d_curr_dest = distance_matrix[current_node, destination_node]
+        savings = d_curr_dest - (d_curr + d_dest)
+
+        # Composite score (lower is better)
+        score = d_curr + alpha * lookahead - beta * savings
+        scores[node] = score
+
+    return min(scores, key=scores.get)
+```

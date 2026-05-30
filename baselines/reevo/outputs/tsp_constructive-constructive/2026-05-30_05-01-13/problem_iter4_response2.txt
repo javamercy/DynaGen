@@ -1,0 +1,135 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: Set[int],
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node to visit using multi-step lookahead, regret, savings,
+    and diversity.
+
+    The composite score for each candidate integrates:
+      - Direct distance from the current node (minimised)
+      - Proximity to the final destination (minimised)
+      - Greedy tour length from the candidate through all remaining nodes to
+        the destination (multi-step lookahead, minimised)
+      - Savings relative to the worst direct option (maximised)
+      - Regret (penalty for not choosing the candidate that leads to the best
+        greedy tour, minimised)
+      - Connectivity: average distance to other unvisited nodes (minimised)
+      - Diversity: standard deviation of distances to other unvisited nodes
+        (maximised)
+
+    All terms are normalised to [0, 1] across candidates to avoid scale bias.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = list(unvisited_nodes)
+    n = len(candidates)
+
+    # -----------------------------------------------------------------
+    # 1. Compute raw values for each candidate
+    # -----------------------------------------------------------------
+    # Direct distances from current node
+    direct = [distance_matrix[current_node][v] for v in candidates]
+
+    # Distances to final destination
+    dest = [distance_matrix[v][destination_node] for v in candidates]
+
+    # Multi-step lookahead: greedy tour length starting from the candidate
+    # (including the candidate as the first stop) through all other unvisited
+    # nodes and ending at the destination.
+    tour_lengths = []
+    for v in candidates:
+        remaining = set(candidates)
+        remaining.remove(v)
+        curr = v
+        length = 0.0
+        while remaining:
+            # nearest neighbour step
+            nxt = min(remaining, key=lambda x: distance_matrix[curr][x])
+            length += distance_matrix[curr][nxt]
+            remaining.remove(nxt)
+            curr = nxt
+        length += distance_matrix[curr][destination_node]
+        tour_lengths.append(length)
+
+    # Savings: how much better this node is compared to the worst direct option
+    dmin = min(direct)
+    dmax = max(direct)
+    savings = [dmax - d for d in direct]  # larger is better
+
+    # Regret: the excess tour length compared to the best tour length
+    tmin = min(tour_lengths)
+    regret = [t - tmin for t in tour_lengths]  # 0 for best, positive for others -> smaller is better
+
+    # Connectivity and diversity: average and standard deviation of distances
+    # to other unvisited nodes
+    avg_dist = []
+    std_dist = []
+    for i, v in enumerate(candidates):
+        others = [candidates[j] for j in range(n) if j != i]
+        if others:
+            dists = [distance_matrix[v][u] for u in others]
+            avg = sum(dists) / len(dists)
+            var = sum((d - avg) ** 2 for d in dists) / len(dists)
+            std = var ** 0.5
+        else:
+            avg = 0.0
+            std = 0.0
+        avg_dist.append(avg)
+        std_dist.append(std)
+
+    # -----------------------------------------------------------------
+    # 2. Normalise all terms to [0, 1]
+    # -----------------------------------------------------------------
+    def normalise(values):
+        mn, mx = min(values), max(values)
+        if mx == mn:
+            return [0.5] * len(values)
+        return [(v - mn) / (mx - mn) for v in values]
+
+    direct_norm = normalise(direct)
+    dest_norm = normalise(dest)
+    tour_norm = normalise(tour_lengths)
+    savings_norm = normalise(savings)
+    regret_norm = normalise(regret)
+    avg_norm = normalise(avg_dist)
+    std_norm = normalise(std_dist)
+
+    # -----------------------------------------------------------------
+    # 3. Compute composite scores (higher is better)
+    # -----------------------------------------------------------------
+    weights = {
+        'direct': 0.5,
+        'dest': 0.3,
+        'tour': 2.0,
+        'savings': 1.0,
+        'regret': 1.0,
+        'connectivity': 0.5,
+        'diversity': 0.2,
+    }
+
+    best_score = float('-inf')
+    best_idx = 0
+    for i in range(n):
+        score = (
+            -weights['direct'] * direct_norm[i]          # minimise direct dist
+            -weights['dest'] * dest_norm[i]              # minimise dest dist
+            -weights['tour'] * tour_norm[i]              # minimise tour length
+            + weights['savings'] * savings_norm[i]       # maximise savings
+            - weights['regret'] * regret_norm[i]         # minimise regret
+            - weights['connectivity'] * avg_norm[i]      # minimise avg distance
+            + weights['diversity'] * std_norm[i]         # maximise diversity
+        )
+        if score > best_score:
+            best_score = score
+            best_idx = i
+
+    return candidates[best_idx]
+```

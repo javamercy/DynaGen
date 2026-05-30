@@ -1,0 +1,38 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using immediate cost, regret lookahead, and destination distance.
+    Prioritizes nodes with high regret and far destinations (by subtracting both from score).
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)  # deterministic order
+    w1, w2, w3 = 0.4, 0.3, 0.3  # weights (tuned)
+
+    scores = {}
+    for i in unvisited:
+        immediate = distance_matrix[current_node, i]
+
+        # Regret: best two-step path that visits i later
+        best_alternative = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_alternative:
+                best_alternative = cost
+        regret = best_alternative - immediate if best_alternative != float('inf') else 0.0
+
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Combined score: lower is better.
+        # Subtract regret and dest_dist to prioritize high regret and far destination nodes.
+        score = w1 * immediate - w2 * regret - w3 * dest_dist
+        scores[i] = score
+
+    # Deterministic tie-breaking: smallest index among those with minimal score
+    min_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == min_score]
+    return min(candidates)
+```

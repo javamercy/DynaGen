@@ -1,0 +1,53 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit from the unvisited nodes using an adaptive, vectorized heuristic."""
+    if not unvisited_nodes:
+        return current_node
+
+    # Convert to list for indexing
+    unvisited = list(unvisited_nodes)
+    n = len(unvisited)
+    unvisited_arr = np.array(unvisited)
+
+    # 1. Proximity: distance from current node to each candidate
+    dist_current = distance_matrix[current_node, unvisited_arr]
+
+    # 2. Look‑ahead regret: minimum distance from candidate to another unvisited node
+    if n > 1:
+        sub_dist = distance_matrix[np.ix_(unvisited_arr, unvisited_arr)].copy()
+        np.fill_diagonal(sub_dist, np.inf)
+        min_other = np.min(sub_dist, axis=1)
+    else:
+        min_other = np.array([0.0])
+
+    # 3. Distance to the destination (final return node)
+    dist_dest = distance_matrix[unvisited_arr, destination_node]
+
+    # Normalize each component by its maximum to avoid scale bias
+    max_curr = np.max(dist_current) if np.max(dist_current) > 0 else 1.0
+    max_other = np.max(min_other) if np.max(min_other) > 0 else 1.0
+    max_dest = np.max(dist_dest) if np.max(dist_dest) > 0 else 1.0
+
+    norm_curr = dist_current / max_curr
+    norm_other = min_other / max_other
+    norm_dest = dist_dest / max_dest
+
+    # Adaptive weights based on the proportion of nodes remaining
+    total_nodes = distance_matrix.shape[0]          # total cities (including start/destination)
+    remaining_ratio = n / total_nodes
+
+    # Proximity weight decreases as we get closer to the end
+    w_proximity = 0.5 + 0.1 * remaining_ratio
+    # Regret weight stays moderate
+    w_regret = 0.3
+    # Destination weight increases when few nodes remain
+    w_destination = 0.2 + 0.1 * (1 - remaining_ratio)
+
+    # Score = weighted sum (minimize)
+    scores = w_proximity * norm_curr + w_regret * norm_other + w_destination * norm_dest
+
+    best_idx = np.argmin(scores)
+    return unvisited_arr[best_idx]
+```

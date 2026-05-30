@@ -1,0 +1,74 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: Set[int],
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Improved constructive heuristic for TSP:
+    combines insertion savings, regret, connectivity, direct and destination proximity.
+    Weights adapt as the number of remaining nodes decreases.
+    Uses vectorized numpy operations for efficiency.
+    """
+    # Handle trivial case
+    n = len(unvisited_nodes)
+    if n == 0:
+        return current_node
+    if n == 1:
+        return next(iter(unvisited_nodes))
+
+    # Convert to indexed numpy arrays for vectorization
+    unvisited = np.array(list(unvisited_nodes), dtype=int)
+    future = np.concatenate([unvisited, [destination_node]])   # shape (n+1,)
+    n_future = n + 1
+
+    # Precompute sub-distance matrix for the future set
+    sub_dist = distance_matrix[np.ix_(future, future)]  # shape (n+1, n+1)
+
+    # ---- Candidate-specific components (vectorized over all candidates) ----
+    # Distances from current node to each candidate
+    dist_curr = distance_matrix[current_node, unvisited]          # (n,)
+    # Distances from each candidate to destination
+    dist_dest = distance_matrix[unvisited, destination_node]      # (n,)
+    # Clarke-Wright savings
+    start_to_dest = distance_matrix[current_node, destination_node]
+    savings = start_to_dest - dist_curr - dist_dest               # (n,)
+
+    # Regret and min_next: distances from candidate to *other* future nodes
+    # Submatrix of candidates (rows 0..n-1) vs all future (columns 0..n)
+    cand_future = sub_dist[:n, :].copy()                         # (n, n+1)
+    # Set diagonal (self‑distance) to infinity for each candidate
+    cand_future[np.arange(n), np.arange(n)] = np.inf
+    # Two smallest distances per candidate (excluding self)
+    sorted = np.partition(cand_future, 1, axis=1)                # (n, n+1)
+    best = sorted[:, 0]                                          # smallest
+    second_best = sorted[:, 1]                                   # second smallest
+    regret = second_best - best                                  # (n,)
+    min_next = best                                              # (n,)
+
+    # Connectivity: average distance to other unvisited nodes
+    among_unvisited = sub_dist[:n, :n].copy()                    # (n, n)
+    among_unvisited[np.arange(n), np.arange(n)] = np.inf
+    conn = np.mean(among_unvisited, axis=1)                      # (n,)
+
+    # ---- Adaptive weights (same logic as v1) ----
+    n_remaining = n
+    w_factor = n_remaining / (n_remaining + 5.0)
+    w_sav = 0.35 * (1 - w_factor) + 0.15 * w_factor
+    w_reg = 0.20 * (1 - w_factor) + 0.30 * w_factor
+    w_con = 0.25 * (1 - w_factor) + 0.10 * w_factor
+    w_direct = 0.10 * (1 - w_factor) + 0.20 * w_factor
+    w_dest = 0.10 * (1 - w_factor) + 0.25 * w_factor
+
+    # ---- Composite score (maximize) ----
+    score = (w_sav * savings +
+             w_reg * regret +
+             w_con * conn -
+             w_direct * dist_curr -
+             w_dest * dist_dest -
+             0.05 * min_next)
+
+    best_idx = int(np.argmax(score))
+    return int(unvisited[best_idx])
+```

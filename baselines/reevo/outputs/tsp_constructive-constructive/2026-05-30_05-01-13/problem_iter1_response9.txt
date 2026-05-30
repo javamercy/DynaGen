@@ -1,0 +1,40 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a look-ahead and regret heuristic.
+    For each candidate, compute a score that combines:
+    - distance from current node
+    - distance to destination
+    - look-ahead: best next step from candidate to any other unvisited node
+    - regret: difference between best and second-best distance from candidate to other unvisited nodes
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    scores = {}
+    for candidate in unvisited_nodes:
+        others = unvisited_nodes - {candidate}
+        # distances from candidate to all other unvisited nodes (including destination if still unvisited)
+        dists_to_others = [distance_matrix[candidate][other] for other in others]
+        best_future = min(dists_to_others) if dists_to_others else 0.0
+        if len(dists_to_others) >= 2:
+            sorted_dists = sorted(dists_to_others)
+            regret = sorted_dists[1] - sorted_dists[0]
+        else:
+            regret = 0.0
+
+        # Weighted score (lower is better)
+        # Parameters: alpha, beta, gamma, delta
+        alpha = 0.35
+        beta = 0.2
+        gamma = 0.25
+        delta = 0.2
+
+        score = (alpha * distance_matrix[current_node][candidate] +
+                 beta * distance_matrix[candidate][destination_node] +
+                 gamma * best_future -
+                 delta * regret)  # high regret penalizes (we want to avoid high regret)
+        scores[candidate] = score
+
+    return min(scores, key=scores.get)
+```

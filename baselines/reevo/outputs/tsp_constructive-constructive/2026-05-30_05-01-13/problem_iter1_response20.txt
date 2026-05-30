@@ -1,0 +1,35 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Look-ahead constructive heuristic:
+    For each candidate, simulate a full nearest‑neighbor tour starting from current_node
+    with the candidate as the first step, then pick the candidate that minimises the total tour length.
+    """
+    best_next = None
+    best_total = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Simulate tour: current -> candidate -> (nearest neighbour over remaining) -> destination
+        remaining = unvisited_nodes - {candidate}
+        current = candidate
+        total = distance_matrix[current_node][candidate]
+
+        # Greedy nearest neighbour over the rest
+        while remaining:
+            # Find nearest unvisited node
+            next_node = min(remaining, key=lambda x: distance_matrix[current][x])
+            total += distance_matrix[current][next_node]
+            current = next_node
+            remaining.remove(next_node)
+
+        # Return to destination (i.e., start)
+        total += distance_matrix[current][destination_node]
+
+        if total < best_total:
+            best_total = total
+            best_next = candidate
+
+    return best_next
+```

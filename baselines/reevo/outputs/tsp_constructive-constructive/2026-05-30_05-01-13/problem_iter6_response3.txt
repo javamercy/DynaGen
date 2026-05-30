@@ -1,0 +1,81 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: Set[int],
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using adaptive weighting of:
+    - Insertion savings (Clarke-Wright savings)
+    - Regret (cost of not choosing the best next edge)
+    - Connectivity (isolation from other unvisited nodes)
+    - Direct and destination proximity
+
+    Weights shift smoothly from exploration (savings, connectivity) to
+    exploitation (regret, destination proximity) as fewer nodes remain.
+    """
+    n_remaining = len(unvisited_nodes)
+    if n_remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    # Total remaining including destination for regret calculation
+    future = unvisited_nodes | {destination_node}
+    # Precompute distances from current to destination for savings
+    start_to_dest = distance_matrix[current_node, destination_node]
+
+    best_score = -np.inf
+    best_node = None
+
+    # Adaptive weight factor: high when many nodes remain, low when few
+    w_factor = n_remaining / (n_remaining + 5)  # 0->0, inf->1
+    w_sav = 0.35 * (1 - w_factor) + 0.15 * w_factor
+    w_reg = 0.20 * (1 - w_factor) + 0.30 * w_factor
+    w_con = 0.25 * (1 - w_factor) + 0.10 * w_factor
+    w_direct = 0.10 * (1 - w_factor) + 0.20 * w_factor
+    w_dest = 0.10 * (1 - w_factor) + 0.25 * w_factor
+
+    for node in unvisited_nodes:
+        # Direct and destination costs (lower is better -> negative contribution)
+        direct_cost = distance_matrix[current_node, node]
+        dest_cost = distance_matrix[node, destination_node]
+
+        # Insertion savings (higher is better)
+        savings = start_to_dest - direct_cost - dest_cost
+
+        # Regret and minimum next distance to any future node (excluding self)
+        dists = [distance_matrix[node, f] for f in future if f != node]
+        dists.sort()
+        if len(dists) >= 2:
+            best = dists[0]
+            second_best = dists[1]
+            regret = second_best - best
+            min_next = best
+        elif len(dists) == 1:
+            regret = dists[0]
+            min_next = dists[0]
+        else:
+            regret = 0.0
+            min_next = 0.0
+
+        # Connectivity: average distance to other unvisited nodes (higher = more isolated)
+        other = unvisited_nodes - {node}
+        if other:
+            conn = np.mean([distance_matrix[node, o] for o in other])
+        else:
+            conn = 0.0
+
+        # Composite score (maximise)
+        score = (w_sav * savings +
+                 w_reg * regret +
+                 w_con * conn -
+                 w_direct * direct_cost -
+                 w_dest * dest_cost -
+                 0.05 * min_next)   # slight penalty for very close next edge
+
+        if score > best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

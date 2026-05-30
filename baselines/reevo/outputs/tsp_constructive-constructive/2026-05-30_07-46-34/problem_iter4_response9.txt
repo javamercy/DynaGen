@@ -1,0 +1,63 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a weighted heuristic that penalizes large residual distances to the destination.
+    
+    For each candidate, the score combines:
+    - immediate cost from current node to candidate,
+    - the best single-step lookahead from candidate (if more than one unvisited remains),
+    - a penalty proportional to the distance from candidate to the destination,
+    - (optional, if multiple nodes remain) a penalty for the distance from the best next node to the destination.
+    
+    All penalties have positive coefficients so that larger distances increase the score,
+    making nodes with shorter return paths more attractive.
+    
+    Weights:
+        immediate: 1.0
+        best_next: 0.7
+        dest_dist: 0.5
+        best_next_dest_dist: 0.3  (only if at least two unvisited nodes remain)
+    """
+    best_node = None
+    best_score = float('inf')
+    
+    for candidate in unvisited_nodes:
+        # Direct cost from current to candidate
+        immediate = distance_matrix[current_node][candidate]
+        remaining = unvisited_nodes - {candidate}
+        
+        if len(remaining) >= 2:
+            # Look-ahead: best next hop from candidate and its subsequent distance to destination
+            # Find the best next node k (k != candidate) that minimizes:
+            #   distance[candidate][k] + 0.7 * (distance from k to destination)
+            # We will use a weighted combination for the look-ahead decision as well.
+            best_lookahead = float('inf')
+            best_next_dest = float('inf')
+            for k in remaining:
+                lookahead_cost = (distance_matrix[candidate][k] +
+                                  0.5 * distance_matrix[k][destination_node])  # light weight on next->dest
+                if lookahead_cost < best_lookahead:
+                    best_lookahead = lookahead_cost
+                    best_next_dest = distance_matrix[k][destination_node]
+            # Score: immediate + 0.7 * best_lookahead + 0.5 * dest_dist + 0.3 * best_next_dest
+            score = (immediate +
+                     0.7 * best_lookahead +
+                     0.5 * distance_matrix[candidate][destination_node] +
+                     0.3 * best_next_dest)
+        elif len(remaining) == 1:
+            # Only one node left after candidate: must go candidate -> k -> destination
+            k = next(iter(remaining))
+            direct_future = distance_matrix[candidate][k] + distance_matrix[k][destination_node]
+            score = immediate + 0.7 * direct_future + 0.5 * distance_matrix[candidate][destination_node]
+        else:
+            # No remaining: candidate is the last node
+            score = immediate + distance_matrix[candidate][destination_node]
+        
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+    
+    return best_node
+```

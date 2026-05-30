@@ -1,0 +1,51 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidate_data = {}
+    best_cost = float('inf')
+    best_candidates = []
+
+    for candidate in unvisited_nodes:
+        # Simulate a greedy nearest-neighbour completion from candidate
+        unvisited_rest = set(unvisited_nodes)
+        unvisited_rest.remove(candidate)
+        cur = current_node
+        cost = distance_matrix[cur][candidate]
+        cur = candidate
+        while unvisited_rest:
+            nxt = min(unvisited_rest, key=lambda x: distance_matrix[cur][x])
+            cost += distance_matrix[cur][nxt]
+            cur = nxt
+            unvisited_rest.remove(nxt)
+        cost += distance_matrix[cur][destination_node]
+
+        # Compute regret: difference between second-best and best outgoing distance from candidate
+        others = [o for o in unvisited_nodes if o != candidate] + [destination_node]
+        distances = sorted(distance_matrix[candidate][o] for o in others)
+        regret = distances[1] - distances[0] if len(distances) >= 2 else 0.0
+
+        candidate_data[candidate] = (cost, regret)
+
+        if cost < best_cost - 1e-10:
+            best_cost = cost
+            best_candidates = [candidate]
+        elif abs(cost - best_cost) < 1e-10:
+            best_candidates.append(candidate)
+
+    # Ties are broken by highest regret (most urgent node first)
+    if len(best_candidates) == 1:
+        return best_candidates[0]
+    else:
+        best_regret = -1.0
+        chosen = best_candidates[0]
+        for c in best_candidates:
+            _, reg = candidate_data[c]
+            if reg > best_regret:
+                best_regret = reg
+                chosen = c
+        return chosen
+```

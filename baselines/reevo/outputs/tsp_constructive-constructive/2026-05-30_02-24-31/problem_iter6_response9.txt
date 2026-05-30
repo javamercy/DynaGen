@@ -1,0 +1,50 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using immediate cost, two-step regret (cost of visiting later via another node),
+    one-step lookahead (best distance from candidate to another unvisited), and distance to destination.
+    Weights are tuned to balance these factors. Deterministic tie-breaking by smallest node index.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)  # deterministic order
+
+    # compute immediate costs for all unvisited
+    immediate_costs = {i: distance_matrix[current_node, i] for i in unvisited}
+
+    scores = {}
+    # weights: immediate, regret, lookahead, dest_dist
+    w1, w2, w3, w4 = 0.25, 0.3, 0.25, 0.2
+
+    for i in unvisited:
+        immediate = immediate_costs[i]
+
+        # Regret: minimum cost to visit i via another node j (j != i)
+        best_alternative = float('inf')
+        best_next_from_i = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            # cost of going current->j->i
+            cost_via_j = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost_via_j < best_alternative:
+                best_alternative = cost_via_j
+            # lookahead: best distance from i to j (j != i)
+            d = distance_matrix[i, j]
+            if d < best_next_from_i:
+                best_next_from_i = d
+
+        regret = best_alternative - immediate if best_alternative != float('inf') else 0.0
+        lookahead = best_next_from_i if best_next_from_i != float('inf') else 0.0
+
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Lower score is better. Subtract regret, lookahead, and dest_dist to prioritize high values.
+        score = w1 * immediate - w2 * regret - w3 * lookahead - w4 * dest_dist
+        scores[i] = score
+
+    best_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == best_score]
+    return min(candidates)
+```

@@ -1,0 +1,59 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using a heuristic that combines Clarke-Wright savings,
+    regret (urgency of visiting now), and distance components.
+    
+    The score for each candidate u is:
+        score = w_sav * saving(u) + w_reg * regret(u) - w_dir * direct_cost(u) - w_dest * dest_cost(u)
+    where savings and regret are normalized to have similar scale.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    # Weights (can be tuned)
+    w_sav = 0.5
+    w_reg = 0.3
+    w_dir = 0.1
+    w_dest = 0.1
+    
+    candidates = list(unvisited_nodes)
+    scores = {}
+    
+    # Precompute direct costs for normalization
+    direct_costs = np.array([distance_matrix[current_node, u] for u in candidates])
+    min_direct = np.min(direct_costs)
+    max_direct = np.max(direct_costs)
+    direct_range = max_direct - min_direct if max_direct > min_direct else 1.0
+    
+    for u in candidates:
+        direct = distance_matrix[current_node, u]
+        dest = distance_matrix[u, destination_node]
+        other = [v for v in candidates if v != u]
+        
+        # Savings: distance[current][dest] - (direct + dest)
+        saving = distance_matrix[current_node, destination_node] - (direct + dest)
+        
+        # Regret: Minimum additional cost if we visit some other node v first instead of u now
+        if other:
+            costs_if_delayed = np.array([
+                distance_matrix[current_node, v] + distance_matrix[v, u] - direct
+                for v in other
+            ])
+            regret = max(0.0, np.min(costs_if_delayed))
+        else:
+            regret = 0.0
+        
+        # Normalize direct cost to [0,1] (lower better)
+        dir_norm = (direct - min_direct) / direct_range
+        dest_norm = dest / (np.max(distance_matrix) + 1e-9)  # crude normalization to avoid large values
+        
+        # Final score: maximize savings and regret, minimize normalized distances
+        score = w_sav * saving + w_reg * regret - w_dir * dir_norm - w_dest * dest_norm
+        scores[u] = score
+    
+    # Return candidate with highest score
+    return max(scores, key=scores.get)
+```

@@ -1,0 +1,55 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a weighted combination of immediate cost, two-step regret,
+    future edge regret (mean vs best), and destination distance. Weights are tuned to
+    emphasize regret terms for better lookahead.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Deterministic ordering for tie-breaking
+    candidates = sorted(unvisited_nodes)
+
+    # Weights emphasizing regret components
+    w_imm, w_two, w_future, w_dest = 0.1, 0.4, 0.3, 0.2
+
+    best_score = float('inf')
+    best_node = None
+
+    for i in candidates:
+        # Immediate distance from current node to i
+        imm = distance_matrix[current_node, i]
+
+        # Two-step lookahead regret: best indirect path via any other j
+        best_two_step = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_two_step:
+                best_two_step = cost
+        regret_two = best_two_step - imm if best_two_step != float('inf') else 0.0
+
+        # Future regret: mean of all other future edges minus the best future edge from i
+        future_costs = [distance_matrix[i, v] for v in unvisited_nodes if v != i]
+        if len(future_costs) >= 2:
+            best_future = min(future_costs)
+            mean_future = sum(future_costs) / len(future_costs)
+            regret_future = mean_future - best_future
+        else:
+            regret_future = 0.0
+
+        # Distance to the final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Combined score (lower is better)
+        score = w_imm * imm - w_two * regret_two - w_future * regret_future - w_dest * dest_dist
+
+        # Deterministic tie-breaking: smaller node index wins
+        if score < best_score or (np.isclose(score, best_score) and i < best_node):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

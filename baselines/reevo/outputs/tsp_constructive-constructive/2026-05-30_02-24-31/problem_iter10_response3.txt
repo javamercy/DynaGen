@@ -1,0 +1,79 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set,
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Improved constructive heuristic for TSP that combines:
+    - Immediate cost
+    - Two‑step regret (best vs second best two‑step path to a node)
+    - Distance to destination
+    - Lookahead savings (best edge from current vs best edge from candidate)
+
+    All terms are weighted and combined into a single score; the node with
+    the lowest score is selected. Deterministic tie‑breaking favours the
+    smaller node index.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = list(unvisited_nodes)
+    # Weights for: immediate cost, two‑step regret, destination distance, lookahead savings
+    w_imm, w_reg, w_dest, w_sav = 0.20, 0.30, 0.20, 0.30
+
+    best_score = float('inf')
+    best_node = None
+
+    # Pre‑compute best edge from current node to any unvisited node
+    best_from_current = min(distance_matrix[current_node, j] for j in unvisited)
+
+    for u in unvisited:
+        # 1. Immediate cost
+        imm = distance_matrix[current_node, u]
+
+        # 2. Two‑step regret: difference between the best and the second best
+        #    two‑step path that ends at u (starting from current_node).
+        two_step_costs = []
+        for j in unvisited:
+            if j == u:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, u]
+            two_step_costs.append(cost)
+
+        if len(two_step_costs) >= 2:
+            sorted_costs = sorted(two_step_costs)
+            best_two = sorted_costs[0]
+            second_best_two = sorted_costs[1]
+            regret_two = second_best_two - best_two
+        elif len(two_step_costs) == 1:
+            regret_two = 0.0   # no alternative, no regret
+        else:
+            regret_two = 0.0
+
+        # 3. Distance to final destination
+        dest_dist = distance_matrix[u, destination_node]
+
+        # 4. Lookahead savings: best edge from current minus best edge from candidate
+        #    (to any other unvisited node).
+        best_from_u = min(distance_matrix[u, j] for j in unvisited if j != u)
+        lookahead_savings = best_from_current - best_from_u
+
+        # Composite score: lower is better.
+        # Negative weights for regret and savings reward high regret and positive savings.
+        score = (w_imm * imm
+                 - w_reg * regret_two
+                 + w_dest * dest_dist
+                 - w_sav * lookahead_savings)
+
+        # Deterministic tie‑breaking: prefer smaller index
+        if score < best_score - 1e-12:
+            best_score = score
+            best_node = u
+        elif abs(score - best_score) < 1e-12 and u < best_node:
+            best_node = u
+
+    return best_node
+```

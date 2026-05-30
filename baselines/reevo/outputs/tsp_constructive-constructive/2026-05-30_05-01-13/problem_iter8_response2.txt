@@ -1,0 +1,90 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: Set[int],
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node using an adaptive multi‑criterion heuristic.
+
+    Criteria:
+    - Clarke‑Wright savings
+    - Regret (urgency based on best vs. second‑best distance to future nodes)
+    - Proximity to current node (direct cost, negative)
+    - Proximity to destination (cost to close the tour, negative)
+    - Future promise (minimum distance to any other unvisited node, negative)
+    - Isolation (average distance to other unvisited nodes, positive)
+
+    Weights shift from exploration (savings, isolation) to exploitation
+    (regret, destination proximity) as fewer nodes remain.
+    """
+    n_remaining = len(unvisited_nodes)
+    if n_remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    # Future set includes destination and all unvisited nodes (used for regret)
+    future = unvisited_nodes | {destination_node}
+
+    # Precompute base saving from direct edge (current -> destination)
+    base_saving = distance_matrix[current_node, destination_node]
+
+    # Adaptive weights based on remaining nodes
+    alpha = n_remaining / (n_remaining + 6)  # smooth transition 0→1
+    w_sav = 0.35 * (1 - alpha) + 0.10 * alpha
+    w_reg = 0.20 * (1 - alpha) + 0.35 * alpha
+    w_curr = 0.15 * (1 - alpha) + 0.10 * alpha   # proximity to current
+    w_dest = 0.10 * (1 - alpha) + 0.20 * alpha   # proximity to destination
+    w_fut  = 0.10 * (1 - alpha) + 0.15 * alpha   # future promise (min next)
+    w_isol = 0.10 * (1 - alpha) + 0.10 * alpha   # isolation (avg distance to others)
+
+    best_score = -np.inf
+    best_node = None
+
+    for node in unvisited_nodes:
+        # Direct distances
+        d_cur_node = distance_matrix[current_node, node]
+        d_node_dest = distance_matrix[node, destination_node]
+
+        # Clarke‑Wright savings
+        saving = base_saving - d_cur_node - d_node_dest
+
+        # Regret and future promise (min distance to any future node)
+        dists_to_future = [distance_matrix[node, f] for f in future if f != node]
+        dists_to_future.sort()
+        if len(dists_to_future) >= 2:
+            regret = dists_to_future[1] - dists_to_future[0]
+            min_next = dists_to_future[0]
+        elif len(dists_to_future) == 1:
+            regret = dists_to_future[0]   # only one option – regret equals distance
+            min_next = dists_to_future[0]
+        else:
+            regret = 0.0
+            min_next = 0.0
+
+        # Isolation: average distance to other unvisited nodes
+        other_unvisited = unvisited_nodes - {node}
+        if other_unvisited:
+            isolation = np.mean([distance_matrix[node, o] for o in other_unvisited])
+        else:
+            isolation = 0.0
+
+        # Composite score (maximise)
+        score = (
+            w_sav * saving
+            + w_reg * regret
+            - w_curr * d_cur_node       # lower distance better → negative weight
+            - w_dest * d_node_dest
+            - w_fut  * min_next         # encourage close future neighbor
+            + w_isol * isolation        # prefer isolated nodes (insert now)
+        )
+
+        if score > best_score:
+            best_score = score
+            best_node = node
+
+    return best_node if best_node is not None else next(iter(unvisited_nodes))
+```

@@ -1,0 +1,52 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node to visit using a regret-based look-ahead heuristic.
+    
+    For each candidate node i:
+        - Compute regret = distance(current, i) - min_{j in unvisited ∪ {destination} \ {i}} distance(j, i)
+        - Compute two-step cost = distance(current, i) + min_{j in unvisited \ {i}} distance(i, j)
+        - Score = alpha * regret + beta * two_step_cost
+    Select the node with minimum score.
+    """
+    alpha = 0.7
+    beta = 0.3
+    best_node = None
+    best_score = float('inf')
+    
+    for i in unvisited_nodes:
+        # min future connection (from any other unvisited or destination)
+        min_future = float('inf')
+        for j in unvisited_nodes:
+            if j != i:
+                d = distance_matrix[j][i]
+                if d < min_future:
+                    min_future = d
+        # also consider destination as a possible predecessor
+        d_dest = distance_matrix[destination_node][i]
+        if d_dest < min_future:
+            min_future = d_dest
+        regret = distance_matrix[current_node][i] - min_future
+        
+        # two-step look-ahead
+        if len(unvisited_nodes) >= 2:
+            next_min = min(distance_matrix[i][j] for j in unvisited_nodes if j != i)
+        else:
+            next_min = distance_matrix[i][destination_node]  # last step to return
+        two_step = distance_matrix[current_node][i] + next_min
+        
+        score = alpha * regret + beta * two_step
+        
+        if score < best_score:
+            best_score = score
+            best_node = i
+    
+    return best_node
+```

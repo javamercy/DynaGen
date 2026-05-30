@@ -1,0 +1,48 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit using statistical properties and lookahead."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Weights for the components (can be tuned)
+    w_direct = 0.3
+    w_mean = 0.3
+    w_std = 0.2
+    w_lookahead = 0.1
+    w_dest = 0.1
+
+    best_node = None
+    best_score = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Direct distance from current node to candidate
+        direct_cost = distance_matrix[current_node][candidate]
+
+        # Distances from candidate to all other unvisited nodes
+        other_nodes = unvisited_nodes - {candidate}
+        if other_nodes:
+            other_distances = [distance_matrix[candidate][v] for v in other_nodes]
+            mean_cost = np.mean(other_distances)
+            std_cost = np.std(other_distances)
+            lookahead_cost = min(other_distances)
+        else:
+            mean_cost = 0.0
+            std_cost = 0.0
+            lookahead_cost = 0.0
+
+        # Distance from candidate to the final destination (often the starting node)
+        dest_cost = distance_matrix[candidate][destination_node]
+
+        # Score: lower is better. Reward high std to encourage exploration.
+        score = (w_direct * direct_cost +
+                 w_mean * mean_cost -
+                 w_std * std_cost +
+                 w_lookahead * lookahead_cost +
+                 w_dest * dest_cost)
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

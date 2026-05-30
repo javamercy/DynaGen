@@ -1,0 +1,45 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using a two-step look-ahead heuristic.
+    For each candidate node u, compute the cost of visiting u now and then
+    the cheapest possible next step v from u (the closest remaining node).
+    The candidate that minimizes the sum of these two distances (plus a
+    small bonus for proximity to the final destination) is chosen.
+    """
+    scores = {}
+    remaining_count = len(unvisited_nodes)
+
+    for u in unvisited_nodes:
+        # Step 1: distance from current to u
+        d1 = distance_matrix[current_node][u]
+
+        remaining = set(unvisited_nodes)
+        remaining.remove(u)
+
+        if remaining:
+            # Step 2: closest node v from u (greedy one-step look-ahead)
+            v = min(remaining, key=lambda x: distance_matrix[u][x])
+            d2 = distance_matrix[u][v]
+        else:
+            # Last node: go directly to destination
+            d2 = distance_matrix[u][destination_node]
+
+        # Two-step look-ahead cost
+        lookahead = d1 + d2
+
+        # Bonus: proximity to the final destination (encourage ending well)
+        dest_dist = distance_matrix[destination_node][u]
+
+        # Weighted score (lower is better)
+        alpha = 0.7   # emphasis on look-ahead
+        beta  = 0.3   # emphasis on destination distance
+        score = alpha * lookahead + beta * dest_dist
+
+        scores[u] = score
+
+    # Return the node with the minimum score
+    return min(scores, key=scores.get)
+```

@@ -1,0 +1,61 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using a constructive heuristic that balances
+    Clarke-Wright savings, positive regret, connectivity, and destination proximity.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes to select from.")
+    
+    candidates = list(unvisited_nodes)
+    if len(candidates) == 1:
+        return candidates[0]
+    
+    # Weights (tuned for the composite score)
+    w_dir = -0.3          # penalize direct distance
+    w_dest = -0.2         # penalize distance to final destination
+    w_sav = 0.35          # reward Clarke-Wright savings
+    w_regret = 0.3        # reward positive regret (urgency to select now)
+    w_conn_avg = -0.15    # penalize mean distance to other unvisited nodes
+    w_conn_std = 0.1      # reward diversity (std deviation of distances)
+    
+    # Precompute direct distances and destination distances for all candidates
+    direct = np.array([distance_matrix[current_node, u] for u in candidates])
+    dest = np.array([distance_matrix[u, destination_node] for u in candidates])
+    savings = distance_matrix[current_node, destination_node] - (direct + dest)
+    
+    scores = np.zeros(len(candidates))
+    for i, u in enumerate(candidates):
+        # Other unvisited nodes (excluding u)
+        other_indices = [j for j in range(len(candidates)) if j != i]
+        if other_indices:
+            # Distances from u to other unvisited nodes
+            dists_to_others = np.array([distance_matrix[u, candidates[j]] for j in other_indices])
+            conn_avg = np.mean(dists_to_others)
+            conn_std = np.std(dists_to_others)
+            
+            # Regret: minimum extra cost if we postpone visiting u
+            costs_if_delayed = np.array([
+                distance_matrix[current_node, candidates[j]] + distance_matrix[candidates[j], u] - direct[i]
+                for j in other_indices
+            ])
+            regret = max(0.0, np.min(costs_if_delayed))
+        else:
+            # Should not happen because we already handled size 1, but safety
+            conn_avg = 0.0
+            conn_std = 0.0
+            regret = 0.0
+        
+        score = (w_dir * direct[i] +
+                 w_dest * dest[i] +
+                 w_sav * savings[i] +
+                 w_regret * regret +
+                 w_conn_avg * conn_avg +
+                 w_conn_std * conn_std)
+        scores[i] = score
+    
+    # Return candidate with highest score
+    return candidates[np.argmax(scores)]
+```

@@ -1,0 +1,63 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit from the unvisited nodes using a weighted combination of savings,
+    regret, and connectivity with dynamic weights adapted to the number of remaining nodes."""
+    
+    # If only one candidate, return it immediately
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    n = distance_matrix.shape[0]
+    r = len(unvisited_nodes) / n  # fraction of unvisited nodes
+    
+    # Dynamic weights (self‑normalizing because slopes sum to 0)
+    w_sav = 0.1 + 0.5 * (1 - r)
+    w_reg = 0.2 + 0.2 * (1 - r)
+    w_con = 0.7 - 0.7 * (1 - r)
+    
+    candidates = list(unvisited_nodes)
+    savings = []
+    regrets = []
+    conns = []
+    
+    for node in candidates:
+        # Savings: dist(cand, dest) - dist(current, cand)
+        saving = distance_matrix[node, destination_node] - distance_matrix[current_node, node]
+        savings.append(saving)
+        
+        # Regret: min distance from cand to any other unvisited node minus dist(current, cand)
+        others = [j for j in candidates if j != node]
+        if others:
+            min_dist_to_other = min(distance_matrix[node, j] for j in others)
+            regret = min_dist_to_other - distance_matrix[current_node, node]
+        else:
+            regret = 0.0
+        regrets.append(regret)
+        
+        # Connectivity: negative average distance to other unvisited nodes
+        if others:
+            avg_dist_to_others = np.mean([distance_matrix[node, j] for j in others])
+        else:
+            avg_dist_to_others = 0.0
+        conns.append(-avg_dist_to_others)
+    
+    # Z‑score normalization for each criterion
+    def z_scores(values):
+        arr = np.array(values, dtype=float)
+        if arr.std() == 0:
+            return np.zeros_like(arr)
+        return (arr - arr.mean()) / arr.std()
+    
+    z_sav = z_scores(savings)
+    z_reg = z_scores(regrets)
+    z_con = z_scores(conns)
+    
+    # Combined score (higher is better)
+    scores = w_sav * z_sav + w_reg * z_reg + w_con * z_con
+    
+    # Return the node with highest score
+    best_idx = np.argmax(scores)
+    return candidates[best_idx]
+```

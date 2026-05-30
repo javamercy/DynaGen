@@ -1,0 +1,78 @@
+```python
+import numpy as np
+
+def compute_row_max_norm(distance_matrix: np.ndarray) -> np.ndarray:
+    """Compute per-row max distance (excluding self) for normalization."""
+    n = distance_matrix.shape[0]
+    row_max = np.zeros(n)
+    for i in range(n):
+        row = distance_matrix[i]
+        # remove self distance (diagonal)
+        other = np.delete(row, i)
+        max_val = np.max(other)
+        # avoid division by zero if all distances equal (including zero)
+        row_max[i] = max_val if max_val > 1e-12 else 1.0
+    return row_max
+
+def select_next_node_v2(current_node: int,
+                        destination_node: int,
+                        unvisited_nodes: set,
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using two-step lookahead, regret,
+    and adaptive weighting based on remaining nodes.
+    """
+    # precompute per-row normalization maxima
+    row_max = compute_row_max_norm(distance_matrix)
+    n_total = distance_matrix.shape[0]
+    remaining = len(unvisited_nodes)
+
+    # early/late phase weight using sigmoid
+    remaining_frac = remaining / n_total
+    sig = 1.0 / (1.0 + np.exp(-5.0 * (remaining_frac - 0.5)))
+    w_connect = 0.3 * sig
+    w_dest = 0.3 * (1.0 - sig)
+    w_immediate = 0.4
+    w_regret = 0.2  # positive, score = ... - w_regret * regret
+
+    best_node = None
+    best_score = float('inf')
+
+    for j in unvisited_nodes:
+        # normalized immediate distance
+        d_cur_j = distance_matrix[current_node][j] / row_max[current_node]
+
+        # normalized connectivity (average distance to other unvisited)
+        if remaining <= 1:
+            connectivity = 0.0
+        else:
+            others = list(unvisited_nodes - {j})
+            dists_j_others = [distance_matrix[j][k] / row_max[j] for k in others]
+            connectivity = np.mean(dists_j_others)
+
+        # normalized destination distance
+        d_j_dest = distance_matrix[j][destination_node] / row_max[j]
+
+        # regret: gap between best and second-best distance from j to other unvisited
+        if remaining <= 2:
+            regret = 0.0
+        else:
+            candidates = [k for k in unvisited_nodes if k != j]
+            dists = [distance_matrix[j][k] / row_max[j] for k in candidates]
+            sorted_dists = sorted(dists)
+            best = sorted_dists[0]
+            second_best = sorted_dists[1] if len(sorted_dists) > 1 else best
+            regret = second_best - best  # positive
+
+        # score: lower is better
+        score = (w_immediate * d_cur_j +
+                 w_connect * connectivity +
+                 w_dest * d_j_dest -
+                 w_regret * regret)
+
+        if score < best_score:
+            best_score = score
+            best_node = j
+
+    return best_node
+```

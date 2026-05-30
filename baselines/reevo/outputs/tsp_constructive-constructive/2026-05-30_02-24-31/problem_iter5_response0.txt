@@ -1,0 +1,54 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using:
+    - immediate cost (distance from current)
+    - two-step lookahead (distance from candidate to its nearest other unvisited node)
+    - regret based on best and second-best immediate costs (high regret = penalty for skipping)
+    - distance to destination
+    Weights are tuned heuristically.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)  # deterministic order
+
+    # Compute best and second-best immediate costs for regret
+    costs = {}
+    for i in unvisited:
+        costs[i] = distance_matrix[current_node, i]
+    sorted_costs = sorted(costs.values())
+    best_cost = sorted_costs[0]
+    second_best_cost = sorted_costs[1] if len(sorted_costs) > 1 else best_cost
+
+    w1, w2, w3, w4 = 0.3, 0.2, 0.3, 0.2  # tuned weights
+
+    scores = {}
+    for i in unvisited:
+        immediate = costs[i]
+
+        # Two-step lookahead: cost of best immediate successor from i
+        if len(unvisited) > 1:
+            lookahead = min(distance_matrix[i, j] for j in unvisited if j != i)
+        else:
+            lookahead = 0.0
+
+        # Regret: penalty for not taking the best immediate node now
+        if immediate == best_cost:
+            regret = second_best_cost - best_cost
+        else:
+            regret = 0.0
+
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Score: lower is better. Subtract regret to prioritize high-regret nodes.
+        score = w1 * immediate + w2 * lookahead - w3 * regret - w4 * dest_dist
+        scores[i] = score
+
+    # Deterministic tie-breaking: smallest index among minimal score
+    min_score = min(scores.values())
+    candidates = [node for node, sc in scores.items() if sc == min_score]
+    return min(candidates)
+```

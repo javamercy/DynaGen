@@ -1,0 +1,22 @@
+algorithm: reevo
+max_fe: 503
+pop_size: 5
+init_pop_size: 5
+mutation_rate: 0.5
+timeout: 180
+diversify_init_pop: true
+problem:
+  problem_name: tsp_constructive
+  problem_type: constructive
+  obj_type: min
+  problem_size: 500
+  func_name: select_next_node
+  description: Solving Traveling Salesman Problem (TSP) with constructive heuristics.
+    TSP requires finding the shortest path that visits all given nodes and returns
+    to the starting node.
+llm_client:
+  _target_: utils.llm_client.openai.OpenAIClient
+  model: deepseek-v4-flash
+  temperature: 0.7
+  api_key: ${oc.env:DEEPSEEK_API_KEY}
+  base_url: https://api.deepseek.com

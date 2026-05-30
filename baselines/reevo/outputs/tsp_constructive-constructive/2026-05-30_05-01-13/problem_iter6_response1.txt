@@ -1,0 +1,45 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic that combines:
+    - proximity (distance from current node)
+    - savings (Clarke-Wright style, wrt the destination node)
+    - one-step look-ahead (minimum distance from candidate to another unvisited node)
+
+    Uses fixed weights: w1=0.25, w2=0.5, w3=0.25 (emphasizing savings).
+    The score is minimized.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Fixed weights (tuned for general TSP instances)
+    w1 = 0.25  # weight for distance from current
+    w2 = 0.50  # weight for savings (positive savings reduce score)
+    w3 = 0.25  # weight for look-ahead
+
+    best_node = None
+    best_score = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Distance from current node to candidate
+        dist_cur = distance_matrix[current_node][candidate]
+
+        # Savings: d(current, dest) + d(candidate, dest) - d(current, candidate)
+        savings = (distance_matrix[current_node][destination_node] +
+                   distance_matrix[candidate][destination_node] -
+                   distance_matrix[current_node][candidate])
+
+        # One-step look-ahead: shortest distance from candidate to any other unvisited node
+        other_distances = [distance_matrix[candidate][other]
+                           for other in unvisited_nodes if other != candidate]
+        look_ahead = min(other_distances) if other_distances else 0.0
+
+        # Composite score (lower is better)
+        score = w1 * dist_cur - w2 * savings + w3 * look_ahead
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

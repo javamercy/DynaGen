@@ -1,0 +1,82 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Mutated version with a look‑ahead mechanism: for each candidate i, compute a greedy
+    two‑step path from i (nearest then second‑nearest unvisited node) to the destination.
+    Combine with immediate cost, two‑step regret, future regret, and destination distance.
+    Weights are tuned to penalize high immediate cost and to reward good future prospects.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Deterministic ordering for tie-breaking
+    candidates = sorted(unvisited_nodes)
+
+    # Weights for: immediate, two-step regret, future regret, destination distance, look-ahead
+    w_imm, w_two, w_future, w_dest, w_look = 0.2, 0.25, 0.15, 0.15, 0.25
+
+    best_score = float('inf')
+    best_node = None
+
+    for i in candidates:
+        # 1. Immediate distance from current node to i
+        imm = distance_matrix[current_node, i]
+
+        # 2. Two-step regret: best indirect path via any other j
+        best_two = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_two:
+                best_two = cost
+        regret_two = best_two - imm if best_two != float('inf') else 0.0
+
+        # 3. Future regret: second-best minus best edge from i to other unvisited nodes
+        future_costs = [distance_matrix[i, v] for v in unvisited_nodes if v != i]
+        if len(future_costs) >= 2:
+            sorted_future = sorted(future_costs)
+            regret_future = sorted_future[1] - sorted_future[0]
+        else:
+            regret_future = 0.0
+
+        # 4. Distance to the final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # 5. Look‑ahead: greedy 2‑step path from i
+        remaining = [v for v in unvisited_nodes if v != i]
+        if len(remaining) >= 2:
+            # first step: nearest neighbour from i
+            first_nn = min(remaining, key=lambda v: distance_matrix[i, v])
+            first_cost = distance_matrix[i, first_nn]
+            # second step: nearest neighbour from first_nn among the rest
+            rest = [v for v in remaining if v != first_nn]
+            if len(rest) >= 1:
+                second_nn = min(rest, key=lambda v: distance_matrix[first_nn, v])
+                second_cost = distance_matrix[first_nn, second_nn]
+                # final jump to destination
+                final_cost = distance_matrix[second_nn, destination_node]
+                lookahead = first_cost + second_cost + final_cost
+            else:
+                lookahead = first_cost + dest_dist
+        elif len(remaining) == 1:
+            lookahead = distance_matrix[i, remaining[0]] + distance_matrix[remaining[0], destination_node]
+        else:
+            lookahead = dest_dist
+
+        # Combined score (lower is better)
+        score = (w_imm * imm
+                 - w_two * regret_two
+                 - w_future * regret_future
+                 - w_dest * dest_dist
+                 + w_look * lookahead)   # positive weight because we want to minimise lookahead
+
+        # Deterministic tie-breaking: smaller node index wins
+        if score < best_score or (np.isclose(score, best_score) and i < best_node):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

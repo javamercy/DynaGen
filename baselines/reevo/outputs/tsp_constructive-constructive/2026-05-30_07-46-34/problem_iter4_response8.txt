@@ -1,0 +1,84 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """Select next node with normalized adaptive multi-criteria scoring."""
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    total_nodes = distance_matrix.shape[0]
+    n_remaining = len(unvisited_nodes)
+    max_unvisited = total_nodes - 1  # current_node already visited
+    progress = 1.0 - n_remaining / max_unvisited if max_unvisited > 0 else 1.0
+
+    # Adaptive weights (same structure as v1)
+    w_imm = 0.5 * (0.5 + 0.5 * progress)
+    w_look = 0.3 * (1.0 - progress)
+    w_regret = 0.4 * progress
+    w_div = 0.3 * (1.0 - progress)
+    w_dest = 0.1
+
+    # Prepare lists of raw scores for normalization
+    candidates = list(unvisited_nodes)
+    imm_vals = []
+    look_vals = []
+    regret_vals = []
+    avg_vals = []
+    dest_vals = []
+    remaining_sets = []
+
+    for candidate in candidates:
+        remaining = unvisited_nodes - {candidate}
+        remaining_sets.append(remaining)
+        imm_vals.append(distance_matrix[current_node, candidate])
+        dest_vals.append(distance_matrix[candidate, destination_node])
+
+        if remaining:
+            dists = [distance_matrix[candidate, u] for u in remaining]
+            look_vals.append(min(dists))
+            if len(remaining) >= 2:
+                sorted_dists = sorted(dists)
+                regret_vals.append(sorted_dists[1] - sorted_dists[0])
+            else:
+                regret_vals.append(0.0)
+            avg_vals.append(np.mean(dists))
+        else:
+            look_vals.append(distance_matrix[candidate, destination_node])
+            regret_vals.append(0.0)
+            avg_vals.append(0.0)
+
+    # Min-max normalization with epsilon
+    eps = 1e-9
+    def normalize(vals):
+        mn = min(vals)
+        mx = max(vals)
+        if mx - mn < eps:
+            return [0.0 for _ in vals]
+        return [(v - mn) / (mx - mn) for v in vals]
+
+    imm_norm = normalize(imm_vals)
+    look_norm = normalize(look_vals)
+    regret_norm = normalize(regret_vals)
+    avg_norm = normalize(avg_vals)
+    dest_norm = normalize(dest_vals)
+
+    # Compute composite score (lower is better)
+    best_score = float('inf')
+    best_node = None
+    for i, candidate in enumerate(candidates):
+        score = (w_imm * imm_norm[i] +
+                 w_look * look_norm[i] -
+                 w_regret * regret_norm[i] -
+                 w_div * avg_norm[i] +
+                 w_dest * dest_norm[i])
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

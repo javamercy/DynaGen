@@ -1,0 +1,91 @@
+```python
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Improved constructive heuristic for TSP next-node selection.
+
+    Uses adaptive multi‑criteria weighting:
+      - direct cost (lower is better)
+      - destination proximity (lower is better)
+      - insertion savings (higher is better)
+      - regret (cost of not taking the best edge from candidate)
+      - isolation (average distance to other unvisited nodes)
+    Each criterion is normalised to [0,1] and then combined with weights
+    that depend on the number of remaining nodes (early vs late stage).
+    """
+    n_remaining = len(unvisited_nodes)
+    if n_remaining == 1:
+        return next(iter(unvisited_nodes))
+
+    # Precompute all candidate nodes as a list
+    candidates = list(unvisited_nodes)
+    n_candidates = len(candidates)
+
+    # Gather raw values for each candidate
+    direct_costs = np.empty(n_candidates, dtype=np.float64)
+    dest_proxies = np.empty(n_candidates, dtype=np.float64)
+    savings = np.empty(n_candidates, dtype=np.float64)
+    regrets = np.empty(n_candidates, dtype=np.float64)
+    isolations = np.empty(n_candidates, dtype=np.float64)
+
+    future_set = unvisited_nodes | {destination_node}
+
+    for idx, node in enumerate(candidates):
+        direct_costs[idx] = distance_matrix[current_node, node]
+        dest_proxies[idx] = distance_matrix[node, destination_node]
+        savings[idx] = distance_matrix[current_node, destination_node] - direct_costs[idx] - dest_proxies[idx]
+
+        # Distances from node to all other future nodes (exclude self)
+        dists = [distance_matrix[node, f] for f in future_set if f != node]
+        dists.sort()
+        if len(dists) >= 2:
+            regrets[idx] = dists[1] - dists[0]      # difference between second best and best
+        elif len(dists) == 1:
+            regrets[idx] = dists[0]                  # only one option (destination)
+        else:
+            regrets[idx] = 0.0
+
+        # Isolation: average distance to other unvisited nodes
+        others = [distance_matrix[node, o] for o in unvisited_nodes if o != node]
+        isolations[idx] = np.mean(others) if others else 0.0
+
+    # Normalise each criterion to [0,1] over candidates (higher is better for all)
+    # For direct and dest_proxies, lower is better -> invert by using max - value
+    def normalise(arr, higher_is_better=True):
+        mn, mx = arr.min(), arr.max()
+        if mx == mn:
+            return np.ones_like(arr)
+        if higher_is_better:
+            return (arr - mn) / (mx - mn)
+        else:
+            return (mx - arr) / (mx - mn)
+
+    norm_direct = normalise(direct_costs, higher_is_better=False)
+    norm_dest = normalise(dest_proxies, higher_is_better=False)
+    norm_savings = normalise(savings, higher_is_better=True)
+    norm_regret = normalise(regrets, higher_is_better=True)
+    norm_isolation = normalise(isolations, higher_is_better=True)
+
+    # Adaptive weights based on remaining nodes
+    if n_remaining > 5:
+        w_direct, w_dest, w_sav, w_reg, w_isol = 0.15, 0.10, 0.30, 0.25, 0.20
+    elif n_remaining > 3:
+        w_direct, w_dest, w_sav, w_reg, w_isol = 0.20, 0.20, 0.20, 0.25, 0.15
+    else:
+        w_direct, w_dest, w_sav, w_reg, w_isol = 0.25, 0.25, 0.15, 0.20, 0.15
+
+    # Composite score (maximise)
+    scores = (w_direct * norm_direct +
+              w_dest * norm_dest +
+              w_sav * norm_savings +
+              w_reg * norm_regret +
+              w_isol * norm_isolation)
+
+    # Return the candidate with highest score
+    best_idx = np.argmax(scores)
+    return candidates[best_idx]
+```

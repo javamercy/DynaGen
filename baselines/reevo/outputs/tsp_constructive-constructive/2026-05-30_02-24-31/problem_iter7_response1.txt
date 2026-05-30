@@ -1,0 +1,81 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Mutated version with emphasis on regret via adjusted weights and a three-step lookahead.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    candidates = sorted(unvisited_nodes)
+
+    # Weights: increased regret emphasis, added three-step regret
+    w_imm = 0.1
+    w_two = 0.4
+    w_three = 0.2
+    w_future = 0.2
+    w_dest = 0.1
+
+    best_score = float('inf')
+    best_node = None
+
+    # Precompute distance list for speed (optional)
+    for i in candidates:
+        # Immediate distance
+        imm = distance_matrix[current_node, i]
+
+        # --- Two-step regret (best indirect path via one intermediate) ---
+        best_two = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_two:
+                best_two = cost
+        regret_two = best_two - imm if best_two != float('inf') else 0.0
+
+        # --- Three-step regret (best indirect path via two intermediates) ---
+        best_three = float('inf')
+        other_nodes = [v for v in candidates if v != i]
+        n_other = len(other_nodes)
+        if n_other >= 2:
+            for idx1, j in enumerate(other_nodes):
+                for k in other_nodes[idx1+1:]:
+                    # Two possible orders: j->k or k->j, take min
+                    cost1 = distance_matrix[current_node, j] + distance_matrix[j, k] + distance_matrix[k, i]
+                    cost2 = distance_matrix[current_node, k] + distance_matrix[k, j] + distance_matrix[j, i]
+                    cost = min(cost1, cost2)
+                    if cost < best_three:
+                        best_three = cost
+            # regret: how much worse it is to take the two-step path vs three-step? Actually we want to penalize high regret.
+            # If best_three is much smaller than best_two, then choosing i now might be suboptimal; regret_three positive.
+            regret_three = best_two - best_three if best_three != float('inf') else 0.0
+        else:
+            regret_three = 0.0
+
+        # --- Future edge regret (among edges from i to other unvisited nodes) ---
+        future_costs = [distance_matrix[i, v] for v in candidates if v != i]
+        if len(future_costs) >= 2:
+            sorted_fut = sorted(future_costs)
+            regret_future = sorted_fut[1] - sorted_fut[0]
+        else:
+            regret_future = 0.0
+
+        # Distance to final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Score: lower is better, negate regrets so that large regret reduces score (more desirable)
+        score = (w_imm * imm 
+                 - w_two * regret_two 
+                 - w_three * regret_three 
+                 - w_future * regret_future 
+                 - w_dest * dest_dist)
+
+        # Deterministic tie-breaking
+        if score < best_score or (np.isclose(score, best_score) and i < best_node):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

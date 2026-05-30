@@ -1,0 +1,46 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved heuristic: simple weighted combination of immediate cost, regret,
+    and distance to the final destination. Fewer weights, no normalization.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Weights tuned to prioritize regret and destination proximity
+    w_imm, w_regret, w_dest = 0.2, 0.4, 0.4
+
+    unvisited = sorted(unvisited_nodes)
+    best_score = float('inf')
+    best_node = None
+
+    for i in unvisited:
+        immediate = distance_matrix[current_node, i]
+
+        # Regret: best alternative cost to reach i via a different node j
+        best_alt = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_alt:
+                best_alt = cost
+        regret = best_alt - immediate if best_alt != float('inf') else 0.0
+
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Lower score is better
+        score = w_imm * immediate - w_regret * regret - w_dest * dest_dist
+
+        # Deterministic tie-breaking: smaller index wins
+        if score < best_score - 1e-12:
+            best_score = score
+            best_node = i
+        elif abs(score - best_score) <= 1e-12 and i < best_node:
+            best_score = score
+            best_node = i
+
+    return best_node
+```

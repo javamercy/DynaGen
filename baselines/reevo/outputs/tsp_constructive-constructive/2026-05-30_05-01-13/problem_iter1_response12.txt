@@ -1,0 +1,49 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a one-step rollout (look-ahead) heuristic.
+    For each candidate, simulate a nearest-neighbor construction from the candidate
+    through the remaining unvisited nodes back to the destination, and choose the
+    candidate that minimizes the total cost (immediate + simulated remainder).
+    """
+    # If only one unvisited node remains, return it immediately
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_total = float('inf')
+
+    # Precompute all distances for speed
+    dist = distance_matrix
+
+    for candidate in unvisited_nodes:
+        immediate = dist[current_node][candidate]
+
+        # Remaining nodes after picking candidate
+        remaining = unvisited_nodes - {candidate}
+        if not remaining:
+            # No remaining nodes: go directly to destination
+            total = immediate + dist[candidate][destination_node]
+        else:
+            # Simulate a greedy nearest-neighbor tour from candidate
+            pos = candidate
+            remaining_set = set(remaining)
+            tour_cost = 0.0
+            while remaining_set:
+                # Find closest unvisited node
+                next_node = min(remaining_set, key=lambda n: dist[pos][n])
+                tour_cost += dist[pos][next_node]
+                pos = next_node
+                remaining_set.remove(next_node)
+            # Return to destination
+            tour_cost += dist[pos][destination_node]
+            total = immediate + tour_cost
+
+        if total < best_total:
+            best_total = total
+            best_node = candidate
+
+    return best_node
+```

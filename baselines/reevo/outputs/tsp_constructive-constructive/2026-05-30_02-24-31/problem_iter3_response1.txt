@@ -1,0 +1,45 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """Select next node using two-step lookahead with regret and destination distance."""
+    n = len(unvisited_nodes)
+    if n == 0:
+        raise ValueError("No unvisited nodes to choose from")
+    
+    # Precompute two-step costs (immediate + cheapest second step)
+    two_step_costs = {}
+    best_two_step = float('inf')
+    for j in unvisited_nodes:
+        immediate = distance_matrix[current_node][j]
+        if n == 1:
+            two_step = immediate
+        else:
+            # minimum distance from j to any other unvisited node
+            min_next = min(
+                distance_matrix[j][k] for k in unvisited_nodes if k != j
+            )
+            two_step = immediate + min_next
+        two_step_costs[j] = two_step
+        if two_step < best_two_step:
+            best_two_step = two_step
+    
+    # Score each candidate: lower is better
+    scores = {}
+    w1, w2, w3 = 1.0, 0.5, 0.3   # weights for immediate cost, regret, destination distance
+    for j in unvisited_nodes:
+        immediate = distance_matrix[current_node][j]
+        dest_dist = distance_matrix[destination_node][j]
+        regret = two_step_costs[j] - best_two_step   # non-negative
+        score = w1 * immediate + w2 * regret + w3 * dest_dist
+        scores[j] = score
+    
+    # Deterministic tie-breaking: smallest index among nodes with minimal score
+    next_node = min(scores, key=lambda x: (scores[x], x))
+    return next_node
+```

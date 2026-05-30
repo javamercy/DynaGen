@@ -1,0 +1,55 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, 
+                        unvisited_nodes: Set[int], 
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a two-step lookahead with regret.
+    
+    For each candidate, we evaluate:
+      - immediate cost: dist(current, candidate)
+      - future regret: difference between the best and second-best edges
+        from the candidate to other unvisited nodes (or to the destination
+        if no other unvisited remain). A large regret means choosing this
+        candidate preserves a very good option for later.
+    Score = immediate_cost - 0.4 * regret + 0.1 * dist(candidate, destination)
+    Lower score is better.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+    
+    best_node = None
+    best_score = float('inf')
+    beta = 0.4
+    gamma = 0.1
+    
+    for candidate in unvisited_nodes:
+        immediate = distance_matrix[current_node][candidate]
+        
+        # Remaining nodes after picking candidate
+        remaining = unvisited_nodes - {candidate}
+        if remaining:
+            # Distances from candidate to remaining nodes
+            cand_dists = [distance_matrix[candidate][n] for n in remaining]
+            cand_dists.sort()
+            best_future = cand_dists[0]
+            second_best = cand_dists[1] if len(cand_dists) > 1 else best_future
+            regret = second_best - best_future
+        else:
+            # No other unvisited, must go to destination
+            best_future = distance_matrix[candidate][destination_node]
+            regret = 0.0  # no alternative
+        
+        # Distance to destination (final leg)
+        to_dest = distance_matrix[candidate][destination_node]
+        
+        score = immediate - beta * regret + gamma * to_dest
+        
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+    
+    return best_node
+```

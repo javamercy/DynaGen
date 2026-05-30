@@ -1,0 +1,40 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: Set[int], distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using a 2-step lookahead heuristic.
+    For each candidate node, consider the cost of also taking the best (nearest) edge
+    from that candidate to the remaining unvisited nodes.
+    """
+    # If only one node left, it must be chosen
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_score = float('inf')
+
+    for u in unvisited_nodes:
+        # Direct cost from current to candidate u
+        direct_cost = distance_matrix[current_node][u]
+
+        # Look ahead: from u, find the nearest unvisited node (excluding u)
+        remaining = unvisited_nodes - {u}
+        if remaining:
+            lookahead_cost = min(distance_matrix[u][v] for v in remaining)
+        else:
+            lookahead_cost = 0.0  # will not occur due to len check
+
+        # Distance from candidate to the final destination (penalty term)
+        dest_cost = distance_matrix[u][destination_node]
+
+        # Combined score (lower is better)
+        score = direct_cost + 0.5 * lookahead_cost + 0.2 * dest_cost
+
+        if score < best_score:
+            best_score = score
+            best_node = u
+
+    return best_node
+```

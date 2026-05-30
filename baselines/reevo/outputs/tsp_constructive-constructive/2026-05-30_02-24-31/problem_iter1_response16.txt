@@ -1,0 +1,26 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a one-step lookahead (nearest neighbor with lookahead)."""
+    best_node = None
+    best_score = float('inf')
+    for node in unvisited_nodes:
+        # cost to go from current to candidate
+        cost_to_node = distance_matrix[current_node][node]
+        # lookahead: from candidate, best distance to any other unvisited node
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            next_best = min(distance_matrix[node][n] for n in remaining)
+        else:
+            # last node: go directly to destination
+            next_best = distance_matrix[node][destination_node]
+        # total cost = current edge + lookahead edge
+        total = cost_to_node + next_best
+        # tie‑breaker: prefer nodes closer to destination
+        score = total + 0.2 * distance_matrix[node][destination_node]
+        if score < best_score:
+            best_score = score
+            best_node = node
+    return best_node
+```

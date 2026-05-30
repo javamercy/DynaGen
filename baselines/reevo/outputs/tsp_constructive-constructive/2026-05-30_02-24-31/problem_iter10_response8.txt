@@ -1,0 +1,84 @@
+```python
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Enhanced selection heuristic for TSP constructive algorithm.
+
+    Combines immediate cost, two-step regret, lookahead savings, and Clarke-Wright
+    savings with adaptive weighting that shifts from exploration to exploitation
+    as fewer nodes remain. Weights are normalised to the same scale using the
+    maximum distance in the matrix.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = sorted(unvisited_nodes)
+    n = len(unvisited)
+    max_dist = distance_matrix.max()  # scale factor for normalisation
+
+    # --- adaptive weights ---
+    # When many nodes remain: favour regret (diversification) and lookahead savings.
+    # When few remain: favour immediate cost and destination proximity.
+    # Fraction of nodes remaining (relative to current state) – since we don't know total,
+    # we use a sigmoid-like function: f = 1 / (1 + exp(-(n-10)/3)) for smooth transition.
+    # But simpler: linear transition based on n.
+    frac = 1.0 - 1.0 / (1.0 + n)   # 0 when n=0 (not used), ~1 when n large
+
+    w_imm   = 0.2 + 0.3 * (1.0 - frac)   # 0.2..0.5, higher when few nodes left
+    w_reg   = 0.4 * frac                  # 0..0.4   , higher when many nodes
+    w_dest  = 0.3 + 0.1 * (1.0 - frac)   # 0.3..0.4 , higher when few nodes
+    w_save  = 0.3 * frac                  # 0..0.3   , higher when many nodes
+    w_best  = 0.2 * frac                  # 0..0.2   , additional term
+
+    # Precompute best edge from current to any unvisited (for lookahead savings)
+    best_from_current = min(distance_matrix[current_node, j] for j in unvisited)
+
+    best_score = float('inf')
+    best_node = None
+
+    for u in unvisited:
+        # 1. Immediate cost (direct distance)
+        imm = distance_matrix[current_node, u]
+
+        # 2. Regret: difference between best alternative two-step path (current->j->u)
+        # and the direct edge. Normalise by max_dist.
+        best_alt = float('inf')
+        for j in unvisited:
+            if j == u:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, u]
+            if cost < best_alt:
+                best_alt = cost
+        regret = (best_alt - imm) / max_dist   # regret >= 0 (triangle inequality likely holds)
+
+        # 3. Distance to final destination
+        dest = distance_matrix[u, destination_node] / max_dist
+
+        # 4. Clarke-Wright savings: positive if going via u is better than direct
+        # savings = dist(current, dest) - (dist(current, u) + dist(u, dest))
+        cw_savings = (distance_matrix[current_node, destination_node] -
+                      distance_matrix[current_node, u] - distance_matrix[u, destination_node]) / max_dist
+
+        # 5. Lookahead savings: difference between best from current and best from u
+        best_from_u = min(distance_matrix[u, j] for j in unvisited if j != u)
+        lookahead_savings = (best_from_current - best_from_u) / max_dist
+
+        # Composite score (lower is better): costs are positive, savings are subtracted
+        score = (w_imm * imm / max_dist
+                 - w_reg * regret
+                 + w_dest * dest
+                 - w_save * cw_savings
+                 - w_best * lookahead_savings)
+
+        if score < best_score - 1e-12:
+            best_score = score
+            best_node = u
+        elif abs(score - best_score) < 1e-12 and (best_node is None or u < best_node):
+            best_node = u
+
+    return best_node
+```

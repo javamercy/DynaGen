@@ -1,0 +1,103 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: Set[int],
+                        distance_matrix: np.ndarray) -> int:
+    """
+    Improved next‑node selection for TSP constructive heuristics.
+
+    Uses smoothed adaptive weights that shift from exploration to exploitation
+    as the number of remaining nodes decreases. All criteria are normalised to
+    [0,1] to avoid scale bias. A penalty for the minimal distance to any
+    remaining node (including destination) is included to discourage premature
+    isolation.
+    """
+    n_remain = len(unvisited_nodes)
+    if n_remain == 1:
+        return next(iter(unvisited_nodes))
+
+    # Precompute distances from current to destination once
+    cur_to_dest = distance_matrix[current_node, destination_node]
+
+    # Future set for regret / min‑distance computation
+    future = unvisited_nodes | {destination_node}
+    # Number of future nodes (including destination) for normalisation
+    n_future = len(future)
+
+    # Collect raw values for all candidates
+    candidates = list(unvisited_nodes)
+    n_cand = len(candidates)
+
+    savings = np.empty(n_cand, dtype=np.float64)
+    regrets = np.empty(n_cand, dtype=np.float64)
+    min_next = np.empty(n_cand, dtype=np.float64)
+    direct_cost = np.empty(n_cand, dtype=np.float64)
+    dest_cost = np.empty(n_cand, dtype=np.float64)
+    connectivity = np.empty(n_cand, dtype=np.float64)  # average dist to other unvisited
+
+    for i, node in enumerate(candidates):
+        direct_cost[i] = distance_matrix[current_node, node]
+        dest_cost[i] = distance_matrix[node, destination_node]
+        savings[i] = cur_to_dest - direct_cost[i] - dest_cost[i]
+
+        # Sort distances to all future nodes (exclude self)
+        dists = np.array([distance_matrix[node, f] for f in future if f != node])
+        dists.sort()
+        if len(dists) >= 2:
+            regrets[i] = dists[1] - dists[0]   # difference between second‑best and best
+            min_next[i] = dists[0]
+        elif len(dists) == 1:
+            regrets[i] = dists[0]
+            min_next[i] = dists[0]
+        else:  # should not happen because there is at least destination
+            regrets[i] = 0.0
+            min_next[i] = 0.0
+
+        # Connectivity: average distance to other unvisited nodes (excluding self)
+        other = unvisited_nodes - {node}
+        if other:
+            connectivity[i] = np.mean([distance_matrix[node, o] for o in other])
+        else:
+            connectivity[i] = 0.0
+
+    # Normalise each criterion to [0,1] (higher is better)
+    def normalise(arr, invert=False):
+        mn, mx = arr.min(), arr.max()
+        if mx == mn:
+            return np.ones_like(arr)
+        if invert:       # lower raw value → higher normalised score
+            return (mx - arr) / (mx - mn)
+        else:
+            return (arr - mn) / (mx - mn)
+
+    savings_norm = normalise(savings, invert=False)
+    regret_norm = normalise(regrets, invert=False)      # higher regret = more urgent
+    minnext_norm = normalise(min_next, invert=True)     # smaller min_next → penalty (invert so large value = good)
+    direct_norm = normalise(direct_cost, invert=True)   # lower direct cost → better
+    dest_norm = normalise(dest_cost, invert=True)       # lower dest cost → better
+    conn_norm = normalise(connectivity, invert=False)   # isolation → exploration
+
+    # Smooth adaptive weights based on remaining nodes
+    # w_factor close to 0 when many remain, close to 1 when few remain
+    w_factor = n_remain / (n_remain + 10.0)  # slowly increasing
+    # Weights: early → savings, connectivity; late → regret, direct, dest, min‐next penalty
+    w_sav = 0.30 * (1 - w_factor) + 0.10 * w_factor
+    w_reg = 0.20 * (1 - w_factor) + 0.35 * w_factor
+    w_direct = 0.10 * (1 - w_factor) + 0.15 * w_factor
+    w_dest = 0.10 * (1 - w_factor) + 0.20 * w_factor
+    w_conn = 0.20 * (1 - w_factor) + 0.05 * w_factor
+    w_minnext = 0.10 * (1 - w_factor) + 0.15 * w_factor  # penalty weight
+
+    # Composite score (maximise)
+    scores = (w_sav * savings_norm +
+              w_reg * regret_norm +
+              w_direct * direct_norm +
+              w_dest * dest_norm +
+              w_conn * conn_norm +
+              w_minnext * minnext_norm)
+
+    best_idx = int(np.argmax(scores))
+    return candidates[best_idx]
+```

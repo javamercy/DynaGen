@@ -1,0 +1,43 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a full greedy look‑ahead heuristic.
+
+    For each candidate node, simulate the remaining tour using the nearest
+    neighbour heuristic and choose the candidate that minimises the total
+    estimated distance (direct edge + completion cost).
+    """
+    import numpy as np
+
+    # Trivial case: only one candidate remains
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_candidate = None
+    best_total = np.inf
+
+    for candidate in unvisited_nodes:
+        direct_cost = distance_matrix[current_node, candidate]
+
+        # Simulate greedy nearest‑neighbour completion from the candidate
+        remaining = set(unvisited_nodes)
+        remaining.remove(candidate)
+        last = candidate
+        completion_cost = 0.0
+
+        # Repeatedly go to the nearest unvisited node
+        while remaining:
+            nearest = min(remaining, key=lambda n: distance_matrix[last, n])
+            completion_cost += distance_matrix[last, nearest]
+            remaining.remove(nearest)
+            last = nearest
+
+        # Finally return to the destination node
+        completion_cost += distance_matrix[last, destination_node]
+
+        total_estimated = direct_cost + completion_cost
+        if total_estimated < best_total:
+            best_total = total_estimated
+            best_candidate = candidate
+
+    return best_candidate
+```

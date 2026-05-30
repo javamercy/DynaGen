@@ -1,0 +1,46 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a combination of look-ahead and summary statistics.
+    The score balances immediate cost, best next hop, average/std of remaining distances,
+    and distance to destination. Lower scores are preferred.
+    """
+    best_node = None
+    best_score = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Immediate step cost
+        immediate = distance_matrix[current_node][candidate]
+
+        # Remaining nodes after visiting candidate
+        remaining = unvisited_nodes - {candidate}
+
+        if remaining:
+            # Look-ahead: cheapest next hop from candidate
+            look_ahead = min(distance_matrix[candidate][k] for k in remaining)
+
+            # Summary statistics of distances from candidate to remaining nodes
+            dists = [distance_matrix[candidate][i] for i in remaining]
+            mean_dist = np.mean(dists)
+            std_dist = np.std(dists)
+
+            # Distance from candidate back to destination
+            dest_dist = distance_matrix[candidate][destination_node]
+
+            # Weighted score (weights chosen heuristically)
+            score = (0.3 * immediate +
+                     0.3 * look_ahead -
+                     0.2 * mean_dist +
+                     0.1 * std_dist -
+                     0.1 * dest_dist)
+        else:
+            # Last node: must go directly to destination
+            dest_dist = distance_matrix[candidate][destination_node]
+            score = immediate + dest_dist
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

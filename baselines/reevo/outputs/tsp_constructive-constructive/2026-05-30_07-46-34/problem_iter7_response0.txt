@@ -1,0 +1,52 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node to visit from the unvisited nodes using adaptive weights,
+    two-step lookahead, and regret."""
+    
+    total_nodes = distance_matrix.shape[0]
+    n_remaining = len(unvisited_nodes)
+    r = n_remaining / total_nodes  # fraction of nodes still unvisited
+    
+    # Normalize distances by max distance to avoid scale issues
+    max_dist = distance_matrix.max()
+    if max_dist == 0:
+        max_dist = 1.0
+    
+    scores = {}
+    
+    # Precompute distances from current to all unvisited nodes for regret calculation
+    dists_from_current = {node: distance_matrix[current_node][node] for node in unvisited_nodes}
+    sorted_dists = sorted(dists_from_current.values())
+    best_dist = sorted_dists[0]
+    second_best = sorted_dists[1] if len(sorted_dists) >= 2 else best_dist
+    
+    for node in unvisited_nodes:
+        d_current_norm = distance_matrix[current_node][node] / max_dist
+        d_dest_norm = distance_matrix[destination_node][node] / max_dist
+        
+        # Two-step lookahead: distance to node + best onward distance
+        remaining_except = unvisited_nodes - {node}
+        if remaining_except:
+            onward_min = min(distance_matrix[node][k] for k in remaining_except)
+            two_step_norm = d_current_norm + onward_min / max_dist
+        else:
+            two_step_norm = d_current_norm  # no further nodes
+        
+        # Regret: how much worse it would be to skip this node now
+        d_current_node = dists_from_current[node]
+        regret = (second_best - d_current_node) / max_dist
+        
+        # Adaptive weights based on remaining fraction
+        w_lookahead = max(0.1, r)          # high early, low late
+        w_regret = 1.0 - r                 # low early, high late
+        w_dest = 1.0 - r                   # low early, high late
+        
+        # Score to minimize (negative regret encourages selection)
+        score = w_lookahead * two_step_norm + w_dest * d_dest_norm - w_regret * regret
+        scores[node] = score
+    
+    next_node = min(scores, key=scores.get)
+    return next_node
+```

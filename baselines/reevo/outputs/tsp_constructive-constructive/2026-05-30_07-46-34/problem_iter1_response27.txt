@@ -1,0 +1,35 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select the next node using a 2-step lookahead greedy simulation."""
+    best_node = None
+    best_score = float('inf')
+    
+    for candidate in unvisited_nodes:
+        # Simulate from candidate: up to 2 nearest-neighbor steps
+        remaining = set(unvisited_nodes) - {candidate}
+        sim_current = candidate
+        sim_distance = 0.0
+        steps = 0
+        
+        while remaining and steps < 2:
+            # Greedy nearest neighbor from current simulation node
+            next_node = min(remaining, key=lambda n: distance_matrix[sim_current][n])
+            sim_distance += distance_matrix[sim_current][next_node]
+            remaining.remove(next_node)
+            sim_current = next_node
+            steps += 1
+        
+        # Add direct distance from last simulated node to the destination
+        sim_distance += distance_matrix[sim_current][destination_node]
+        
+        # Total cost: edge from current to candidate + simulated path + final edge
+        total_score = distance_matrix[current_node][candidate] + sim_distance
+        
+        if total_score < best_score:
+            best_score = total_score
+            best_node = candidate
+    
+    return best_node
+```

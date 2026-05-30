@@ -1,0 +1,50 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node with adaptive two-step lookahead and normalized components."""
+    import numpy as np
+    
+    n_total = distance_matrix.shape[0]
+    n_unvisited = len(unvisited_nodes)
+    frac_remaining = n_unvisited / n_total
+    
+    # Precompute raw values for each candidate
+    imm_vals = []
+    dest_vals = []
+    future_vals = []   # best distance from candidate to another unvisited node (excluding itself)
+    
+    for node in unvisited_nodes:
+        imm = distance_matrix[current_node, node]
+        dest = distance_matrix[node, destination_node]
+        if n_unvisited > 1:
+            future = min(distance_matrix[node, j] for j in unvisited_nodes if j != node)
+        else:
+            future = 0.0
+        imm_vals.append(imm)
+        dest_vals.append(dest)
+        future_vals.append(future)
+    
+    # Min-max normalize each component across candidates
+    def normalize(vals):
+        min_v, max_v = min(vals), max(vals)
+        if max_v == min_v:
+            return [0.5] * len(vals)
+        return [(v - min_v) / (max_v - min_v) for v in vals]
+    
+    imm_norm = normalize(imm_vals)
+    dest_norm = normalize(dest_vals)
+    future_norm = normalize(future_vals)
+    
+    # Adaptive weights: more weight on future lookahead early, more on immediate later
+    w_imm = 1.0 - frac_remaining
+    w_future = frac_remaining
+    w_dest = 0.2  # constant small weight for destination proximity
+    
+    scores = {}
+    for idx, node in enumerate(unvisited_nodes):
+        # Combine normalized components (lower is better)
+        score = w_imm * imm_norm[idx] + w_dest * dest_norm[idx] + w_future * future_norm[idx]
+        scores[node] = score
+    
+    # Return node with smallest score
+    return min(scores, key=scores.get)
+```

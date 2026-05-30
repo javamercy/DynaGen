@@ -1,0 +1,83 @@
+```python
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node using an exact two-step look-ahead heuristic with
+    regret-based tie-breaking.
+
+    For each candidate node u in unvisited_nodes:
+        - immediate cost: distance from current_node to u
+        - look-ahead cost: minimum over v in remaining of
+          (distance[u][v] + distance[v][destination_node])
+          where remaining = unvisited_nodes - {u}. If no remaining node exists,
+          look-ahead = distance[u][destination_node].
+        - total = immediate + look_ahead
+
+    The candidate with the smallest total is chosen. If ties exist, the
+    candidate with the larger look-ahead regret (second_best_look_ahead -
+    best_look_ahead) is preferred, as it imposes stronger future constraints.
+    If still tied, the smaller node index is chosen.
+
+    Parameters
+    ----------
+    current_node : int
+        The node we are currently at.
+    destination_node : int
+        The final node we must return to (e.g., the starting depot).
+    unvisited_nodes : set of int
+        The set of nodes not yet visited (must be non-empty).
+    distance_matrix : np.ndarray
+        Square matrix of pairwise distances.
+
+    Returns
+    -------
+    int
+        The selected next node to visit.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_total = float('inf')
+    best_regret = -1.0  # regret = second_best - best, higher is better
+
+    for u in unvisited_nodes:
+        immediate = distance_matrix[current_node, u]
+        remaining = unvisited_nodes - {u}
+
+        if remaining:
+            # Compute best and second best two-step paths from u to destination
+            first = float('inf')
+            second = float('inf')
+            for v in remaining:
+                cost = distance_matrix[u, v] + distance_matrix[v, destination_node]
+                if cost < first:
+                    second = first
+                    first = cost
+                elif cost < second:
+                    second = cost
+            look_ahead = first
+            regret = second - first if second < float('inf') else 0.0
+        else:
+            look_ahead = distance_matrix[u, destination_node]
+            regret = 0.0
+
+        total = immediate + look_ahead
+
+        # Primary criterion: minimize total cost
+        # Secondary: maximize regret (more urgent to pick u now)
+        # Tertiary: smaller node index
+        if (total < best_total or
+            (total == best_total and regret > best_regret) or
+            (total == best_total and regret == best_regret and
+             (best_node is None or u < best_node))):
+            best_total = total
+            best_regret = regret
+            best_node = u
+
+    return best_node
+```

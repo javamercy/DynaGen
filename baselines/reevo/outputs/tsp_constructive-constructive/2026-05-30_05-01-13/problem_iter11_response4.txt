@@ -1,0 +1,116 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node combining savings, regret, connectivity and greedy lookahead
+    with z-score normalization and adaptive weights based on remaining nodes.
+    """
+    # Shortcut: only one candidate
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    total_nodes = distance_matrix.shape[0]
+    n_remaining = len(unvisited_nodes)
+    # progress: 0 = all nodes left, 1 = none left
+    progress = 1.0 - n_remaining / (total_nodes - 1)  # -1 because start is visited
+
+    # Precompute destination distance for efficiency
+    dist_to_dest_node = {node: distance_matrix[node][destination_node] for node in unvisited_nodes}
+
+    # Helper: greedy tour cost from 'start' through 'nodes' back to destination
+    def greedy_remaining(start, nodes):
+        if not nodes:
+            return distance_matrix[start][destination_node]
+        total = 0
+        cur = start
+        remaining = set(nodes)
+        while remaining:
+            # nearest neighbour
+            nxt = min(remaining, key=lambda x: distance_matrix[cur][x])
+            total += distance_matrix[cur][nxt]
+            remaining.remove(nxt)
+            cur = nxt
+        total += distance_matrix[cur][destination_node]
+        return total
+
+    # Collect raw components for all candidates
+    savings = []
+    regret = []          # raw insertion cost (lower is better)
+    connectivity = []    # average distance to other unvisited (lower is better)
+    lookahead = []       # greedy tour cost from candidate (lower is better)
+    candidates = list(unvisited_nodes)
+
+    for node in candidates:
+        # Savings: Clarke-Wright style
+        sav = distance_matrix[current_node][destination_node] + dist_to_dest_node[node] - distance_matrix[current_node][node]
+        savings.append(sav)
+
+        # Insertion cost (regret base)
+        ins_cost = distance_matrix[current_node][node] + dist_to_dest_node[node] - distance_matrix[current_node][destination_node]
+        regret.append(ins_cost)
+
+        # Connectivity: average distance to other unvisited nodes
+        others = [n for n in candidates if n != node]
+        if others:
+            avg_dist = np.mean([distance_matrix[node][o] for o in others])
+        else:
+            avg_dist = 0
+        connectivity.append(avg_dist)
+
+        # Lookahead: greedy remaining from this node
+        remaining_for_look = [n for n in candidates if n != node]
+        la = greedy_remaining(node, remaining_for_look)
+        lookahead.append(la)
+
+    # Convert to numpy arrays for z-score
+    savings = np.array(savings, dtype=float)
+    regret = np.array(regret, dtype=float)
+    connectivity = np.array(connectivity, dtype=float)
+    lookahead = np.array(lookahead, dtype=float)
+
+    # Function to compute z-score (higher = better for the final composite)
+    def norm_higher_better(values):
+        mu = np.mean(values)
+        sigma = np.std(values)
+        if sigma < 1e-12:
+            return np.zeros_like(values)
+        return (values - mu) / sigma
+
+    # For lower-is-better components, we invert the z-score
+    def norm_lower_better(values):
+        mu = np.mean(values)
+        sigma = np.std(values)
+        if sigma < 1e-12:
+            return np.zeros_like(values)
+        return (mu - values) / sigma   # high when values are low
+
+    norm_sav = norm_higher_better(savings)          # savings: larger is better
+    norm_reg = norm_lower_better(regret)            # regret (insertion cost): lower is better
+    norm_conn = norm_lower_better(connectivity)     # connectivity: lower avg distance is better
+    norm_look = norm_lower_better(lookahead)        # lookahead cost: lower is better
+
+    # Adaptive weights based on progress (number of nodes left)
+    # Exploitation (high savings/regret weight) as progress increases,
+    # Exploration (high connectivity/lookahead) when many nodes remain.
+    w_s = 0.2 + 0.3 * progress         # savings weight
+    w_r = 0.1 + 0.3 * progress         # regret weight
+    w_c = 0.4 - 0.2 * progress         # connectivity weight
+    w_l = 0.3 - 0.1 * progress         # lookahead weight
+    # Normalize weights to sum to 1
+    total_w = w_s + w_r + w_c + w_l
+    w_s /= total_w
+    w_r /= total_w
+    w_c /= total_w
+    w_l /= total_w
+
+    # Composite score
+    scores = (w_s * norm_sav +
+              w_r * norm_reg +
+              w_c * norm_conn +
+              w_l * norm_look)
+
+    # Return candidate with highest score
+    best_idx = int(np.argmax(scores))
+    return candidates[best_idx]
+```

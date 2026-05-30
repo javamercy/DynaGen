@@ -1,0 +1,73 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Adaptive constructive heuristic for TSP.
+    Combines greedy distance, savings, regret (best vs second-best future cost),
+    and 2-step lookahead (current -> candidate -> best follower -> destination).
+    Weights shift from exploration (savings, regret) to exploitation (direct distances) as nodes decrease.
+    """
+    if not unvisited_nodes:
+        return current_node  # fallback, should not happen
+    unvisited = list(unvisited_nodes)
+    n = len(unvisited)
+
+    if n == 1:
+        return unvisited[0]
+
+    nodes = np.array(unvisited, dtype=int)
+    total_nodes = distance_matrix.shape[0]
+    # remaining ratio: 1 when many nodes left, 0 when only one left
+    alpha = n / (total_nodes - 1) if total_nodes > 1 else 1.0
+
+    # ---------- vectorised raw terms ----------
+    d_cur = distance_matrix[current_node, nodes]                     # (n,)
+    d_dest = distance_matrix[nodes, destination_node]                # (n,)
+    savings = distance_matrix[current_node, destination_node] - d_cur - d_dest  # larger is better
+
+    # future cost matrix: distances from each candidate to all other unvisited + destination
+    sub_dist = distance_matrix[nodes[:, None], nodes]                # (n, n)
+    np.fill_diagonal(sub_dist, np.inf)                               # ignore self
+    dest_col = distance_matrix[nodes, destination_node][:, None]     # (n, 1)
+    full_dist = np.hstack((sub_dist, dest_col))                      # (n, n+1)
+
+    # best and second best distances (smallest) for regret
+    partitioned = np.partition(full_dist, 1, axis=1)
+    best = partitioned[:, 0]
+    second_best = partitioned[:, 1]
+    regret = second_best - best  # larger is better
+
+    # lookahead: min over j of dist(candidate, j) + dist(j, destination) for j != candidate
+    lookahead_mat = sub_dist + distance_matrix[nodes, destination_node]  # broadcast dest distances
+    np.fill_diagonal(lookahead_mat, np.inf)
+    lookahead = np.min(lookahead_mat, axis=1)  # (n,)
+
+    # ---------- normalise each component to [0,1] ----------
+    def normalize(x):
+        mn, mx = np.min(x), np.max(x)
+        if mx == mn:
+            return np.zeros_like(x)
+        return (x - mn) / (mx - mn)
+
+    nd_cur = normalize(d_cur)
+    nd_dest = normalize(d_dest)
+    nd_sav = normalize(savings)
+    nd_reg = normalize(regret)
+    nd_look = normalize(lookahead)
+
+    # ---------- adaptive weights ----------
+    w_cur = 0.30 * (1 - alpha) + 0.10
+    w_dest = 0.25 * (1 - alpha) + 0.05
+    w_sav = 0.40 * alpha + 0.10
+    w_reg = 0.25 * alpha + 0.05
+    w_look = 0.40
+
+    # ---------- composite score (lower is better) ----------
+    scores = (w_cur * nd_cur +
+              w_dest * nd_dest +
+              w_look * nd_look -
+              w_sav * nd_sav -
+              w_reg * nd_reg)
+
+    best_idx = np.argmin(scores)
+    return nodes[best_idx]
+```

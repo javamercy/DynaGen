@@ -1,0 +1,81 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: Set[int], distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node to visit using adaptive multi-step look-ahead.
+
+    The score for each candidate balances:
+      - Direct travel cost from current node (minimized)
+      - Savings relative to the worst direct choice (maximized)
+      - Best next-step cost (minimized) as two-step look-ahead
+      - Regret: difference between best and second-best next step (maximized)
+      - Proximity to the final destination (minimized)
+      - Connectivity: average distance to other unvisited nodes (minimized)
+      - Diversity: standard deviation of distances to other unvisited nodes (maximized)
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes")
+
+    # Adaptive parameters based on number of unvisited nodes
+    n = len(unvisited_nodes)
+    w_direct = 1.0
+    w_savings = 2.0
+    w_lookahead = 0.5 * (1 + n / 10)  # more weight when more nodes
+    w_regret = 0.4
+    w_dest = 0.3
+    w_conn = 0.2
+    w_std = 0.1
+
+    # Precompute direct distances from current to all unvisited
+    direct_distances = {node: distance_matrix[current_node][node] for node in unvisited_nodes}
+    min_direct = min(direct_distances.values())
+    max_direct = max(direct_distances.values())
+    denom = max_direct - min_direct if max_direct > min_direct else 1.0
+
+    scores = {}
+    for node in unvisited_nodes:
+        direct = direct_distances[node]
+
+        # Savings: how much closer is this node compared to the worst option?
+        savings = (max_direct - direct) / denom
+
+        # Two-step look-ahead: if we go to node next, what is the cost of the best
+        # subsequent step (either to another unvisited node or to the destination)?
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            next_costs = [distance_matrix[node][nxt] for nxt in remaining]
+            sorted_next = sorted(next_costs)
+            best_next = sorted_next[0]
+            second_best_next = sorted_next[1] if len(sorted_next) >= 2 else best_next
+
+            # Connectivity and diversity
+            avg_dist_to_remaining = float(np.mean([distance_matrix[node][r] for r in remaining]))
+            if len(remaining) > 1:
+                std_dist_to_remaining = float(np.std([distance_matrix[node][r] for r in remaining]))
+            else:
+                std_dist_to_remaining = 0.0
+        else:
+            # No more unvisited nodes: next step goes directly to destination
+            best_next = distance_matrix[node][destination_node]
+            second_best_next = best_next
+            avg_dist_to_remaining = best_next
+            std_dist_to_remaining = 0.0
+
+        # Regret: how much better is the best next step over the second best?
+        lookahead_regret = best_next - second_best_next
+
+        # Proximity to final destination
+        dest_dist = distance_matrix[destination_node][node]
+
+        # Composite score (higher is better)
+        score = (-w_direct * direct) + w_savings * savings + (-w_lookahead * best_next) \
+                + w_regret * lookahead_regret - w_dest * dest_dist - w_conn * avg_dist_to_remaining \
+                + w_std * std_dist_to_remaining
+
+        scores[node] = score
+
+    # Select the node with the highest score
+    return max(scores, key=scores.get)
+```

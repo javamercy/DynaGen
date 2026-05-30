@@ -1,0 +1,37 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select next node using a weighted sum of immediate cost, two-step lookahead cost, and distance to destination.
+    Weights: 0.3 for immediate, 0.4 for lookahead, 0.3 for destination distance.
+    """
+    if not unvisited_nodes:
+        return None
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    unvisited = list(unvisited_nodes)
+    w_imm, w_look, w_dest = 0.3, 0.4, 0.3
+    best_score = float('inf')
+    best_node = None
+
+    for i in unvisited:
+        imm = distance_matrix[current_node, i]
+
+        # Best two-step alternative: min_{j != i} (dist[current][j] + dist[j][i])
+        best_alt = float('inf')
+        for j in unvisited:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_alt:
+                best_alt = cost
+
+        dest = distance_matrix[i, destination_node]
+        score = w_imm * imm + w_look * best_alt + w_dest * dest
+
+        if score < best_score or (score == best_score and i < (best_node if best_node is not None else float('inf'))):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

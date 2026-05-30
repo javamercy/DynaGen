@@ -1,0 +1,38 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a greedy look-ahead heuristic.
+    For each candidate, simulate a nearest neighbor completion of the tour
+    (starting from current -> candidate) and choose the candidate that yields
+    the smallest total tour length. This provides a full look-ahead of the
+    remaining construction.
+    """
+    # If only one node left, return it immediately
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_total = float('inf')
+
+    for candidate in unvisited_nodes:
+        total = distance_matrix[current_node, candidate]
+        remaining = set(unvisited_nodes)
+        remaining.remove(candidate)
+        current = candidate
+
+        # Simulate nearest neighbor until all nodes are visited
+        while remaining:
+            nearest = min(remaining, key=lambda n: distance_matrix[current, n])
+            total += distance_matrix[current, nearest]
+            remaining.remove(nearest)
+            current = nearest
+
+        # Return to destination (starting node)
+        total += distance_matrix[current, destination_node]
+
+        if total < best_total:
+            best_total = total
+            best_node = candidate
+
+    return best_node
+```

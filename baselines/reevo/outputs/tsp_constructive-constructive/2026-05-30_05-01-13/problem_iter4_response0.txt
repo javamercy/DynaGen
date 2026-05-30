@@ -1,0 +1,76 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved regret-based heuristic with dynamic alpha and two‑step look‑ahead,
+    plus a destination proximity term that becomes important as the tour progresses.
+
+    Score = w_lookahead * (direct_cost + best_two_step_future) 
+            - w_regret * regret 
+            + w_dest * dest_proximity
+
+    All weights are adaptive based on the fraction of remaining nodes.
+    """
+    total_nodes = distance_matrix.shape[0]
+    n_unvisited = len(unvisited_nodes)
+
+    # Trivial case: only one node left
+    if n_unvisited == 1:
+        return next(iter(unvisited_nodes))
+
+    # Adaptive weights: when many nodes remain, regret (flexibility) and lookahead matter;
+    # when few nodes remain, be greedy and also steer towards the destination.
+    fraction = n_unvisited / total_nodes
+    w_lookahead = 1.0
+    w_regret = 0.5 * fraction          # up to 0.5
+    w_dest = 0.3 * (1.0 - fraction)    # up to 0.3 when only a few nodes remain
+
+    best_score = float('inf')
+    best_node = None
+
+    # Precompute destination distances for all candidates (used later)
+    dest_distances = {node: distance_matrix[node][destination_node] for node in unvisited_nodes}
+
+    # Normalisation of distances (optional but improves stability across instances)
+    all_dists = distance_matrix.flatten()
+    d_min = all_dists.min()
+    d_max = all_dists.max()
+    denom = d_max - d_min if d_max > d_min else 1.0
+
+    for candidate in unvisited_nodes:
+        # Immediate travel cost (normalised)
+        direct_cost = (distance_matrix[current_node][candidate] - d_min) / denom
+
+        remaining = unvisited_nodes - {candidate}
+        n_remaining = len(remaining)
+
+        # Two-step look-ahead: best cost from candidate to destination via any remaining node
+        best_future = float('inf')
+        for next_node in remaining:
+            cost = distance_matrix[candidate][next_node] + distance_matrix[next_node][destination_node]
+            normalised_cost = (cost - 2 * d_min) / denom   # approximate normalisation
+            if normalised_cost < best_future:
+                best_future = normalised_cost
+
+        # Regret: difference between second‑best and best edge from candidate to remaining nodes
+        if n_remaining >= 2:
+            dists = sorted((distance_matrix[candidate][n] - d_min) / denom for n in remaining)
+            regret = dists[1] - dists[0]
+        else:
+            regret = 0.0
+
+        # Destination proximity (normalised, higher is better so we subtract it in cost)
+        dest_proximity = 1.0 - (dest_distances[candidate] - d_min) / denom
+
+        # Composite score (lower is better)
+        score = (w_lookahead * (direct_cost + best_future)
+                 - w_regret * regret
+                 - w_dest * dest_proximity)
+
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+
+    return best_node
+```

@@ -1,0 +1,55 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """Select next node with adaptive multi-step look-ahead balancing direct cost, destination proximity, connectivity, and regret."""
+    # Coefficients (tuned for adaptive multi-step look-ahead)
+    w_dir = -0.3
+    w_dest = -0.2
+    w_conn_avg = -0.15
+    w_conn_std = 0.1
+    w_savings = 0.25
+    w_lookahead = -0.2  # negative because we want to minimize next step cost
+    w_regret = 0.3      # positive to maximize regret (urgency)
+
+    candidates = list(unvisited_nodes)
+    scores = {}
+    direct_costs = np.array([distance_matrix[current_node, u] for u in candidates])
+    min_direct = np.min(direct_costs)
+
+    for i, u in enumerate(candidates):
+        direct = direct_costs[i]
+        dest = distance_matrix[u, destination_node]
+        other = [v for v in candidates if v != u]
+        if other:
+            dists_to_others = np.array([distance_matrix[u, v] for v in other])
+            conn_avg = np.mean(dists_to_others)
+            conn_std = np.std(dists_to_others)
+            # 1-step look-ahead: best next step from u among remaining unvisited nodes
+            best_next_cost = np.min(dists_to_others)
+            # Regret: minimum added cost if we postpone visiting u (visit another node v first)
+            costs_if_delayed = np.array([distance_matrix[current_node, v] + distance_matrix[v, u] - direct for v in other])
+            regret = np.maximum(0, np.min(costs_if_delayed))
+        else:
+            # Only one candidate left
+            conn_avg = 0.0
+            conn_std = 0.0
+            best_next_cost = 0.0
+            regret = 0.0
+
+        # Savings: Clarke-Wright type saving between current and u via destination
+        saving = distance_matrix[current_node, destination_node] - (direct + dest)
+
+        score = (w_dir * direct +
+                 w_dest * dest +
+                 w_conn_avg * conn_avg +
+                 w_conn_std * conn_std +
+                 w_savings * saving +
+                 w_lookahead * best_next_cost +
+                 w_regret * regret)
+        scores[u] = score
+
+    # Choose the node with the highest score
+    next_node = max(scores, key=scores.get)
+    return next_node
+```

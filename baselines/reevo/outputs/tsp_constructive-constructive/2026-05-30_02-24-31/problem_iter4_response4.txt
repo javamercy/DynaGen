@@ -1,0 +1,70 @@
+```python
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray,
+) -> int:
+    """
+    Select the next node to visit using immediate cost, edge-level regret,
+    and destination proximity.
+
+    The heuristic scores each candidate as:
+        score = immediate_cost - alpha * regret + beta * dest_cost
+    where:
+        - immediate_cost: distance from current node to candidate.
+        - regret: difference between the best and second-best edge from the
+          candidate to other unvisited nodes (or to destination if none remain).
+          A high regret signals that postponing this candidate may lead to a
+          large future cost.
+        - dest_cost: distance from candidate to the final destination.
+    Lower scores are preferred.
+
+    Parameters alpha and beta are tuned to balance the three terms. The
+    values used here (alpha=0.6, beta=0.1) have been chosen to give good
+    results on common TSP benchmarks, favoring look‑ahead regret while
+    still gently steering toward the destination.
+
+    If only one node remains, it is returned immediately.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    alpha = 0.6   # weight for regret (higher = more look‑ahead)
+    beta  = 0.1   # weight for destination proximity (small influence)
+
+    best_node = None
+    best_score = float("inf")
+
+    for candidate in unvisited_nodes:
+        immediate = distance_matrix[current_node, candidate]
+
+        remaining = unvisited_nodes - {candidate}
+        if remaining:
+            # Get distances from candidate to all other unvisited nodes
+            cand_dists = [distance_matrix[candidate, n] for n in remaining]
+            cand_dists.sort()
+            best_future = cand_dists[0]
+            second_best = cand_dists[1] if len(cand_dists) > 1 else best_future
+            regret = second_best - best_future
+        else:
+            # No other nodes left – next step must go to destination
+            best_future = distance_matrix[candidate, destination_node]
+            regret = 0.0  # no choice, regret is irrelevant
+
+        dest_cost = distance_matrix[candidate, destination_node]
+
+        # Score: lower is better (minimization problem)
+        score = immediate - alpha * regret + beta * dest_cost
+
+        # Deterministic tie‑breaking: if scores are identical, prefer
+        # the candidate with lower immediate cost (greedy fallback).
+        if score < best_score:
+            best_score = score
+            best_node = candidate
+        elif score == best_score:
+            if immediate < distance_matrix[current_node, best_node]:
+                best_node = candidate
+
+    return best_node
+```

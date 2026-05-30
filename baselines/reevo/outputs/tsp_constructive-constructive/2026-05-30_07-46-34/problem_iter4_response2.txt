@@ -1,0 +1,46 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a full two-step lookahead heuristic.
+
+    For each candidate n in unvisited_nodes, evaluate the total cost of the partial path
+    current_node -> n -> k -> destination_node, where k is the best remaining node (k ≠ n)
+    that minimizes this two-step cost. If only one candidate remains, the path is simply
+    current_node -> n -> destination_node. The candidate with the smallest total cost is chosen.
+
+    This heuristic provides better decisions than simple nearest neighbor by considering
+    the effect of the current choice on the subsequent step.
+    """
+    if not unvisited_nodes:
+        raise ValueError("No unvisited nodes provided.")
+
+    best_node = None
+    best_score = float('inf')
+
+    # Convert set to list for ordered iteration
+    unvisited_list = list(unvisited_nodes)
+    n_candidates = len(unvisited_list)
+
+    for i, n in enumerate(unvisited_list):
+        d_cur_n = distance_matrix[current_node, n]
+
+        if n_candidates == 1:
+            # Only one candidate left; must go directly to destination
+            total = d_cur_n + distance_matrix[n, destination_node]
+        else:
+            # Two-step lookahead: find k that minimizes d_cur_n + d_n_k + d_k_dest
+            min_two_step = float('inf')
+            for j, k in enumerate(unvisited_list):
+                if j == i:
+                    continue
+                cost = d_cur_n + distance_matrix[n, k] + distance_matrix[k, destination_node]
+                if cost < min_two_step:
+                    min_two_step = cost
+            total = min_two_step
+
+        if total < best_score:
+            best_score = total
+            best_node = n
+
+    return best_node
+```

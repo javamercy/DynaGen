@@ -1,0 +1,61 @@
+```python
+import numpy as np
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved selection heuristic with greater emphasis on regret.
+    Two-step regret now uses best vs. second-best indirect path (standard regret),
+    and future regret compares second-best vs. best outgoing edge.
+    Weights are tuned to prioritise regret terms.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    # Deterministic ordering for tie-breaking
+    candidates = sorted(unvisited_nodes)
+
+    # Weights: immediate cost, two-step regret, future regret, destination distance
+    w_imm, w_two, w_future, w_dest = 0.2, 0.4, 0.3, 0.1
+
+    best_score = float('inf')
+    best_node = None
+
+    for i in candidates:
+        # Immediate distance from current node to i
+        imm = distance_matrix[current_node, i]
+
+        # Two-step regret: second_best - best indirect path
+        best_two = float('inf')
+        second_best_two = float('inf')
+        for j in candidates:
+            if j == i:
+                continue
+            cost = distance_matrix[current_node, j] + distance_matrix[j, i]
+            if cost < best_two:
+                second_best_two = best_two
+                best_two = cost
+            elif cost < second_best_two:
+                second_best_two = cost
+        regret_two = 0.0 if second_best_two == float('inf') else second_best_two - best_two
+
+        # Future regret: second_best - best outgoing edge from i to other unvisited nodes
+        future_costs = [distance_matrix[i, v] for v in unvisited_nodes if v != i]
+        if len(future_costs) >= 2:
+            sorted_f = sorted(future_costs)
+            regret_future = sorted_f[1] - sorted_f[0]
+        else:
+            regret_future = 0.0
+
+        # Distance to the final destination
+        dest_dist = distance_matrix[i, destination_node]
+
+        # Combined score (lower is better)
+        score = w_imm * imm - w_two * regret_two - w_future * regret_future - w_dest * dest_dist
+
+        # Deterministic tie-breaking: smaller node index wins
+        if score < best_score or (np.isclose(score, best_score) and (best_node is None or i < best_node)):
+            best_score = score
+            best_node = i
+
+    return best_node
+```

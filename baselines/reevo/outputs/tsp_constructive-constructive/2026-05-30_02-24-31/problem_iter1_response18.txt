@@ -1,0 +1,42 @@
+```python
+import numpy as np
+from typing import Set
+
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: Set[int], distance_matrix: np.ndarray) -> int:
+    """
+    Look-ahead heuristic: for each candidate next node, simulate a greedy nearest-neighbor
+    tour covering all remaining unvisited nodes (excluding candidate) and finally returning
+    to the destination. The candidate that minimises the total estimated cost is chosen.
+    """
+    if len(unvisited_nodes) == 1:
+        return next(iter(unvisited_nodes))
+
+    best_node = None
+    best_total = float('inf')
+
+    for candidate in unvisited_nodes:
+        # Cost of moving from current to candidate
+        cost = distance_matrix[current_node][candidate]
+
+        # Simulate greedy nearest-neighbor from candidate over all other unvisited nodes
+        sim_current = candidate
+        remaining = set(unvisited_nodes)
+        remaining.remove(candidate)
+        sim_cost = 0.0
+        while remaining:
+            # Find nearest unvisited node
+            nearest = min(remaining, key=lambda j: distance_matrix[sim_current][j])
+            sim_cost += distance_matrix[sim_current][nearest]
+            sim_current = nearest
+            remaining.remove(nearest)
+
+        # Finally go to destination
+        sim_cost += distance_matrix[sim_current][destination_node]
+
+        total_estimate = cost + sim_cost
+        if total_estimate < best_total:
+            best_total = total_estimate
+            best_node = candidate
+
+    return best_node
+```

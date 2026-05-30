@@ -1,0 +1,37 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int, unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Select the next node using a two-step look-ahead mechanism.
+    For each candidate node, the score combines:
+      - Immediate cost from current to candidate (first step)
+      - Best next move from candidate to any remaining unvisited node (second step)
+      - A bias for proximity to the final destination (to encourage early return planning)
+    The node with the lowest total score is chosen.
+    """
+    best_node = None
+    best_score = float('inf')
+
+    for node in unvisited_nodes:
+        # First step: distance from current to this candidate
+        first_step = distance_matrix[current_node][node]
+
+        # Simulate the second step: from candidate to the best remaining unvisited node
+        remaining = unvisited_nodes - {node}
+        if remaining:
+            second_step = min(distance_matrix[node][k] for k in remaining)
+        else:
+            # If this is the last node, we must return to the destination
+            second_step = distance_matrix[node][destination_node]
+
+        # Additional look-ahead: penalize nodes far from the final destination
+        final_return = distance_matrix[node][destination_node]
+
+        # Composite score (weights can be tuned, but 0.6 on second step ensures look-ahead)
+        score = first_step + 0.6 * second_step + 0.2 * final_return
+
+        if score < best_score:
+            best_score = score
+            best_node = node
+
+    return best_node
+```

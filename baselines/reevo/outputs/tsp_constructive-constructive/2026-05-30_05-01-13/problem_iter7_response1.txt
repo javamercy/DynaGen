@@ -1,0 +1,67 @@
+```python
+import numpy as np
+
+def select_next_node_v2(
+    current_node: int,
+    destination_node: int,
+    unvisited_nodes: set,
+    distance_matrix: np.ndarray
+) -> int:
+    """
+    Select the next node to visit using adaptive weights on savings and regret,
+    with normalization and multi-step lookahead awareness through regret.
+    """
+    nodes = list(unvisited_nodes)
+    n_remain = len(nodes)
+    if n_remain == 1:
+        return nodes[0]
+
+    total_nodes = distance_matrix.shape[0]
+    remaining_ratio = n_remain / (total_nodes - 1)          # 0 when none remain, close to 1 when many
+    w_sav = 1.0 - remaining_ratio                           # savings more important early
+    w_reg = remaining_ratio                                 # regret more important late
+
+    # Vectorized distances
+    d_curr = distance_matrix[current_node, nodes]           # shape (n_remain,)
+    d_dest = distance_matrix[destination_node, nodes]       # shape (n_remain,)
+    savings_cost = d_curr + d_dest                          # smaller -> better
+
+    # Regret: second‑best minus best distance from candidate to other unvisited nodes
+    sub_dist = distance_matrix[nodes][:, nodes]             # (n_remain, n_remain)
+    # Set diagonal to large value so it is ignored
+    np.fill_diagonal(sub_dist, np.inf)
+    # Partition each row to get two smallest values efficiently
+    # For each row, find the two smallest distances
+    # We'll use np.partition (O(n)): smallest two go to first two positions
+    row_min = np.min(sub_dist, axis=1)                      # best distance
+    # For second best, set best distance to inf and take min
+    sub_dist_no_best = sub_dist.copy()
+    # Set the column index of the best value to inf row-wise
+    best_indices = np.argmin(sub_dist, axis=1)
+    rows = np.arange(n_remain)
+    sub_dist_no_best[rows, best_indices] = np.inf
+    second_min = np.min(sub_dist_no_best, axis=1)           # second best distance
+    regret = second_min - row_min                           # higher -> more urgent
+
+    # Normalize each component to [0,1]
+    min_sav = np.min(savings_cost)
+    max_sav = np.max(savings_cost)
+    if max_sav == min_sav:
+        savings_norm = np.zeros_like(savings_cost)
+    else:
+        savings_norm = (savings_cost - min_sav) / (max_sav - min_sav)
+
+    min_reg = np.min(regret)
+    max_reg = np.max(regret)
+    if max_reg == min_reg:
+        regret_norm = np.zeros_like(regret)
+    else:
+        regret_norm = (regret - min_reg) / (max_reg - min_reg)
+
+    # Total score: higher is better
+    # Want to minimise savings_cost (so negative savings_norm) and maximize regret (so add regret_norm)
+    scores = -w_sav * savings_norm + w_reg * regret_norm
+
+    best_idx = np.argmax(scores)
+    return nodes[best_idx]
+```

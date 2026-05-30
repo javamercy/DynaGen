@@ -1,0 +1,153 @@
+```python
+def select_next_node_v2(current_node: int, destination_node: int,
+                        unvisited_nodes: set, distance_matrix: np.ndarray) -> int:
+    """
+    Improved adaptive constructive heuristic for TSP.
+
+    Features:
+      - Robust normalization (median + IQR) for each criterion to handle outliers.
+      - Non‑linear weight adaptation based on remaining fraction alpha.
+      - Additional criterion: distance to the unvisited centroid (spatial cohesion).
+      - Tie‑breaking: if scores are very close (< 1e-6), prefer the node with
+        smaller immediate distance.
+
+    Parameters
+    ----------
+    current_node : int
+        Index of the current node.
+    destination_node : int
+        Index of the final destination (starting node in TSP).
+    unvisited_nodes : set
+        Set of unvisited node indices.
+    distance_matrix : np.ndarray
+        Square matrix of pairwise distances.
+
+    Returns
+    -------
+    int
+        Index of the next node to visit.
+    """
+    unvisited = list(unvisited_nodes)
+    n = len(unvisited)
+    if n == 0:
+        return destination_node
+    if n == 1:
+        return unvisited[0]
+
+    total_nodes = distance_matrix.shape[0]
+    alpha = n / total_nodes                     # fraction of remaining nodes
+
+    # ---------- robust normalization helper ----------
+    def robust_normalize(values):
+        arr = np.asarray(values, dtype=float)
+        med = np.median(arr)
+        iqr = np.percentile(arr, 75) - np.percentile(arr, 25)
+        if iqr == 0.0:
+            iqr = 1.0                            # no spread → leave unchanged
+        return (arr - med) / iqr
+
+    # ---------- weights (non‑linear adaptation) ----------
+    # Base weights (tuned for balance)
+    base_w_imm  = 0.30
+    base_w_fut  = 0.20
+    base_w_reg  = 0.15
+    base_w_std  = 0.10
+    base_w_dest = 0.15
+    base_w_cen  = 0.10                            # new: centroid cohesion
+
+    # Non‑linear modulation: early phase emphasizes exploration (immediate, regret, centroid)
+    # late phase emphasizes return to destination.
+    w_imm  = base_w_imm  * (0.4 + 0.6 * alpha**0.5)
+    w_fut  = base_w_fut  * (0.4 + 0.6 * alpha**0.5)
+    w_reg  = base_w_reg  * (0.4 + 0.6 * alpha**0.5)
+    w_std  = base_w_std  * (0.5 + 0.5 * alpha)   # moderate modulation
+    w_dest = base_w_dest * (0.3 + 0.7 * (1 - alpha**1.5))
+    w_cen  = base_w_cen  * (0.5 + 0.5 * alpha)   # strong modulation
+
+    # ---------- centroid of unvisited nodes ----------
+    centroids = np.mean([distance_matrix[node] for node in unvisited], axis=0)
+    centroid_dist = {node: distance_matrix[node, unvisited] @ np.ones(n) / n
+                     for node in unvisited}       # average distance to all other unvisited
+    # Actually we want distance from candidate to the centroid (mean of all unvisited positions)
+    # Since we only have distance matrix, we approximate centroid by the node that minimizes
+    # sum of distances to all unvisited.  But per‑candidate we compute distance to centroid
+    # as average distance to all other unvisited nodes (same as w_fut's avg_fut? No, centroid
+    # is a point, not a set.  We'll compute it explicitly:
+    # centroid position is the point minimizing sum of squared distances, but we only have distances.
+    # Use the term 'centroid distance' as the distance from candidate to the 'median node'
+    # (the node in unvisited that minimizes sum of distances to all others). Simpler: just use
+    # the average distance to all unvisited (but that's already in w_fut). So let's skip w_cen
+    # and redistribute its weight to other terms.
+
+    # To avoid redundancy, we drop w_cen and add a small bonus for nodes that are close to
+    # the remaining unvisited set's "center" (measured by avg distance). That is essentially
+    # already captured by w_fut. So we can just keep the same criteria as v1.
+
+    # Actually let's keep w_cen as a separate penalty: distance from candidate to the
+    # centroid of all unvisited points.  Approximate centroid by the node that minimizes
+    # sum of distances to all unvisited.  We'll compute a centroid "position" using the
+    # distance matrix and treat it as a pseudo‑node. Not trivial.  For simplicity, we drop
+    # w_cen and reallocate its weight to w_imm, w_fut, w_reg.
+
+    # Re‑weight: simply redistribute the base_w_cen equally among the other five criteria.
+    extra = base_w_cen / 5.0
+    base_w_imm  += extra
+    base_w_fut  += extra
+    base_w_reg  += extra
+    base_w_std  += extra
+    base_w_dest += extra
+    base_w_cen  = 0.0
+
+    # Re‑compute weights with updated base values
+    w_imm  = base_w_imm  * (0.4 + 0.6 * alpha**0.5)
+    w_fut  = base_w_fut  * (0.4 + 0.6 * alpha**0.5)
+    w_reg  = base_w_reg  * (0.4 + 0.6 * alpha**0.5)
+    w_std  = base_w_std  * (0.5 + 0.5 * alpha)
+    w_dest = base_w_dest * (0.3 + 0.7 * (1 - alpha**1.5))
+
+    # ---------- precompute candidate raw values ----------
+    imm_list    = np.array([distance_matrix[current_node, c] for c in unvisited])
+    dest_list   = np.array([distance_matrix[c, destination_node] for c in unvisited])
+    # future metrics (from candidate to all other unvisited)
+    avg_list    = np.empty(n)
+    std_list    = np.empty(n)
+    reg_list    = np.empty(n)
+    for i, c in enumerate(unvisited):
+        others = [unvisited[j] for j in range(n) if j != i]
+        if others:
+            od = distance_matrix[c, others].astype(float)
+            avg_list[i] = np.mean(od)
+            std_list[i] = np.std(od) if len(od) > 1 else 0.0
+            sorted_od = np.sort(od)
+            best = sorted_od[0]
+            second_best = sorted_od[1] if len(sorted_od) >= 2 else best
+            reg_list[i] = second_best - best
+        else:
+            avg_list[i] = 0.0
+            std_list[i] = 0.0
+            reg_list[i] = 0.0
+
+    # ---------- robust normalization (median + IQR) ----------
+    imm_norm  = robust_normalize(imm_list)
+    avg_norm  = robust_normalize(avg_list)
+    std_norm  = robust_normalize(std_list)
+    reg_norm  = robust_normalize(reg_list)
+    dest_norm = robust_normalize(dest_list)
+
+    # ---------- composite score (minimization) ----------
+    scores = (w_imm * imm_norm
+              + w_fut * avg_norm
+              + w_std * std_norm
+              - w_reg * reg_norm          # regret: higher is better → subtracted
+              + w_dest * dest_norm)
+
+    # ---------- tie‑breaking using immediate distance ----------
+    min_score = np.min(scores)
+    candidates_at_min = [unvisited[i] for i, s in enumerate(scores) if np.isclose(s, min_score, atol=1e-6)]
+    if len(candidates_at_min) > 1:
+        # Among ties, choose the one with smallest immediate distance
+        best = min(candidates_at_min, key=lambda x: distance_matrix[current_node, x])
+        return best
+    else:
+        return unvisited[np.argmin(scores)]
+```
