@@ -1,0 +1,206 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000009: cma_coordinate_hybrid
+Status: valid; mean AOCC score: 0.443714 (higher is better)
+Thought: Hybrid optimizer combining CMA-ES for global search and adaptive coordinate descent for local refinement. CMA-ES runs for the first 80% of evaluations, then coordinate descent fine-tunes the best point for the remaining budget. This leverages CMA's strong adaptation on ill-conditioned and separable problems, while coordinate descent improves final accuracy on multimodal functions. Seed controls randomness. Budget is strictly observed.
+Mean AOCC: 0.4437144677064215
+Mean final error: 2.105472925165669
+AOCC by group: {'high_conditioning_unimodal': 0.6179142944132956, 'low_moderate_conditioning': 0.6481132328346908, 'multimodal_strong_global_structure': 0.2717522210975439, 'multimodal_weak_global_structure': 0.15701764404957705, 'separable': 0.5646546991626542}
+History source: yes
+History bucket: bbob:group:low_moderate_conditioning
+History role: regime specialist
+Code:
+```python
+import numpy as np
+import math
+
+class Optimizer:
+    def __init__(self, budget, dim, seed):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+
+    def __call__(self, func):
+        np.random.seed(self.seed)
+        dim = self.dim
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        # CMA-ES initialization
+        mean = np.random.uniform(lb, ub)
+        best_x = mean.copy()
+        best_val = func(mean)
+        evals = 1
+        report_best(best_val, best_x)
+        sigma = 0.5 * np.mean(ub - lb)
+        C = np.eye(dim)
+        lam = 4 + int(3 * math.log(dim))
+        lam = min(lam, self.budget - evals)
+        if lam < 2:
+            lam = max(2, self.budget - evals)
+        mu = lam // 2
+        weights = np.log(mu + 0.5) - np.log(np.arange(1, mu + 1))
+        weights = weights / np.sum(weights)
+        mueff = 1.0 / np.sum(weights ** 2)
+        cc = (4 + mueff/dim) / (dim + 4 + 2*mueff/dim)
+        cs = (mueff + 2) / (dim + mueff + 5)
+        c1 = 2 / ((dim + 1.3) ** 2 + mueff)
+        cmu = min(1 - c1, 2 * (mueff - 2 + 1/mueff) / ((dim + 2) ** 2 + mueff))
+        damps = 1 + 2 * max(0, math.sqrt((mueff-1)/(dim+1)) - 1) + cs
+        pc = np.zeros(dim)
+        ps = np.zeros(dim)
+        # CMA-ES phase until 80% budget used
+        cma_budget = int(0.8 * self.budget)
+        while evals < cma_budget:
+            remaining = cma_budget - evals
+            if remaining < lam:
+                lam = max(2, remaining)
+                if lam < 2:
+                    break
+            # Sample population
+            try:
+                A = np.linalg.cholesky(C)
+            except np.linalg.LinAlgError:
+                A = np.eye(dim)
+            candidates = []
+            for i in range(lam):
+                z = np.random.randn(dim)
+                x = mean + sigma * A @ z
+                x = np.clip(x, lb, ub)
+                candidates.append(x)
+            # Evaluate
+            vals = []
+            for x in candidates:
+                if evals >= cma_budget:
+                    break
+                val = func(x)
+                vals.append(val)
+                evals += 1
+                if val < best_val:
+                    best_val = val
+                    best_x = x.copy()
+                    report_best(best_val, best_x)
+            if len(vals) == 0:
+                break
+            idx = np.argsort(vals)
+            candidates = [candidates[i] for i in idx]
+            old_mean = mean.copy()
+            mean = np.sum([w * candidates[i] for i, w in enumerate(weights[:len(weights)])], axis=0)
+            mean = np.clip(mean, lb, ub)
+            z_mean = (mean - old_mean) / sigma
+            try:
+                invsqrtC = np.linalg.inv(np.linalg.cholesky(C))
+            except:
+                invsqrtC = np.eye(dim)
+            ps = (1 - cs) * ps + math.sqrt(cs * (2 - cs) * mueff) * invsqrtC @ z_mean
+            hsig = np.linalg.norm(ps) / math.sqrt(1 - (1 - cs) ** (2*evals/lam)) < (1.4 + 2/(dim+1))
+            pc = (1 - cc) * pc + hsig * math.sqrt(cc * (2 - cc) * mueff) * z_mean
+            C = (1 - c1 - cmu) * C + c1 * (np.outer(pc, pc) + (1 - hsig) * cc * (2 - cc) * C)
+            for i in range(mu):
+                z = (candidates[i] - old_mean) / sigma
+                C += cmu * weights[i] * np.outer(z, z)
+            C = (C + C.T) / 2
+            sigma = sigma * math.exp((cs / damps) * (np.linalg.norm(ps) / math.sqrt(dim) - 1))
+        # Coordinate descent phase on best_x for remaining budget
+        step_sizes = (ub - lb) * 0.1
+        while evals < self.budget:
+            # randomly choose dimension
+            d = np.random.randint(dim)
+            step = step_sizes[d]
+            # positive direction
+            x_candidate = best_x.copy()
+            x_candidate[d] = np.clip(best_x[d] + step, lb[d], ub[d])
+            val_candidate = func(x_candidate)
+            evals += 1
+            if val_candidate < best_val:
+                best_val = val_candidate
+                best_x = x_candidate.copy()
+                report_best(best_val, best_x)
+                step_sizes[d] *= 1.2
+            else:
+                # negative direction
+                x_candidate[d] = np.clip(best_x[d] - step, lb[d], ub[d])
+                val_candidate = func(x_candidate)
+                evals += 1
+                if val_candidate < best_val:
+                    best_val = val_candidate
+                    best_x = x_candidate.copy()
+                    report_best(best_val, best_x)
+                    step_sizes[d] *= 1.2
+                else:
+                    step_sizes[d] *= 0.5
+            step_sizes[d] = max(step_sizes[d], 1e-10)
+            if evals >= self.budget:
+                break
+        return best_val, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m5_intensify_search
+
+GOAL: Create a stronger exploitation-focused version of one parent. Improve how it refines promising candidates, allocates effort to high-quality regions, reduces wasted work, or makes more precise local decisions while preserving correctness.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

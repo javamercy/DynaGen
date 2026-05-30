@@ -1,0 +1,251 @@
+[system]
+
+        You generate robust, compact Python optimizers for continuous black-box minimization.
+        DynaGen ranks BBOB candidates by mean AOCC; higher mean AOCC is better.
+        Follow the requested interface exactly.
+        
+
+[user]
+PARENTS:
+Candidate cand_000005: MemeticGlobalLocal
+Status: valid; mean AOCC score: 0.385306 (higher is better)
+Thought: Initialize with Latin Hypercube sampling (budget/2 points), then run a simple differential evolution variant for global exploration using the remaining budget, but capped at budget/2. After each generation, refine the best with a few Nelder-Mead simplex steps (budget/4). Use seed for reproducibility via numpy.random.RandomState. Clip all points to bounds. Report best on improvement.
+Mean AOCC: 0.38530633399964537
+Mean final error: 3.7658102175399364
+AOCC by group: {'high_conditioning_unimodal': 0.6362269349403231, 'low_moderate_conditioning': 0.4407802783362595, 'multimodal_strong_global_structure': 0.14902674053849535, 'multimodal_weak_global_structure': 0.27574674255490134, 'separable': 0.4358457624955702}
+Code:
+```python
+import numpy as np
+
+class Optimizer:
+    def __init__(self, budget, dim, seed):
+        self.budget = budget
+        self.dim = dim
+        self.seed = seed
+        self.rng = np.random.RandomState(seed)
+
+    def __call__(self, func):
+        lb = func.bounds.lb
+        ub = func.bounds.ub
+        dim = self.dim
+        budget = self.budget
+        rng = self.rng
+
+        # Latin Hypercube Sampling
+        n_init = max(2, budget // 4)
+        points = np.empty((n_init, dim))
+        for i in range(dim):
+            points[:, i] = rng.uniform(lb[i], ub[i], size=n_init)
+        # Shuffle each column to create LHS
+        for i in range(dim):
+            rng.shuffle(points[:, i])
+        # Evaluate
+        best_x = points[0].copy()
+        best_f = func(best_x)
+        evals = 1
+        for i in range(1, n_init):
+            if evals >= budget:
+                break
+            x = points[i]
+            f = func(x)
+            evals += 1
+            if f < best_f:
+                best_f = f
+                best_x = x.copy()
+                report_best(best_f, best_x)
+
+        # Differential Evolution style global search
+        pop_size = max(5, dim * 2)
+        pop = np.empty((pop_size, dim))
+        for i in range(pop_size):
+            pop[i] = rng.uniform(lb, ub, size=dim)
+        # Evaluate pop (if not already evaluated)
+        pop_f = np.full(pop_size, np.inf)
+        for i in range(pop_size):
+            if evals >= budget:
+                break
+            f = func(pop[i])
+            evals += 1
+            pop_f[i] = f
+            if f < best_f:
+                best_f = f
+                best_x = pop[i].copy()
+                report_best(best_f, best_x)
+
+        # Main DE loop
+        max_gen = 10
+        for gen in range(max_gen):
+            if evals >= budget:
+                break
+            new_pop = np.empty_like(pop)
+            for i in range(pop_size):
+                if evals >= budget:
+                    break
+                # Mutation: choose three distinct indices
+                indices = [j for j in range(pop_size) if j != i]
+                a, b, c = rng.choice(indices, 3, replace=False)
+                mutant = pop[a] + 0.8 * (pop[b] - pop[c])
+                # Clip
+                mutant = np.clip(mutant, lb, ub)
+                # Crossover: binomial
+                cross_prob = 0.9
+                trial = np.where(rng.rand(dim) < cross_prob, mutant, pop[i])
+                trial = np.clip(trial, lb, ub)
+                f_trial = func(trial)
+                evals += 1
+                if f_trial < pop_f[i]:
+                    new_pop[i] = trial
+                    pop_f[i] = f_trial
+                    if f_trial < best_f:
+                        best_f = f_trial
+                        best_x = trial.copy()
+                        report_best(best_f, best_x)
+                else:
+                    new_pop[i] = pop[i]
+            pop = new_pop
+
+        # Local refinement with Nelder-Mead from best
+        n_local = min(budget - evals, budget // 4)
+        if n_local > 0:
+            # Build simplex around best_x
+            simplex = np.zeros((dim+1, dim))
+            simplex[0] = best_x
+            for i in range(dim):
+                delta = 0.05 * (ub[i] - lb[i])
+                if delta == 0:
+                    delta = 0.001
+                x = best_x.copy()
+                x[i] += delta
+                x[i] = np.clip(x[i], lb[i], ub[i])
+                simplex[i+1] = x
+            # Evaluate simplex
+            simplex_f = np.full(dim+1, np.inf)
+            for i in range(dim+1):
+                if evals >= budget:
+                    break
+                f = func(simplex[i])
+                evals += 1
+                simplex_f[i] = f
+                if f < best_f:
+                    best_f = f
+                    best_x = simplex[i].copy()
+                    report_best(best_f, best_x)
+            # Nelder-Mead iterations
+            for _ in range(n_local):
+                if evals >= budget:
+                    break
+                # Order simplex
+                order = np.argsort(simplex_f)
+                simplex = simplex[order]
+                simplex_f = simplex_f[order]
+                centroid = np.mean(simplex[:-1], axis=0)
+                # Reflection
+                xr = centroid + 1.0 * (centroid - simplex[-1])
+                xr = np.clip(xr, lb, ub)
+                fr = func(xr)
+                evals += 1
+                if fr < simplex_f[0]:
+                    # Expansion
+                    xe = centroid + 2.0 * (centroid - simplex[-1])
+                    xe = np.clip(xe, lb, ub)
+                    fe = func(xe)
+                    evals += 1
+                    if fe < fr:
+                        simplex[-1] = xe
+                        simplex_f[-1] = fe
+                    else:
+                        simplex[-1] = xr
+                        simplex_f[-1] = fr
+                elif fr < simplex_f[-2]:
+                    simplex[-1] = xr
+                    simplex_f[-1] = fr
+                else:
+                    # Contraction
+                    xc = centroid + 0.5 * (simplex[-1] - centroid)
+                    xc = np.clip(xc, lb, ub)
+                    fc = func(xc)
+                    evals += 1
+                    if fc < simplex_f[-1]:
+                        simplex[-1] = xc
+                        simplex_f[-1] = fc
+                    else:
+                        # Shrink
+                        for i in range(1, dim+1):
+                            simplex[i] = simplex[0] + 0.5 * (simplex[i] - simplex[0])
+                            simplex[i] = np.clip(simplex[i], lb, ub)
+                            f = func(simplex[i])
+                            evals += 1
+                            simplex_f[i] = f
+                # Update best
+                idx_min = np.argmin(simplex_f)
+                if simplex_f[idx_min] < best_f:
+                    best_f = simplex_f[idx_min]
+                    best_x = simplex[idx_min].copy()
+                    report_best(best_f, best_x)
+
+        return best_f, best_x
+```
+
+DynaGen score: mean AOCC; higher is better. The optimizer still minimizes each BBOB objective value.
+
+STRATEGY: m5_intensify_search
+
+GOAL: Create a stronger exploitation-focused version of one parent. Improve how it refines promising candidates, allocates effort to high-quality regions, reduces wasted work, or makes more precise local decisions while preserving correctness.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Implement a complete continuous black-box optimizer with exactly this interface:
+
+class Optimizer:
+    def __init__(self, budget: int, dim: int, seed: int):
+        ...
+
+    def __call__(self, func):
+        ...
+
+Functional rules:
+- func(x) evaluates one NumPy-compatible point x with shape (dim,).
+- The objective is minimization.
+- The search bounds are available as func.bounds.lb and func.bounds.ub.
+- Return the best observed objective value and its point as (best_value, best_x).
+- Never call func more than self.budget times.
+- Use self.dim and the bounds; do not assume a fixed dimension.
+- seed must control stochastic behavior when randomness is used.
+- Keep all candidate points inside the bounds, using clipping or bounded sampling.
+- Do not hard-code behavior for specific BBOB function ids, instance ids, seeds, or evaluator artifacts.
+- Do not read files, write files, access the network, spawn subprocesses, or call external solvers.
+
+Timeout and reporting rules:
+- A global helper report_best(value, x) is available.
+- Call report_best(best_value, best_x) whenever you improve the incumbent.
+- report_best does not replace returning (best_value, best_x).
+
+Before producing the final response, internally verify the candidate:
+
+1. The code defines class Optimizer with __init__(self, budget, dim, seed) and __call__(self, func).
+2. The optimizer evaluates at least one feasible point before any expensive logic.
+3. Every func call is counted or guarded so total calls never exceed self.budget.
+4. All points are finite and clipped or sampled within func.bounds.lb and func.bounds.ub.
+5. report_best(best_value, best_x) is called for the initial incumbent and every improvement.
+6. seed controls stochastic behavior if randomness is used.
+7. Only allowed imports are used.
+8. The code does not read files, write files, access the network, spawn subprocesses, or call external solvers.
+9. The implementation avoids obvious infinite loops and unguarded expensive repeated work.
+
+Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the optimization idea, including initialization, improvement, diversification, seed use, and budget use",
+  "code": "complete Python code as a JSON string"
+}
+
+Strict formatting rules:
+- Do not use Markdown.
+- Do not include ``` fences.
+- Do not include comments outside the JSON.
+- The code field must be a valid JSON string.
+- Escape newlines in code as \n.
+- Escape inner double quotes as needed.
+- The code must define class Optimizer with the required methods.

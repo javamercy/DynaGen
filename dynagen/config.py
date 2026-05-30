@@ -130,6 +130,9 @@ class EvolutionConfig:
     strategy_weights: dict[str, float] = field(default_factory=dict)
     archive_mode_strategy_weights: dict[str, float] | None = None
     archive_mode_strategy_weights_after_generation: int = 0
+    committee_recovery_strategies: list[str] = field(default_factory=lambda: [
+        "e1_radical_exploration", "e2_backbone_exploration", "e3_hybrid_recombination",
+    ])
     verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
     history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
     output_mode: str = "single"
@@ -177,6 +180,9 @@ class EvolutionConfig:
         self.committee_test_budget = int(self.committee_test_budget)
         if self.committee_test_budget < 1:
             raise ValueError("evolution.committee_test_budget must be at least 1")
+        self.committee_recovery_strategies = [
+            Strategy(strategy) for strategy in self.committee_recovery_strategies
+        ]
         if isinstance(self.niche, dict):
             self.niche = NicheConfig(**self.niche)
         elif not isinstance(self.niche, NicheConfig):

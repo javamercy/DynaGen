@@ -79,6 +79,7 @@ class EvolutionEngine:
         self._committee_specialists: list[Candidate] = []
         self._committee_assignments: dict[str, list[str]] = {}
         self._committee_niche_iteration: dict[str, int] = {}
+        self._exploration_burst_functions: list[str] = []
 
     def run(self) -> Population:
         output_mode = self.config.evolution.output_mode
@@ -321,6 +322,9 @@ class EvolutionEngine:
 
             logger.info("[%s] cadence generation %d — all %d niches", problem_tag, generation, len(specialists))
             all_offspring: list[Candidate] = []
+            if self._exploration_burst_functions:
+                all_offspring += self._burst_exploration(generation, population)
+                self._exploration_burst_functions.clear()
             for specialist in specialists:
                 assigned = self._committee_assignments.get(specialist.id, [])
                 scores = self.problem.per_instance_scores(specialist)
@@ -370,6 +374,11 @@ class EvolutionEngine:
         offspring = self._execute_tasks_parallel(tasks)
         self._register_candidates(offspring)
         self._update_history(offspring, generation=generation)
+
+        if self._exploration_burst_functions and generation == 1:
+            offspring += self._burst_exploration(generation, population)
+            self._exploration_burst_functions.clear()
+
         return offspring
 
     def _recompute_committee(self) -> None:
@@ -390,6 +399,15 @@ class EvolutionEngine:
         self._committee_specialists = specialists
         self._committee_assignments = assignments
 
+        if len(specialists) < self.config.evolution.committee_size:
+            all_assigned = set()
+            for inst_list in assignments.values():
+                all_assigned.update(inst_list)
+            all_instances = set()
+            for c in pool:
+                all_instances.update(per_instance_scores_fn(c).keys())
+            self._exploration_burst_functions = sorted(all_instances - all_assigned)
+
         problem_tag = self._problem_tag()
         logger.info("[%s] committee recomputed | specialists=%d", problem_tag, len(specialists))
         for sp in specialists:
@@ -408,6 +426,37 @@ class EvolutionEngine:
                 niche_mean,
                 global_mean,
             )
+
+    def _burst_exploration(self, generation: int, population: Population) -> list[Candidate]:
+        problem_tag = self._problem_tag()
+        orphaned = self._exploration_burst_functions
+        logger.info(
+            "[%s] exploration burst | gen=%d | functions=%s",
+            problem_tag, generation, ",".join(orphaned[:8]) + ("..." if len(orphaned) > 8 else ""),
+        )
+        temp_specialist = Candidate(
+            id="_burst_", generation=generation, strategy="exploration_burst",
+            name="_burst_", metrics={"aocc_by_function": {k: 0.0 for k in orphaned}},
+        )
+        tasks: list[_CandidateTask] = []
+        burst_strategies = self.config.evolution.committee_recovery_strategies
+        for strategy in burst_strategies:
+            for _ in range(self.config.evolution.offspring_per_strategy):
+                candidate_id = self.store.next_candidate_id()
+                parents = self._parents_for_niche(orphaned, population)
+                strategy_parents = self._select_strategy_parents(strategy, parents)
+                messages = self.problem.build_evolution_prompt(
+                    strategy, strategy_parents[:1], feedback_context="",
+                )
+                tasks.append(_CandidateTask(
+                    candidate_id=candidate_id, generation=generation, strategy=str(strategy),
+                    parents=strategy_parents, messages=messages,
+                    prompt=_format_messages(messages),
+                ))
+        offspring = self._execute_tasks_parallel(tasks)
+        self._register_candidates(offspring)
+        self._update_history(offspring, generation=generation)
+        return offspring
 
     def _select_niche(self, specialists: list[Candidate]) -> Candidate | None:
         if not specialists:
@@ -480,6 +529,8 @@ class EvolutionEngine:
         per_instance_scores_fn = lambda c: self.problem.per_instance_scores(c)
         scored: list[tuple[Candidate, float]] = []
         for c in population.candidates:
+            if c.status == CandidateStatus.ERROR:
+                continue
             scores = per_instance_scores_fn(c)
             if not scores:
                 continue
