@@ -1,6 +1,6 @@
 run:
-  name: vrp_calls_20
-  output_dir: runs/vrp
+  name: vrp
+  output_dir: runs/vrp_pop_5_gen_20_history
   seed: 100
 
 problem:
@@ -20,26 +20,26 @@ evolution:
   generations: 20
   offspring_per_strategy: 1
   verbal_gradients:
-    enabled: true
+    enabled: false
     llm_model: deepseek-v4-flash
     llm_every_n_generations: 2
     max_llm_calls_per_generation: 5
     temperature: 0.2
   history:
     enabled: true
-    max_size: 64
+    max_size: 20
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
-    parent_sample_probability: 0.35
+    parent_sample_probability: 0.3
     s3_history_parent_min: 1
-    final_selection_uses_history: true
+    final_selection_uses_history: false
     deduplicate_code: true
     diversity_weight: 0.25
     recency_weight: 0.05
     robustness_weight: 0.35
 
 evaluation:
-  timeout_seconds: 180
+  timeout_seconds: 200
   timeout_penalty: 0
   metric: mean_gap
 
