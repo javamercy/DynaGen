@@ -1,0 +1,6 @@
+{
+    "algorithm": "Increase the distance of each edge in the current local optimum tour by adding \u03bb * (1 + edge_n_used) * (original_distance / mean_distance) with \u03bb = 0.2 * mean_distance, so that longer edges are penalized more heavily.",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    mean_dist = np.mean(edge_distance)\n    lam = 0.2 * mean_dist\n    # Build set of edges in the local optimum tour (undirected)\n    tour_edges = set()\n    for i in range(n):\n        a = local_opt_tour[i]\n        b = local_opt_tour[(i + 1) % n]\n        tour_edges.add((a, b))\n        tour_edges.add((b, a))\n    # Add penalty to tour edges\n    for i in range(n):\n        for j in range(i + 1, n):\n            if (i, j) in tour_edges:\n                penalty = lam * (1 + edge_n_used[i, j]) * (edge_distance[i, j] / mean_dist)\n                updated[i, j] += penalty\n                updated[j, i] += penalty\n    return updated",
+    "objective": 5.71978,
+    "other_inf": null
+}

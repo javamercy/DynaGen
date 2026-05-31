@@ -1,0 +1,6 @@
+{
+    "algorithm": "Multiply the distances of edges in the current local optimum tour by a factor that depends on the edge's original distance relative to the maximum distance and its usage count, with a scaling factor of 0.5, while leaving all other edges unchanged.",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    max_dist = np.max(edge_distance)\n    beta = 0.5  # scaling factor for multiplicative penalty\n\n    # Build set of undirected edges in the current tour\n    tour_edges = set()\n    for i in range(n):\n        a = local_opt_tour[i]\n        b = local_opt_tour[(i + 1) % n]\n        tour_edges.add((a, b))\n        tour_edges.add((b, a))\n\n    # Apply multiplicative penalty to tour edges\n    for i in range(n):\n        for j in range(i + 1, n):\n            if (i, j) in tour_edges:\n                factor = 1 + beta * (1 + edge_n_used[i, j]) * (edge_distance[i, j] / max_dist)\n                updated[i, j] *= factor\n                updated[j, i] *= factor\n    return updated",
+    "objective": 5.69388,
+    "other_inf": null
+}

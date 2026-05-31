@@ -1,0 +1,6 @@
+{
+    "algorithm": "Multiply original distances by a factor that grows linearly with usage count, then multiply by a log-normal random variable with mean 1 to achieve multiplicative penalization and multiplicative noise.",
+    "code": "def update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    \n    lambda_ = 0.1   # scaling factor for usage penalty\n    sigma = 0.2     # log-normal noise scale (mean 1)\n    \n    # Multiplicative penalty based on usage count\n    factor = 1.0 + lambda_ * edge_n_used\n    updated *= factor\n    \n    # Multiplicative log-normal noise with mean 1\n    rng = np.random.default_rng()\n    mu = -0.5 * sigma * sigma\n    noise_factors = np.exp(mu + sigma * rng.standard_normal(size=(n, n)))\n    # Symmetrize noise factors\n    noise_factors = (noise_factors + noise_factors.T) / 2.0\n    np.fill_diagonal(noise_factors, 1.0)  # diagonal will be set to 0 later\n    updated *= noise_factors\n    \n    # Ensure symmetry and non-negative distances\n    updated = (updated + updated.T) / 2.0\n    np.fill_diagonal(updated, 0)\n    updated = np.maximum(updated, 0)\n    \n    return updated",
+    "objective": 5.65949,
+    "other_inf": null
+}

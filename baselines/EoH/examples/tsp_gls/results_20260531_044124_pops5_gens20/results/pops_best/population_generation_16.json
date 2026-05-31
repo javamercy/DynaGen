@@ -1,0 +1,6 @@
+{
+    "algorithm": "The algorithm applies different multiplicative adjustments to tour and non-tour edges using two parameters alpha and beta, where tour edges are penalised by factor 1+alpha/(1+used) and non-tour edges are rewarded by factor 1-beta/(1+used).",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    updated = edge_distance.copy()\n    n = len(local_opt_tour)\n    # Build set of undirected tour edges\n    tour_edges = set()\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        tour_edges.add((min(u, v), max(u, v)))\n    # Two separate parameters for tour and non-tour edges\n    alpha = 0.5   # penalty strength for tour edges\n    beta = 0.2    # reward strength for non-tour edges\n    # Update all upper-triangular edges\n    for i in range(n):\n        for j in range(i+1, n):\n            used = edge_n_used[i, j]\n            if (i, j) in tour_edges:\n                factor = 1 + alpha / (1 + used)\n            else:\n                factor = 1 - beta / (1 + used)\n            updated[i, j] = edge_distance[i, j] * factor\n            updated[j, i] = updated[i, j]\n    return updated",
+    "objective": 5.6511,
+    "other_inf": null
+}

@@ -1,0 +1,6 @@
+{
+    "algorithm": "Modify distances by multiplying each edge in the current tour by a factor that grows quadratically with its usage count: factor = 1 + 0.1 * (1 + edge_n_used)^2.",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    updated = edge_distance.copy()\n    n = len(local_opt_tour)\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        factor = 1 + 0.1 * (1 + edge_n_used[u, v]) ** 2\n        updated[u, v] = edge_distance[u, v] * factor\n        updated[v, u] = edge_distance[v, u] * factor\n    return updated",
+    "objective": 5.68354,
+    "other_inf": null
+}

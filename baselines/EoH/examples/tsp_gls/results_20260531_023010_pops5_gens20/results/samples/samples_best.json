@@ -1,0 +1,7 @@
+{
+    "sample_order": 331,
+    "operator": "m1",
+    "algorithm": " Apply a linear penalty of 0.1 times usage count on edges of the current local optimum, and add uniform random noise in [-0.05, 0.05] to all edges. ",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    \"\"\"Modify the edge distance matrix to escape the current local optimum.\"\"\"\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    # Linear penalty on edges of the current local optimum\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        usage = edge_n_used[u, v]\n        penalty = 0.1 * usage\n        updated[u, v] += penalty\n        updated[v, u] += penalty\n    # Add uniform noise\n    noise = np.random.uniform(-0.05, 0.05, (n, n))\n    updated += noise\n    # Ensure symmetry\n    updated = (updated + updated.T) / 2.0\n    return updated",
+    "objective": 5.66487
+}

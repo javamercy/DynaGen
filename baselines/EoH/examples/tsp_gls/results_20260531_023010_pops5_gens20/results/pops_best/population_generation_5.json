@@ -1,0 +1,6 @@
+{
+    "algorithm": "Use an exponential penalty scaled by \u03b2=0.05 on edges of the current local optimum based on usage count, and add Gaussian noise with standard deviation 0.02 to all edges to promote exploration.",
+    "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    \"\"\"Modify the edge distance matrix to escape the current local optimum.\"\"\"\n    updated = edge_distance.copy()\n    n = len(local_opt_tour)\n    beta = 0.05  # exponential scaling factor\n    # Exponential penalty on edges in the current local optimum\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        usage = edge_n_used[u, v]  # symmetric matrix\n        penalty = beta * (np.exp(usage) - 1) * edge_distance[u, v]\n        updated[u, v] += penalty\n        updated[v, u] += penalty\n    # Add Gaussian noise with standard deviation 0.02\n    noise = np.random.randn(n, n) * 0.02\n    updated += noise\n    # Ensure symmetry\n    updated = (updated + updated.T) / 2.0\n    return updated",
+    "objective": 5.68766,
+    "other_inf": null
+}

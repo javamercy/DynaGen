@@ -1,0 +1,32 @@
+[
+    {
+        "algorithm": "Multiply original distances by a factor that grows linearly with usage count, then multiply by a log-normal random variable with mean 1 to achieve multiplicative penalization and multiplicative noise.",
+        "code": "def update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    \n    lambda_ = 0.1   # scaling factor for usage penalty\n    sigma = 0.2     # log-normal noise scale (mean 1)\n    \n    # Multiplicative penalty based on usage count\n    factor = 1.0 + lambda_ * edge_n_used\n    updated *= factor\n    \n    # Multiplicative log-normal noise with mean 1\n    rng = np.random.default_rng()\n    mu = -0.5 * sigma * sigma\n    noise_factors = np.exp(mu + sigma * rng.standard_normal(size=(n, n)))\n    # Symmetrize noise factors\n    noise_factors = (noise_factors + noise_factors.T) / 2.0\n    np.fill_diagonal(noise_factors, 1.0)  # diagonal will be set to 0 later\n    updated *= noise_factors\n    \n    # Ensure symmetry and non-negative distances\n    updated = (updated + updated.T) / 2.0\n    np.fill_diagonal(updated, 0)\n    updated = np.maximum(updated, 0)\n    \n    return updated",
+        "objective": 5.65949,
+        "other_inf": null
+    },
+    {
+        "algorithm": " For each edge, multiply the original distance by exp(alpha * usage_count) and add Gaussian noise with standard deviation proportional to the mean original distance. ",
+        "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = edge_distance.shape[0]\n    rng = np.random.default_rng()\n    alpha = 0.1                    # exponential penalty strength\n    sigma_factor = 0.05            # noise scale relative to mean distance\n    mean_dist = np.mean(edge_distance)\n\n    # Exponential multiplicative penalty based on usage count\n    updated = edge_distance * np.exp(alpha * edge_n_used)\n\n    # Add symmetric Gaussian noise\n    noise = rng.normal(0, sigma_factor * mean_dist, size=(n, n))\n    noise = (noise + noise.T) / 2.0\n    updated += noise\n\n    # Ensure diagonal is zero and non-negative\n    np.fill_diagonal(updated, 0.0)\n    updated = np.maximum(updated, 0.0)\n\n    return updated",
+        "objective": 5.69906,
+        "other_inf": null
+    },
+    {
+        "algorithm": "My new algorithm applies a quadratic penalty to tour edges proportional to the square of their usage count and adds Gaussian noise with standard deviation derived from the standard deviation of distances.",
+        "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    med = np.median(edge_distance)\n    std = np.std(edge_distance)\n    alpha = 0.05 * med                     # quadratic penalty scale\n    gamma = 0.1 * std                      # Gaussian noise scale\n\n    # Add quadratic penalty to each edge of the current tour\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        penalty = alpha * (edge_n_used[u, v] ** 2)\n        updated[u, v] += penalty\n        updated[v, u] += penalty\n\n    # Add Gaussian-distributed perturbation to every edge (symmetric)\n    rng = np.random.default_rng()\n    for i in range(n):\n        for j in range(i + 1, n):\n            delta = rng.normal(scale=gamma)\n            updated[i, j] += delta\n            updated[j, i] += delta\n\n    return updated",
+        "objective": 5.70079,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Use a logarithmic penalty for tour edges proportional to edge_n_used, and add a heavy-tailed Laplace perturbation to all edges to encourage exploration, with parameters derived from the median of distances.",
+        "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = len(local_opt_tour)\n    updated = edge_distance.copy()\n    med = np.median(edge_distance)\n    alpha = 0.1 * med                     # logarithmic penalty scale\n    gamma = 0.02 * med                    # Laplace noise scale\n\n    # Add logarithmic penalty to each edge of the current tour\n    for i in range(n):\n        u = local_opt_tour[i]\n        v = local_opt_tour[(i + 1) % n]\n        penalty = alpha * np.log1p(edge_n_used[u, v])\n        updated[u, v] += penalty\n        updated[v, u] += penalty\n\n    # Add Laplace-distributed perturbation to every edge (symmetric)\n    rng = np.random.default_rng()\n    for i in range(n):\n        for j in range(i + 1, n):\n            delta = rng.laplace(scale=gamma)\n            updated[i, j] += delta\n            updated[j, i] += delta\n\n    return updated",
+        "objective": 5.70224,
+        "other_inf": null
+    },
+    {
+        "algorithm": "Apply an additive penalty that grows quadratically with usage count and add Laplacian noise scaled by the original distance to the distance matrix, then symmetrize and enforce non-negativity.",
+        "code": "import numpy as np\n\ndef update_edge_distance(edge_distance: np.ndarray, local_opt_tour: np.ndarray,\n                          edge_n_used: np.ndarray) -> np.ndarray:\n    n = edge_distance.shape[0]\n    rng = np.random.default_rng()\n    \n    lambda_ = 0.1          # penalty strength\n    sigma = 0.2            # noise scale factor\n\n    # Quadratic additive penalty based on usage count\n    penalty = lambda_ * edge_n_used ** 2\n\n    # Laplacian noise with standard deviation proportional to original distance\n    noise_scale = sigma * (edge_distance + 1e-6)\n    noise = rng.laplace(0, noise_scale, size=(n, n))\n\n    # Combine original distances, penalty, and noise\n    updated = edge_distance + penalty + noise\n\n    # Enforce symmetry\n    updated = (updated + updated.T) / 2.0\n    np.fill_diagonal(updated, 0.0)\n    updated = np.maximum(updated, 0.0)\n\n    return updated",
+        "objective": 5.7033,
+        "other_inf": null
+    }
+]
