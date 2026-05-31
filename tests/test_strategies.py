@@ -1,6 +1,11 @@
 import unittest
 
-from dynagen.evolution.strategies import STRATEGIES, STRATEGIES_METADATA, Strategy, parent_count
+from dynagen.evolution.strategies import (
+    STRATEGIES,
+    STRATEGIES_METADATA,
+    Strategy,
+    parent_count,
+)
 
 
 class StrategyMetadataTests(unittest.TestCase):
@@ -8,13 +13,9 @@ class StrategyMetadataTests(unittest.TestCase):
         expected = {
             Strategy.E1_RADICAL_EXPLORATION: 3,
             Strategy.E2_BACKBONE_EXPLORATION: 3,
-            Strategy.E3_HYBRID_RECOMBINATION: 2,
             Strategy.M1_COMPONENT_REPLACEMENT: 1,
             Strategy.M2_PARAMETER_SCHEDULE_MUTATION: 1,
             Strategy.M3_SIMPLIFY_GENERALIZE: 1,
-            Strategy.M4_CONTRACT_REPAIR: 1,
-            Strategy.M5_INTENSIFY_SEARCH: 1,
-            Strategy.M6_DIVERSIFY_SEARCH: 1,
         }
 
         for strategy, count in expected.items():
@@ -36,11 +37,6 @@ class StrategyMetadataTests(unittest.TestCase):
                 "mechanism, structure, or execution strategy. The result should be motivated by "
                 "the parents but clearly not a direct copy."
             ),
-            "e3_hybrid_recombination": (
-                "Combine compatible strengths from multiple parents into one coherent algorithm. "
-                "Select only components that work well together, resolve conflicts between their "
-                "design choices, and avoid merely concatenating all parent mechanisms."
-            ),
             "m1_component_replacement": (
                 "Create a modified version of one parent by replacing exactly one major component "
                 "while preserving the parent algorithm's overall identity. Possible components "
@@ -56,21 +52,6 @@ class StrategyMetadataTests(unittest.TestCase):
                 "Create a simpler and more robust version of one parent by removing brittle, "
                 "over-specialized, redundant, or overly complex components. Preserve the essential "
                 "idea and required behavior while improving generalization and maintainability."
-            ),
-            "m4_contract_repair": (
-                "Revise one parent to better satisfy the required interface, constraints, safety "
-                "rules, and budget limits. Preserve the main algorithmic idea, but fix invalid "
-                "return paths, unsafe assumptions, missing fallback behavior, and fragile edge cases."
-            ),
-            "m5_intensify_search": (
-                "Create a stronger exploitation-focused version of one parent. Improve how it "
-                "refines promising candidates, allocates effort to high-quality regions, reduces "
-                "wasted work, or makes more precise local decisions while preserving correctness."
-            ),
-            "m6_diversify_search": (
-                "Create a more exploration-focused version of one parent. Improve how it generates "
-                "diverse candidates, escapes stagnation, varies search trajectories, uses restarts "
-                "or perturbations, or avoids premature convergence while respecting the contract."
             ),
         }
 

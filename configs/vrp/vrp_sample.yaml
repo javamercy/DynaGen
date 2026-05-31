@@ -39,30 +39,26 @@ evolution:
   generations: 20                      # Number of evolution generations
   offspring_per_strategy: 1            # Candidates generated per strategy per generation
 
-  # --- Strategies — 9 available (3 exploration, 6 mutation) ---
-  # strategies:                        # Explicit strategy list (default: all 9)
+  # --- Strategies — 5 available (2 exploration, 3 mutation) ---
+  # strategies:                        # Explicit strategy list (default: all 5)
   #   - e1_radical_exploration
   #   - e2_backbone_exploration
-  #   - e3_hybrid_recombination
   #   - m1_component_replacement
   #   - m2_parameter_schedule_mutation
   #   - m3_simplify_generalize
-  #   - m4_contract_repair
-  #   - m5_intensify_search
-  #   - m6_diversify_search
 
   # --- Strategy weights — per-strategy sampling probability (0.0–1.0) ---
   # strategy_weights:                  # Applied when history is empty (default: unweighted)
-  #   m5_intensify_search: 0.8
-  #   m6_diversify_search: 0.5
+  #   m1_component_replacement: 0.3
+  #   m2_parameter_schedule_mutation: 0.3
 
   # --- Archive-mode strategy weights — overrides from generation N onward ---
   # archive_mode_strategy_weights:     # Applied from gen >= after_generation
-  #   m5_intensify_search: 0.9
-  #   m6_diversify_search: 0.3
-  #   m1_component_replacement: 0.1
+  #   m1_component_replacement: 0.4
+  #   m2_parameter_schedule_mutation: 0.3
+  #   m3_simplify_generalize: 0.2
   # archive_mode_strategy_weights_after_generation: 3   # when to activate (default 0 = immediate)
-  # committee_recovery_strategies: [ e1_radical_exploration, e2_backbone_exploration, e3_hybrid_recombination ]
+  # committee_recovery_strategies: [ e1_radical_exploration, e2_backbone_exploration, m1_component_replacement ]
   # niche_population_mix: false
   # archive_niche_replacement: true
 

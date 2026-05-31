@@ -51,9 +51,13 @@ class VerbalGradientConfig:
             self.llm_model = str(self.llm_model).strip() or None
         self.temperature = float(self.temperature)
         if self.llm_every_n_generations < 1:
-            raise ValueError("verbal_gradients.llm_every_n_generations must be at least 1")
+            raise ValueError(
+                "verbal_gradients.llm_every_n_generations must be at least 1"
+            )
         if self.max_llm_calls_per_generation < 0:
-            raise ValueError("verbal_gradients.max_llm_calls_per_generation must be non-negative")
+            raise ValueError(
+                "verbal_gradients.max_llm_calls_per_generation must be non-negative"
+            )
         if self.temperature < 0 or self.temperature > 2:
             raise ValueError("verbal_gradients.temperature must be between 0 and 2")
 
@@ -65,7 +69,9 @@ class HistoryConfig:
     enabled: bool = True
     max_size: int = 64
     max_per_bucket: int = 4
-    add_statuses: list[str] = field(default_factory=lambda: ["valid", "evaluated", "timeout"])
+    add_statuses: list[str] = field(
+        default_factory=lambda: ["valid", "evaluated", "timeout"]
+    )
     parent_sample_probability: float = 0.35
     s3_history_parent_min: int = 1
     final_selection_uses_history: bool = True
@@ -78,7 +84,11 @@ class HistoryConfig:
         self.enabled = bool(self.enabled)
         self.max_size = int(self.max_size)
         self.max_per_bucket = int(self.max_per_bucket)
-        self.add_statuses = [str(status).strip().lower() for status in self.add_statuses if str(status).strip()]
+        self.add_statuses = [
+            str(status).strip().lower()
+            for status in self.add_statuses
+            if str(status).strip()
+        ]
         self.parent_sample_probability = float(self.parent_sample_probability)
         self.s3_history_parent_min = int(self.s3_history_parent_min)
         self.final_selection_uses_history = bool(self.final_selection_uses_history)
@@ -93,13 +103,15 @@ class HistoryConfig:
         if not self.add_statuses:
             raise ValueError("history.add_statuses must not be empty")
         if self.parent_sample_probability < 0 or self.parent_sample_probability > 1:
-            raise ValueError("history.parent_sample_probability must be between 0 and 1")
+            raise ValueError(
+                "history.parent_sample_probability must be between 0 and 1"
+            )
         if self.s3_history_parent_min < 0:
             raise ValueError("history.s3_history_parent_min must be non-negative")
         for name, value in (
-                ("history.diversity_weight", self.diversity_weight),
-                ("history.recency_weight", self.recency_weight),
-                ("history.robustness_weight", self.robustness_weight),
+            ("history.diversity_weight", self.diversity_weight),
+            ("history.recency_weight", self.recency_weight),
+            ("history.robustness_weight", self.robustness_weight),
         ):
             if value < 0:
                 raise ValueError(f"{name} must be non-negative")
@@ -130,12 +142,18 @@ class EvolutionConfig:
     strategy_weights: dict[str, float] = field(default_factory=dict)
     archive_mode_strategy_weights: dict[str, float] | None = None
     archive_mode_strategy_weights_after_generation: int = 0
-    committee_recovery_strategies: list[str] = field(default_factory=lambda: [
-        "e1_radical_exploration", "e2_backbone_exploration", "e3_hybrid_recombination",
-    ])
+    committee_recovery_strategies: list[str] = field(
+        default_factory=lambda: [
+            "e1_radical_exploration",
+            "e2_backbone_exploration",
+            "m1_component_replacement",
+        ]
+    )
     niche_population_mix: bool = False
     archive_niche_replacement: bool = True
-    verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(default_factory=VerbalGradientConfig)
+    verbal_gradients: VerbalGradientConfig | dict[str, Any] = field(
+        default_factory=VerbalGradientConfig
+    )
     history: HistoryConfig | dict[str, Any] = field(default_factory=HistoryConfig)
     output_mode: str = "single"
     committee_size: int = 3
@@ -161,10 +179,14 @@ class EvolutionConfig:
         elif isinstance(self.archive_mode_strategy_weights, str):
             self.archive_mode_strategy_weights = {
                 str(key): float(weight)
-                for key, weight in _parse_simple_dict(self.archive_mode_strategy_weights).items()
+                for key, weight in _parse_simple_dict(
+                    self.archive_mode_strategy_weights
+                ).items()
                 if float(weight) >= 0
             }
-        self.archive_mode_strategy_weights_after_generation = int(self.archive_mode_strategy_weights_after_generation)
+        self.archive_mode_strategy_weights_after_generation = int(
+            self.archive_mode_strategy_weights_after_generation
+        )
         if isinstance(self.verbal_gradients, dict):
             self.verbal_gradients = VerbalGradientConfig(**self.verbal_gradients)
         elif not isinstance(self.verbal_gradients, VerbalGradientConfig):
@@ -175,7 +197,9 @@ class EvolutionConfig:
             raise ValueError("evolution.history must be a mapping")
         self.output_mode = str(self.output_mode).lower().strip()
         if self.output_mode not in {"single", "committee_specialist", "committee_loop"}:
-            raise ValueError("evolution.output_mode must be 'single', 'committee_specialist', or 'committee_loop'")
+            raise ValueError(
+                "evolution.output_mode must be 'single', 'committee_specialist', or 'committee_loop'"
+            )
         self.committee_size = int(self.committee_size)
         if self.committee_size < 1:
             raise ValueError("evolution.committee_size must be at least 1")
@@ -243,7 +267,9 @@ class ProblemConfig:
     bounds: list[float] = field(default_factory=lambda: [-5.0, 5.0])
     aocc_lower_bound: float = 1e-8
     aocc_upper_bound: float = 1e2
-    comparison_baselines: list[str] = field(default_factory=lambda: ["random_search", "differential_evolution"])
+    comparison_baselines: list[str] = field(
+        default_factory=lambda: ["random_search", "differential_evolution"]
+    )
     dvrp_search_limit: int = 8
     dvrp_test_sizes: list[int] = field(default_factory=lambda: [10, 20, 50, 100, 200])
     dvrp_test_limit_per_size: int = 64
@@ -258,9 +284,13 @@ class ProblemConfig:
 
         self.function_ids = [int(function_id) for function_id in self.function_ids]
         self.dimension = int(self.dimension)
-        self.search_instances = [int(instance_id) for instance_id in self.search_instances]
+        self.search_instances = [
+            int(instance_id) for instance_id in self.search_instances
+        ]
         self.test_instances = [int(instance_id) for instance_id in self.test_instances]
-        self.test_dimensions = [int(dimension) for dimension in self.test_dimensions] or [self.dimension]
+        self.test_dimensions = [
+            int(dimension) for dimension in self.test_dimensions
+        ] or [self.dimension]
         self.bounds = [float(bound) for bound in self.bounds]
         self.aocc_lower_bound = float(self.aocc_lower_bound)
         self.aocc_upper_bound = float(self.aocc_upper_bound)
@@ -300,7 +330,10 @@ def _validate_bbob_problem_config(config: ProblemConfig) -> None:
         raise ValueError("BBOB search_instances and test_instances must not be empty")
     if len(config.bounds) != 2 or config.bounds[0] >= config.bounds[1]:
         raise ValueError("problem.bounds must contain [lower, upper]")
-    if config.aocc_lower_bound <= 0 or config.aocc_upper_bound <= config.aocc_lower_bound:
+    if (
+        config.aocc_lower_bound <= 0
+        or config.aocc_upper_bound <= config.aocc_lower_bound
+    ):
         raise ValueError("AOCC bounds must satisfy 0 < lower < upper")
 
 
@@ -326,7 +359,9 @@ def _validate_vrp_problem_config(config: ProblemConfig) -> None:
         raise ValueError("problem.vrp_test_limit_per_size must be at least 1")
 
 
-def _validate_evaluation_config_for_problem(config: EvaluationConfig, problem_type: str) -> None:
+def _validate_evaluation_config_for_problem(
+    config: EvaluationConfig, problem_type: str
+) -> None:
     if problem_type in ("vrp", "dvrp"):
         return
     if not config.seeds:
@@ -393,7 +428,9 @@ def load_config(path: str | Path | None = None) -> RunConfig:
 
 
 def save_config(path: str | Path, config: RunConfig) -> None:
-    Path(path).write_text(json.dumps(config.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+    Path(path).write_text(
+        json.dumps(config.to_dict(), indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def _to_plain(value: Any) -> Any:
@@ -446,7 +483,9 @@ def _parse_scalar(value: str) -> Any:
         return False
     if value in {"null", "None", "~"}:
         return None
-    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
         return value[1:-1]
     try:
         return int(value)

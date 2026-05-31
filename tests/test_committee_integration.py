@@ -1,4 +1,5 @@
 """Integration tests: committee mode end-to-end with mocked LLM, no API key needed."""
+
 import os
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from dynagen.problems import problem_for_config
 # ---------------------------------------------------------------------------
 # Mock providers — one per problem type, each returns valid code
 # ---------------------------------------------------------------------------
+
 
 class _MockProvider(LLMProvider):
     def __init__(self, code: str, name: str = "mock_optimizer"):
@@ -34,7 +36,7 @@ class _MockProvider(LLMProvider):
 
 
 # Minimal valid code per problem type
-BBOB_CODE = '''\
+BBOB_CODE = """\
 import numpy as np
 
 class Optimizer:
@@ -55,9 +57,9 @@ class Optimizer:
             if i + 1 >= self.budget:
                 func.report_best(best_value, best_x) if hasattr(func, "report_best") else None
         return best_x, best_value
-'''
+"""
 
-TSP_CODE = '''\
+TSP_CODE = """\
 import numpy as np
 
 def solve_tsp(distance_matrix, seed, budget):
@@ -72,9 +74,9 @@ def solve_tsp(distance_matrix, seed, budget):
             best_len = length
             best_tour = tour
     return best_tour
-'''
+"""
 
-DVRP_CODE = '''\
+DVRP_CODE = """\
 def choose_next_customer(current_location, available_customers, current_time,
                          time_windows, service_times, travel_times, truck_id,
                          truck_capacities, current_loads, customer_demands,
@@ -82,15 +84,15 @@ def choose_next_customer(current_location, available_customers, current_time,
     if not available_customers:
         return None
     return available_customers[0]
-'''
+"""
 
-VRP_CODE = '''\
+VRP_CODE = """\
 def solve_vrp(customers, depot, vehicle_count, vehicle_capacity, seed, budget):
     routes = [[] for _ in range(vehicle_count)]
     for i, c in enumerate(customers):
         routes[i % vehicle_count].append(c)
     return routes
-'''
+"""
 
 # ---------------------------------------------------------------------------
 # Configs
@@ -122,7 +124,7 @@ evolution:
   offspring_per_strategy: 1
   output_mode: committee_specialist
   committee_size: 2
-  strategies: [ m5_intensify_search ]
+  strategies: [ m1_component_replacement ]
   history:
     enabled: true
     max_size: 10
@@ -159,7 +161,7 @@ evolution:
   offspring_per_strategy: 1
   output_mode: committee_specialist
   committee_size: 2
-  strategies: [ m5_intensify_search ]
+  strategies: [ m1_component_replacement ]
   history:
     enabled: true
     max_size: 10
@@ -202,7 +204,7 @@ evolution:
   offspring_per_strategy: 1
   output_mode: committee_specialist
   committee_size: 2
-  strategies: [ m5_intensify_search ]
+  strategies: [ m1_component_replacement ]
   history:
     enabled: true
     max_size: 10
@@ -244,7 +246,7 @@ evolution:
   offspring_per_strategy: 1
   output_mode: committee_specialist
   committee_size: 2
-  strategies: [ m5_intensify_search ]
+  strategies: [ m1_component_replacement ]
   history:
     enabled: true
     max_size: 10
@@ -268,6 +270,7 @@ data:
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _run_engine(tmp_path, config, mock_provider):
     config.output_dir = str(tmp_path)
     problem = problem_for_config(config)
@@ -275,15 +278,20 @@ def _run_engine(tmp_path, config, mock_provider):
     test_eval = problem.build_evaluator(config, pool_name="test_instances")
     store = RunStore.create(tmp_path, config.name, config.to_dict())
     engine = EvolutionEngine(
-        config=config, provider=mock_provider,
-        search_evaluator=search_eval, test_evaluator=test_eval, store=store,
+        config=config,
+        provider=mock_provider,
+        search_evaluator=search_eval,
+        test_evaluator=test_eval,
+        store=store,
     )
     population = engine.run()
     return population, store
 
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_bbob_committee_integration(tmp_path):
     config = RunConfig.from_dict(_parse_simple_yaml(BBOB_YAML))
@@ -294,6 +302,7 @@ def test_bbob_committee_integration(tmp_path):
     assert Path(store.root, "final_report.md").exists()
     assert Path(store.root, "committee.json").exists()
 
+
 def test_tsp_committee_integration(tmp_path):
     config = RunConfig.from_dict(_parse_simple_yaml(TSP_YAML))
     provider = _MockProvider(TSP_CODE, "mock_tsp")
@@ -303,9 +312,13 @@ def test_tsp_committee_integration(tmp_path):
     assert Path(store.root, "final_report.md").exists()
     assert Path(store.root, "committee.json").exists()
 
+
 @pytest.mark.skipif(
-    not (Path("data/dvrp/train/instances.pkl").exists()
-         if Path.cwd().name == "DynaGen" else True),
+    not (
+        Path("data/dvrp/train/instances.pkl").exists()
+        if Path.cwd().name == "DynaGen"
+        else True
+    ),
     reason="DVRP pickle data not found — run from project root with data/ present",
 )
 def test_dvrp_committee_integration(tmp_path):
@@ -316,9 +329,13 @@ def test_dvrp_committee_integration(tmp_path):
     assert len(population.candidates) > 0
     assert Path(store.root, "final_report.md").exists()
 
+
 @pytest.mark.skipif(
-    not (Path("data/vrp/train/instances.pkl").exists()
-         if Path.cwd().name == "DynaGen" else True),
+    not (
+        Path("data/vrp/train/instances.pkl").exists()
+        if Path.cwd().name == "DynaGen"
+        else True
+    ),
     reason="VRP pickle data not found — run from project root with data/ present",
 )
 def test_vrp_committee_integration(tmp_path):

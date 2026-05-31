@@ -61,14 +61,14 @@ class _CandidateTask:
 
 class EvolutionEngine:
     def __init__(
-            self,
-            *,
-            config: RunConfig,
-            provider: LLMProvider,
-            feedback_provider: LLMProvider | None = None,
-            search_evaluator: CandidateEvaluator,
-            test_evaluator: CandidateEvaluator,
-            store: RunStore,
+        self,
+        *,
+        config: RunConfig,
+        provider: LLMProvider,
+        feedback_provider: LLMProvider | None = None,
+        search_evaluator: CandidateEvaluator,
+        test_evaluator: CandidateEvaluator,
+        store: RunStore,
     ) -> None:
         self.config = config
         self.provider = provider
@@ -145,8 +145,8 @@ class EvolutionEngine:
             )
             self._save_history(generation)
             if (
-                    output_mode != "single"
-                    and generation % self.config.evolution.niche.cadence_generations == 0
+                output_mode != "single"
+                and generation % self.config.evolution.niche.cadence_generations == 0
             ):
                 self._recompute_committee()
 
@@ -233,9 +233,9 @@ class EvolutionEngine:
                 if isinstance(tr, dict):
                     metrics = tr.get("metrics") or {}
                     af = (
-                            metrics.get("aocc_by_function")
-                            or metrics.get("score_by_instance_size")
-                            or {}
+                        metrics.get("aocc_by_function")
+                        or metrics.get("score_by_instance_size")
+                        or {}
                     )
                 if isinstance(af, dict):
                     test_per_function[sp.id] = {str(k): float(v) for k, v in af.items()}
@@ -277,19 +277,19 @@ class EvolutionEngine:
             self.feedback_provider, "model", None
         )
         candidate_generation_calls = (
-                self._sum_provider_metric(
-                    provider_summaries, key="candidate_generation_calls"
-                )
-                or 0
+            self._sum_provider_metric(
+                provider_summaries, key="candidate_generation_calls"
+            )
+            or 0
         )
         feedback_calls = (
-                self._sum_provider_metric(provider_summaries, key="feedback_calls") or 0
+            self._sum_provider_metric(provider_summaries, key="feedback_calls") or 0
         )
         total_api_calls = (
-                self._sum_provider_metric(provider_summaries, key="total_api_calls") or 0
+            self._sum_provider_metric(provider_summaries, key="total_api_calls") or 0
         )
         failed_calls = (
-                self._sum_provider_metric(provider_summaries, key="failed_calls") or 0
+            self._sum_provider_metric(provider_summaries, key="failed_calls") or 0
         )
         summary = {
             "llm_model": main_model,
@@ -305,8 +305,8 @@ class EvolutionEngine:
                 "enabled": self.config.evolution.verbal_gradients.enabled,
                 "llm_every_n_generations": self.config.evolution.verbal_gradients.llm_every_n_generations,
                 "llm_model": self.config.evolution.verbal_gradients.llm_model
-                             or feedback_model
-                             or main_model,
+                or feedback_model
+                or main_model,
                 "feedback_llm_model": feedback_model,
                 "temperature": self.config.evolution.verbal_gradients.temperature,
                 **self._verbal_gradient_stats,
@@ -357,14 +357,14 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
 
     def _generate_offspring(
-            self, generation: int, population: Population
+        self, generation: int, population: Population
     ) -> list[Candidate]:
         if self.config.evolution.output_mode == "single":
             return self._generate_single_offspring(generation, population)
         return self._generate_committee_offspring(generation, population)
 
     def _generate_single_offspring(
-            self, generation: int, population: Population
+        self, generation: int, population: Population
     ) -> list[Candidate]:
         tasks = self._build_offspring_tasks(generation, population)
         offspring = self._execute_tasks_parallel(tasks)
@@ -373,7 +373,7 @@ class EvolutionEngine:
         return offspring
 
     def _generate_committee_offspring(
-            self, generation: int, population: Population
+        self, generation: int, population: Population
     ) -> list[Candidate]:
         niche_config = self.config.evolution.niche
         cadence = niche_config.cadence_generations
@@ -453,8 +453,8 @@ class EvolutionEngine:
         self._update_history(offspring, generation=generation)
 
         if (
-                not self.config.evolution.niche_population_mix
-                and self.config.evolution.archive_niche_replacement
+            not self.config.evolution.niche_population_mix
+            and self.config.evolution.archive_niche_replacement
         ):
             self._replace_if_better(chosen, assigned, offspring, population)
 
@@ -527,11 +527,11 @@ class EvolutionEngine:
             )
 
     def _replace_if_better(
-            self,
-            specialist: Candidate,
-            assigned: list[str],
-            offspring: list[Candidate],
-            population: Population,
+        self,
+        specialist: Candidate,
+        assigned: list[str],
+        offspring: list[Candidate],
+        population: Population,
     ) -> None:
         if not assigned:
             return
@@ -560,7 +560,7 @@ class EvolutionEngine:
                         break
 
     def _burst_exploration(
-            self, generation: int, population: Population
+        self, generation: int, population: Population
     ) -> list[Candidate]:
         problem_tag = self._problem_tag()
         orphaned = self._exploration_burst_functions
@@ -605,11 +605,11 @@ class EvolutionEngine:
         return offspring
 
     def _committee_survivors(
-            self, pool: list[Candidate], population_size: int
+        self, pool: list[Candidate], population_size: int
     ) -> list[Candidate]:
         if (
-                not self.config.evolution.niche_population_mix
-                or not self._committee_specialists
+            not self.config.evolution.niche_population_mix
+            or not self._committee_specialists
         ):
             return select_survivors(pool, population_size)
 
@@ -681,10 +681,10 @@ class EvolutionEngine:
         return specialists[-1] if specialists else None
 
     def _build_niche_offspring_tasks(
-            self,
-            generation: int,
-            population: Population,
-            specialist: Candidate,
+        self,
+        generation: int,
+        population: Population,
+        specialist: Candidate,
     ) -> list[_CandidateTask]:
         assigned = self._committee_assignments.get(specialist.id, [])
         niche_parents = self._parents_for_niche(assigned, population)
@@ -728,9 +728,9 @@ class EvolutionEngine:
         return tasks
 
     def _parents_for_niche(
-            self,
-            assigned_instances: list[str],
-            population: Population,
+        self,
+        assigned_instances: list[str],
+        population: Population,
     ) -> list[Candidate]:
         if not assigned_instances:
             return list(population.candidates)
@@ -773,8 +773,8 @@ class EvolutionEngine:
     def _effective_strategies(self, *, generation: int = 0) -> list[Strategy]:
         threshold = self.config.evolution.archive_mode_strategy_weights_after_generation
         archive_active = (
-                self.config.evolution.archive_mode_strategy_weights is not None
-                and generation >= threshold
+            self.config.evolution.archive_mode_strategy_weights is not None
+            and generation >= threshold
         )
         weights = (
             self.config.evolution.archive_mode_strategy_weights
@@ -790,13 +790,13 @@ class EvolutionEngine:
             if self.rng.random() < weight:
                 active.append(strategy)
         if not active:
-            active = [Strategy.M5_INTENSIFY_SEARCH]
+            active = [Strategy.M1_COMPONENT_REPLACEMENT]
         return active
 
     def _build_offspring_tasks(
-            self,
-            generation: int,
-            population: Population,
+        self,
+        generation: int,
+        population: Population,
     ) -> list[_CandidateTask]:
         tasks: list[_CandidateTask] = []
         available_strategies = self._effective_strategies(generation=generation)
@@ -914,7 +914,7 @@ class EvolutionEngine:
         return candidate
 
     def _select_strategy_parents(
-            self, strategy: Strategy, candidates: list[Candidate]
+        self, strategy: Strategy, candidates: list[Candidate]
     ) -> list[Candidate]:
         count = parent_count(strategy)
         if not self.history.enabled or not self.history.entries:
@@ -924,11 +924,7 @@ class EvolutionEngine:
 
         selected: list[Candidate] = []
         selected_ids: set[str] = set()
-        history_min = (
-            self.config.evolution.history.s3_history_parent_min
-            if strategy == Strategy.E3_HYBRID_RECOMBINATION
-            else 0
-        )
+        history_min = 0
         history_min = min(history_min, count)
         if history_min:
             selected.extend(
@@ -945,8 +941,8 @@ class EvolutionEngine:
         while len(selected) < count:
             remaining = count - len(selected)
             use_history = (
-                    self.rng.random()
-                    < self.config.evolution.history.parent_sample_probability
+                self.rng.random()
+                < self.config.evolution.history.parent_sample_probability
             )
             next_parent: list[Candidate] = []
             if use_history:
@@ -955,7 +951,7 @@ class EvolutionEngine:
                     rng=self.rng,
                     candidate_index=self._candidate_index,
                     exclude_ids=selected_ids,
-                    diversify_buckets=strategy == Strategy.E3_HYBRID_RECOMBINATION,
+                    diversify_buckets=False,
                 )
             if not next_parent:
                 pool = [
@@ -972,7 +968,7 @@ class EvolutionEngine:
                     rng=self.rng,
                     candidate_index=self._candidate_index,
                     exclude_ids=selected_ids,
-                    diversify_buckets=strategy == Strategy.E3_HYBRID_RECOMBINATION,
+                    diversify_buckets=False,
                 )
             if not next_parent:
                 break
@@ -991,14 +987,14 @@ class EvolutionEngine:
         return dict(metrics_getter()) if callable(metrics_getter) else {}
 
     def _ensure_parent_verbal_gradients(
-            self,
-            parents: list[Candidate],
-            generation: int,
+        self,
+        parents: list[Candidate],
+        generation: int,
     ) -> None:
         gradient_config = self.config.evolution.verbal_gradients
         if (
-                not gradient_config.enabled
-                or generation % gradient_config.llm_every_n_generations != 0
+            not gradient_config.enabled
+            or generation % gradient_config.llm_every_n_generations != 0
         ):
             return
         problem_tag = self._problem_tag()
@@ -1007,8 +1003,8 @@ class EvolutionEngine:
             if candidate_has_llm_gradient(parent):
                 continue
             if (
-                    self._llm_gradient_calls_by_generation.get(generation, 0)
-                    >= gradient_config.max_llm_calls_per_generation
+                self._llm_gradient_calls_by_generation.get(generation, 0)
+                >= gradient_config.max_llm_calls_per_generation
             ):
                 continue
             logger.info(
@@ -1024,11 +1020,11 @@ class EvolutionEngine:
             )
 
     def _generate_llm_verbal_gradient(
-            self,
-            *,
-            candidate: Candidate,
-            parents: list[Candidate],
-            generation: int,
+        self,
+        *,
+        candidate: Candidate,
+        parents: list[Candidate],
+        generation: int,
     ) -> None:
         prompt_builder = getattr(self.problem, "build_llm_verbal_gradient_prompt", None)
         text_completion = getattr(self.feedback_provider, "complete_text", None)
@@ -1050,7 +1046,7 @@ class EvolutionEngine:
             "status": "ok",
         }
         self._llm_gradient_calls_by_generation[generation] = (
-                self._llm_gradient_calls_by_generation.get(generation, 0) + 1
+            self._llm_gradient_calls_by_generation.get(generation, 0) + 1
         )
         try:
             text = text_completion(prompt, temperature=gradient_config.temperature)
@@ -1093,10 +1089,10 @@ class EvolutionEngine:
         return summary
 
     def _sum_provider_metric(
-            self,
-            summaries: list[dict[str, object]],
-            *,
-            key: str,
+        self,
+        summaries: list[dict[str, object]],
+        *,
+        key: str,
     ) -> int | None:
         values: list[int] = []
         for summary in summaries:
@@ -1151,8 +1147,8 @@ class EvolutionEngine:
 
     def _search_best(self, population: Population) -> Candidate:
         if (
-                not self.history.enabled
-                or not self.config.evolution.history.final_selection_uses_history
+            not self.history.enabled
+            or not self.config.evolution.history.final_selection_uses_history
         ):
             return population.best
         candidates_by_id = {
@@ -1183,15 +1179,15 @@ class EvolutionEngine:
 
 
 def _reflection_fields_for_strategy(strategy: str | None) -> set[str]:
-    if str(strategy) in ("S2", "m5_intensify_search", "m6_diversify_search"):
+    if str(strategy) in ("S2", "m1_component_replacement"):
         return {"summary", "aim", "preserve", "change", "avoid"}
     return {"summary", "aim"}
 
 
 def scheduled_llm_calls(config: RunConfig) -> int:
     weights = (
-            config.evolution.archive_mode_strategy_weights
-            or config.evolution.strategy_weights
+        config.evolution.archive_mode_strategy_weights
+        or config.evolution.strategy_weights
     )
     if weights:
         expected_strategies = sum(weights.values())
@@ -1206,14 +1202,14 @@ def scheduled_llm_calls(config: RunConfig) -> int:
 
 
 def _build_candidate_from_response(
-        response: ParsedCandidateResponse,
-        *,
-        candidate_id: str,
-        generation: int,
-        strategy: str,
-        parents: list[str] | None = None,
-        prompt: str,
-        metrics: dict | None = None,
+    response: ParsedCandidateResponse,
+    *,
+    candidate_id: str,
+    generation: int,
+    strategy: str,
+    parents: list[str] | None = None,
+    prompt: str,
+    metrics: dict | None = None,
 ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
     score_name = _metric_score_name(candidate_metrics)
@@ -1238,14 +1234,14 @@ def _build_candidate_from_response(
 
 
 def _failed_candidate(
-        *,
-        candidate_id: str,
-        generation: int,
-        strategy: str,
-        prompt: str,
-        parents: list[str] | None = None,
-        error_details: str | None = None,
-        metrics: dict | None = None,
+    *,
+    candidate_id: str,
+    generation: int,
+    strategy: str,
+    prompt: str,
+    parents: list[str] | None = None,
+    error_details: str | None = None,
+    metrics: dict | None = None,
 ) -> Candidate:
     candidate_metrics = dict(metrics) if metrics is not None else {}
     score_name = _metric_score_name(candidate_metrics)

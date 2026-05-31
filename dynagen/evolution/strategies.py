@@ -4,13 +4,9 @@ from enum import StrEnum
 class Strategy(StrEnum):
     E1_RADICAL_EXPLORATION = "e1_radical_exploration"
     E2_BACKBONE_EXPLORATION = "e2_backbone_exploration"
-    E3_HYBRID_RECOMBINATION = "e3_hybrid_recombination"
     M1_COMPONENT_REPLACEMENT = "m1_component_replacement"
     M2_PARAMETER_SCHEDULE_MUTATION = "m2_parameter_schedule_mutation"
     M3_SIMPLIFY_GENERALIZE = "m3_simplify_generalize"
-    M4_CONTRACT_REPAIR = "m4_contract_repair"
-    M5_INTENSIFY_SEARCH = "m5_intensify_search"
-    M6_DIVERSIFY_SEARCH = "m6_diversify_search"
 
 
 STRATEGIES = {
@@ -31,14 +27,6 @@ STRATEGIES = {
             "the parents but clearly not a direct copy."
         ),
         "parent_count": 3,
-    },
-    "e3_hybrid_recombination": {
-        "description": (
-            "Combine compatible strengths from multiple parents into one coherent algorithm. "
-            "Select only components that work well together, resolve conflicts between their "
-            "design choices, and avoid merely concatenating all parent mechanisms."
-        ),
-        "parent_count": 2,
     },
     "m1_component_replacement": {
         "description": (
@@ -65,35 +53,10 @@ STRATEGIES = {
         ),
         "parent_count": 1,
     },
-    "m4_contract_repair": {
-        "description": (
-            "Revise one parent to better satisfy the required interface, constraints, safety "
-            "rules, and budget limits. Preserve the main algorithmic idea, but fix invalid "
-            "return paths, unsafe assumptions, missing fallback behavior, and fragile edge cases."
-        ),
-        "parent_count": 1,
-    },
-    "m5_intensify_search": {
-        "description": (
-            "Create a stronger exploitation-focused version of one parent. Improve how it "
-            "refines promising candidates, allocates effort to high-quality regions, reduces "
-            "wasted work, or makes more precise local decisions while preserving correctness."
-        ),
-        "parent_count": 1,
-    },
-    "m6_diversify_search": {
-        "description": (
-            "Create a more exploration-focused version of one parent. Improve how it generates "
-            "diverse candidates, escapes stagnation, varies search trajectories, uses restarts "
-            "or perturbations, or avoids premature convergence while respecting the contract."
-        ),
-        "parent_count": 1,
-    },
 }
 
 STRATEGIES_METADATA = {
-    Strategy(strategy_name): metadata
-    for strategy_name, metadata in STRATEGIES.items()
+    Strategy(strategy_name): metadata for strategy_name, metadata in STRATEGIES.items()
 }
 
 

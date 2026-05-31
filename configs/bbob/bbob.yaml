@@ -28,20 +28,18 @@ evolution:
   offspring_per_strategy: 1
   
   strategy_weights:
-    m5_intensify_search: 0.8
-    m6_diversify_search: 0.5
-    m1_component_replacement: 0.15
-    m2_parameter_schedule_mutation: 0.1
-    e2_backbone_exploration: 0.15
-    e3_hybrid_recombination: 0.15
-  archive_mode_strategy_weights:
-    m5_intensify_search: 0.9
-    m6_diversify_search: 0.3
-    m1_component_replacement: 0.1
+    m1_component_replacement: 0.3
+    m2_parameter_schedule_mutation: 0.3
+    m3_simplify_generalize: 0.2
+    e1_radical_exploration: 0.1
     e2_backbone_exploration: 0.1
-    e3_hybrid_recombination: 0.1
+  archive_mode_strategy_weights:
+    m1_component_replacement: 0.4
+    m2_parameter_schedule_mutation: 0.3
+    m3_simplify_generalize: 0.2
+    e2_backbone_exploration: 0.1
   archive_mode_strategy_weights_after_generation: 5
-  committee_recovery_strategies: [ e1_radical_exploration, e2_backbone_exploration, e3_hybrid_recombination ]
+  committee_recovery_strategies: [ e1_radical_exploration, e2_backbone_exploration, m1_component_replacement ]
   niche_population_mix: false
   archive_niche_replacement: true
 

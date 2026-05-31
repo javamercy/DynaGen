@@ -20,19 +20,14 @@ _VRP_STRATEGY_DESCRIPTIONS = {
         "limits, or scheduling rules. Prefer meaningful adaptive or runtime-aware schedules "
         "over arbitrary constant changes, while keeping the parent algorithm's structure."
     ),
-    Strategy.M4_CONTRACT_REPAIR: (
-        "Revise one parent to better satisfy the required interface, constraints, safety "
-        "rules, and runtime limits. Preserve the main algorithmic idea, but fix invalid "
-        "return paths, unsafe assumptions, missing fallback behavior, and fragile edge cases."
-    ),
 }
 
 
 def build_vrp_evolution_prompt(
-        strategy: str,
-        parents: list[Candidate],
-        *,
-        feedback_context: str = "",
+    strategy: str,
+    parents: list[Candidate],
+    *,
+    feedback_context: str = "",
 ) -> list[dict[str, str]]:
     strategy_enum = Strategy(strategy)
     strategy_description = _vrp_strategy_description(strategy_enum)
@@ -52,17 +47,24 @@ def build_vrp_evolution_prompt(
             "Do not ignore the parents or generate an unrelated solver from scratch.",
             "VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.",
         ]
-    blocks.extend([
-        f"PARENTS:\n{render_vrp_candidates(parents)}",
-        VRP_SOLVER_CONTRACT.strip(),
-        VRP_INTERNAL_CHECKLIST.strip(),
-        VRP_RESPONSE_FORMAT.strip(),
-    ])
+    blocks.extend(
+        [
+            f"PARENTS:\n{render_vrp_candidates(parents)}",
+            VRP_SOLVER_CONTRACT.strip(),
+            VRP_INTERNAL_CHECKLIST.strip(),
+            VRP_RESPONSE_FORMAT.strip(),
+        ]
+    )
     return [
-        {"role": "system", "content": "You generate executable, reliable VRP metaheuristics for evolutionary search."},
+        {
+            "role": "system",
+            "content": "You generate executable, reliable VRP metaheuristics for evolutionary search.",
+        },
         {"role": "user", "content": "\n\n".join(blocks)},
     ]
 
 
 def _vrp_strategy_description(strategy: Strategy) -> str:
-    return _VRP_STRATEGY_DESCRIPTIONS.get(strategy, STRATEGIES_METADATA[strategy]["description"])
+    return _VRP_STRATEGY_DESCRIPTIONS.get(
+        strategy, STRATEGIES_METADATA[strategy]["description"]
+    )
