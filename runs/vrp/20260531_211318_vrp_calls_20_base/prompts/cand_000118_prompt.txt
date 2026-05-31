@@ -1,0 +1,188 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY m2_parameter_schedule_mutation: Create a variant of one parent by changing its parameters, thresholds, rates, limits, or scheduling rules. Prefer meaningful adaptive or runtime-aware schedules over arbitrary constant changes, while keeping the parent algorithm's structure.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000110: simplified_alns_rrt
+Status: valid; gap: 0.465558
+Thought: Simplified ALNS with RRT acceptance. Uses farthest-first initial construction, random removal, greedy insertion, uniform operator selection (i.e., always same operators), RRT threshold decreasing linearly from 0.1 to 0.01. No adaptive weights, no regret-2, no restart, no 2-opt. Iterations bounded by min(2000,20*n). Designed to be robust and avoid timeouts.
+Mean gap: 0.465557685751271
+Mean max route distance: 2.063865327883144
+Mean total route distance: 12.240013595003333
+Gap by instance size: {'100': 0.465557685751271}
+Gap by truck count: {'6': 0.465557685751271}
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0, 0] for _ in range(truck_count)]
+    random.seed(0)
+    dist = distance_matrix
+
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        d = 0.0
+        for i in range(len(route)-1):
+            d += dist[route[i], route[i+1]]
+        return d
+
+    def insertion_delta(route, pos, cust):
+        prev = route[pos-1]
+        nxt = route[pos]
+        return dist[prev, cust] + dist[cust, nxt] - dist[prev, nxt]
+
+    # Farthest-first initial construction
+    customers = sorted(range(1, n), key=lambda c: -dist[0][c])
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_dists = [0.0] * truck_count
+    for cust in customers:
+        best_truck = None
+        best_pos = None
+        best_max = float('inf')
+        best_total = float('inf')
+        for t, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                new_dist = route_dists[t] + insertion_delta(route, pos, cust)
+                new_max = max(route_dists[:t] + [new_dist] + route_dists[t+1:])
+                new_total = sum(route_dists) + insertion_delta(route, pos, cust)
+                if new_max < best_max or (new_max == best_max and new_total < best_total):
+                    best_max = new_max
+                    best_total = new_total
+                    best_truck = t
+                    best_pos = pos
+        route = routes[best_truck]
+        routes[best_truck] = route[:best_pos] + [cust] + route[best_pos:]
+        route_dists[best_truck] += insertion_delta(route, best_pos, cust)
+
+    current_routes = [list(r) for r in routes]
+    current_dists = list(route_dists)
+    current_max = max(current_dists)
+    current_total = sum(current_dists)
+    best_routes = [list(r) for r in routes]
+    best_dists = list(route_dists)
+    best_max = current_max
+    best_total = current_total
+    report_best_vrp(best_routes)
+
+    # Parameters
+    max_iter = min(2000, 20 * n)
+    removal_start = 0.3
+    removal_end = 0.1
+    beta_start = 0.1
+    beta_end = 0.01
+
+    for it in range(max_iter):
+        removal_fraction = removal_start + (removal_end - removal_start) * (it / max_iter)
+        num_removals = max(1, int(removal_fraction * (n - 1)))
+        beta = beta_start + (beta_end - beta_start) * (it / max_iter)
+
+        # Random removal
+        all_customers = [c for r in current_routes for c in r[1:-1]]
+        random.shuffle(all_customers)
+        to_remove = set(all_customers[:num_removals])
+        new_routes = []
+        new_dists = []
+        for route in current_routes:
+            new_route = [0] + [c for c in route[1:-1] if c not in to_remove] + [0]
+            new_routes.append(new_route)
+            new_dists.append(route_distance(new_route))
+        removed = list(to_remove)
+
+        # Greedy repair
+        routes_repair = [list(r) for r in new_routes]
+        dists_repair = list(new_dists)
+        unassigned = list(removed)
+        current_max_repair = max(dists_repair)
+        for cust in unassigned:
+            best_truck = None
+            best_pos = None
+            best_new_max = float('inf')
+            best_new_total = float('inf')
+            best_delta = None
+            for t, route in enumerate(routes_repair):
+                old_dist = dists_repair[t]
+                for pos in range(1, len(route)):
+                    delta = insertion_delta(route, pos, cust)
+                    new_dist = old_dist + delta
+                    new_max = max(current_max_repair, new_dist)
+                    new_total = sum(dists_repair) + delta
+                    if new_max < best_new_max or (new_max == best_new_max and new_total < best_new_total):
+                        best_new_max = new_max
+                        best_new_total = new_total
+                        best_truck = t
+                        best_pos = pos
+                        best_delta = delta
+            route = routes_repair[best_truck]
+            routes_repair[best_truck] = route[:best_pos] + [cust] + route[best_pos:]
+            dists_repair[best_truck] += best_delta
+            if dists_repair[best_truck] > current_max_repair:
+                current_max_repair = dists_repair[best_truck]
+        new_max = max(dists_repair)
+        new_total = sum(dists_repair)
+
+        # RRT acceptance
+        threshold = best_max * (1.0 + beta)
+        if new_max <= threshold:
+            current_routes = [list(r) for r in routes_repair]
+            current_dists = list(dists_repair)
+            current_max = new_max
+            current_total = new_total
+            if new_max < best_max - 1e-9 or (abs(new_max - best_max) < 1e-9 and new_total < best_total):
+                best_max = new_max
+                best_total = new_total
+                best_routes = [list(r) for r in routes_repair]
+                best_dists = list(dists_repair)
+                report_best_vrp(best_routes)
+
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

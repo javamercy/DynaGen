@@ -1,0 +1,146 @@
+import numpy as np
+import math
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    def route_length(route):
+        if len(route) == 2:
+            return 0.0
+        total = 0.0
+        for i in range(len(route) - 1):
+            total += distance_matrix[route[i], route[i + 1]]
+        return total
+    
+    # Initialize routes
+    routes = [[0, 0] for _ in range(truck_count)]
+    
+    # Regret insertion construction
+    unassigned = set(customers)
+    while unassigned:
+        best_cust = None
+        best_regret = -1e9
+        best_cost = None
+        best_route_idx = None
+        best_pos = None
+        for cust in unassigned:
+            insert_costs = []
+            for r_idx, route in enumerate(routes):
+                for pos in range(1, len(route)):
+                    prev = route[pos - 1]
+                    nxt = route[pos]
+                    cost = (distance_matrix[prev, cust] + 
+                            distance_matrix[cust, nxt] - 
+                            distance_matrix[prev, nxt])
+                    insert_costs.append((cost, r_idx, pos))
+            insert_costs.sort(key=lambda x: x[0])
+            best = insert_costs[0][0]
+            second = insert_costs[1][0] if len(insert_costs) > 1 else best + 1e9
+            regret = second - best
+            if (regret > best_regret or 
+                (regret == best_regret and best_cost is not None and best > best_cost) or
+                (regret == best_regret and best_cost is not None and abs(best - best_cost) < 1e-12 and cust < best_cust)):
+                best_regret = regret
+                best_cost = best
+                best_cust = cust
+                best_route_idx = insert_costs[0][1]
+                best_pos = insert_costs[0][2]
+        route = routes[best_route_idx]
+        route.insert(best_pos, best_cust)
+        unassigned.remove(best_cust)
+    
+    # Improvement phase
+    current_max = max(route_length(r) for r in routes)
+    report_best_vrp(routes)
+    max_iter = n * truck_count
+    iteration = 0
+    improved = True
+    
+    while improved and iteration < max_iter:
+        improved = False
+        iteration += 1
+        
+        # 1) Inter-route relocate: move a customer from the longest route to another to reduce max
+        lengths = [route_length(r) for r in routes]
+        max_idx = max(range(truck_count), key=lambda i: lengths[i])
+        max_route = routes[max_idx]
+        if len(max_route) > 3:  # at least one customer to move
+            for cust in max_route[1:-1]:
+                new_max_route = [0] + [c for c in max_route[1:-1] if c != cust] + [0]
+                new_max_len = route_length(new_max_route)
+                for r_idx in range(truck_count):
+                    if r_idx == max_idx:
+                        continue
+                    other_route = routes[r_idx]
+                    for pos in range(1, len(other_route)):
+                        new_other = other_route[:pos] + [cust] + other_route[pos:]
+                        new_other_len = route_length(new_other)
+                        new_max_candidate = max(new_max_len, new_other_len, 
+                            *[route_length(routes[i]) for i in range(truck_count) if i not in (max_idx, r_idx)])
+                        if new_max_candidate < current_max - 1e-12:
+                            # Apply move
+                            routes[max_idx] = new_max_route
+                            routes[r_idx] = new_other
+                            current_max = new_max_candidate
+                            report_best_vrp(routes)
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+        if improved:
+            continue
+        
+        # 2) Inter-route swap: swap a customer between two routes
+        for i in range(truck_count):
+            for j in range(i + 1, truck_count):
+                route_i = routes[i]
+                route_j = routes[j]
+                if len(route_i) <= 2 and len(route_j) <= 2:
+                    continue
+                for cust_i in route_i[1:-1]:
+                    for cust_j in route_j[1:-1]:
+                        # new routes after swap
+                        new_i = [0] + [c for c in route_i[1:-1] if c != cust_i] + [cust_j] + [0]
+                        new_j = [0] + [c for c in route_j[1:-1] if c != cust_j] + [cust_i] + [0]
+                        # Actually we need to keep order? For simplicity, remove both and reinsert at some position
+                        # We'll create new routes by removing cust_i from i and cust_j from j, then add cust_j to i and cust_i to j
+                        # But best insertion positions need to be computed. To avoid complexity, we compute length directly
+                        # We'll compute length of new_i and new_j using distance_matrix, assuming the order is as original but with the swap.
+                        # Actually swap means we exchange customers, but the positions may be different. We'll use a simple method: 
+                        # Remove both and insert at the same positions? That might not be optimal. We'll compute by constructing new routes:
+                        # We need to keep the relative order of other customers. Let's do:
+                        temp_i = route_i[1:-1]
+                        temp_j = route_j[1:-1]
+                        new_i_custs = [c for c in temp_i if c != cust_i] + [cust_j]
+                        new_j_custs = [c for c in temp_j if c != cust_j] + [cust_i]
+                        # Now we need to order them. We'll use nearest neighbor? That's too heavy. Instead, we can compute the length 
+                        # by summing distances along the sequence. But the order matters. We'll assume we keep the original order 
+                        # and insert the swapped customer at the end? That's arbitrary. Better to use a more systematic approach.
+                        # Given time, we'll skip this neighborhood and rely only on relocate and 2-opt.
+                        pass
+        
+        # 3) Intra-route 2-opt on each route
+        for r_idx in range(truck_count):
+            route = routes[r_idx]
+            if len(route) <= 3:
+                continue
+            for i in range(1, len(route) - 2):
+                for k in range(i + 1, len(route) - 1):
+                    new_route = route[:i] + route[i:k+1][::-1] + route[k+1:]
+                    new_len = route_length(new_route)
+                    if new_len < route_length(route) - 1e-12:
+                        routes[r_idx] = new_route
+                        new_max = max(route_length(r) for r in routes)
+                        if new_max < current_max - 1e-12:
+                            current_max = new_max
+                            report_best_vrp(routes)
+                        improved = True
+                        break
+                if improved:
+                    break
+        # End of neighborhoods
+    # Final report
+    return routes

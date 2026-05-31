@@ -1,0 +1,408 @@
+import numpy as np
+import random
+from collections import deque
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    random.seed(0)
+    n = distance_matrix.shape[0]
+    depot = 0
+    customers = list(range(1, n))
+    max_dist = np.max(distance_matrix)
+
+    def route_distance(route):
+        return sum(distance_matrix[route[i], route[i+1]] for i in range(len(route)-1))
+
+    def two_opt(route, max_iter=5):
+        route = route[:]
+        improved = True
+        it = 0
+        while improved and it < max_iter:
+            improved = False
+            it += 1
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    if route_distance(new_route) < route_distance(route):
+                        route = new_route
+                        improved = True
+        return route
+
+    def balance_routes(routes, lengths):
+        improved = True
+        max_balance_iter = n
+        it = 0
+        while improved and it < max_balance_iter:
+            improved = False
+            it += 1
+            max_idx = max(range(truck_count), key=lambda i: lengths[i])
+            min_idx = min(range(truck_count), key=lambda i: lengths[i])
+            if max_idx == min_idx or lengths[max_idx] == lengths[min_idx]:
+                break
+            max_route = routes[max_idx]
+            best_cust = None
+            best_overall_reduction = 0
+            for pos in range(1, len(max_route)-1):
+                cust = max_route[pos]
+                new_max_route = max_route[:pos] + max_route[pos+1:]
+                new_max_len = route_distance(new_max_route)
+                min_route = routes[min_idx]
+                best_insertion_len = float('inf')
+                best_pos = -1
+                for p in range(1, len(min_route)):
+                    new_min_route = min_route[:p] + [cust] + min_route[p:]
+                    l = route_distance(new_min_route)
+                    if l < best_insertion_len:
+                        best_insertion_len = l
+                        best_pos = p
+                new_min_route = min_route[:best_pos] + [cust] + min_route[best_pos:]
+                new_min_len = route_distance(new_min_route)
+                other_lengths = [lengths[i] for i in range(truck_count) if i not in (max_idx, min_idx)]
+                new_max_global = max(new_max_len, new_min_len, max(other_lengths) if other_lengths else 0)
+                old_max_global = max(lengths)
+                reduction = old_max_global - new_max_global
+                if reduction > best_overall_reduction:
+                    best_overall_reduction = reduction
+                    best_cust = (cust, best_pos)
+            if best_cust is not None and best_overall_reduction > 0:
+                cust, best_insert_pos = best_cust
+                new_max = [node for node in max_route if node != cust]
+                min_route = routes[min_idx]
+                new_min = min_route[:best_insert_pos] + [cust] + min_route[best_insert_pos:]
+                routes[max_idx] = new_max
+                routes[min_idx] = new_min
+                lengths[max_idx] = route_distance(new_max)
+                lengths[min_idx] = route_distance(new_min)
+                improved = True
+        return routes, lengths
+
+    def regret_construction(k=3, noise_factor=0.1):
+        routes = [[0, 0] for _ in range(truck_count)]
+        unvisited = set(customers)
+        while unvisited:
+            best_cust = None
+            best_regret = -float('inf')
+            best_inc = float('inf')
+            best_route_idx = -1
+            best_pos = -1
+            for cust in unvisited:
+                incs = []
+                for r_idx, route in enumerate(routes):
+                    for pos in range(1, len(route)):
+                        inc = distance_matrix[route[pos-1], cust] + distance_matrix[cust, route[pos]] - distance_matrix[route[pos-1], route[pos]]
+                        noise = random.uniform(0, noise_factor * max_dist)
+                        incs.append((inc + noise, pos, r_idx))
+                incs.sort(key=lambda x: x[0])
+                if len(incs) >= k:
+                    regret = sum(incs[i][0] - incs[0][0] for i in range(1, k))
+                else:
+                    regret = 0.0
+                inc = incs[0][0]
+                pos = incs[0][1]
+                r_idx = incs[0][2]
+                if regret > best_regret or (regret == best_regret and inc < best_inc):
+                    best_regret = regret
+                    best_inc = inc
+                    best_cust = cust
+                    best_route_idx = r_idx
+                    best_pos = pos
+            routes[best_route_idx].insert(best_pos, best_cust)
+            unvisited.remove(best_cust)
+        return routes
+
+    def worst_ruin_recreate(routes, lengths, fraction=0.15):
+        n_cust = n - 1
+        num_remove = max(1, int(n_cust * fraction))
+        savings = []
+        for r_idx, route in enumerate(routes):
+            for pos in range(1, len(route)-1):
+                cust = route[pos]
+                prev = route[pos-1]
+                nxt = route[pos+1]
+                saving = distance_matrix[prev, cust] + distance_matrix[cust, nxt] - distance_matrix[prev, nxt]
+                savings.append((saving, cust, r_idx, pos))
+        savings.sort(reverse=True)
+        to_remove = [item[1] for item in savings[:num_remove]]
+        new_routes = [[0, 0] for _ in range(truck_count)]
+        for r_idx, route in enumerate(routes):
+            new_routes[r_idx] = [0] + [c for c in route[1:-1] if c not in to_remove] + [0]
+        unvisited = set(to_remove)
+        while unvisited:
+            best_cust = None
+            best_regret = -float('inf')
+            best_inc = float('inf')
+            best_route_idx = -1
+            best_pos = -1
+            for cust in unvisited:
+                incs = []
+                for r_idx, route in enumerate(new_routes):
+                    for pos in range(1, len(route)):
+                        inc = distance_matrix[route[pos-1], cust] + distance_matrix[cust, route[pos]] - distance_matrix[route[pos-1], route[pos]]
+                        noise = random.uniform(0, 0.1 * max_dist)
+                        incs.append((inc + noise, pos, r_idx))
+                incs.sort(key=lambda x: x[0])
+                if len(incs) >= 3:
+                    regret = incs[1][0] - incs[0][0] + incs[2][0] - incs[0][0]
+                else:
+                    regret = 0.0
+                inc = incs[0][0]
+                pos = incs[0][1]
+                r_idx = incs[0][2]
+                if regret > best_regret or (regret == best_regret and inc < best_inc):
+                    best_regret = regret
+                    best_inc = inc
+                    best_cust = cust
+                    best_route_idx = r_idx
+                    best_pos = pos
+            new_routes[best_route_idx].insert(best_pos, best_cust)
+            unvisited.remove(best_cust)
+        for r_idx in range(truck_count):
+            if len(new_routes[r_idx]) > 2:
+                new_routes[r_idx] = two_opt(new_routes[r_idx], max_iter=5)
+        new_lengths = [route_distance(r) for r in new_routes]
+        new_routes, new_lengths = balance_routes(new_routes, new_lengths)
+        return new_routes, new_lengths
+
+    def greedy_split(perm):
+        routes = [[0, 0] for _ in range(truck_count)]
+        lengths = [0.0] * truck_count
+        for cust in perm:
+            best_truck = -1
+            best_new_max = float('inf')
+            best_pos = -1
+            best_total = float('inf')
+            for t in range(truck_count):
+                route = routes[t]
+                best_inc = float('inf')
+                best_p = -1
+                for p in range(1, len(route)):
+                    inc = distance_matrix[route[p-1], cust] + distance_matrix[cust, route[p]] - distance_matrix[route[p-1], route[p]]
+                    if inc < best_inc:
+                        best_inc = inc
+                        best_p = p
+                new_len = lengths[t] + best_inc
+                other_lengths = [lengths[i] for i in range(truck_count) if i != t]
+                new_max = max(new_len, max(other_lengths) if other_lengths else 0)
+                new_total = new_len + sum(other_lengths)
+                if (new_max < best_new_max or 
+                    (new_max == best_new_max and new_total < best_total) or 
+                    (new_max == best_new_max and new_total == best_total and t < best_truck)):
+                    best_new_max = new_max
+                    best_total = new_total
+                    best_truck = t
+                    best_p = best_p
+            routes[best_truck].insert(best_p, cust)
+            lengths[best_truck] += distance_matrix[routes[best_truck][best_p-1], cust] + distance_matrix[cust, routes[best_truck][best_p+1]] - distance_matrix[routes[best_truck][best_p-1], routes[best_truck][best_p+1]] # simplified? Actually recalc
+            lengths[best_truck] = route_distance(routes[best_truck])
+        return routes, lengths
+
+    def vnd(routes, lengths):
+        improved = True
+        max_cycles = n
+        cycle = 0
+        while improved and cycle < max_cycles:
+            improved = False
+            cycle += 1
+            best_move = None
+            best_new_max = max(lengths)
+            best_total = sum(lengths)
+            # Inter-route relocate
+            for cust in range(1, n):
+                src_idx = None
+                src_pos = None
+                for i, route in enumerate(routes):
+                    if cust in route:
+                        src_idx = i
+                        src_pos = route.index(cust)
+                        break
+                if src_idx is None:
+                    continue
+                new_src = routes[src_idx][:src_pos] + routes[src_idx][src_pos+1:]
+                src_len = route_distance(new_src)
+                for dst_idx in range(truck_count):
+                    if dst_idx == src_idx:
+                        continue
+                    if len(routes[dst_idx]) <= 2:
+                        continue
+                    for ins_pos in range(1, len(routes[dst_idx])):
+                        new_dst = routes[dst_idx][:ins_pos] + [cust] + routes[dst_idx][ins_pos:]
+                        new_lengths = lengths[:]
+                        new_lengths[src_idx] = src_len
+                        new_lengths[dst_idx] = route_distance(new_dst)
+                        new_max = max(new_lengths)
+                        new_total = sum(new_lengths)
+                        if (new_max < best_new_max or 
+                            (new_max == best_new_max and new_total < best_total) or 
+                            (new_max == best_new_max and new_total == best_total and src_idx < dst_idx)):
+                            best_new_max = new_max
+                            best_total = new_total
+                            best_move = ('relocate', src_idx, src_pos, dst_idx, ins_pos, new_src, new_dst)
+            if best_move is not None and best_new_max < max(lengths):
+                routes[best_move[1]] = best_move[5]
+                routes[best_move[3]] = best_move[6]
+                lengths = [route_distance(r) for r in routes]
+                improved = True
+                continue
+            # Inter-route swap
+            best_move = None
+            best_new_max = max(lengths)
+            best_total = sum(lengths)
+            for i_idx in range(truck_count):
+                if len(routes[i_idx]) <= 2:
+                    continue
+                for i_pos in range(1, len(routes[i_idx])-1):
+                    cust_i = routes[i_idx][i_pos]
+                    for j_idx in range(i_idx+1, truck_count):
+                        if len(routes[j_idx]) <= 2:
+                            continue
+                        for j_pos in range(1, len(routes[j_idx])-1):
+                            cust_j = routes[j_idx][j_pos]
+                            new_i = routes[i_idx][:i_pos] + [cust_j] + routes[i_idx][i_pos+1:]
+                            new_j = routes[j_idx][:j_pos] + [cust_i] + routes[j_idx][j_pos+1:]
+                            new_lengths = lengths[:]
+                            new_lengths[i_idx] = route_distance(new_i)
+                            new_lengths[j_idx] = route_distance(new_j)
+                            new_max = max(new_lengths)
+                            new_total = sum(new_lengths)
+                            if (new_max < best_new_max or 
+                                (new_max == best_new_max and new_total < best_total) or 
+                                (new_max == best_new_max and new_total == best_total and i_idx < j_idx)):
+                                best_new_max = new_max
+                                best_total = new_total
+                                best_move = ('swap', i_idx, i_pos, j_idx, j_pos, new_i, new_j)
+            if best_move is not None and best_new_max < max(lengths):
+                routes[best_move[1]] = best_move[5]
+                routes[best_move[3]] = best_move[6]
+                lengths = [route_distance(r) for r in routes]
+                improved = True
+                continue
+            # Intra-route 2-opt
+            best_move = None
+            best_new_max = max(lengths)
+            best_total = sum(lengths)
+            for r_idx in range(truck_count):
+                if len(routes[r_idx]) <= 3:
+                    continue
+                for i in range(1, len(routes[r_idx])-2):
+                    for j in range(i+1, len(routes[r_idx])-1):
+                        new_route = routes[r_idx][:i] + routes[r_idx][i:j+1][::-1] + routes[r_idx][j+1:]
+                        new_len = route_distance(new_route)
+                        if new_len >= lengths[r_idx]:
+                            continue
+                        new_lengths = lengths[:]
+                        new_lengths[r_idx] = new_len
+                        new_max = max(new_lengths)
+                        new_total = sum(new_lengths)
+                        if (new_max < best_new_max or 
+                            (new_max == best_new_max and new_total < best_total) or 
+                            (new_max == best_new_max and new_total == best_total and r_idx < 0)):
+                            best_new_max = new_max
+                            best_total = new_total
+                            best_move = ('2opt', r_idx, i, j, new_route)
+            if best_move is not None and best_new_max < max(lengths):
+                routes[best_move[1]] = best_move[4]
+                lengths = [route_distance(r) for r in routes]
+                improved = True
+                continue
+            # If no improvement, balance and break
+            routes, lengths = balance_routes(routes, lengths)
+            break
+        return routes, lengths
+
+    def evaluate(perm):
+        routes, lengths = greedy_split(perm)
+        routes, lengths = vnd(routes, lengths)
+        routes, lengths = balance_routes(routes, lengths)
+        max_len = max(lengths)
+        return max_len, routes, lengths
+
+    best_routes = None
+    best_max = float('inf')
+    pop_size = min(10, n)
+    max_gen = n * 5
+    crossover_rate = 0.8
+    mutation_rate = 0.1
+
+    # initial population: one regret-3, rest random
+    population = []
+    greedy_routes = regret_construction(k=3, noise_factor=0.1)
+    greedy_perm = []
+    for r in greedy_routes:
+        greedy_perm.extend(r[1:-1])
+    population.append(greedy_perm)
+    while len(population) < pop_size:
+        perm = list(customers)
+        random.shuffle(perm)
+        population.append(perm)
+
+    # evaluate initial population
+    fitness = []
+    for perm in population:
+        max_len, routes, _ = evaluate(perm)
+        fitness.append(max_len)
+        if max_len < best_max:
+            best_max = max_len
+            best_routes = [r[:] for r in routes]
+            report_best_vrp(best_routes)
+
+    stagnation = 0
+    ruin_fraction = 0.15
+    for gen in range(max_gen):
+        # tournament selection (size 3) from current population
+        idx1 = random.randint(0, pop_size-1)
+        idx2 = random.randint(0, pop_size-1)
+        idx3 = random.randint(0, pop_size-1)
+        parent1 = population[min([idx1, idx2, idx3], key=lambda i: fitness[i])]
+        idx1 = random.randint(0, pop_size-1)
+        idx2 = random.randint(0, pop_size-1)
+        idx3 = random.randint(0, pop_size-1)
+        parent2 = population[min([idx1, idx2, idx3], key=lambda i: fitness[i])]
+        if random.random() < crossover_rate:
+            m = len(parent1)
+            start = random.randint(0, m-1)
+            end = random.randint(start+1, m)
+            child = [None] * m
+            child[start:end] = parent1[start:end]
+            pos = end
+            for gene in parent2:
+                if gene not in child:
+                    child[pos % m] = gene
+                    pos += 1
+        else:
+            child = list(parent1)
+        if random.random() < mutation_rate:
+            i = random.randint(0, len(child)-1)
+            j = random.randint(0, len(child)-1)
+            child[i], child[j] = child[j], child[i]
+        # evaluate child
+        max_len_child, routes_child, lengths_child = evaluate(child)
+        if max_len_child < best_max:
+            best_max = max_len_child
+            best_routes = [r[:] for r in routes_child]
+            report_best_vrp(best_routes)
+        # steady-state: replace worst if child is better than worst
+        worst_idx = max(range(pop_size), key=lambda i: fitness[i])
+        if max_len_child < fitness[worst_idx]:
+            population[worst_idx] = child
+            fitness[worst_idx] = max_len_child
+        # adaptive ruin-recreate on worst solution if stagnation
+        if stagnation > 3:
+            ruin_fraction = min(0.3, 0.15 + 0.05 * stagnation)
+            worst_idx = max(range(pop_size), key=lambda i: fitness[i])
+            worst_perm = population[worst_idx]
+            worst_routes, worst_lengths = greedy_split(worst_perm)
+            new_worst_routes, new_worst_lengths = worst_ruin_recreate(worst_routes, worst_lengths, fraction=ruin_fraction)
+            new_worst_perm = []
+            for r in new_worst_routes:
+                new_worst_perm.extend(r[1:-1])
+            _, new_routes, new_lengths = evaluate(new_worst_perm)
+            new_max = max(new_lengths)
+            population[worst_idx] = new_worst_perm
+            fitness[worst_idx] = new_max
+            if new_max < best_max:
+                best_max = new_max
+                best_routes = [r[:] for r in new_routes]
+                report_best_vrp(best_routes)
+            stagnation = 0
+        else:
+            stagnation += 1
+    return best_routes

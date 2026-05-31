@@ -1,0 +1,212 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or effort allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000003: regret_insertion_solver
+Status: valid; gap: 18.9248
+Thought: Regret-insertion construction: for each unassigned customer, compute best and second-best insertion positions (minimizing route length increase), then insert the customer with maximum regret (difference) into its best position, with ties broken by larger insertion cost. After construction, iterate inter-route relocate and intra-route 2-opt improvements to minimize max route distance, bounded by instance size. Uses report_best_vrp at each improvement.
+Mean gap: 18.9248402394474
+Mean max route distance: 2.439148312775795
+Mean total route distance: 14.517417117964012
+Gap by instance size: {'100': 18.9248402394474}
+Gap by truck count: {'6': 18.9248402394474}
+Code:
+```python
+import numpy as np
+import math
+from itertools import permutations
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    # Initialize routes: each truck starts and ends at depot
+    routes = [[0, 0] for _ in range(truck_count)]
+    
+    def route_length(route):
+        total = 0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i], route[i+1]]
+        return total
+    
+    def total_routes_length():
+        return [route_length(r) for r in routes]
+    
+    # Regret insertion
+    unassigned = set(customers)
+    while unassigned:
+        best_customer = None
+        best_regret = -1
+        best_pos = None
+        best_route_idx = None
+        best_insertion_cost = None
+        for cust in unassigned:
+            costs = []  # list of (cost, route_idx, pos_idx)
+            for r_idx, route in enumerate(routes):
+                # consider all insertion positions (after first node, before last)
+                for pos in range(1, len(route)):
+                    # insertion cost: dist(prev,cust) + dist(cust,next) - dist(prev,next)
+                    prev = route[pos-1]
+                    next_node = route[pos]
+                    cost = distance_matrix[prev, cust] + distance_matrix[cust, next_node] - distance_matrix[prev, next_node]
+                    costs.append((cost, r_idx, pos))
+            # Sort by cost ascending
+            costs.sort(key=lambda x: x[0])
+            # There must be at least one insertion (if route is [0,0], only pos=1)
+            best_cost = costs[0][0]
+            # Regret: if only one route possible? Actually there are always truck_count routes, but all may be non-empty or empty.
+            # Second best: if len(costs) > 1, use second; else use a large number or same? regret = second - best
+            second_cost = costs[1][0] if len(costs) > 1 else best_cost + 1e9  # large regret if only one feasible
+            regret = second_cost - best_cost
+            # Keep customer with highest regret; ties: highest best insertion cost
+            if regret > best_regret or (regret == best_regret and best_insertion_cost is not None and best_cost > best_insertion_cost):
+                best_regret = regret
+                best_customer = cust
+                best_route_idx = costs[0][1]
+                best_pos = costs[0][2]
+                best_insertion_cost = best_cost
+            # Also handle ties: if regret equal and best_cost equal, choose smaller customer index for stability
+            elif regret == best_regret and best_cost == best_insertion_cost and cust < best_customer:
+                best_customer = cust
+                best_route_idx = costs[0][1]
+                best_pos = costs[0][2]
+        # Insert best_customer
+        route = routes[best_route_idx]
+        route.insert(best_pos, best_customer)
+        unassigned.remove(best_customer)
+    
+    # Improvement: local search to minimize max route distance
+    # Compute current max
+    current_max = max(route_length(r) for r in routes)
+    improved = True
+    max_iter = n * truck_count  # finite bound
+    iterations = 0
+    while improved and iterations < max_iter:
+        improved = False
+        iterations += 1
+        # Inter-route relocate: try moving a customer from one route to another
+        # To reduce max, we try to move a customer from the longest route to a shorter one
+        lengths = [route_length(r) for r in routes]
+        max_idx = np.argmax(lengths)
+        max_route = routes[max_idx]
+        # If max_route has only depot nodes, skip
+        if len(max_route) <= 2:
+            continue
+        # Try removing each customer from max_idx and inserting into other routes
+        best_delta = 0
+        best_move = None
+        for cust in max_route[1:-1]:  # customers only
+            # Temporarily remove cust, get new length of max_route
+            new_max_route = [x for x in max_route if x != cust]
+            new_max_len = route_length(new_max_route)
+            # For each other route
+            for r_idx in range(truck_count):
+                if r_idx == max_idx:
+                    continue
+                other_route = routes[r_idx]
+                # Try all insertion positions
+                for pos in range(1, len(other_route)):
+                    new_other_route = other_route[:pos] + [cust] + other_route[pos:]
+                    new_other_len = route_length(new_other_route)
+                    # New max will be max of new_max_len, new_other_len, and other routes lengths unchanged
+                    new_max_candidate = max(new_max_len, new_other_len, *[lengths[i] for i in range(truck_count) if i not in (max_idx, r_idx)])
+                    if new_max_candidate < current_max:
+                        # Improvement
+                        delta = current_max - new_max_candidate
+                        if delta > best_delta:
+                            best_delta = delta
+                            best_move = (cust, max_idx, r_idx, pos)
+        if best_move:
+            cust, from_idx, to_idx, pos = best_move
+            # Remove from from_idx
+            routes[from_idx] = [x for x in routes[from_idx] if x != cust]
+            # Insert at to_idx
+            routes[to_idx].insert(pos, cust)
+            # Update lengths
+            current_max = current_max - best_delta
+            improved = True
+            # Report best
+            # (The overall best is the current solution, but we call report_best_vrp for safety)
+            # But we need to import report_best_vrp from somewhere? The problem says call report_best_vrp(routes). We assume it's available.
+            # However, the code will be run in an environment where report_best_vrp is defined.
+            # We'll call it here.
+            # Since we cannot import it, we assume it's global. But to avoid NameError, we'll add a dummy definition.
+            # Actually the instruction says "call report_best_vrp(routes)" - we must call it. We'll assume it's available.
+            # So we call report_best_vrp(routes)
+            # But to make the code self-contained, we can define it as a placeholder? The instruction didn't say we must define it.
+            # I'll call it assuming it exists.
+            # To be safe, we can try-except, but that's not allowed? We'll just call it.
+            report_best_vrp(routes)
+        else:
+            # Intra-route 2-opt on each route
+            for r_idx in range(truck_count):
+                route = routes[r_idx]
+                if len(route) <= 3:
+                    continue
+                improved_intra = True
+                inner_iter = 0
+                while improved_intra and inner_iter < len(route):
+                    improved_intra = False
+                    inner_iter += 1
+                    for i in range(1, len(route)-2):
+                        for k in range(i+1, len(route)-1):
+                            new_route = route[:i] + route[i:k+1][::-1] + route[k+1:]
+                            if route_length(new_route) < route_length(route):
+                                route[:] = new_route
+                                improved_intra = True
+                                improved = True
+                                # Update max if needed
+                                new_max = max(route_length(r) for r in routes)
+                                if new_max < current_max:
+                                    current_max = new_max
+                                    report_best_vrp(routes)
+                                break
+                        if improved_intra:
+                            break
+    return routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

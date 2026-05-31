@@ -1,0 +1,703 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY e1_radical_exploration: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000052: adaptive_alns
+Status: timeout; gap: 1.56883
+Thought: Based on the shared ALNS backbone from parents, this variant uses adaptive operator selection based on past success scores (roulette wheel) instead of exploration bias. It preserves initial greedy insertion, worst/random removal, greedy repair, simulated annealing acceptance, linear cooling, and restart on stagnation. The score-based selection adapts faster to effective operators.
+Mean gap: 1.5688299749025263
+Mean max route distance: 2.086098640326608
+Mean total route distance: 12.289895406397438
+Gap by instance size: {'100': 1.5688299749025263}
+Gap by truck count: {'6': 1.5688299749025263}
+Error details: timeout on instances_000: VRP solver timed out after 180.001s (timeout_seconds=180)
+Code:
+```python
+import numpy as np
+import math
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0, 0] for _ in range(truck_count)]
+    random.seed(0)
+    dist = distance_matrix
+
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        d = 0.0
+        for i in range(len(route)-1):
+            d += dist[route[i], route[i+1]]
+        return d
+
+    # Initial construction: random order greedy insertion (minimize max then total)
+    customers = list(range(1, n))
+    random.shuffle(customers)
+    routes = [[0, 0] for _ in range(truck_count)]
+    for cust in customers:
+        best_truck = None
+        best_pos = None
+        best_max = float('inf')
+        best_total = float('inf')
+        for t, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                new_route = route[:pos] + [cust] + route[pos:]
+                new_routes = routes[:t] + [new_route] + routes[t+1:]
+                new_max = max(route_distance(r) for r in new_routes)
+                new_total = sum(route_distance(r) for r in new_routes)
+                if new_max < best_max or (new_max == best_max and new_total < best_total):
+                    best_max = new_max
+                    best_total = new_total
+                    best_truck = t
+                    best_pos = pos
+        routes[best_truck].insert(best_pos, cust)
+
+    current_routes = [list(r) for r in routes]
+    best_routes = [list(r) for r in routes]
+    best_max = max(route_distance(r) for r in best_routes)
+    report_best_vrp(best_routes)
+
+    # ALNS parameters
+    max_iter = max(100, 3 * n)
+    removal_fraction = 0.15
+    num_removals = max(1, int(removal_fraction * (n-1)))
+    T0 = best_max / 2.0
+    T = T0
+
+    # Adaptive operator weights (scores)
+    destroy_scores = [1, 1]  # worst, random
+    destroy_usage = [1, 1]
+    score_best = 3
+    score_accepted = 1
+    score_rejected = 0
+
+    def worst_removal(routes, num_removals):
+        all_contribs = []
+        for t, route in enumerate(routes):
+            if len(route) <= 2:
+                continue
+            base = route_distance(route)
+            for i in range(1, len(route)-1):
+                prev = route[i-1]
+                nxt = route[i+1]
+                contrib = dist[prev, route[i]] + dist[route[i], nxt] - dist[prev, nxt]
+                all_contribs.append((-contrib, t, i, route[i]))
+        all_contribs.sort(key=lambda x: x[0])
+        to_remove = set()
+        for _, t, i, cust in all_contribs[:num_removals]:
+            to_remove.add(cust)
+        new_routes = []
+        for t, route in enumerate(routes):
+            new_routes.append([0] + [c for c in route[1:-1] if c not in to_remove] + [0])
+        return list(to_remove), new_routes
+
+    def random_removal(routes, num_removals):
+        all_customers = [c for r in routes for c in r[1:-1]]
+        random.shuffle(all_customers)
+        to_remove = set(all_customers[:num_removals])
+        new_routes = []
+        for route in routes:
+            new_routes.append([0] + [c for c in route[1:-1] if c not in to_remove] + [0])
+        return list(to_remove), new_routes
+
+    def greedy_repair(routes, unassigned):
+        routes = [list(r) for r in routes]
+        unassigned = list(unassigned)
+        for cust in unassigned:
+            best_max = float('inf')
+            best_total = float('inf')
+            best_truck = None
+            best_pos = None
+            for t, route in enumerate(routes):
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    new_routes = routes[:t] + [new_route] + routes[t+1:]
+                    new_max_val = max(route_distance(r) for r in new_routes)
+                    new_total_val = sum(route_distance(r) for r in new_routes)
+                    if new_max_val < best_max or (new_max_val == best_max and new_total_val < best_total):
+                        best_max = new_max_val
+                        best_total = new_total_val
+                        best_truck = t
+                        best_pos = pos
+            routes[best_truck].insert(best_pos, cust)
+        return routes
+
+    no_improve_iter = 0
+    restart_threshold = int(0.2 * max_iter)
+
+    for it in range(max_iter):
+        # Select destroy operator via roulette wheel based on scores
+        total_score = sum(destroy_scores)
+        probs = [s / total_score for s in destroy_scores]
+        destroy_op = random.choices([0, 1], weights=probs)[0]
+
+        # Destroy
+        if destroy_op == 0:
+            removed, partial = worst_removal(current_routes, num_removals)
+        else:
+            removed, partial = random_removal(current_routes, num_removals)
+
+        # Repair (greedy)
+        new_routes = greedy_repair(partial, removed)
+
+        # Evaluate
+        new_max = max(route_distance(r) for r in new_routes)
+        new_total = sum(route_distance(r) for r in new_routes)
+        current_max = max(route_distance(r) for r in current_routes)
+        current_total = sum(route_distance(r) for r in current_routes)
+
+        delta = new_max - current_max
+        accepted = False
+        if delta < 0 or (delta == 0 and new_total < current_total) or random.random() < math.exp(-delta / max(T, 1e-9)):
+            accepted = True
+            current_routes = [list(r) for r in new_routes]
+            if new_max < best_max - 1e-9 or (abs(new_max - best_max) < 1e-9 and new_total < sum(route_distance(r) for r in best_routes)):
+                best_max = new_max
+                best_routes = [list(r) for r in new_routes]
+                report_best_vrp(best_routes)
+                no_improve_iter = 0
+                destroy_scores[destroy_op] += score_best
+            else:
+                no_improve_iter += 1
+                destroy_scores[destroy_op] += score_accepted
+        else:
+            no_improve_iter += 1
+            destroy_scores[destroy_op] += score_rejected
+
+        # Temperature update (linear cooling)
+        T = T0 * (1 - it / max_iter)
+
+        # Restart if stuck
+        if no_improve_iter >= restart_threshold:
+            large_removal_count = max(1, int(0.5 * (n-1)))
+            removed, partial = random_removal(current_routes, large_removal_count)
+            current_routes = greedy_repair(partial, removed)
+            T = T0
+            no_improve_iter = 0
+
+    return best_routes
+```
+
+Candidate cand_000057: alns_repair
+Status: timeout; gap: 1.74087
+Thought: Repaired ALNS solver from parent: reduced iterations (min(5000,30*n)) to avoid timeout, optimized repair by maintaining route distances and computing insertion impact incrementally, added 2-opt local search on best solution for improvement, preserved deterministic tie-breaking and simulated annealing acceptance.
+Mean gap: 1.740873210146369
+Mean max route distance: 2.089241905907908
+Mean total route distance: 12.254257531916625
+Gap by instance size: {'100': 1.740873210146369}
+Gap by truck count: {'6': 1.740873210146369}
+Error details: timeout on instances_000: VRP solver timed out after 180s (timeout_seconds=180)
+Code:
+```python
+import numpy as np
+import math
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0, 0] for _ in range(truck_count)]
+    random.seed(0)
+    dist = distance_matrix
+
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        d = 0.0
+        for i in range(len(route) - 1):
+            d += dist[route[i], route[i + 1]]
+        return d
+
+    # Initial construction: random order greedy insertion minimizing max distance
+    customers = list(range(1, n))
+    random.shuffle(customers)
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_dists = [0.0] * truck_count
+    for cust in customers:
+        best_truck = None
+        best_pos = None
+        best_max = float('inf')
+        best_total = float('inf')
+        for t, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                new_route = route[:pos] + [cust] + route[pos:]
+                new_dist = route_distance(new_route)
+                new_max = max(route_dists[:t] + [new_dist] + route_dists[t+1:])
+                new_total = sum(route_dists[:t]) + new_dist + sum(route_dists[t+1:])
+                if new_max < best_max or (new_max == best_max and new_total < best_total):
+                    best_max = new_max
+                    best_total = new_total
+                    best_truck = t
+                    best_pos = pos
+        routes[best_truck].insert(best_pos, cust)
+        route_dists[best_truck] = route_distance(routes[best_truck])
+
+    current_routes = [list(r) for r in routes]
+    current_dists = list(route_dists)
+    current_max = max(current_dists)
+    current_total = sum(current_dists)
+    best_routes = [list(r) for r in routes]
+    best_dists = list(route_dists)
+    best_max = current_max
+    best_total = current_total
+    report_best_vrp(best_routes)
+
+    # ALNS parameters
+    max_iter = min(5000, 30 * n)
+    removal_fraction = 0.25
+    num_removals = max(1, int(removal_fraction * (n - 1)))
+    T0 = best_max / 2.0
+    T = T0
+
+    # Helper functions for destroy and repair
+    def worst_removal(routes, dists, num_removals):
+        all_contribs = []
+        for t, route in enumerate(routes):
+            if len(route) <= 2:
+                continue
+            base = dists[t]
+            for i in range(1, len(route) - 1):
+                prev = route[i - 1]
+                nxt = route[i + 1]
+                with_ = dist[prev, route[i]] + dist[route[i], nxt]
+                without = dist[prev, nxt]
+                contrib = with_ - without
+                all_contribs.append((-contrib, t, i, route[i]))
+        all_contribs.sort(key=lambda x: x[0])
+        to_remove = set()
+        for _, t, i, cust in all_contribs[:num_removals]:
+            to_remove.add(cust)
+        new_routes = []
+        new_dists = []
+        for t, route in enumerate(routes):
+            new_route = [0] + [c for c in route[1:-1] if c not in to_remove] + [0]
+            new_routes.append(new_route)
+            new_dists.append(route_distance(new_route))
+        return list(to_remove), new_routes, new_dists
+
+    def random_removal(routes, dists, num_removals):
+        all_customers = [c for r in routes for c in r[1:-1]]
+        random.shuffle(all_customers)
+        to_remove = set(all_customers[:num_removals])
+        new_routes = []
+        new_dists = []
+        for route in routes:
+            new_route = [0] + [c for c in route[1:-1] if c not in to_remove] + [0]
+            new_routes.append(new_route)
+            new_dists.append(route_distance(new_route))
+        return list(to_remove), new_routes, new_dists
+
+    def greedy_repair(routes, dists, unassigned):
+        routes = [list(r) for r in routes]
+        dists = list(dists)
+        unassigned = list(unassigned)
+        current_max_local = max(dists)
+        for cust in unassigned:
+            best_truck = None
+            best_pos = None
+            best_new_max = float('inf')
+            best_new_total = float('inf')
+            for t, route in enumerate(routes):
+                old_dist = dists[t]
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    new_dist = route_distance(new_route)
+                    delta_dist = new_dist - old_dist
+                    new_max = max(current_max_local, new_dist)
+                    new_total = sum(dists) + delta_dist
+                    if new_max < best_new_max or (new_max == best_new_max and new_total < best_new_total):
+                        best_new_max = new_max
+                        best_new_total = new_total
+                        best_truck = t
+                        best_pos = pos
+                        best_new_dist = new_dist
+            # update route and distances
+            routes[best_truck].insert(best_pos, cust)
+            dists[best_truck] = best_new_dist
+            if best_new_dist > current_max_local:
+                current_max_local = best_new_dist
+        return routes, dists
+
+    def regret2_repair(routes, dists, unassigned):
+        routes = [list(r) for r in routes]
+        dists = list(dists)
+        unassigned = list(unassigned)
+        current_max_local = max(dists)
+        while unassigned:
+            best_info = None
+            for cust in unassigned:
+                best_max = float('inf')
+                best_total = float('inf')
+                best_truck = None
+                best_pos = None
+                second_best_max = float('inf')
+                second_best_total = float('inf')
+                for t, route in enumerate(routes):
+                    old_dist = dists[t]
+                    for pos in range(1, len(route)):
+                        new_route = route[:pos] + [cust] + route[pos:]
+                        new_dist = route_distance(new_route)
+                        delta_dist = new_dist - old_dist
+                        new_max = max(current_max_local, new_dist)
+                        new_total = sum(dists) + delta_dist
+                        if new_max < best_max or (new_max == best_max and new_total < best_total):
+                            second_best_max = best_max
+                            second_best_total = best_total
+                            best_max = new_max
+                            best_total = new_total
+                            best_truck = t
+                            best_pos = pos
+                            best_delta = delta_dist
+                        elif new_max < second_best_max or (new_max == second_best_max and new_total < second_best_total):
+                            second_best_max = new_max
+                            second_best_total = new_total
+                if second_best_max == float('inf'):
+                    regret = float('inf')
+                else:
+                    regret = second_best_max - best_max
+                if best_info is None:
+                    best_info = (regret, best_max, best_total, cust, best_truck, best_pos, best_delta)
+                else:
+                    if regret > best_info[0] or (regret == best_info[0] and (
+                        best_max < best_info[1] or (best_max == best_info[1] and cust < best_info[3]))):
+                        best_info = (regret, best_max, best_total, cust, best_truck, best_pos, best_delta)
+            regret, best_max, best_total, cust, best_truck, best_pos, best_delta = best_info
+            routes[best_truck].insert(best_pos, cust)
+            dists[best_truck] += best_delta
+            if dists[best_truck] > current_max_local:
+                current_max_local = dists[best_truck]
+            unassigned.remove(cust)
+        return routes, dists
+
+    for it in range(max_iter):
+        destroy_op = random.choice([0, 1])
+        repair_op = random.choice([0, 1])
+
+        if destroy_op == 0:
+            removed, partial, partial_dists = worst_removal(current_routes, current_dists, num_removals)
+        else:
+            removed, partial, partial_dists = random_removal(current_routes, current_dists, num_removals)
+
+        if repair_op == 0:
+            new_routes, new_dists = greedy_repair(partial, partial_dists, removed)
+        else:
+            new_routes, new_dists = regret2_repair(partial, partial_dists, removed)
+
+        new_max = max(new_dists)
+        new_total = sum(new_dists)
+        delta = new_max - current_max
+        if delta < 0 or (delta == 0 and new_total < current_total) or random.random() < math.exp(-delta / max(T, 1e-9)):
+            current_routes = [list(r) for r in new_routes]
+            current_dists = list(new_dists)
+            current_max = new_max
+            current_total = new_total
+            if new_max < best_max - 1e-9 or (abs(new_max - best_max) < 1e-9 and new_total < best_total):
+                best_max = new_max
+                best_total = new_total
+                best_routes = [list(r) for r in new_routes]
+                best_dists = list(new_dists)
+                report_best_vrp(best_routes)
+
+        T = T0 * (1 - it / max_iter)
+
+    # Post-optimization: 2-opt improvement on best solution
+    improved = True
+    while improved:
+        improved = False
+        for t, route in enumerate(best_routes):
+            if len(route) <= 3:
+                continue
+            for i in range(1, len(route) - 2):
+                for j in range(i + 1, len(route) - 1):
+                    # reverse segment i..j
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    if new_dist < best_dists[t] - 1e-9:
+                        old_other = sum(best_dists[:t]) + sum(best_dists[t+1:])
+                        new_total = old_other + new_dist
+                        new_max = max(best_dists[:t] + [new_dist] + best_dists[t+1:])
+                        if new_max < best_max - 1e-9 or (abs(new_max - best_max) < 1e-9 and new_total < best_total):
+                            best_routes[t] = new_route
+                            best_dists[t] = new_dist
+                            best_max = new_max
+                            best_total = new_total
+                            report_best_vrp(best_routes)
+                            improved = True
+                            break
+                if improved:
+                    break
+            if improved:
+                break
+
+    return best_routes
+```
+
+Candidate cand_000053: hybrid_alns_balancing
+Status: timeout; gap: 2.36513
+Thought: Combine worst and random removal with adaptive selection, greedy repair, simulated annealing, and periodic balance local search that moves customers from max-distance routes to reduce max. Reduced iterations and removal fraction to avoid timeout.
+Mean gap: 2.365130303062405
+Mean max route distance: 2.1024465325053283
+Mean total route distance: 12.204525708405308
+Gap by instance size: {'100': 2.365130303062405}
+Gap by truck count: {'6': 2.365130303062405}
+Error details: timeout on instances_000: VRP solver timed out after 180.001s (timeout_seconds=180)
+Code:
+```python
+import numpy as np
+import math
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0, 0] for _ in range(truck_count)]
+    random.seed(0)
+    dist = distance_matrix
+
+    def route_distance(route):
+        if len(route) <= 2:
+            return 0.0
+        d = 0.0
+        for i in range(len(route)-1):
+            d += dist[route[i], route[i+1]]
+        return d
+
+    # Initial construction: random order greedy insertion minimizing max distance
+    customers = list(range(1, n))
+    random.shuffle(customers)
+    routes = [[0, 0] for _ in range(truck_count)]
+    for cust in customers:
+        best_truck = None
+        best_pos = None
+        best_max = float('inf')
+        best_total = float('inf')
+        for t, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                new_route = route[:pos] + [cust] + route[pos:]
+                new_routes = routes[:t] + [new_route] + routes[t+1:]
+                new_max = max(route_distance(r) for r in new_routes)
+                new_total = sum(route_distance(r) for r in new_routes)
+                if new_max < best_max or (new_max == best_max and new_total < best_total):
+                    best_max = new_max
+                    best_total = new_total
+                    best_truck = t
+                    best_pos = pos
+        routes[best_truck].insert(best_pos, cust)
+
+    current_routes = [list(r) for r in routes]
+    best_routes = [list(r) for r in routes]
+    best_max = max(route_distance(r) for r in best_routes)
+    best_total = sum(route_distance(r) for r in best_routes)
+    report_best_vrp(best_routes)
+
+    # ALNS parameters
+    max_iter = 15 * n
+    removal_fraction = 0.15
+    num_removals = max(1, int(removal_fraction * (n-1)))
+    T0 = best_max / 2.0
+    T = T0
+
+    destroy_usage = [1, 1]  # worst, random
+    repair_usage = [1]
+
+    def worst_removal(routes, num_removals):
+        all_contribs = []
+        for t, route in enumerate(routes):
+            if len(route) <= 2:
+                continue
+            base = route_distance(route)
+            for i in range(1, len(route)-1):
+                prev = route[i-1]
+                nxt = route[i+1]
+                with_ = dist[prev, route[i]] + dist[route[i], nxt]
+                without = dist[prev, nxt]
+                contrib = with_ - without
+                all_contribs.append((-contrib, t, i, route[i]))
+        all_contribs.sort(key=lambda x: x[0])
+        to_remove = set()
+        for _, t, i, cust in all_contribs[:num_removals]:
+            to_remove.add(cust)
+        new_routes = []
+        for t, route in enumerate(routes):
+            new_routes.append([0] + [c for c in route[1:-1] if c not in to_remove] + [0])
+        return list(to_remove), new_routes
+
+    def random_removal(routes, num_removals):
+        all_customers = [c for r in routes for c in r[1:-1]]
+        random.shuffle(all_customers)
+        to_remove = set(all_customers[:num_removals])
+        new_routes = []
+        for route in routes:
+            new_routes.append([0] + [c for c in route[1:-1] if c not in to_remove] + [0])
+        return list(to_remove), new_routes
+
+    def greedy_repair(routes, unassigned):
+        routes = [list(r) for r in routes]
+        unassigned = list(unassigned)
+        for cust in unassigned:
+            best_max = float('inf')
+            best_total = float('inf')
+            best_truck = None
+            best_pos = None
+            for t, route in enumerate(routes):
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    new_routes = routes[:t] + [new_route] + routes[t+1:]
+                    new_max_val = max(route_distance(r) for r in new_routes)
+                    new_total_val = sum(route_distance(r) for r in new_routes)
+                    if new_max_val < best_max or (new_max_val == best_max and new_total_val < best_total):
+                        best_max = new_max_val
+                        best_total = new_total_val
+                        best_truck = t
+                        best_pos = pos
+            routes[best_truck].insert(best_pos, cust)
+        return routes
+
+    def balance_local_search(routes):
+        # Try to move a customer from max-distance route to another route to reduce max
+        max_route_idx = max(range(len(routes)), key=lambda i: route_distance(routes[i]))
+        max_route = routes[max_route_idx]
+        if len(max_route) <= 2:
+            return routes
+        # Try removing each customer from max_route and inserting into other routes
+        best_routes = None
+        best_max = route_distance(routes[max_route_idx])
+        for i in range(1, len(max_route)-1):
+            cust = max_route[i]
+            # Remove cust from max_route
+            new_max_route = [0] + [c for c in max_route[1:-1] if c != cust] + [0]
+            if len(new_max_route) <= 2:
+                new_max_route = [0, 0]
+            # Try inserting cust into any other route
+            for t in range(len(routes)):
+                if t == max_route_idx:
+                    continue
+                route = routes[t]
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    candidate_routes = list(routes)
+                    candidate_routes[max_route_idx] = new_max_route
+                    candidate_routes[t] = new_route
+                    new_max_val = max(route_distance(r) for r in candidate_routes)
+                    new_total_val = sum(route_distance(r) for r in candidate_routes)
+                    if new_max_val < best_max or (new_max_val == best_max and new_total_val < sum(route_distance(r) for r in (best_routes if best_routes else routes))):
+                        best_max = new_max_val
+                        best_routes = [list(r) for r in candidate_routes]
+        if best_routes is not None:
+            return best_routes
+        return routes
+
+    no_improve_iter = 0
+    restart_threshold = int(0.1 * max_iter)
+    balance_freq = max(1, int(max_iter / 10))
+
+    for it in range(max_iter):
+        # Operator selection with exploration bias
+        total_destroy = sum(destroy_usage)
+        destroy_probs = [total_destroy / u for u in destroy_usage]
+        destroy_probs = [p / sum(destroy_probs) for p in destroy_probs]
+        destroy_op = random.choices([0, 1], weights=destroy_probs)[0]
+
+        # Destroy
+        if destroy_op == 0:
+            removed, partial = worst_removal(current_routes, num_removals)
+        else:
+            removed, partial = random_removal(current_routes, num_removals)
+
+        # Repair (greedy only)
+        new_routes = greedy_repair(partial, removed)
+
+        # Evaluate
+        new_max = max(route_distance(r) for r in new_routes)
+        new_total = sum(route_distance(r) for r in new_routes)
+        current_max = max(route_distance(r) for r in current_routes)
+        current_total = sum(route_distance(r) for r in current_routes)
+
+        delta = new_max - current_max
+        if delta < 0 or (delta == 0 and new_total < current_total) or random.random() < math.exp(-delta / max(T, 1e-9)):
+            current_routes = [list(r) for r in new_routes]
+            if new_max < best_max - 1e-9 or (abs(new_max - best_max) < 1e-9 and new_total < sum(route_distance(r) for r in best_routes)):
+                best_max = new_max
+                best_routes = [list(r) for r in new_routes]
+                report_best_vrp(best_routes)
+                no_improve_iter = 0
+            else:
+                no_improve_iter += 1
+        else:
+            no_improve_iter += 1
+
+        # Update operator usage (adaptive weights)
+        destroy_usage[destroy_op] += 1
+
+        # Temperature update
+        T = T0 * (1 - it / max_iter)
+
+        # Balance local search periodically
+        if it % balance_freq == 0:
+            current_routes = balance_local_search(current_routes)
+            current_max = max(route_distance(r) for r in current_routes)
+            current_total = sum(route_distance(r) for r in current_routes)
+            if current_max < best_max - 1e-9 or (abs(current_max - best_max) < 1e-9 and current_total < sum(route_distance(r) for r in best_routes)):
+                best_max = current_max
+                best_routes = [list(r) for r in current_routes]
+                report_best_vrp(best_routes)
+                no_improve_iter = 0
+
+        # Restart if stuck
+        if no_improve_iter >= restart_threshold:
+            large_removal_count = max(1, int(0.4 * (n-1)))
+            removed, partial = random_removal(current_routes, large_removal_count)
+            current_routes = greedy_repair(partial, removed)
+            T = T0
+            no_improve_iter = 0
+
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
