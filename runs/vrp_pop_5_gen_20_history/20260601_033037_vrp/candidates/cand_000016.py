@@ -1,0 +1,242 @@
+import numpy as np
+
+def solve_vrp(distance_matrix, truck_count):
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    best_routes = None
+    best_max = float('inf')
+
+    def route_distance(route):
+        total = 0.0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i], route[i+1]]
+        return total
+
+    def report_best_vrp(routes):
+        nonlocal best_routes, best_max
+        maxd = max(route_distance(r) for r in routes)
+        if maxd < best_max - 1e-12:
+            best_max = maxd
+            best_routes = [list(r) for r in routes]
+
+    # --- DP split: given permutation, produce routes minimizing max distance ---
+    def split_permutation(perm, K):
+        m = len(perm)
+        INF = 1e100
+        # precompute segment distances
+        seg = [[0.0]*m for _ in range(m)]
+        for i in range(m):
+            for j in range(i, m):
+                d = distance_matrix[0, perm[i]] + distance_matrix[perm[j], 0]
+                for k in range(i, j):
+                    d += distance_matrix[perm[k], perm[k+1]]
+                seg[i][j] = d
+        dp = [[INF]*(K+1) for _ in range(m+1)]
+        dp[0][0] = 0.0
+        pred = [[-1]*(K+1) for _ in range(m+1)]
+        for i in range(1, m+1):
+            for k in range(1, min(i, K)+1):
+                best = INF
+                best_j = -1
+                for j in range(k-1, i):
+                    if dp[j][k-1] >= INF:
+                        continue
+                    cand = max(dp[j][k-1], seg[j][i-1])
+                    if cand < best - 1e-12:
+                        best = cand
+                        best_j = j
+                dp[i][k] = best
+                pred[i][k] = best_j
+        # reconstruct routes
+        routes = []
+        i = m
+        k = K
+        while k > 0:
+            j = pred[i][k]
+            if i > j:
+                segment = [0] + perm[j:i] + [0]
+            else:
+                segment = [0, 0]
+            routes.insert(0, segment)
+            i = j
+            k -= 1
+        while len(routes) < K:
+            routes.append([0, 0])
+        # compute max distance for reconstruction (may differ slightly due to floating point)
+        maxd = max(route_distance(r) for r in routes)
+        return routes, maxd
+
+    # --- Constructive heuristics for initial population ---
+    def savings_construction():
+        # Clarke-Wright savings, merge until truck_count routes
+        savings = []
+        for i in range(1, n):
+            for j in range(i+1, n):
+                s = distance_matrix[0, i] + distance_matrix[0, j] - distance_matrix[i, j]
+                savings.append((-s, i, j))
+        savings.sort(key=lambda x: (x[0], x[1], x[2]))
+        # each customer as a separate route
+        routes = {i: [0, i, 0] for i in range(1, n)}
+        # maintain for each route its first and last customer
+        first = {i: i for i in range(1, n)}
+        last = {i: i for i in range(1, n)}
+        # union-find for routes
+        parent = {i: i for i in range(1, n)}
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx == ry:
+                return False
+            parent[ry] = rx
+            return True
+        for _, i, j in savings:
+            if find(i) != find(j):
+                # check if i and j are endpoints of their routes
+                ri = find(i)
+                rj = find(j)
+                if (first[ri] not in (i, j)) or (last[ri] not in (i, j)) or (first[rj] not in (i, j)) or (last[rj] not in (i, j)):
+                    continue
+                # merge: connect route i's end to route j's start or vice versa
+                # we need to check orientations: we want to connect last[ri] to first[rj] or last[rj] to first[ri]?
+                # The savings formula assumes two routes with endpoints i and j
+                # We'll connect the route that has i at its end to the route that has j at its start, or similar
+                # Simplify: always merge by appending route of j to route of i
+                route_i = routes[first[ri]]
+                route_j = routes[first[rj]]
+                # Determine orientation: we want to connect the two routes minimizing distance
+                # We'll try both connections and pick the one that actually corresponds to the saving
+                # For simplicity, just concatenate route_i + route_j[1:] (remove depot at connection)
+                new_route = route_i[:-1] + route_j[1:]
+                # update first and last
+                new_first = route_i[1]
+                new_last = route_j[-2]
+                # merge union-find
+                union(i, j)
+                root = find(i)
+                routes[new_first] = new_route
+                first[root] = new_first
+                last[root] = new_last
+                # delete old route keys
+                # Only keep one representative per component
+        # After merging, collect routes of final components
+        comp_routes = {}
+        for c in range(1, n):
+            r = find(c)
+            if r not in comp_routes:
+                comp_routes[r] = [0]
+            # we need to reconstruct route from representative
+        # Since above merging leaves only first customer as key, we can collect all first customers
+        final_routes = []
+        visited = set()
+        for c in range(1, n):
+            root = find(c)
+            if root not in visited:
+                visited.add(root)
+                # retrieve route via first[ root ]
+                first_cust = first[root]
+                final_routes.append(routes[first_cust])
+        # If more routes than truck_count, we need to merge more? Actually we stop merging when truck_count reached.
+        # We'll continue merging until we have truck_count routes, but above merges all.
+        # Instead, we should limit number of routes. We'll adapt: after sorting savings, we merge only if number of routes > truck_count.
+        # For simplicity, we do full merge then if too few routes, split some? Not needed.
+        return final_routes
+
+    # We'll use simpler constructions: just use sorted order permutations
+    def sorted_by_dist_asc():
+        return sorted(customers, key=lambda x: (distance_matrix[0, x], x))
+    def sorted_by_dist_desc():
+        return sorted(customers, key=lambda x: (-distance_matrix[0, x], x))
+
+    # Generate initial population of permutations
+    pop_size = 10
+    pop = []
+    # Add sorted permutations with rotation
+    base_perm = sorted_by_dist_asc()
+    for shift in range(pop_size):
+        perm = base_perm[shift:] + base_perm[:shift]
+        pop.append(perm)
+    # Also include best of savings and clustering? We'll compute later
+    # Actually we need to evaluate each permutation
+    def evaluate(perm):
+        routes, maxd = split_permutation(perm, truck_count)
+        report_best_vrp(routes)
+        return routes, maxd
+
+    # Evaluate initial population
+    pop_fitness = []
+    for perm in pop:
+        routes, maxd = evaluate(perm)
+        pop_fitness.append((maxd, perm, routes))
+    pop_fitness.sort(key=lambda x: (x[0], x[1]))
+    best_fitness = pop_fitness[0][0]
+
+    # GA loop
+    gen_max = 20
+    for gen in range(gen_max):
+        # Select two best parents
+        parent1 = pop_fitness[0][1]
+        parent2 = pop_fitness[1][1] if len(pop_fitness) > 1 else parent1
+        # Order crossover (OX)
+        size = len(parent1)
+        pos1 = gen % size
+        pos2 = (gen + size//2) % size
+        if pos1 > pos2:
+            pos1, pos2 = pos2, pos1
+        child = [-1]*size
+        # copy segment from parent1
+        child[pos1:pos2] = parent1[pos1:pos2]
+        # fill rest from parent2 in order
+        ptr = 0
+        for i in range(size):
+            if child[i] == -1:
+                while parent2[ptr] in child:
+                    ptr += 1
+                child[i] = parent2[ptr]
+                ptr += 1
+        # swap mutation
+        i1 = gen % size
+        i2 = (gen*2 + 1) % size
+        child[i1], child[i2] = child[i2], child[i1]
+        # evaluate child
+        routes_c, maxd_c = evaluate(child)
+        # if child is better than worst in population, replace
+        if maxd_c < pop_fitness[-1][0] - 1e-12:
+            pop_fitness[-1] = (maxd_c, child, routes_c)
+            pop_fitness.sort(key=lambda x: (x[0], x[1]))
+        # also if better than global best, report is done in evaluate
+        if maxd_c < best_fitness - 1e-12:
+            best_fitness = maxd_c
+
+    # Final local search: 2-opt on each route of best solution
+    def two_opt(route):
+        if len(route) <= 3:
+            return route
+        improved = True
+        while improved:
+            improved = False
+            best_gain = 0
+            best_swap = None
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    gain = route_distance(route) - route_distance(new_route)
+                    if gain > best_gain + 1e-12:
+                        best_gain = gain
+                        best_swap = new_route
+            if best_swap is not None:
+                route = best_swap
+                improved = True
+        return route
+
+    # apply to best found routes
+    best_routes_final = [two_opt(r) for r in best_routes]
+    report_best_vrp(best_routes_final)
+
+    # Ensure exactly truck_count routes
+    while len(best_routes) < truck_count:
+        best_routes.append([0, 0])
+    return best_routes

@@ -1,0 +1,169 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or effort allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000002: greedy_insertion_minimax
+Status: valid; gap: 18.467
+Thought: Construct routes by inserting each customer into the feasible position that minimizes the increase in the maximum route distance. Use deterministic tie-breaking by route index then position index. After construction, apply a bounded local search: for each route, try 2-opt moves to reduce its distance, and attempt relocate moves from the longest route to others if it reduces the maximum distance. All loops are finite and bounded by instance size. report_best_vrp is called whenever a better solution is found.
+Mean gap: 18.466984659166496
+Mean max route distance: 2.4283883970141202
+Mean total route distance: 14.417496161698665
+Gap by instance size: {'100': 18.466984659166496}
+Gap by truck count: {'6': 18.466984659166496}
+Code:
+```python
+import numpy as np
+import math
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    routes = [[0, 0] for _ in range(truck_count)]
+    customers = list(range(1, n))
+    
+    def route_distance(route):
+        d = 0.0
+        for i in range(len(route)-1):
+            d += distance_matrix[route[i], route[i+1]]
+        return d
+    
+    def max_route_distance(routes):
+        return max(route_distance(r) for r in routes)
+    
+    def insert_customer(route, pos, cust):
+        return route[:pos] + [cust] + route[pos:]
+    
+    # Greedy insertion
+    for cust in customers:
+        best_max = float('inf')
+        best_route_idx = -1
+        best_pos = -1
+        current_max = max_route_distance(routes)
+        for r_idx, route in enumerate(routes):
+            # positions to insert: from 1 to len(route)-1 (before ending 0)
+            for pos in range(1, len(route)):
+                new_route = insert_customer(route, pos, cust)
+                new_route_dist = route_distance(new_route)
+                other_routes = [routes[i] for i in range(truck_count) if i != r_idx]
+                other_max = max(route_distance(r) for r in other_routes) if other_routes else 0.0
+                new_max = max(new_route_dist, other_max)
+                if new_max < best_max or (new_max == best_max and (r_idx < best_route_idx or (r_idx == best_route_idx and pos < best_pos))):
+                    best_max = new_max
+                    best_route_idx = r_idx
+                    best_pos = pos
+        # Insert at best position
+        route = routes[best_route_idx]
+        routes[best_route_idx] = insert_customer(route, best_pos, cust)
+    
+    best_routes = [list(r) for r in routes]
+    best_max = max_route_distance(best_routes)
+    
+    # Local search improvement
+    improved = True
+    max_iter = n * n  # bounded
+    iter_count = 0
+    while improved and iter_count < max_iter:
+        improved = False
+        iter_count += 1
+        # 2-opt for each route
+        for r_idx, route in enumerate(routes):
+            if len(route) <= 3:
+                continue
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    # 2-opt: reverse segment i..j
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    if route_distance(new_route) < route_distance(route):
+                        routes[r_idx] = new_route
+                        improved = True
+                        current_max = max_route_distance(routes)
+                        if current_max < best_max:
+                            best_max = current_max
+                            best_routes = [list(r) for r in routes]
+                        break
+                if improved:
+                    break
+        if improved:
+            continue
+        # Relocate: try moving a customer from the longest route to another
+        max_dist = max_route_distance(routes)
+        longest_indices = [i for i, r in enumerate(routes) if route_distance(r) == max_dist]
+        for r_idx in longest_indices:
+            if len(routes[r_idx]) <= 3:
+                continue
+            # For each customer in the longest route (excluding depot)
+            for pos in range(1, len(routes[r_idx])-1):
+                cust = routes[r_idx][pos]
+                # Try to move to other routes
+                for other_idx, other_route in enumerate(routes):
+                    if other_idx == r_idx:
+                        continue
+                    for other_pos in range(1, len(other_route)):
+                        new_other = insert_customer(other_route, other_pos, cust)
+                        new_self = routes[r_idx][:pos] + routes[r_idx][pos+1:]
+                        # New routes
+                        new_routes = list(routes)
+                        new_routes[r_idx] = new_self
+                        new_routes[other_idx] = new_other
+                        new_max = max_route_distance(new_routes)
+                        if new_max < best_max:
+                            best_max = new_max
+                            best_routes = [list(r) for r in new_routes]
+                            routes = new_routes
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        # If no improvement, break
+    
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

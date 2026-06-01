@@ -1,0 +1,146 @@
+import numpy as np
+import random
+import math
+import itertools
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0,0] for _ in range(truck_count)]
+    customers = list(range(1, n))
+    num_customers = len(customers)
+    if truck_count >= num_customers:
+        routes = [[0, c, 0] for c in customers]
+        for _ in range(truck_count - num_customers):
+            routes.append([0,0])
+        return routes
+
+    # ---- Cluster-first initial solution (farthest-first seeds, nearest neighbor) ----
+    seeds = []
+    first_seed = max(customers, key=lambda x: distance_matrix[0][x])
+    seeds.append(first_seed)
+    while len(seeds) < truck_count:
+        best_cust = None
+        best_min_dist = -1
+        for c in customers:
+            if c in seeds:
+                continue
+            min_dist = min(distance_matrix[c][s] for s in seeds)
+            if min_dist > best_min_dist or (min_dist == best_min_dist and (best_cust is None or c < best_cust)):
+                best_min_dist = min_dist
+                best_cust = c
+        if best_cust is not None:
+            seeds.append(best_cust)
+        else:
+            break
+    # assign each customer to nearest seed
+    clusters = [[] for _ in range(truck_count)]
+    for c in customers:
+        if c in seeds:
+            continue
+        best_idx = min(range(truck_count), key=lambda i: (distance_matrix[c][seeds[i]], i))
+        clusters[best_idx].append(c)
+    for i, s in enumerate(seeds):
+        clusters[i].append(s)
+    # build routes via nearest neighbor from depot
+    def route_distance(route):
+        total = 0.0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i]][route[i+1]]
+        return total
+    routes = []
+    for cl in clusters:
+        if not cl:
+            routes.append([0,0])
+        else:
+            unvisited = list(cl)
+            route = [0]
+            current = 0
+            while unvisited:
+                nearest = min(unvisited, key=lambda x: distance_matrix[current][x])
+                route.append(nearest)
+                unvisited.remove(nearest)
+                current = nearest
+            route.append(0)
+            routes.append(route)
+    best_routes = [list(r) for r in routes]
+    best_max = max(route_distance(r) for r in routes)
+    def report_if_better(routes):
+        nonlocal best_routes, best_max
+        maxd = max(route_distance(r) for r in routes)
+        if maxd < best_max:
+            best_max = maxd
+            best_routes = [list(r) for r in routes]
+            report_best_vrp(best_routes)
+    report_if_better(routes)
+
+    # ---- LNS parameters ----
+    max_iter = min(num_customers * truck_count, 600)
+    T_start = 100.0
+    T_end = 1.0
+    T = T_start
+    cooling = (T_end / T_start) ** (1.0 / max_iter) if max_iter > 0 else 1.0
+
+    # Cheapest insertion (greedy) repair
+    def cheapest_insertion(removed, current_routes):
+        routes = [list(r) for r in current_routes]
+        unassigned = sorted(removed)  # deterministic order
+        for cust in unassigned:
+            best_delta = float('inf')
+            best_route_idx = None
+            best_pos = None
+            for r_idx, route in enumerate(routes):
+                for pos in range(1, len(route)):
+                    prev = route[pos-1]
+                    next_ = route[pos]
+                    delta = distance_matrix[prev][cust] + distance_matrix[cust][next_] - distance_matrix[prev][next_]
+                    if delta < best_delta or (delta == best_delta and (pos < best_pos if best_pos is not None else False)):
+                        best_delta = delta
+                        best_route_idx = r_idx
+                        best_pos = pos
+            if best_route_idx is not None:
+                routes[best_route_idx].insert(best_pos, cust)
+        return routes
+
+    # Main LNS loop
+    current_routes = [list(r) for r in routes]
+    current_max = best_max
+    for iteration in range(max_iter):
+        # Ruin: randomly remove a few customers (1 to min(3, num_customers))
+        remove_count = random.randint(1, min(3, num_customers))
+        # collect all customers currently assigned (excluding depot)
+        all_custs = []
+        for r in current_routes:
+            for c in r:
+                if c != 0:
+                    all_custs.append(c)
+        if len(all_custs) < remove_count:
+            break
+        to_remove = random.sample(all_custs, remove_count)
+        # Remove them from routes
+        new_routes = []
+        for r in current_routes:
+            new_route = [c for c in r if c not in to_remove]
+            # Ensure depot ends
+            if new_route[0] != 0:
+                new_route = [0] + new_route
+            if new_route[-1] != 0:
+                new_route.append(0)
+            new_routes.append(new_route)
+        # Repair using cheapest insertion
+        new_routes = cheapest_insertion(to_remove, new_routes)
+        new_max = max(route_distance(r) for r in new_routes)
+        # Acceptance
+        if new_max < current_max or random.random() < math.exp((current_max - new_max) / T):
+            current_routes = new_routes
+            current_max = new_max
+            if new_max < best_max:
+                best_max = new_max
+                best_routes = [list(r) for r in new_routes]
+                report_if_better(best_routes)
+        T *= cooling
+    # Ensure exactly truck_count routes
+    while len(best_routes) < truck_count:
+        best_routes.append([0,0])
+    report_if_better(best_routes)
+    return best_routes

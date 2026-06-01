@@ -1,0 +1,240 @@
+import numpy as np
+import random
+import math
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+
+    def route_length(route):
+        if len(route) <= 1:
+            return 0.0
+        total = 0.0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i], route[i+1]]
+        return total
+
+    best_max = float('inf')
+    best_routes = None
+
+    def report_best_vrp(routes):
+        nonlocal best_max, best_routes
+        m = max(route_length(r) for r in routes)
+        if m < best_max - 1e-12:
+            best_max = m
+            best_routes = [list(r) for r in routes]
+
+    def decode(perm):
+        routes = [[0, 0] for _ in range(truck_count)]
+        lengths = [0.0] * truck_count
+        for cust in perm:
+            best_max_val = float('inf')
+            best_inc = float('inf')
+            best_r = -1
+            best_p = -1
+            for r in range(truck_count):
+                route = routes[r]
+                for p in range(1, len(route)):
+                    prev = route[p-1]
+                    nxt = route[p]
+                    new_len = lengths[r] - distance_matrix[prev, nxt] + distance_matrix[prev, cust] + distance_matrix[cust, nxt]
+                    new_max = new_len
+                    for rr in range(truck_count):
+                        if rr != r and lengths[rr] > new_max:
+                            new_max = lengths[rr]
+                    inc = new_len - lengths[r]
+                    if new_max < best_max_val or (abs(new_max - best_max_val) < 1e-12 and inc < best_inc):
+                        best_max_val = new_max
+                        best_inc = inc
+                        best_r = r
+                        best_p = p
+            routes[best_r].insert(best_p, cust)
+            lengths[best_r] = route_length(routes[best_r])
+        max_len = max(lengths)
+        return routes, lengths, max_len
+
+    def local_search(routes, lengths, current_best):
+        max_iter_local = 5 * n
+        if max_iter_local == 0:
+            return routes, lengths
+        T0 = current_best * 0.1 if current_best > 0 else 1.0
+        T_end = 0.001
+        cooling = (T_end / T0) ** (1.0 / max_iter_local)
+        T = T0
+        current_max = max(lengths)
+        for _ in range(max_iter_local):
+            move_type = random.randint(0, 1)
+            best_move = None
+            best_new_max = float('inf')
+            best_tie = None
+            if move_type == 0:
+                max_len = max(lengths)
+                candidates = [i for i, l in enumerate(lengths) if abs(l - max_len) < 1e-12]
+                t1 = random.choice(candidates)
+                route1 = routes[t1]
+                if len(route1) <= 2:
+                    continue
+                i = random.randint(1, len(route1)-2)
+                cust = route1[i]
+                t2 = random.randint(0, truck_count-1)
+                if t2 == t1:
+                    continue
+                j = random.randint(1, len(routes[t2])-1)
+                new_route1 = route1[:i] + route1[i+1:]
+                new_len1 = route_length(new_route1)
+                new_route2 = routes[t2][:j] + [cust] + routes[t2][j:]
+                new_len2 = route_length(new_route2)
+                new_max = new_len1
+                for k in range(truck_count):
+                    if k == t1:
+                        if new_len1 > new_max: new_max = new_len1
+                    elif k == t2:
+                        if new_len2 > new_max: new_max = new_len2
+                    else:
+                        if lengths[k] > new_max: new_max = lengths[k]
+                tie = (new_max, t1, t2, i, j)
+                if best_tie is None or tie < best_tie:
+                    best_new_max = new_max
+                    best_move = ('relocate', t1, i, t2, j, cust)
+                    best_tie = tie
+            else:
+                max_len = max(lengths)
+                candidates = [i for i, l in enumerate(lengths) if abs(l - max_len) < 1e-12]
+                t = random.choice(candidates)
+                route = routes[t]
+                if len(route) <= 3:
+                    continue
+                i = random.randint(1, len(route)-3)
+                j = random.randint(i+1, len(route)-2)
+                new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                new_len = route_length(new_route)
+                new_max = new_len
+                for k in range(truck_count):
+                    if k != t:
+                        if lengths[k] > new_max:
+                            new_max = lengths[k]
+                tie = (new_max, t, i, j)
+                if best_tie is None or tie < best_tie:
+                    best_new_max = new_max
+                    best_move = ('2opt', t, i, j, new_route)
+                    best_tie = tie
+            if best_move is None:
+                continue
+            delta = best_new_max - current_max
+            if delta < 0 or random.random() < math.exp(-delta / T):
+                if best_move[0] == 'relocate':
+                    _, t1, i, t2, j, cust = best_move
+                    routes[t1].pop(i)
+                    routes[t2].insert(j, cust)
+                    lengths[t1] = route_length(routes[t1])
+                    lengths[t2] = route_length(routes[t2])
+                else:
+                    _, t, i, j, new_route = best_move
+                    routes[t] = new_route
+                    lengths[t] = route_length(new_route)
+                current_max = max(lengths)
+                if current_max < best_max - 1e-12:
+                    report_best_vrp(routes)
+            T *= cooling
+        return routes, lengths
+
+    def ruin_recreate(routes, lengths):
+        # remove 20% of all customers, half from longest route, rest from others
+        num_remove = max(1, int(0.2 * (n - 1)))
+        # find longest route
+        max_len = max(lengths)
+        max_route_idx = lengths.index(max_len)
+        max_route = routes[max_route_idx]
+        interior_cust = max_route[1:-1]
+        to_remove = []
+        # from longest route: take up to half of num_remove
+        remove_from_long = min(len(interior_cust), max(1, num_remove // 2))
+        # deterministic: first remove_from_long customers (in order)
+        to_remove.extend(interior_cust[:remove_from_long])
+        # from other routes: take remaining
+        remaining = num_remove - len(to_remove)
+        if remaining > 0:
+            other_custs = []
+            for idx, r in enumerate(routes):
+                if idx != max_route_idx:
+                    other_custs.extend(r[1:-1])
+            # deterministic: first remaining customers
+            to_remove.extend(other_custs[:remaining])
+        # remove customers from routes
+        for cust in to_remove:
+            for t in range(truck_count):
+                if cust in routes[t]:
+                    idx = routes[t].index(cust)
+                    if idx != 0 and idx != len(routes[t])-1:
+                        routes[t] = routes[t][:idx] + routes[t][idx+1:]
+                        lengths[t] = route_length(routes[t])
+                    break
+        # reinsert using greedy min-max
+        unassigned = set(to_remove)
+        while unassigned:
+            candidates = []
+            for cust in list(unassigned):
+                best_max_val = float('inf')
+                best_inc = float('inf')
+                best_r = -1
+                best_p = -1
+                for r in range(truck_count):
+                    route = routes[r]
+                    for p in range(1, len(route)):
+                        prev = route[p-1]
+                        nxt = route[p]
+                        new_len = lengths[r] - distance_matrix[prev, nxt] + distance_matrix[prev, cust] + distance_matrix[cust, nxt]
+                        new_max = new_len
+                        for rr in range(truck_count):
+                            if rr != r and lengths[rr] > new_max:
+                                new_max = lengths[rr]
+                        inc = new_len - lengths[r]
+                        if new_max < best_max_val or (abs(new_max - best_max_val) < 1e-12 and inc < best_inc):
+                            best_max_val = new_max
+                            best_inc = inc
+                            best_r = r
+                            best_p = p
+                candidates.append((best_max_val, best_inc, cust, best_r, best_p))
+            candidates.sort(key=lambda x: (x[0], x[1], x[2]))
+            _, _, cust, r, p = candidates[0]
+            routes[r].insert(p, cust)
+            lengths[r] = route_length(routes[r])
+            unassigned.remove(cust)
+        return routes, lengths
+
+    # initial solution
+    perm = customers[:]
+    random.shuffle(perm)
+    routes, lengths, max_len = decode(perm)
+    routes, lengths = local_search(routes, lengths, best_max if best_max != float('inf') else max_len)
+    report_best_vrp(routes)
+
+    # main loop
+    max_outer = max(5, (n - 1) * truck_count)  # bounded by instance
+    stagnation_limit = max(5, max_outer // 5)
+    no_improve = 0
+    for outer_iter in range(max_outer):
+        # if stagnation: apply ruin and recreate
+        if no_improve >= stagnation_limit:
+            # reset no_improve
+            no_improve = 0
+            # ruin and recreate from current best
+            cur_routes = [list(r) for r in best_routes]
+            cur_lengths = [route_length(r) for r in cur_routes]
+            cur_routes, cur_lengths = ruin_recreate(cur_routes, cur_lengths)
+            cur_routes, cur_lengths = local_search(cur_routes, cur_lengths, best_max)
+            new_max = max(cur_lengths)
+            report_best_vrp(cur_routes)
+        else:
+            # apply local search to current best (or a copy)
+            cur_routes = [list(r) for r in best_routes]
+            cur_lengths = [route_length(r) for r in cur_routes]
+            cur_routes, cur_lengths = local_search(cur_routes, cur_lengths, best_max)
+            new_max = max(cur_lengths)
+            if new_max < best_max - 1e-12:
+                report_best_vrp(cur_routes)
+                no_improve = 0
+            else:
+                no_improve += 1
+
+    return best_routes

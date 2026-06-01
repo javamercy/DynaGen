@@ -1,0 +1,623 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY e2_backbone_exploration: Identify the useful shared backbone among the provided parents, then create a new algorithm that preserves that core principle while changing the surrounding mechanism, structure, or execution strategy. The result should be motivated by the parents but clearly not a direct copy.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000029: adaptive_tenure_tabu
+Status: valid; gap: 13.5238
+Thought: Variant of simplified_regret_tabu with adaptive tabu tenure. Construction uses regret-based min-max insertion with deterministic tie-breaking (regret then customer index). Tabu search uses relocate, swap, and 2-opt neighborhoods. Tabu tenure starts at 7 and adapts: increases by 1 (up to 12) if no improvement for max(5, n//5) iterations, decreases by 1 (down to 3) on improvement. Iteration limit is (n-1)*truck_count*2. Aspiration criterion: new max < best max. Deterministic tie-breaking via tuple (new_max, move_type, indices). report_best_vrp called on improvements.
+Mean gap: 13.523822752104977
+Mean max route distance: 2.3227231560037045
+Mean total route distance: 13.899154058996984
+Gap by instance size: {'100': 13.523822752104977}
+Gap by truck count: {'6': 13.523822752104977}
+Code:
+```python
+import numpy as np
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    def route_distance(route):
+        if len(route) <= 1:
+            return 0.0
+        total = 0.0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i], route[i+1]]
+        return total
+    
+    # Construction: regret-based min-max insertion
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_dists = [0.0] * truck_count
+    unassigned = set(customers)
+    
+    while unassigned:
+        best_regret = -1.0
+        selected_cust = None
+        best_info = None
+        for cust in list(unassigned):
+            best_new_max = float('inf')
+            second_best_new_max = float('inf')
+            best_t = -1
+            best_pos = -1
+            for t in range(truck_count):
+                route = routes[t]
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    new_len = route_distance(new_route)
+                    new_max = new_len
+                    for k in range(truck_count):
+                        if k != t:
+                            new_max = max(new_max, route_dists[k])
+                    if new_max < best_new_max:
+                        second_best_new_max = best_new_max
+                        best_new_max = new_max
+                        best_t = t
+                        best_pos = pos
+                    elif new_max < second_best_new_max:
+                        second_best_new_max = new_max
+            regret = second_best_new_max - best_new_max
+            if regret > best_regret or (regret == best_regret and cust < selected_cust):
+                best_regret = regret
+                selected_cust = cust
+                best_info = (best_t, best_pos)
+        t, pos = best_info
+        routes[t] = routes[t][:pos] + [selected_cust] + routes[t][pos:]
+        route_dists[t] = route_distance(routes[t])
+        unassigned.remove(selected_cust)
+    
+    best_max = max(route_dists)
+    best_routes = [list(r) for r in routes]
+    report_best_vrp(best_routes)
+    
+    def update_best(routes):
+        nonlocal best_max, best_routes
+        m = max(route_distance(r) for r in routes)
+        if m < best_max:
+            best_max = m
+            best_routes = [list(r) for r in routes]
+            report_best_vrp(best_routes)
+    
+    update_best(routes)
+    
+    # Tabu search with adaptive tenure
+    tabu_tenure_min = 3
+    tabu_tenure_max = 12
+    current_tenure = 7
+    tabu_list = []
+    tabu_set = set()
+    max_iter = (n - 1) * truck_count * 2
+    iterations_since_improvement = 0
+    improvement_threshold = max(5, n // 5)
+    
+    for _ in range(max_iter):
+        best_move = None
+        best_new_max = float('inf')
+        best_tie = None
+        # Relocate
+        for t1 in range(truck_count):
+            route1 = routes[t1]
+            if len(route1) <= 2:
+                continue
+            for i in range(1, len(route1)-1):
+                cust = route1[i]
+                new_route1 = route1[:i] + route1[i+1:]
+                dist1_new = route_distance(new_route1)
+                for t2 in range(truck_count):
+                    if t1 == t2:
+                        continue
+                    route2 = routes[t2]
+                    for j in range(1, len(route2)):
+                        new_route2 = route2[:j] + [cust] + route2[j:]
+                        dist2_new = route_distance(new_route2)
+                        new_max = max(dist1_new, dist2_new)
+                        for k in range(truck_count):
+                            if k != t1 and k != t2:
+                                new_max = max(new_max, route_dists[k])
+                        is_tabu = (cust, t2, t1) in tabu_set
+                        if is_tabu and new_max >= best_max:
+                            continue
+                        tie = (new_max, 0, t1, i, t2, j)
+                        if best_tie is None or tie < best_tie:
+                            best_new_max = new_max
+                            best_move = ('relocate', t1, i, t2, j, cust)
+                            best_tie = tie
+        # Swap
+        for t1 in range(truck_count):
+            route1 = routes[t1]
+            if len(route1) <= 2:
+                continue
+            for i in range(1, len(route1)-1):
+                cust1 = route1[i]
+                for t2 in range(t1+1, truck_count):
+                    route2 = routes[t2]
+                    if len(route2) <= 2:
+                        continue
+                    for j in range(1, len(route2)-1):
+                        cust2 = route2[j]
+                        new_route1 = route1[:i] + [cust2] + route1[i+1:]
+                        new_route2 = route2[:j] + [cust1] + route2[j+1:]
+                        dist1_new = route_distance(new_route1)
+                        dist2_new = route_distance(new_route2)
+                        new_max = max(dist1_new, dist2_new)
+                        for k in range(truck_count):
+                            if k != t1 and k != t2:
+                                new_max = max(new_max, route_dists[k])
+                        is_tabu = ((cust1, cust2, t1, t2) in tabu_set) or ((cust2, cust1, t2, t1) in tabu_set)
+                        if is_tabu and new_max >= best_max:
+                            continue
+                        tie = (new_max, 1, t1, i, t2, j)
+                        if best_tie is None or tie < best_tie:
+                            best_new_max = new_max
+                            best_move = ('swap', t1, i, t2, j, cust1, cust2)
+                            best_tie = tie
+        # 2-opt
+        for t in range(truck_count):
+            route = routes[t]
+            if len(route) <= 3:
+                continue
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    new_max = new_dist
+                    for k in range(truck_count):
+                        if k != t:
+                            new_max = max(new_max, route_dists[k])
+                    tie = (new_max, 2, t, i, j)
+                    if best_tie is None or tie < best_tie:
+                        best_new_max = new_max
+                        best_move = ('2opt', t, i, j, new_route)
+                        best_tie = tie
+        
+        if best_move is None:
+            break
+        
+        # Apply move
+        improved = False
+        if best_move[0] == 'relocate':
+            _, t1, i, t2, j, cust = best_move
+            routes[t1] = routes[t1][:i] + routes[t1][i+1:]
+            routes[t2] = routes[t2][:j] + [cust] + routes[t2][j:]
+            route_dists[t1] = route_distance(routes[t1])
+            route_dists[t2] = route_distance(routes[t2])
+            tabu_entry = (cust, t2, t1)
+            tabu_list.append(tabu_entry)
+            tabu_set.add(tabu_entry)
+        elif best_move[0] == 'swap':
+            _, t1, i, t2, j, cust1, cust2 = best_move
+            routes[t1][i] = cust2
+            routes[t2][j] = cust1
+            route_dists[t1] = route_distance(routes[t1])
+            route_dists[t2] = route_distance(routes[t2])
+            tabu_entry1 = (cust1, cust2, t1, t2)
+            tabu_entry2 = (cust2, cust1, t2, t1)
+            tabu_list.append(tabu_entry1)
+            tabu_set.add(tabu_entry1)
+            tabu_list.append(tabu_entry2)
+            tabu_set.add(tabu_entry2)
+        else: # 2opt
+            _, t, i, j, new_route = best_move
+            routes[t] = new_route
+            route_dists[t] = route_distance(new_route)
+        
+        # Manage tabu list: keep only current_tenure items
+        while len(tabu_list) > current_tenure:
+            entry = tabu_list.pop(0)
+            tabu_set.discard(entry)
+        
+        old_best_max = best_max
+        update_best(routes)
+        if best_max < old_best_max:
+            improved = True
+            iterations_since_improvement = 0
+            # decrease tenure
+            if current_tenure > tabu_tenure_min:
+                current_tenure -= 1
+        else:
+            iterations_since_improvement += 1
+            if iterations_since_improvement >= improvement_threshold and current_tenure < tabu_tenure_max:
+                current_tenure += 1
+                iterations_since_improvement = 0
+    
+    return best_routes
+```
+
+Candidate cand_000017: regret_tabu_minmax
+Status: valid; gap: 13.5247
+Thought: Construction: regret-based min-max insertion (selects the customer with the largest difference between best and second-best insertion to balance routes). Improvement: tabu search (tenure 7) with relocate, swap, and 2-opt neighborhoods; at each iteration, the best admissible move (non-tabu or aspirated) is applied even if it worsens the current solution. This provides exploration beyond the improving-only strategy in the parents. Tie-breaking by new max, move type, then truck/position indices.
+Mean gap: 13.524691538688078
+Mean max route distance: 2.3227389939831142
+Mean total route distance: 13.901783195752225
+Gap by instance size: {'100': 13.524691538688078}
+Gap by truck count: {'6': 13.524691538688078}
+History source: yes
+History bucket: vrp:size:100
+History role: regime specialist
+Code:
+```python
+import numpy as np
+import math
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    def route_distance(route):
+        total = 0.0
+        for i in range(len(route)-1):
+            total += distance_matrix[route[i], route[i+1]]
+        return total
+    
+    # Construction: regret-based min-max insertion
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_dists = [0.0] * truck_count
+    unassigned = set(customers)
+    
+    while unassigned:
+        best_regret = -1.0
+        selected_cust = None
+        best_info = None  # (t, pos)
+        
+        for cust in list(unassigned):
+            best_new_max = float('inf')
+            second_best_new_max = float('inf')
+            best_pos = None
+            best_t = None
+            for t in range(truck_count):
+                route = routes[t]
+                # positions from 1 to len(route)-1 (depot at ends)
+                for pos in range(1, len(route)):
+                    new_route = route[:pos] + [cust] + route[pos:]
+                    new_len = route_distance(new_route)
+                    new_max = new_len
+                    for k in range(truck_count):
+                        if k != t:
+                            new_max = max(new_max, route_dists[k])
+                    if new_max < best_new_max:
+                        second_best_new_max = best_new_max
+                        best_new_max = new_max
+                        best_pos = pos
+                        best_t = t
+                    elif new_max < second_best_new_max:
+                        second_best_new_max = new_max
+            regret = second_best_new_max - best_new_max
+            # tie-break: larger regret; if equal, smaller customer index
+            if regret > best_regret or (regret == best_regret and cust < selected_cust):
+                best_regret = regret
+                selected_cust = cust
+                best_info = (best_t, best_pos)
+        
+        # Insert selected customer
+        if selected_cust is None:
+            # fallback: just insert in first route at first position
+            selected_cust = min(unassigned)
+            best_info = (0, 1)
+        t, pos = best_info
+        routes[t] = routes[t][:pos] + [selected_cust] + routes[t][pos:]
+        route_dists[t] = route_distance(routes[t])
+        unassigned.remove(selected_cust)
+    
+    # Initial best solution
+    best_max = max(route_dists)
+    best_routes = [list(r) for r in routes]
+    
+    def report_best_vrp(routes):
+        nonlocal best_max, best_routes
+        m = max(route_distance(r) for r in routes)
+        if m < best_max:
+            best_max = m
+            best_routes = [list(r) for r in routes]
+    
+    report_best_vrp(routes)
+    
+    # Tabu search parameters
+    tabu_tenure = 7
+    tabu_list = []
+    tabu_set = set()
+    max_iter = (n - 1) * truck_count * 2
+    
+    for _ in range(max_iter):
+        best_move = None
+        best_new_max = float('inf')
+        best_tie = None
+        
+        # Relocate moves
+        for t1 in range(truck_count):
+            route1 = routes[t1]
+            if len(route1) <= 2:
+                continue
+            for idx1 in range(1, len(route1)-1):
+                cust = route1[idx1]
+                new_route1 = route1[:idx1] + route1[idx1+1:]
+                dist1_new = route_distance(new_route1)
+                for t2 in range(truck_count):
+                    if t1 == t2:
+                        continue
+                    route2 = routes[t2]
+                    for idx2 in range(1, len(route2)):
+                        new_route2 = route2[:idx2] + [cust] + route2[idx2:]
+                        dist2_new = route_distance(new_route2)
+                        new_max = max(dist1_new, dist2_new)
+                        for k in range(truck_count):
+                            if k != t1 and k != t2:
+                                new_max = max(new_max, route_dists[k])
+                        # tabu check: reverse move (cust, t2, t1) is tabu?
+                        is_tabu = (cust, t2, t1) in tabu_set
+                        # aspiration: if new_max < best_max, ignore tabu
+                        if is_tabu and new_max >= best_max:
+                            continue
+                        # tie-break: (new_max, move_type=0, t1, idx1, t2, idx2)
+                        tie = (new_max, 0, t1, idx1, t2, idx2)
+                        if tie < best_tie if best_tie is not None else True:
+                            best_new_max = new_max
+                            best_move = ('relocate', t1, idx1, t2, idx2, cust)
+                            best_tie = tie
+        
+        # Swap moves
+        for t1 in range(truck_count):
+            route1 = routes[t1]
+            if len(route1) <= 2:
+                continue
+            for idx1 in range(1, len(route1)-1):
+                cust1 = route1[idx1]
+                for t2 in range(t1+1, truck_count):
+                    route2 = routes[t2]
+                    if len(route2) <= 2:
+                        continue
+                    for idx2 in range(1, len(route2)-1):
+                        cust2 = route2[idx2]
+                        new_route1 = route1[:idx1] + [cust2] + route1[idx1+1:]
+                        new_route2 = route2[:idx2] + [cust1] + route2[idx2+1:]
+                        dist1_new = route_distance(new_route1)
+                        dist2_new = route_distance(new_route2)
+                        new_max = max(dist1_new, dist2_new)
+                        for k in range(truck_count):
+                            if k != t1 and k != t2:
+                                new_max = max(new_max, route_dists[k])
+                        # tabu check: two reverse entries
+                        is_tabu = ((cust1, cust2, t1, t2) in tabu_set) or ((cust2, cust1, t2, t1) in tabu_set)
+                        if is_tabu and new_max >= best_max:
+                            continue
+                        tie = (new_max, 1, t1, idx1, t2, idx2)
+                        if tie < best_tie if best_tie is not None else True:
+                            best_new_max = new_max
+                            best_move = ('swap', t1, idx1, t2, idx2, cust1, cust2)
+                            best_tie = tie
+        
+        # 2-opt moves
+        for t in range(truck_count):
+            route = routes[t]
+            if len(route) <= 3:
+                continue
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    new_max = new_dist
+                    for k in range(truck_count):
+                        if k != t:
+                            new_max = max(new_max, route_dists[k])
+                    # 2-opt moves not tabu
+                    tie = (new_max, 2, t, i, j, -1, -1)
+                    if tie < best_tie if best_tie is not None else True:
+                        best_new_max = new_max
+                        best_move = ('2opt', t, i, j, new_route)
+                        best_tie = tie
+        
+        if best_move is None:
+            break
+        
+        # Apply best move
+        if best_move[0] == 'relocate':
+            _, t1, idx1, t2, idx2, cust = best_move
+            routes[t1] = routes[t1][:idx1] + routes[t1][idx1+1:]
+            routes[t2] = routes[t2][:idx2] + [cust] + routes[t2][idx2:]
+            route_dists[t1] = route_distance(routes[t1])
+            route_dists[t2] = route_distance(routes[t2])
+            # Add reverse move to tabu
+            tabu_entry = (cust, t2, t1)
+            tabu_list.append(tabu_entry)
+            tabu_set.add(tabu_entry)
+        elif best_move[0] == 'swap':
+            _, t1, idx1, t2, idx2, cust1, cust2 = best_move
+            routes[t1][idx1] = cust2
+            routes[t2][idx2] = cust1
+            route_dists[t1] = route_distance(routes[t1])
+            route_dists[t2] = route_distance(routes[t2])
+            tabu_entry1 = (cust1, cust2, t1, t2)
+            tabu_entry2 = (cust2, cust1, t2, t1)
+            tabu_list.append(tabu_entry1)
+            tabu_set.add(tabu_entry1)
+            tabu_list.append(tabu_entry2)
+            tabu_set.add(tabu_entry2)
+        else:  # '2opt'
+            _, t, i, j, new_route = best_move
+            routes[t] = new_route
+            route_dists[t] = route_distance(new_route)
+        
+        # Manage tabu list length
+        while len(tabu_list) > tabu_tenure:
+            entry = tabu_list.pop(0)
+            tabu_set.discard(entry)
+        
+        report_best_vrp(routes)
+    
+    return best_routes
+```
+
+Candidate cand_000023: permutation_genetic_pmx_crossover
+Status: valid; gap: 10.7885
+Thought: Modified version of permutation_genetic by replacing the order crossover (OX) with partially mapped crossover (PMX). Everything else unchanged: permutation encoding, min-max insertion decoding, binary tournament selection, swap mutation, steady-state replacement. PMX ensures inheritance of order and adjacency from both parents.
+Mean gap: 10.788460934171638
+Mean max route distance: 2.271374536587225
+Mean total route distance: 13.447781726780487
+Gap by instance size: {'100': 10.788460934171638}
+Gap by truck count: {'6': 10.788460934171638}
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    def compute_route_length(route):
+        return sum(distance_matrix[route[i], route[i+1]] for i in range(len(route)-1))
+    
+    def decode(perm):
+        routes = [[0, 0] for _ in range(truck_count)]
+        lengths = [0.0] * truck_count
+        for cust in perm:
+            best_max = float('inf')
+            best_r = -1
+            best_p = -1
+            for r in range(truck_count):
+                route = routes[r]
+                for p in range(1, len(route)):
+                    prev = route[p-1]
+                    nxt = route[p]
+                    new_len = lengths[r] - distance_matrix[prev, nxt] + distance_matrix[prev, cust] + distance_matrix[cust, nxt]
+                    new_max = new_len
+                    for rr in range(truck_count):
+                        if rr != r and lengths[rr] > new_max:
+                            new_max = lengths[rr]
+                    if new_max < best_max:
+                        best_max = new_max
+                        best_r = r
+                        best_p = p
+                    elif new_max == best_max:
+                        if r < best_r or (r == best_r and p < best_p):
+                            best_max = new_max
+                            best_r = r
+                            best_p = p
+            routes[best_r].insert(best_p, cust)
+            lengths[best_r] = compute_route_length(routes[best_r])
+        max_len = max(lengths)
+        return routes, max_len
+    
+    def report_best_vrp(routes):
+        nonlocal best_max, best_routes
+        m = max(compute_route_length(r) for r in routes)
+        if m < best_max:
+            best_max = m
+            best_routes = [list(r) for r in routes]
+    
+    # Parameters
+    pop_size = min(50, n)
+    max_gen = 5 * n
+    mutation_prob = 0.1
+    
+    # Initialize population
+    population = []
+    best_max = float('inf')
+    best_routes = None
+    for _ in range(pop_size):
+        perm = customers[:]
+        random.shuffle(perm)
+        routes, max_len = decode(perm)
+        population.append((max_len, perm))
+        report_best_vrp(routes)
+    population.sort(key=lambda x: x[0])
+    
+    # Steady-state genetic algorithm
+    for _ in range(max_gen):
+        # Binary tournament selection
+        idx1 = random.sample(range(pop_size), 2)
+        idx2 = random.sample(range(pop_size), 2)
+        parent1 = population[idx1[0]] if population[idx1[0]] <= population[idx1[1]] else population[idx1[1]]
+        parent2 = population[idx2[0]] if population[idx2[0]] <= population[idx2[1]] else population[idx2[1]]
+        p1 = parent1[1]
+        p2 = parent2[1]
+        
+        # Partially Mapped Crossover (PMX)
+        n_cust = len(customers)
+        a = random.randint(0, n_cust-1)
+        b = random.randint(0, n_cust-1)
+        if a > b:
+            a, b = b, a
+        child = [None] * n_cust
+        # Copy segment from parent1
+        child[a:b+1] = p1[a:b+1]
+        # Mapping
+        mapping = {}
+        for i in range(a, b+1):
+            mapping[p1[i]] = p2[i]
+        # Fill positions outside segment from parent2
+        for i in range(n_cust):
+            if i < a or i > b:
+                gene = p2[i]
+                while gene in mapping:
+                    gene = mapping[gene]
+                child[i] = gene
+        # If any None left (should not happen), fill with remaining
+        used = set(child)
+        remaining = [c for c in customers if c not in used]
+        for i in range(n_cust):
+            if child[i] is None:
+                child[i] = remaining.pop()
+        
+        # Mutation
+        if random.random() < mutation_prob:
+            i = random.randint(0, n_cust-1)
+            j = random.randint(0, n_cust-1)
+            child[i], child[j] = child[j], child[i]
+        
+        # Evaluate child
+        routes_child, max_child = decode(child)
+        report_best_vrp(routes_child)
+        
+        # Replace worst if child is better
+        if max_child < population[-1][0]:
+            population[-1] = (max_child, child)
+            population.sort(key=lambda x: x[0])
+    
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

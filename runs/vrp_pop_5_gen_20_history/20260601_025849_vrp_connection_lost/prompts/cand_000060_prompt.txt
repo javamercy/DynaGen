@@ -1,0 +1,166 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+STRATEGY m3_simplify_generalize: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated solver from scratch.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000033: giant_tour_farthest_depot
+Status: valid; gap: 232.754
+Thought: Replace the nearest-neighbor giant tour construction with a deterministic ordering by distance from depot (descending, ties broken by node index). The binary search on maximum route distance and greedy split remain unchanged.
+Mean gap: 232.7539398898145
+Mean max route distance: 6.735353982895186
+Mean total route distance: 38.97769280062734
+Gap by instance size: {'100': 232.7539398898145}
+Gap by truck count: {'6': 232.7539398898145}
+History source: yes
+History bucket: vrp:size:100
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    # Build giant tour by sorting customers by distance to depot descending
+    # Compute distances from depot
+    depot_dists = distance_matrix[0, 1:]
+    # Create list of (distance, customer) pairs, sort descending by distance, then ascending by customer index
+    sorted_cust = sorted(customers, key=lambda c: (-depot_dists[c-1], c))
+    tour = sorted_cust[:]
+    
+    # Precompute distances for segments of the tour
+    def route_dist(cust_list):
+        if not cust_list:
+            return 0.0
+        d = distance_matrix[0, cust_list[0]]
+        for i in range(len(cust_list)-1):
+            d += distance_matrix[cust_list[i], cust_list[i+1]]
+        d += distance_matrix[cust_list[-1], 0]
+        return d
+    
+    full_dist = route_dist(tour)
+    low = 0.0
+    high = full_dist
+    eps = 1e-9
+    
+    def feasible(L):
+        seg_count = 0
+        i = 0
+        while i < len(tour):
+            seg_count += 1
+            if seg_count > truck_count:
+                return False
+            j = i
+            first = tour[j]
+            seg_dist = distance_matrix[0, first]
+            while j < len(tour):
+                if j == i:
+                    pass
+                else:
+                    prev = tour[j-1]
+                    curr = tour[j]
+                    add = distance_matrix[prev, curr]
+                    if seg_dist + add > L + eps:
+                        break
+                    seg_dist += add
+                back_to_depot = distance_matrix[tour[j], 0]
+                if seg_dist + back_to_depot > L + eps:
+                    if j == i:
+                        return False
+                    else:
+                        break
+                j += 1
+            if j == i:
+                return False
+            i = j
+        return seg_count <= truck_count
+    
+    for _ in range(60):
+        mid = (low + high) / 2
+        if feasible(mid):
+            high = mid
+        else:
+            low = mid
+    L_min = high
+    
+    # Reconstruct routes using L_min greedy
+    routes = []
+    i = 0
+    while i < len(tour):
+        j = i
+        first = tour[j]
+        seg_dist = distance_matrix[0, first]
+        while j < len(tour):
+            if j == i:
+                pass
+            else:
+                prev = tour[j-1]
+                curr = tour[j]
+                add = distance_matrix[prev, curr]
+                if seg_dist + add > L_min + eps:
+                    break
+                seg_dist += add
+            back = distance_matrix[tour[j], 0]
+            if seg_dist + back > L_min + eps:
+                if j == i:
+                    break
+                else:
+                    break
+            j += 1
+        segment = tour[i:j]
+        route = [0] + segment + [0]
+        routes.append(route)
+        i = j
+    while len(routes) < truck_count:
+        routes.append([0, 0])
+    routes = routes[:truck_count]
+    
+    report_best_vrp(routes)
+    return routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
