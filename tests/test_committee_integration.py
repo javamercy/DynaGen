@@ -62,13 +62,12 @@ class Optimizer:
 TSP_CODE = """\
 import numpy as np
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = len(distance_matrix)
-    rng = np.random.default_rng(seed)
     best_tour = list(range(n))
     best_len = float("inf")
-    for _ in range(min(budget, 10)):
-        tour = list(rng.permutation(n))
+    for _ in range(10):
+        tour = list(np.random.permutation(n))
         length = sum(distance_matrix[tour[i]][tour[(i + 1) % n]] for i in range(n))
         if length < best_len:
             best_len = length

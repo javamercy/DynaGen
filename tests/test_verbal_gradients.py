@@ -34,7 +34,9 @@ class VerbalGradientTests(unittest.TestCase):
 
         self.assertTrue(config.evolution.verbal_gradients.enabled)
         self.assertEqual(config.evolution.verbal_gradients.llm_every_n_generations, 3)
-        self.assertEqual(config.evolution.verbal_gradients.max_llm_calls_per_generation, 1)
+        self.assertEqual(
+            config.evolution.verbal_gradients.max_llm_calls_per_generation, 1
+        )
         self.assertEqual(config.evolution.verbal_gradients.llm_model, "feedback-model")
         self.assertFalse(hasattr(config.evolution.verbal_gradients, "static_enabled"))
         self.assertFalse(hasattr(config.evolution.verbal_gradients, "llm_enabled"))
@@ -62,10 +64,10 @@ class VerbalGradientTests(unittest.TestCase):
         )
 
         for builder in (
-                build_tsp_llm_verbal_gradient_prompt,
-                build_bbob_llm_verbal_gradient_prompt,
-                build_dvrp_llm_verbal_gradient_prompt,
-                build_vrp_llm_verbal_gradient_prompt,
+            build_tsp_llm_verbal_gradient_prompt,
+            build_bbob_llm_verbal_gradient_prompt,
+            build_dvrp_llm_verbal_gradient_prompt,
+            build_vrp_llm_verbal_gradient_prompt,
         ):
             messages = builder(candidate, parents=[], generation=1)
             user = messages[1]["content"]
@@ -103,7 +105,9 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertNotIn("Change for", text)
         self.assertIn("guarded late-budget", text)
 
-    def test_s3_parent_gradient_formatting_is_unlimited_and_keeps_all_parents(self) -> None:
+    def test_s3_parent_gradient_formatting_is_unlimited_and_keeps_all_parents(
+        self,
+    ) -> None:
         parents = [
             Candidate(
                 id=f"cand_{index}",
@@ -115,11 +119,22 @@ class VerbalGradientTests(unittest.TestCase):
                     "score_name": "distance",
                     VERBAL_GRADIENT_KEY: {
                         "source": "llm",
-                        "summary": " ".join(["long summary about large instances and timeout risk"] * 6),
+                        "summary": " ".join(
+                            ["long summary about large instances and timeout risk"] * 6
+                        ),
                         "aim": "Use complementary mechanisms while keeping valid construction.",
-                        "preserve": ["early reporting", "valid incumbent", "seeded construction"],
-                        "change": ["Use only the complementary mechanism and avoid copying slow loops."],
-                        "avoid": ["unbounded all-pairs neighborhoods", "late reporting"],
+                        "preserve": [
+                            "early reporting",
+                            "valid incumbent",
+                            "seeded construction",
+                        ],
+                        "change": [
+                            "Use only the complementary mechanism and avoid copying slow loops."
+                        ],
+                        "avoid": [
+                            "unbounded all-pairs neighborhoods",
+                            "late reporting",
+                        ],
                     },
                 },
                 distance=10.0,
@@ -133,7 +148,9 @@ class VerbalGradientTests(unittest.TestCase):
         self.assertIn("Parent cand_1 LLM reflection", text)
         self.assertIn("Parent cand_2 LLM reflection", text)
         self.assertIn("Parent cand_3 LLM reflection", text)
-        self.assertIn(" ".join(["long summary about large instances and timeout risk"] * 6), text)
+        self.assertIn(
+            " ".join(["long summary about large instances and timeout risk"] * 6), text
+        )
 
     def test_evolution_prompts_do_not_include_parent_awareness_anymore(self) -> None:
         parent = Candidate(
@@ -142,7 +159,7 @@ class VerbalGradientTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="candidate thought",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            code="def solve_tsp(distance_matrix):\n    return []",
             metrics={
                 "problem": "tsp",
                 "score_name": "distance",
@@ -164,17 +181,29 @@ class VerbalGradientTests(unittest.TestCase):
 
         feedback_context = format_parent_verbal_gradients([parent])
         for messages in (
-                build_tsp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-                build_bbob_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-                build_dvrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
-                build_vrp_evolution_prompt("e1_radical_exploration", [parent], feedback_context=feedback_context),
+            build_tsp_evolution_prompt(
+                "e1_radical_exploration", [parent], feedback_context=feedback_context
+            ),
+            build_bbob_evolution_prompt(
+                "e1_radical_exploration", [parent], feedback_context=feedback_context
+            ),
+            build_dvrp_evolution_prompt(
+                "e1_radical_exploration", [parent], feedback_context=feedback_context
+            ),
+            build_vrp_evolution_prompt(
+                "e1_radical_exploration", [parent], feedback_context=feedback_context
+            ),
         ):
             user = messages[1]["content"]
             self.assertNotIn("STRATEGY", user)
             self.assertIn("VERBAL GRADIENT", user)
 
     def test_llm_gradient_prompt_uses_full_candidate_code(self) -> None:
-        full_code = "def solve_tsp(distance_matrix, seed, budget):\n    " + "x = 1\n    " * 600 + "return []\n"
+        full_code = (
+            "def solve_tsp(distance_matrix):\n    "
+            + "x = 1\n    " * 600
+            + "return []\n"
+        )
         candidate = Candidate(
             id="cand_full",
             generation=1,
@@ -217,7 +246,7 @@ class VerbalGradientTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="candidate thought",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return []",
+            code="def solve_tsp(distance_matrix):\n    return []",
             metrics={
                 "problem": "tsp",
                 "score_name": "distance",
@@ -267,8 +296,12 @@ class VerbalGradientTests(unittest.TestCase):
 
             initial = store.load_candidate("cand_000001")
             offspring = store.load_candidate("cand_000002")
-            initial_prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
-            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
+            initial_prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(
+                encoding="utf-8"
+            )
+            llm_calls = json.loads(
+                (store.root / "llm_calls.json").read_text(encoding="utf-8")
+            )
 
         self.assertEqual(provider.candidate_calls, 2)
         self.assertEqual(feedback_provider.text_calls, 1)
@@ -300,7 +333,9 @@ class VerbalGradientTests(unittest.TestCase):
             ).run()
 
             initial = store.load_candidate("cand_000001")
-            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
+            llm_calls = json.loads(
+                (store.root / "llm_calls.json").read_text(encoding="utf-8")
+            )
 
         self.assertEqual(feedback_provider.text_calls, 0)
         self.assertIsNone(get_candidate_gradient(initial))
@@ -318,7 +353,7 @@ class _FakeProvider:
         return ParsedCandidateResponse(
             name=f"solver_{self.candidate_calls}",
             thought="fake solver",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    return list(range(len(distance_matrix)))",
+            code="def solve_tsp(distance_matrix):\n    return list(range(len(distance_matrix)))",
         )
 
     def complete_with_metadata(self, messages, *, temperature):
@@ -326,13 +361,15 @@ class _FakeProvider:
 
     def complete_text(self, messages, *, temperature):
         self.text_calls += 1
-        return json.dumps({
-            "summary": "LLM-targeted parent guidance.",
-            "aim": "Reduce large-instance gap with one focused mutation.",
-            "preserve": ["early incumbent reporting"],
-            "change": ["Refine the local pass."],
-            "avoid": ["unbounded loops"],
-        })
+        return json.dumps(
+            {
+                "summary": "LLM-targeted parent guidance.",
+                "aim": "Reduce large-instance gap with one focused mutation.",
+                "preserve": ["early incumbent reporting"],
+                "change": ["Refine the local pass."],
+                "avoid": ["unbounded loops"],
+            }
+        )
 
     def summary(self):
         return {
@@ -379,38 +416,42 @@ class _FakeEvaluator:
         return EvaluationResult("valid", 10.0, metrics, score_name="distance")
 
 
-def _run_config(*, llm_every_n_generations: int = 1, llm_model: str = "feedback-model") -> RunConfig:
-    return RunConfig.from_dict({
-        "run": {"name": "test", "output_dir": "runs/test", "seed": 1},
-        "llm": {
-            "provider": "ollama",
-            "model": "fake",
-            "temperature": 0.1,
-        },
-        "evolution": {
-            "population_size": 1,
-            "generations": 1,
-            "offspring_per_strategy": 1,
-            "strategies": ["e1_radical_exploration"],
-            "verbal_gradients": {
-                "enabled": True,
-                "llm_every_n_generations": llm_every_n_generations,
-                "max_llm_calls_per_generation": 1,
-                "llm_model": llm_model,
-                "temperature": 0.2,
+def _run_config(
+    *, llm_every_n_generations: int = 1, llm_model: str = "feedback-model"
+) -> RunConfig:
+    return RunConfig.from_dict(
+        {
+            "run": {"name": "test", "output_dir": "runs/test", "seed": 1},
+            "llm": {
+                "provider": "ollama",
+                "model": "fake",
+                "temperature": 0.1,
             },
-        },
-        "evaluation": {
-            "budget": 10,
-            "timeout_seconds": 1,
-            "seeds": [1],
-            "metric": "mean_gap",
-        },
-        "data": {
-            "search_instances": "unused",
-            "test_instances": "unused",
-        },
-    })
+            "evolution": {
+                "population_size": 1,
+                "generations": 1,
+                "offspring_per_strategy": 1,
+                "strategies": ["e1_radical_exploration"],
+                "verbal_gradients": {
+                    "enabled": True,
+                    "llm_every_n_generations": llm_every_n_generations,
+                    "max_llm_calls_per_generation": 1,
+                    "llm_model": llm_model,
+                    "temperature": 0.2,
+                },
+            },
+            "evaluation": {
+                "budget": 10,
+                "timeout_seconds": 1,
+                "seeds": [1],
+                "metric": "mean_gap",
+            },
+            "data": {
+                "search_instances": "unused",
+                "test_instances": "unused",
+            },
+        }
+    )
 
 
 if __name__ == "__main__":

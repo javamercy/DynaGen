@@ -362,7 +362,7 @@ def _validate_vrp_problem_config(config: ProblemConfig) -> None:
 def _validate_evaluation_config_for_problem(
     config: EvaluationConfig, problem_type: str
 ) -> None:
-    if problem_type in ("vrp", "dvrp"):
+    if problem_type in ("vrp", "dvrp", "tsp"):
         return
     if not config.seeds:
         raise ValueError("At least one seed must be specified")

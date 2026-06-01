@@ -6,12 +6,19 @@ from dynagen.candidates.candidate import Candidate
 from dynagen.config import RunConfig
 from dynagen.domain import load_tsplib_file
 from dynagen.domain.tsp_instance import TSPInstance
-from dynagen.domain.tsp_synthetic import generate_tsp_construct_instances, parse_tsp_construct_spec
+from dynagen.domain.tsp_synthetic import (
+    generate_tsp_construct_instances,
+    parse_tsp_construct_spec,
+)
 from dynagen.evaluation.tsp_history import build_tsp_history_profile
 from dynagen.evaluation.tsp_gradient import build_tsp_llm_verbal_gradient_prompt
 from dynagen.evaluation.tsp_evaluator import TSPCandidateEvaluator
 from dynagen.prompts.tsp_evolution import build_tsp_evolution_prompt
-from dynagen.prompts.tsp_initial import TSP_INITIAL_ROLES, TSPInitialRole, build_tsp_initial_prompt
+from dynagen.prompts.tsp_initial import (
+    TSP_INITIAL_ROLES,
+    TSPInitialRole,
+    build_tsp_initial_prompt,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -20,15 +27,26 @@ logger = logging.getLogger(__name__)
 class TSPProblem:
     type = "tsp"
 
-    def build_evaluator(self, config: RunConfig, *, pool_name: str) -> TSPCandidateEvaluator:
-        path = config.data.search_instances if pool_name == "search_instances" else config.data.test_instances
-        logger.info("[%s] initializing %s pool from %s", self.type.upper(), pool_name, path)
+    def build_evaluator(
+        self, config: RunConfig, *, pool_name: str
+    ) -> TSPCandidateEvaluator:
+        path = (
+            config.data.search_instances
+            if pool_name == "search_instances"
+            else config.data.test_instances
+        )
+        logger.info(
+            "[%s] initializing %s pool from %s", self.type.upper(), pool_name, path
+        )
         instances = load_tsp_instances(path)
-        logger.info("[%s] loaded %d instances for %s", self.type.upper(), len(instances), pool_name)
+        logger.info(
+            "[%s] loaded %d instances for %s",
+            self.type.upper(),
+            len(instances),
+            pool_name,
+        )
         return TSPCandidateEvaluator(
             instances,
-            seeds=config.evaluation.seeds,
-            budget=config.evaluation.budget,
             timeout_seconds=config.evaluation.timeout_seconds,
             timeout_penalty=config.evaluation.timeout_penalty,
             pool_name=pool_name,
@@ -41,11 +59,11 @@ class TSPProblem:
         return build_tsp_initial_prompt(role)
 
     def build_evolution_prompt(
-            self,
-            strategy: str,
-            parents: list[Candidate],
-            *,
-            feedback_context: str = "",
+        self,
+        strategy: str,
+        parents: list[Candidate],
+        *,
+        feedback_context: str = "",
     ) -> list[dict[str, str]]:
         return build_tsp_evolution_prompt(
             strategy,
@@ -54,11 +72,11 @@ class TSPProblem:
         )
 
     def build_llm_verbal_gradient_prompt(
-            self,
-            candidate: Candidate,
-            *,
-            parents: list[Candidate],
-            generation: int,
+        self,
+        candidate: Candidate,
+        *,
+        parents: list[Candidate],
+        generation: int,
     ) -> list[dict[str, str]]:
         return build_tsp_llm_verbal_gradient_prompt(
             candidate,
@@ -103,7 +121,9 @@ def create_tsp_initial_roles(count: int) -> list[TSPInitialRole]:
 
 def load_tsp_instances(path: str | Path | None) -> list[TSPInstance]:
     if not path:
-        raise ValueError("TSP data.search_instances and data.test_instances must be specified")
+        raise ValueError(
+            "TSP data.search_instances and data.test_instances must be specified"
+        )
 
     synthetic_spec = parse_tsp_construct_spec(str(path))
     if synthetic_spec is not None:

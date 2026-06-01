@@ -32,7 +32,7 @@ class HistoryTests(unittest.TestCase):
             strategy="initial:1",
             name="solver",
             thought="",
-            code="def solve_tsp(distance_matrix, seed, budget):\n    # 2-opt nearest insertion restart\n    pass",
+            code="def solve_tsp(distance_matrix):\n    # 2-opt nearest insertion restart\n    pass",
             distance=100.0,
             status=CandidateStatus.VALID,
             metrics={
@@ -45,7 +45,9 @@ class HistoryTests(unittest.TestCase):
                 "timeout_fraction": 0.0,
                 "mean_runtime": 0.1,
                 "score_by_instance_size": {"33": 80.0, "201": 140.0},
-                "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": 80.0},
+                "score_by_instance_source": {
+                    "synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": 80.0
+                },
             },
         )
 
@@ -161,11 +163,20 @@ class HistoryTests(unittest.TestCase):
         self.assertIn("vrp:mechanism:savings", profile["buckets"])
 
     def test_history_rejects_duplicate_code_when_weaker(self) -> None:
-        history = CandidateHistory(config=_run_config(population_size=1, generations=0).evolution.history, problem="tsp")
-        strong = _candidate("cand_1", score=10.0, code="def solve_tsp(a,b,c):\n    return []")
-        weak = _candidate("cand_2", score=20.0, code="def solve_tsp(a,b,c):\n    return []")
+        history = CandidateHistory(
+            config=_run_config(population_size=1, generations=0).evolution.history,
+            problem="tsp",
+        )
+        strong = _candidate(
+            "cand_1", score=10.0, code="def solve_tsp(a,b,c):\n    return []"
+        )
+        weak = _candidate(
+            "cand_2", score=20.0, code="def solve_tsp(a,b,c):\n    return []"
+        )
 
-        history.update([strong], generation=0, profile_builder=build_tsp_history_profile)
+        history.update(
+            [strong], generation=0, profile_builder=build_tsp_history_profile
+        )
         history.update([weak], generation=0, profile_builder=build_tsp_history_profile)
 
         self.assertIn("cand_1", history.entries)
@@ -175,7 +186,9 @@ class HistoryTests(unittest.TestCase):
     def test_engine_samples_history_parent_and_persists_summary(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
-        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"])
+        config = _run_config(
+            population_size=1, generations=1, strategies=["e1_radical_exploration"]
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -187,23 +200,38 @@ class HistoryTests(unittest.TestCase):
                 store=store,
             ).run()
 
-            prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
-            history_summary = json.loads((store.root / "history_summary.json").read_text(encoding="utf-8"))
-            generation_summary = json.loads(
-                (store.generations_dir / "generation_001" / "summary.json").read_text(encoding="utf-8")
+            prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(
+                encoding="utf-8"
             )
-            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
+            history_summary = json.loads(
+                (store.root / "history_summary.json").read_text(encoding="utf-8")
+            )
+            generation_summary = json.loads(
+                (store.generations_dir / "generation_001" / "summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            llm_calls = json.loads(
+                (store.root / "llm_calls.json").read_text(encoding="utf-8")
+            )
 
         self.assertIn("History source: yes", prompt)
         self.assertGreaterEqual(history_summary["size"], 1)
         self.assertIn("history", generation_summary)
         self.assertIn("history", llm_calls)
-        self.assertGreaterEqual(llm_calls["history"]["parent_selections_from_history"], 1)
+        self.assertGreaterEqual(
+            llm_calls["history"]["parent_selections_from_history"], 1
+        )
 
     def test_history_disabled_omits_history_parent_context(self) -> None:
         provider = _FakeProvider()
         evaluator = _FakeEvaluator()
-        config = _run_config(population_size=1, generations=1, strategies=["e1_radical_exploration"], history_enabled=False)
+        config = _run_config(
+            population_size=1,
+            generations=1,
+            strategies=["e1_radical_exploration"],
+            history_enabled=False,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = RunStore(tmpdir)
@@ -215,8 +243,12 @@ class HistoryTests(unittest.TestCase):
                 store=store,
             ).run()
 
-            prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(encoding="utf-8")
-            llm_calls = json.loads((store.root / "llm_calls.json").read_text(encoding="utf-8"))
+            prompt = (store.prompts_dir / "cand_000002_prompt.txt").read_text(
+                encoding="utf-8"
+            )
+            llm_calls = json.loads(
+                (store.root / "llm_calls.json").read_text(encoding="utf-8")
+            )
 
         self.assertNotIn("History source: yes", prompt)
         self.assertFalse(llm_calls["history"]["enabled"])
@@ -242,7 +274,9 @@ def _candidate(candidate_id: str, *, score: float, code: str) -> Candidate:
             "timeout_fraction": 0.0,
             "mean_runtime": 0.1,
             "score_by_instance_size": {"33": score},
-            "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score},
+            "score_by_instance_source": {
+                "synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score
+            },
         },
     )
 
@@ -258,7 +292,7 @@ class _FakeProvider:
             name=f"solver_{self.calls}",
             thought="fake solver",
             code=(
-                "def solve_tsp(distance_matrix, seed, budget):\n"
+                "def solve_tsp(distance_matrix):\n"
                 f"    tag = {self.calls}\n"
                 "    return list(range(len(distance_matrix)))"
             ),
@@ -309,51 +343,55 @@ class _FakeEvaluator:
             "timeout_fraction": 0.0,
             "mean_runtime": 0.1,
             "score_by_instance_size": {"33": score},
-            "score_by_instance_source": {"synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score},
+            "score_by_instance_source": {
+                "synthetic:tsp_construct:n_instance=11:n_cities=32:seed=11": score
+            },
         }
         return EvaluationResult("valid", score, metrics, score_name="distance")
 
 
 def _run_config(
-        *,
-        population_size: int,
-        generations: int,
-        strategies: list[str] | None = None,
-        history_enabled: bool = True,
+    *,
+    population_size: int,
+    generations: int,
+    strategies: list[str] | None = None,
+    history_enabled: bool = True,
 ) -> RunConfig:
-    return RunConfig.from_dict({
-        "run": {"name": "history_test", "output_dir": "runs/test", "seed": 1},
-        "llm": {
-            "provider": "ollama",
-            "model": "fake",
-            "temperature": 0.1,
-        },
-        "evolution": {
-            "population_size": population_size,
-            "generations": generations,
-            "offspring_per_strategy": 1,
-            "strategies": strategies or ["e1_radical_exploration"],
-            "history": {
-                "enabled": history_enabled,
-                "max_size": 8,
-                "max_per_bucket": 2,
-                "parent_sample_probability": 1.0,
-                "s3_history_parent_min": 1,
-                "final_selection_uses_history": True,
-                "deduplicate_code": True,
+    return RunConfig.from_dict(
+        {
+            "run": {"name": "history_test", "output_dir": "runs/test", "seed": 1},
+            "llm": {
+                "provider": "ollama",
+                "model": "fake",
+                "temperature": 0.1,
             },
-        },
-        "evaluation": {
-            "budget": 10,
-            "timeout_seconds": 1,
-            "seeds": [1],
-            "metric": "mean_gap",
-        },
-        "data": {
-            "search_instances": "unused",
-            "test_instances": "unused",
-        },
-    })
+            "evolution": {
+                "population_size": population_size,
+                "generations": generations,
+                "offspring_per_strategy": 1,
+                "strategies": strategies or ["e1_radical_exploration"],
+                "history": {
+                    "enabled": history_enabled,
+                    "max_size": 8,
+                    "max_per_bucket": 2,
+                    "parent_sample_probability": 1.0,
+                    "s3_history_parent_min": 1,
+                    "final_selection_uses_history": True,
+                    "deduplicate_code": True,
+                },
+            },
+            "evaluation": {
+                "budget": 10,
+                "timeout_seconds": 1,
+                "seeds": [1],
+                "metric": "mean_gap",
+            },
+            "data": {
+                "search_instances": "unused",
+                "test_instances": "unused",
+            },
+        }
+    )
 
 
 if __name__ == "__main__":

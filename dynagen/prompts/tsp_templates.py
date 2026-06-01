@@ -4,16 +4,13 @@ from dynagen.evolution.history import format_history_parent_context
 TSP_SOLVER_CONTRACT = """
 Implement this function only:
 
-def solve_tsp(distance_matrix: np.ndarray, seed: int, budget: int) -> np.ndarray:
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
 
 Requirements:
 - Minimize total TSP tour distance.
 - Return a 1D np.ndarray containing each node exactly once.
 - Do not repeat the start node at the end.
-- Always return a valid tour, even when budget is very small.
 - Use only distance_matrix; do not assume coordinates.
-- Use seed for randomness.
-- Treat budget as a hard cap on search effort.
 - Create a valid tour early.
 - Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
 - Do not use files, network, subprocesses, or external solvers.
@@ -22,7 +19,7 @@ Requirements:
 
 TSP_INTERNAL_CHECKLIST = """
 correct signature, valid tour on every return path,
-early report_best_tour, budget-bounded main search, allowed imports only, no I/O/network/subprocesses.
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
 """
 
 TSP_RESPONSE_FORMAT = """
@@ -45,10 +42,7 @@ def tsp_system_prompt() -> str:
 
 
 def render_tsp_candidates(candidates: list[Candidate]) -> str:
-    return "\n\n".join(
-        _render_tsp_candidate(candidate)
-        for candidate in candidates
-    )
+    return "\n\n".join(_render_tsp_candidate(candidate) for candidate in candidates)
 
 
 def _render_tsp_candidate(candidate: Candidate) -> str:
@@ -67,10 +61,12 @@ def _render_tsp_candidate(candidate: Candidate) -> str:
     if history_context:
         parts.append(history_context)
 
-    parts.extend([
-        "Code:",
-        "```python",
-        candidate.code,
-        "```",
-    ])
+    parts.extend(
+        [
+            "Code:",
+            "```python",
+            candidate.code,
+            "```",
+        ]
+    )
     return "\n\n".join(parts)

@@ -1,25 +1,23 @@
 TSP_BASELINES = {
-    "random_shuffle": r'''import numpy as np
+    "random_shuffle": r"""import numpy as np
 import random
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = int(distance_matrix.shape[0])
     if n <= 2:
         return np.arange(n, dtype=int)
-    rng = random.Random(int(seed))
     tour = list(range(n))
-    rng.shuffle(tour)
+    random.shuffle(tour)
     return np.asarray(tour, dtype=int)
-''',
-    "nearest_neighbor": r'''import numpy as np
+""",
+    "nearest_neighbor": r"""import numpy as np
 import random
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = int(distance_matrix.shape[0])
     if n <= 2:
         return np.arange(n, dtype=int)
 
-    random.seed(int(seed))
     start = random.randint(0, n - 1)
     tour = [start]
     unvisited = set(range(n))
@@ -33,16 +31,14 @@ def solve_tsp(distance_matrix, seed, budget):
         current = nearest
 
     return np.asarray(tour, dtype=int)
-''',
-    "two_opt": r'''import numpy as np
+""",
+    "two_opt": r"""import numpy as np
 import random
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = int(distance_matrix.shape[0])
     if n <= 2:
         return np.arange(n, dtype=int)
-
-    random.seed(int(seed))
 
     def compute_length(tour):
         total = distance_matrix[tour[-1], tour[0]]
@@ -87,19 +83,18 @@ def solve_tsp(distance_matrix, seed, budget):
         return tour
 
     tour = nearest_neighbor()
-    max_attempts = min(5000, max(1, int(budget)))
+    max_attempts = 5000
     tour = improve(tour, max_attempts)
     return np.asarray(tour, dtype=int)
-''',
-    "cheapest_insertion": r'''import numpy as np
+""",
+    "cheapest_insertion": r"""import numpy as np
 import random
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = int(distance_matrix.shape[0])
     if n <= 2:
         return np.arange(n, dtype=int)
 
-    random.seed(int(seed))
     remaining = list(range(n))
     start = random.randint(0, n - 1)
     tour = [start]
@@ -126,16 +121,14 @@ def solve_tsp(distance_matrix, seed, budget):
         remaining.remove(best_city)
 
     return np.asarray(tour, dtype=int)
-''',
-    "random_restart": r'''import numpy as np
+""",
+    "random_restart": r"""import numpy as np
 import random
 
-def solve_tsp(distance_matrix, seed, budget):
+def solve_tsp(distance_matrix):
     n = int(distance_matrix.shape[0])
     if n <= 2:
         return np.arange(n, dtype=int)
-
-    random.seed(int(seed))
 
     def compute_length(tour):
         total = distance_matrix[tour[-1], tour[0]]
@@ -180,18 +173,18 @@ def solve_tsp(distance_matrix, seed, budget):
 
     best_tour = nearest_neighbor(random.randint(0, n - 1))
     best_len = compute_length(best_tour)
-    restarts = max(1, min(int(budget), 5))
+    restarts = 5
     for _ in range(restarts):
         start = random.randint(0, n - 1)
         tour = nearest_neighbor(start)
-        tour = two_opt(tour, min(500, max(1, int(budget) // restarts)))
+        tour = two_opt(tour, 500)
         tour_len = compute_length(tour)
         if tour_len < best_len:
             best_len = tour_len
             best_tour = tour
 
     return np.asarray(best_tour, dtype=int)
-''',
+""",
 }
 
 

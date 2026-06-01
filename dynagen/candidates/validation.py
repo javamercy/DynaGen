@@ -2,7 +2,15 @@ import ast
 import inspect
 from dataclasses import dataclass
 
-ALLOWED_IMPORTS = {"numpy", "math", "random", "heapq", "itertools", "collections", "time"}
+ALLOWED_IMPORTS = {
+    "numpy",
+    "math",
+    "random",
+    "heapq",
+    "itertools",
+    "collections",
+    "time",
+}
 
 UNSAFE_CALLS = {
     "open",
@@ -79,12 +87,15 @@ def validate_solver_signature(func) -> ValidationResult:
     except (TypeError, ValueError) as exc:
         return ValidationResult(False, f"Invalid solve_tsp signature: {exc}")
     params = list(signature.parameters.values())
-    if len(params) != 3:
-        return ValidationResult(False, "solve_tsp must accept exactly three parameters")
-    if [param.name for param in params] != ["distance_matrix", "seed", "budget"]:
-        return ValidationResult(False, "solve_tsp parameters must be distance_matrix, seed, budget")
+    if len(params) != 1:
+        return ValidationResult(False, "solve_tsp must accept exactly one parameter")
+    if [param.name for param in params] != ["distance_matrix"]:
+        return ValidationResult(False, "solve_tsp parameters must be distance_matrix")
     for param in params:
-        if param.kind not in {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.POSITIONAL_ONLY}:
+        if param.kind not in {
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.POSITIONAL_ONLY,
+        }:
             return ValidationResult(False, "solve_tsp parameters must be positional")
     return ValidationResult(True)
 
@@ -94,14 +105,25 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
     vrp_solver_node: ast.FunctionDef | None = None
     dvrp_policy_node: ast.FunctionDef | None = None
     optimizer_node: ast.ClassDef | None = None
-    top_level_allowed = (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.Assign, ast.AnnAssign, ast.Expr)
+    top_level_allowed = (
+        ast.Import,
+        ast.ImportFrom,
+        ast.FunctionDef,
+        ast.Assign,
+        ast.AnnAssign,
+        ast.Expr,
+    )
     if contract == "bbob":
         top_level_allowed = top_level_allowed + (ast.ClassDef,)
     for node in getattr(tree, "body", []):
         if not isinstance(node, top_level_allowed):
-            return ValidationResult(False, f"Top-level {type(node).__name__} statements are not allowed")
+            return ValidationResult(
+                False, f"Top-level {type(node).__name__} statements are not allowed"
+            )
         if isinstance(node, ast.Expr) and not isinstance(node.value, ast.Constant):
-            return ValidationResult(False, "Only docstrings/constants are allowed as top-level expressions")
+            return ValidationResult(
+                False, "Only docstrings/constants are allowed as top-level expressions"
+            )
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             result = _validate_import(node)
@@ -125,7 +147,9 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
         return _validate_bbob_optimizer_ast(optimizer_node)
     if contract == "dvrp":
         if dvrp_policy_node is None:
-            return ValidationResult(False, "Missing required choose_next_customer function")
+            return ValidationResult(
+                False, "Missing required choose_next_customer function"
+            )
         return _validate_dvrp_policy_signature_ast(dvrp_policy_node)
     if contract == "vrp":
         if vrp_solver_node is None:
@@ -139,10 +163,10 @@ def _validate_ast(tree: ast.AST, *, contract: str) -> ValidationResult:
 def _validate_solver_signature_ast(node: ast.FunctionDef) -> ValidationResult:
     args = node.args
     positional = list(args.posonlyargs) + list(args.args)
-    if len(positional) != 3 or args.vararg or args.kwonlyargs or args.kwarg:
-        return ValidationResult(False, "solve_tsp must accept exactly three parameters")
-    if [arg.arg for arg in positional] != ["distance_matrix", "seed", "budget"]:
-        return ValidationResult(False, "solve_tsp parameters must be distance_matrix, seed, budget")
+    if len(positional) != 1 or args.vararg or args.kwonlyargs or args.kwarg:
+        return ValidationResult(False, "solve_tsp must accept exactly one parameter")
+    if [arg.arg for arg in positional] != ["distance_matrix"]:
+        return ValidationResult(False, "solve_tsp parameters must be distance_matrix")
     return ValidationResult(True)
 
 
@@ -157,9 +181,14 @@ def _validate_dvrp_policy_signature_ast(node: ast.FunctionDef) -> ValidationResu
         "current_time",
     ]
     if len(positional) != len(expected) or args.vararg or args.kwonlyargs or args.kwarg:
-        return ValidationResult(False, "choose_next_customer must accept exactly five parameters")
+        return ValidationResult(
+            False, "choose_next_customer must accept exactly five parameters"
+        )
     if [arg.arg for arg in positional] != expected:
-        return ValidationResult(False, "choose_next_customer parameters must be current_position, depot_position, truck_positions, available_customers, current_time")
+        return ValidationResult(
+            False,
+            "choose_next_customer parameters must be current_position, depot_position, truck_positions, available_customers, current_time",
+        )
     return ValidationResult(True)
 
 
@@ -170,7 +199,9 @@ def _validate_vrp_solver_signature_ast(node: ast.FunctionDef) -> ValidationResul
     if len(positional) != len(expected) or args.vararg or args.kwonlyargs or args.kwarg:
         return ValidationResult(False, "solve_vrp must accept exactly two parameters")
     if [arg.arg for arg in positional] != expected:
-        return ValidationResult(False, "solve_vrp parameters must be distance_matrix, truck_count")
+        return ValidationResult(
+            False, "solve_vrp parameters must be distance_matrix, truck_count"
+        )
     return ValidationResult(True)
 
 
@@ -183,7 +214,9 @@ def _validate_bbob_optimizer_ast(node: ast.ClassDef) -> ValidationResult:
         elif isinstance(item, ast.FunctionDef) and item.name == "__call__":
             call_node = item
     if init_node is None:
-        return ValidationResult(False, "Optimizer must define __init__(self, budget, dim, seed)")
+        return ValidationResult(
+            False, "Optimizer must define __init__(self, budget, dim, seed)"
+        )
     if call_node is None:
         return ValidationResult(False, "Optimizer must define __call__(self, func)")
     init_result = _validate_method_signature_ast(
@@ -200,7 +233,9 @@ def _validate_bbob_optimizer_ast(node: ast.ClassDef) -> ValidationResult:
     )
 
 
-def _validate_method_signature_ast(node: ast.FunctionDef, names: list[str], message: str) -> ValidationResult:
+def _validate_method_signature_ast(
+    node: ast.FunctionDef, names: list[str], message: str
+) -> ValidationResult:
     args = node.args
     positional = list(args.posonlyargs) + list(args.args)
     if len(positional) != len(names) or args.vararg or args.kwonlyargs or args.kwarg:
@@ -229,5 +264,7 @@ def _validate_call(node: ast.Call) -> ValidationResult:
     if isinstance(func, ast.Name) and func.id in UNSAFE_CALLS:
         return ValidationResult(False, f"Unsafe call not allowed: {func.id}")
     if isinstance(func, ast.Attribute) and func.attr in UNSAFE_ATTRIBUTES:
-        return ValidationResult(False, f"Unsafe attribute call not allowed: {func.attr}")
+        return ValidationResult(
+            False, f"Unsafe attribute call not allowed: {func.attr}"
+        )
     return ValidationResult(True)
