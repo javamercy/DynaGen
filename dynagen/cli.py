@@ -45,6 +45,12 @@ def main(argv: list[str] | None = None) -> int:
         choices=["search_instances", "test_instances"],
         default="search_instances",
     )
+    eval_parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=None,
+        help="Run directory to save results to (overwrites existing test_result.json)",
+    )
 
     summarize_parser = subparsers.add_parser(
         "summarize", help="Print a run final report"
@@ -159,6 +165,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
         result = evaluator.evaluate_code(code)
+        if args.run_dir:
+            candidate_name = _candidate_name_from_args(args)
+            store = RunStore(args.run_dir)
+            store.save_test_result(candidate_name, result)
+            store.write_final_report(
+                "\n".join(
+                    [
+                        f"candidate={candidate_name}",
+                        f"status={result.status}",
+                        f"{result.score_name}={result.score}",
+                    ]
+                )
+            )
+            print(store.root)
         print(build_final_report([]).splitlines()[0])
         print(f"status={result.status} {result.score_name}={result.score}")
         return 0
@@ -347,6 +367,16 @@ def _candidate_code_from_args(
         raise ValueError(
             f"Could not read candidate file {candidate_path}: {exc}"
         ) from exc
+
+
+def _candidate_name_from_args(args) -> str:
+    candidate_baseline = getattr(args, "candidate_baseline", None)
+    if candidate_baseline:
+        return candidate_baseline
+    candidate_path = getattr(args, "candidate", None)
+    if candidate_path is not None:
+        return candidate_path.stem
+    return "unknown"
 
 
 def _provider_from_config(
