@@ -1,0 +1,168 @@
+import numpy as np
+import random
+import itertools
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    random.seed(0)
+    n = distance_matrix.shape[0]
+    if n == 1:
+        return [[0, 0] for _ in range(truck_count)]
+    customers = list(range(1, n))
+    num_customers = n - 1
+    k = min(truck_count, num_customers)
+    # Farthest-first initialization of medoids
+    medoids = []
+    first_medoid = max(customers, key=lambda c: distance_matrix[0][c])
+    medoids.append(first_medoid)
+    while len(medoids) < k:
+        dist_to_medoids = [min(distance_matrix[c][m] for m in medoids) for c in customers]
+        next_medoid = max(customers, key=lambda c: dist_to_medoids[customers.index(c)])
+        medoids.append(next_medoid)
+    # K-medoids clustering (a few iterations)
+    n_iter = 10
+    for _ in range(n_iter):
+        # Assign each customer to nearest medoid
+        assignment = {}
+        for m in medoids:
+            assignment[m] = []
+        for c in customers:
+            nearest = min(medoids, key=lambda m: distance_matrix[c][m])
+            assignment[nearest].append(c)
+        # Update medoids: pick best medoid for each cluster
+        new_medoids = []
+        for m in medoids:
+            cluster = assignment[m]
+            if cluster:
+                best = min(cluster, key=lambda p: sum(distance_matrix[p][q] for q in cluster))
+                new_medoids.append(best)
+            else:
+                new_medoids.append(m)  # keep old if cluster empty
+        if set(new_medoids) == set(medoids):
+            break
+        medoids = new_medoids
+    final_assignment = {}
+    for m in medoids:
+        final_assignment[m] = []
+    for c in customers:
+        nearest = min(medoids, key=lambda m: distance_matrix[c][m])
+        final_assignment[nearest].append(c)
+    clusters = list(final_assignment.values())
+    # If we have fewer clusters than truck_count, add empty clusters
+    while len(clusters) < truck_count:
+        clusters.append([])
+    # Function to compute route distance
+    def route_dist(route):
+        if len(route) <= 1:
+            return 0
+        d = 0
+        for i in range(len(route)-1):
+            d += distance_matrix[route[i]][route[i+1]]
+        return d
+    # Solve TSP for each cluster with nearest neighbor + 2-opt
+    def tsp(cluster):
+        if not cluster:
+            return [0, 0]
+        # Try all starting customers (if cluster small) or limited starts
+        best_route = None
+        best_dist = float('inf')
+        start_points = cluster[:]
+        if len(cluster) > 10:
+            # Use only one start point: the customer farthest from depot
+            start_points = [max(cluster, key=lambda c: distance_matrix[0][c])]
+        for start in start_points:
+            route = [0, start]
+            unvisited = set(cluster)
+            unvisited.remove(start)
+            current = start
+            while unvisited:
+                next_c = min(unvisited, key=lambda c: distance_matrix[current][c])
+                route.append(next_c)
+                unvisited.remove(next_c)
+                current = next_c
+            route.append(0)
+            # 2-opt improvement
+            improved = True
+            max_iter = 100
+            while improved and max_iter > 0:
+                improved = False
+                max_iter -= 1
+                for i in range(1, len(route)-2):
+                    for j in range(i+1, len(route)-1):
+                        new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                        new_dist = route_dist(new_route)
+                        if new_dist < route_dist(route):
+                            route = new_route
+                            improved = True
+            if route_dist(route) < best_dist:
+                best_dist = route_dist(route)
+                best_route = route
+        return best_route
+    # Build initial routes
+    routes = [tsp(cluster) for cluster in clusters]
+    best_max_dist = max(route_dist(r) for r in routes)
+    # Improvement: relocate customers from longest route to shorter ones
+    def try_improve(routes):
+        nonlocal best_max_dist
+        improved = True
+        max_iter = 1000
+        while improved and max_iter > 0:
+            improved = False
+            max_iter -= 1
+            max_dist = max(route_dist(r) for r in routes)
+            # Find longest route(s)
+            candidates = [i for i, r in enumerate(routes) if route_dist(r) == max_dist]
+            if not candidates:
+                break
+            longest_idx = candidates[0]
+            longest_route = routes[longest_idx]
+            if len(longest_route) <= 2:
+                break
+            # For each customer in longest route (excluding depot), try relocate
+            best_move = None
+            best_new_max = max_dist
+            for idx in range(1, len(longest_route)-1):
+                cust = longest_route[idx]
+                new_route_long = longest_route[:idx] + longest_route[idx+1:]
+                # Ensure starts and ends with 0
+                if new_route_long[0] != 0:
+                    continue
+                if new_route_long[-1] != 0:
+                    continue
+                dist_long = route_dist(new_route_long)
+                for other_idx in range(len(routes)):
+                    if other_idx == longest_idx:
+                        continue
+                    other_route = routes[other_idx]
+                    # Insert cust at best position in other route
+                    best_insert_dist = None
+                    best_pos = None
+                    for pos in range(1, len(other_route)):
+                        new_other = other_route[:pos] + [cust] + other_route[pos:]
+                        dist_other = route_dist(new_other)
+                        if best_insert_dist is None or dist_other < best_insert_dist:
+                            best_insert_dist = dist_other
+                            best_pos = pos
+                    new_max = max(dist_long, best_insert_dist, max(route_dist(r) for j, r in enumerate(routes) if j not in [longest_idx, other_idx]))
+                    if new_max < best_new_max:
+                        best_new_max = new_max
+                        best_move = (longest_idx, other_idx, idx, best_pos, cust)
+            if best_move is not None:
+                li, oi, idx, pos, cust = best_move
+                new_long = routes[li][:idx] + routes[li][idx+1:]
+                new_other = routes[oi][:pos] + [cust] + routes[oi][pos:]
+                # Update routes
+                routes[li] = new_long
+                routes[oi] = new_other
+                # Check feasibility (should be ok)
+                new_max = max(route_dist(r) for r in routes)
+                if new_max < best_max_dist:
+                    best_max_dist = new_max
+                    # report_best_vrp(routes)  # uncomment if available
+                improved = True
+        return routes
+    routes = try_improve(routes)
+    # Ensure exactly truck_count routes
+    while len(routes) < truck_count:
+        routes.append([0, 0])
+    # Ensure each customer appears exactly once (should be already)
+    return routes
