@@ -1,0 +1,158 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000037: oropt_delta
+
+Status: valid; distance: 10.9053
+
+Thought: Multi-start regret insertion with random initial triangle, followed by Or-opt local search using delta evaluation to reduce runtime. For each segment of length L=1,2,3, compute the change in distance when removing and reinserting it at a new position, avoiding full tour distance recomputation. Maintain compact code and early reporting.
+
+Code:
+
+```python
+
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 3:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    best_tour = None
+    best_dist = float('inf')
+    for restart in range(min(10, n)):
+        start = random.sample(range(n), 3)
+        tour = list(start)
+        remaining = set(range(n)) - set(start)
+        while remaining:
+            best_city = -1
+            best_regret = -1
+            best_pos = -1
+            best_cost = float('inf')
+            for city in remaining:
+                costs = []
+                for pos in range(len(tour)):
+                    before = tour[pos-1]
+                    after = tour[pos] if pos < len(tour) else tour[0]
+                    delta = distance_matrix[before, city] + distance_matrix[city, after] - distance_matrix[before, after]
+                    costs.append((delta, pos))
+                costs.sort(key=lambda x: x[0])
+                first = costs[0][0]
+                second = costs[1][0] if len(costs) > 1 else first
+                regret = second - first
+                if regret > best_regret or (regret == best_regret and city < best_city):
+                    best_regret = regret
+                    best_city = city
+                    best_pos = costs[0][1]
+                    best_cost = first
+            tour.insert(best_pos, best_city)
+            remaining.remove(best_city)
+        tour_arr = np.array(tour)
+        dist = 0
+        for i in range(n):
+            dist += distance_matrix[tour[i], tour[(i+1)%n]]
+        if dist < best_dist - 1e-10:
+            best_dist = dist
+            best_tour = tour_arr.copy()
+            report_best_tour(best_tour)
+        improved = True
+        while improved:
+            improved = False
+            for L in [1, 2, 3]:
+                if L >= n:
+                    continue
+                for i in range(n):
+                    seg_indices = [(i + k) % n for k in range(L)]
+                    seg = [tour[idx] for idx in seg_indices]
+                    # Remove segment: compute distance contribution of the edges that get broken
+                    # Before removal: edges: (tour[seg_indices[0]-1], tour[seg_indices[0]]) and (tour[seg_indices[-1]], tour[(seg_indices[-1]+1)%n])
+                    # After removal: new edge directly connects those two endpoints
+                    before_rem = tour[(seg_indices[0] - 1) % n]
+                    after_rem = tour[(seg_indices[-1] + 1) % n]
+                    removed_edges = distance_matrix[before_rem, tour[seg_indices[0]]] + distance_matrix[tour[seg_indices[-1]], after_rem]
+                    added_edge = distance_matrix[before_rem, after_rem]
+                    delta_rem = added_edge - removed_edges  # negative if removal improves
+                    # Now consider insertion at each position pos in the reduced tour (length n-L)
+                    new_tour_no_seg = [tour[j] for j in range(n) if j not in seg_indices]
+                    m = n - L
+                    for pos in range(m + 1):
+                        # Insert seg at position pos
+                        # Before insertion, edges: (new_tour_no_seg[pos-1], new_tour_no_seg[pos]) if pos not at ends, else cyclic
+                        if pos == 0:
+                            pre = new_tour_no_seg[-1]
+                            post = new_tour_no_seg[0]
+                        elif pos == m:
+                            pre = new_tour_no_seg[-1]
+                            post = new_tour_no_seg[0]
+                        else:
+                            pre = new_tour_no_seg[pos-1]
+                            post = new_tour_no_seg[pos]
+                        old_edge = distance_matrix[pre, post]
+                        # New edges: (pre, seg[0]) and (seg[-1], post)
+                        new_edges = distance_matrix[pre, seg[0]] + distance_matrix[seg[-1], post]
+                        delta_ins = new_edges - old_edge
+                        total_delta = delta_rem + delta_ins
+                        if total_delta < -1e-10:
+                            # Apply move
+                            # Reconstruct full tour
+                            candidate = new_tour_no_seg[:pos] + seg + new_tour_no_seg[pos:]
+                            dist += total_delta
+                            tour = candidate
+                            if dist < best_dist - 1e-10:
+                                best_dist = dist
+                                best_tour = np.array(tour)
+                                report_best_tour(best_tour)
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000037 LLM reflection:
+- Summary: Candidate achieved near-parent quality (10.905 vs 10.881) with 5x runtime reduction, but slight quality loss suggests floating point accumulation or insufficient search intensity.
+- Aim: Recover parent-level tour quality while retaining candidate's runtime efficiency.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

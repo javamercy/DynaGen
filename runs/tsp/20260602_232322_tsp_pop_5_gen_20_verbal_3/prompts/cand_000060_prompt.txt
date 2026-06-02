@@ -1,0 +1,149 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000049: robust_regret_oropt
+
+Status: valid; distance: 10.8489
+
+Thought: Multi-start regret insertion with random initial triangle, followed by thorough Or-opt local search using delta evaluation. Increased restarts to 20 and improved tie-breaking to prefer lower insertion cost when regret ties. Or-opt iterates until no improvement across all segment lengths to better explore neighborhood.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n <= 3:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    best_tour = None
+    best_dist = float('inf')
+    for restart in range(20):
+        start = random.sample(range(n), 3)
+        tour = list(start)
+        remaining = set(range(n)) - set(start)
+        while remaining:
+            best_city = -1
+            best_regret = -1
+            best_pos = -1
+            best_cost = float('inf')
+            for city in remaining:
+                costs = []
+                for pos in range(len(tour)):
+                    before = tour[pos-1]
+                    after = tour[pos] if pos < len(tour) else tour[0]
+                    delta = distance_matrix[before, city] + distance_matrix[city, after] - distance_matrix[before, after]
+                    costs.append((delta, pos))
+                costs.sort(key=lambda x: x[0])
+                first = costs[0][0]
+                second = costs[1][0] if len(costs) > 1 else first
+                regret = second - first
+                if regret > best_regret or (regret == best_regret and first < best_cost):
+                    best_regret = regret
+                    best_city = city
+                    best_pos = costs[0][1]
+                    best_cost = first
+            tour.insert(best_pos, best_city)
+            remaining.remove(best_city)
+        tour_arr = np.array(tour)
+        dist = 0.0
+        for i in range(n):
+            dist += distance_matrix[tour[i], tour[(i+1)%n]]
+        if dist < best_dist - 1e-10:
+            best_dist = dist
+            best_tour = tour_arr.copy()
+            report_best_tour(best_tour)
+        improved = True
+        while improved:
+            improved = False
+            for L in [1, 2, 3]:
+                if L >= n:
+                    continue
+                for i in range(n):
+                    seg_indices = [(i + k) % n for k in range(L)]
+                    seg = [tour[idx] for idx in seg_indices]
+                    before_rem = tour[(seg_indices[0] - 1) % n]
+                    after_rem = tour[(seg_indices[-1] + 1) % n]
+                    removed_edges = distance_matrix[before_rem, tour[seg_indices[0]]] + distance_matrix[tour[seg_indices[-1]], after_rem]
+                    added_edge = distance_matrix[before_rem, after_rem]
+                    delta_rem = added_edge - removed_edges
+                    new_tour_no_seg = [tour[j] for j in range(n) if j not in seg_indices]
+                    m = n - L
+                    for pos in range(m + 1):
+                        if pos == 0:
+                            pre = new_tour_no_seg[-1]
+                            post = new_tour_no_seg[0]
+                        elif pos == m:
+                            pre = new_tour_no_seg[-1]
+                            post = new_tour_no_seg[0]
+                        else:
+                            pre = new_tour_no_seg[pos-1]
+                            post = new_tour_no_seg[pos]
+                        old_edge = distance_matrix[pre, post]
+                        new_edges = distance_matrix[pre, seg[0]] + distance_matrix[seg[-1], post]
+                        delta_ins = new_edges - old_edge
+                        total_delta = delta_rem + delta_ins
+                        if total_delta < -1e-10:
+                            candidate = new_tour_no_seg[:pos] + seg + new_tour_no_seg[pos:]
+                            dist += total_delta
+                            tour = candidate
+                            if dist < best_dist - 1e-10:
+                                best_dist = dist
+                                best_tour = np.array(tour)
+                                report_best_tour(best_tour)
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+    return best_tour
+
+```
+
+STRATEGY: m3_simplify_generalize
+
+GOAL: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

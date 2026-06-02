@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000004",
+  "generation": 3,
+  "gradient": {
+    "aim": "Refine the local search or restart mechanism to achieve shorter tours without sacrificing validity or increasing runtime beyond the constraint.",
+    "avoid": [
+      "Removing validity checks or breaking permutation property",
+      "Making changes that drastically increase runtime (e.g., O(n^3) neighborhoods)",
+      "Omitting best-tour reporting or failing to update when improved"
+    ],
+    "candidate_id": "cand_000004",
+    "change": [
+      "Increase number of 2-opt iterations or apply more aggressive perturbations (e.g., double-bridge) after plateaus",
+      "Introduce a second local search heuristic (e.g., Or-opt) after 2-opt converges"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 3,
+    "parent_ids": [],
+    "preserve": [
+      "Best-of-all-starts nearest neighbor initialization",
+      "2-opt improvement loop",
+      "report_best_tour calls",
+      "Valid permutation guarantee"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 11.115049044922591,
+    "source": "llm",
+    "summary": "Multi-start nearest neighbor plus 2-opt with random kicks produces valid tours with competitive length but still room for improvement in exploitation.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix):\\n    n = len(distance_matrix)\\n    if n <= 2:\\n        return np.arange(n)\\n    # nearest neighbor initial tour (best of all starts)\\n    best_tour = None\\n    best_dist = float('inf')\\n    for start in range(n):\\n        tour = [start]\\n        visited = {start}\\n        current = start\\n        for _ in range(n-1):\\n            next_node = min((j for j in range(n) if j not in visited), key=lambda j: distance_matrix[current][j])\\n            tour.append(next_node)\\n            visited.add(next_node)\\n            current = next_node\\n        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))\\n        if dist < best_dist:\\n            best_dist = dist\\n            best_tour = tour[:]\\n    tour = best_tour[:]\\n    report_best_tour(tour)\\n    \\n    # improvement: 2-opt + random kick\\n    for iteration in range(20):\\n        improved = True\\n        while improved:\\n            improved = False\\n            for i in range(n):\\n                # rotate so that i is at front\\n                rotated = tour[i:] + tour[:i]\\n                a = rotated[0]\\n                b = rotated[1]\\n                for offset in range(2, n):\\n                    j = offset\\n                    c = rotated[j]\\n                    d = rotated[(j+1)%n]\\n                    current_len = distance_matrix[a][b] + distance_matrix[c][d]\\n                    new_len = distance_matrix[a][c] + distance_matrix[b][d]\\n                    if new_len < current_len:\\n                        # apply 2-opt reverse segment\\n                        rotated[1:j+1] = reversed(rotated[1:j+1])\\n                        tour = rotated[i:] + rotated[:i]\\n                        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))\\n                        if dist < best_dist:\\n                            best_dist = dist\\n                            best_tour = tour[:]\\n                            report_best_tour(best_tour)\\n                        improved = True\\n                        break\\n                if improved:\\n                    break\\n        # random kick (except last iteration)\\n        if iteration >= 19:\\n            break\\n        # select a random non-adjacent edge pair\\n        i = np.random.randint(n)\\n        possible = [k for k in range(n) if (k-i)%n not in (0,1,n-1)]\\n        if not possible:\\n            continue\\n        j = np.random.choice(possible)\\n        # apply 2-opt move regardless of gain\\n        rotated = tour[i:] + tour[:i]\\n        offset = (j - i) % n\\n        if offset < 2 or offset >= n:\\n            continue\\n        rotated[1:offset+1] = reversed(rotated[1:offset+1])\\n        tour = rotated[i:] + rotated[:i]\\n    return np.array(best_tour)\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000004\",\"metrics\":{\"best_gap\":null,\"distance\":11.115049044922591,\"gap_by_instance_size\":{\"200\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"diversity_score\":1.0,\"history_score\":1.6072007710396932,\"in_history\":true,\"primary_bucket\":\"tsp:size:200\",\"quality_score\":0.9890071371646366,\"robustness_score\":0.9091246682144474},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":6.1065848846919835,\"mean_tour_length\":11.115049044922591,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"200\":11.115049044922591},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.115049044922591},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":600.0,\"tour_length_by_instance_size\":{\"200\":11.115049044922591},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.115049044922591},\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":11.115049044922591,\"status\":\"valid\",\"thought\":\"Generate initial tour via nearest neighbor from each start node, take best. Then iteratively improve using 2-opt until local optimum, followed by a random 2-opt kick to escape, repeating for a fixed number of iterations. Report new best tours during improvement.\"},\"delta_vs_best_parent\":null,\"generation\":3,\"goal\":\"minimize TSP tour length while always returning a valid permutation\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Multi-start nearest neighbor plus 2-opt with random kicks produces valid tours with competitive length but still room for improvement in exploitation.\",\n  \"aim\": \"Refine the local search or restart mechanism to achieve shorter tours without sacrificing validity or increasing runtime beyond the constraint.\",\n  \"preserve\": [\n    \"Best-of-all-starts nearest neighbor initialization\",\n    \"2-opt improvement loop\",\n    \"report_best_tour calls\",\n    \"Valid permutation guarantee\"\n  ],\n  \"change\": [\n    \"Increase number of 2-opt iterations or apply more aggressive perturbations (e.g., double-bridge) after plateaus\",\n    \"Introduce a second local search heuristic (e.g., Or-opt) after 2-opt converges\"\n  ],\n  \"avoid\": [\n    \"Removing validity checks or breaking permutation property\",\n    \"Making changes that drastically increase runtime (e.g., O(n^3) neighborhoods)\",\n    \"Omitting best-tour reporting or failing to update when improved\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

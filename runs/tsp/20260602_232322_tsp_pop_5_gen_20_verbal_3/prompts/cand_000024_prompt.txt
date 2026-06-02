@@ -1,0 +1,129 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000004: lk_improver
+
+Status: valid; distance: 11.115
+
+Thought: Generate initial tour via nearest neighbor from each start node, take best. Then iteratively improve using 2-opt until local optimum, followed by a random 2-opt kick to escape, repeating for a fixed number of iterations. Report new best tours during improvement.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = len(distance_matrix)
+    if n <= 2:
+        return np.arange(n)
+    # nearest neighbor initial tour (best of all starts)
+    best_tour = None
+    best_dist = float('inf')
+    for start in range(n):
+        tour = [start]
+        visited = {start}
+        current = start
+        for _ in range(n-1):
+            next_node = min((j for j in range(n) if j not in visited), key=lambda j: distance_matrix[current][j])
+            tour.append(next_node)
+            visited.add(next_node)
+            current = next_node
+        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))
+        if dist < best_dist:
+            best_dist = dist
+            best_tour = tour[:]
+    tour = best_tour[:]
+    report_best_tour(tour)
+    
+    # improvement: 2-opt + random kick
+    for iteration in range(20):
+        improved = True
+        while improved:
+            improved = False
+            for i in range(n):
+                # rotate so that i is at front
+                rotated = tour[i:] + tour[:i]
+                a = rotated[0]
+                b = rotated[1]
+                for offset in range(2, n):
+                    j = offset
+                    c = rotated[j]
+                    d = rotated[(j+1)%n]
+                    current_len = distance_matrix[a][b] + distance_matrix[c][d]
+                    new_len = distance_matrix[a][c] + distance_matrix[b][d]
+                    if new_len < current_len:
+                        # apply 2-opt reverse segment
+                        rotated[1:j+1] = reversed(rotated[1:j+1])
+                        tour = rotated[i:] + rotated[:i]
+                        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_tour = tour[:]
+                            report_best_tour(best_tour)
+                        improved = True
+                        break
+                if improved:
+                    break
+        # random kick (except last iteration)
+        if iteration >= 19:
+            break
+        # select a random non-adjacent edge pair
+        i = np.random.randint(n)
+        possible = [k for k in range(n) if (k-i)%n not in (0,1,n-1)]
+        if not possible:
+            continue
+        j = np.random.choice(possible)
+        # apply 2-opt move regardless of gain
+        rotated = tour[i:] + tour[:i]
+        offset = (j - i) % n
+        if offset < 2 or offset >= n:
+            continue
+        rotated[1:offset+1] = reversed(rotated[1:offset+1])
+        tour = rotated[i:] + rotated[:i]
+    return np.array(best_tour)
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000004 LLM reflection:
+- Summary: Multi-start nearest neighbor plus 2-opt with random kicks produces valid tours with competitive length but still room for improvement in exploitation.
+- Aim: Refine the local search or restart mechanism to achieve shorter tours without sacrificing validity or increasing runtime beyond the constraint.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

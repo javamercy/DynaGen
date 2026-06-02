@@ -1,0 +1,275 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000003: farthest_insertion_2opt
+
+Status: valid; distance: 11.584
+
+Thought: Construct tour via farthest-insertion heuristic (start with farthest pair, repeatedly insert farthest remaining node at position minimizing distance increase). Then apply 2-opt local search for improvement. Report best tour at construction and after each 2-opt improvement.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour.copy())
+        return tour
+    # find two farthest cities
+    max_dist = 0
+    start = end = 0
+    for i in range(n):
+        for j in range(i+1, n):
+            d = distance_matrix[i, j]
+            if d > max_dist:
+                max_dist = d
+                start, end = i, j
+    tour = [start, end]
+    remaining = set(range(n)) - {start, end}
+    while remaining:
+        # find farthest node from current tour
+        farthest_dist = -1
+        farthest_node = None
+        for node in remaining:
+            min_dist = min(distance_matrix[node, t] for t in tour)
+            if min_dist > farthest_dist:
+                farthest_dist = min_dist
+                farthest_node = node
+        # find best insertion position
+        best_increase = float('inf')
+        best_pos = 0
+        for i in range(len(tour)):
+            prev = tour[i]
+            nxt = tour[(i+1) % len(tour)]
+            increase = distance_matrix[prev, farthest_node] + distance_matrix[farthest_node, nxt] - distance_matrix[prev, nxt]
+            if increase < best_increase:
+                best_increase = increase
+                best_pos = i+1
+        tour.insert(best_pos, farthest_node)
+        remaining.remove(farthest_node)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n-1):
+            for j in range(i+2, n):
+                if j-i == 1:
+                    continue
+                # consider reversal of segment i+1..j
+                i1 = i
+                i2 = i+1
+                j1 = j
+                j2 = (j+1) % n
+                if distance_matrix[tour[i1], tour[i2]] + distance_matrix[tour[j1], tour[j2]] > distance_matrix[tour[i1], tour[j1]] + distance_matrix[tour[i2], tour[j2]]:
+                    improved = True
+                    tour = tour[:i+1] + tour[i+1:j+1][::-1] + tour[j+1:]
+                    tour_arr = np.array(tour)
+                    report_best_tour(tour_arr)
+    return tour_arr
+
+```
+
+Candidate cand_000004: lk_improver
+
+Status: valid; distance: 11.115
+
+Thought: Generate initial tour via nearest neighbor from each start node, take best. Then iteratively improve using 2-opt until local optimum, followed by a random 2-opt kick to escape, repeating for a fixed number of iterations. Report new best tours during improvement.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = len(distance_matrix)
+    if n <= 2:
+        return np.arange(n)
+    # nearest neighbor initial tour (best of all starts)
+    best_tour = None
+    best_dist = float('inf')
+    for start in range(n):
+        tour = [start]
+        visited = {start}
+        current = start
+        for _ in range(n-1):
+            next_node = min((j for j in range(n) if j not in visited), key=lambda j: distance_matrix[current][j])
+            tour.append(next_node)
+            visited.add(next_node)
+            current = next_node
+        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))
+        if dist < best_dist:
+            best_dist = dist
+            best_tour = tour[:]
+    tour = best_tour[:]
+    report_best_tour(tour)
+    
+    # improvement: 2-opt + random kick
+    for iteration in range(20):
+        improved = True
+        while improved:
+            improved = False
+            for i in range(n):
+                # rotate so that i is at front
+                rotated = tour[i:] + tour[:i]
+                a = rotated[0]
+                b = rotated[1]
+                for offset in range(2, n):
+                    j = offset
+                    c = rotated[j]
+                    d = rotated[(j+1)%n]
+                    current_len = distance_matrix[a][b] + distance_matrix[c][d]
+                    new_len = distance_matrix[a][c] + distance_matrix[b][d]
+                    if new_len < current_len:
+                        # apply 2-opt reverse segment
+                        rotated[1:j+1] = reversed(rotated[1:j+1])
+                        tour = rotated[i:] + rotated[:i]
+                        dist = sum(distance_matrix[tour[i-1]][tour[i]] for i in range(n))
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_tour = tour[:]
+                            report_best_tour(best_tour)
+                        improved = True
+                        break
+                if improved:
+                    break
+        # random kick (except last iteration)
+        if iteration >= 19:
+            break
+        # select a random non-adjacent edge pair
+        i = np.random.randint(n)
+        possible = [k for k in range(n) if (k-i)%n not in (0,1,n-1)]
+        if not possible:
+            continue
+        j = np.random.choice(possible)
+        # apply 2-opt move regardless of gain
+        rotated = tour[i:] + tour[:i]
+        offset = (j - i) % n
+        if offset < 2 or offset >= n:
+            continue
+        rotated[1:offset+1] = reversed(rotated[1:offset+1])
+        tour = rotated[i:] + rotated[:i]
+    return np.array(best_tour)
+
+```
+
+Candidate cand_000009: adaptive_rcl_2opt
+
+Status: valid; distance: 11.1211
+
+Thought: Multiple trials with decreasing RCL size from n/2 to sqrt(n) for exploration-to-exploitation transition, followed by 2-opt improvement. Reports best tour found across trials.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    if n == 0:
+        return np.array([], dtype=np.int64)
+    if n == 1:
+        return np.array([0], dtype=np.int64)
+
+    best_tour = None
+    best_cost = np.inf
+
+    # Schedule: RCL sizes from n//2 down to sqrt(n)
+    rcl_sizes = np.linspace(max(2, n//2), max(2, int(np.sqrt(n))), num=min(n, 10)).astype(int)
+    rcl_sizes = np.unique(rcl_sizes)  # remove duplicates
+
+    for rcl_size in rcl_sizes:
+        # Single construction
+        start = np.random.randint(n)
+        tour = [start]
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        current = start
+        while unvisited:
+            dists = distance_matrix[current, list(unvisited)]
+            sorted_indices = np.argsort(dists)
+            sorted_cities = np.array(list(unvisited))[sorted_indices]
+            k = min(rcl_size, len(sorted_cities))
+            candidate = sorted_cities[np.random.randint(k)]
+            tour.append(candidate)
+            unvisited.remove(candidate)
+            current = candidate
+        tour = np.array(tour, dtype=np.int64)
+
+        # 2-opt improvement
+        improved = True
+        while improved:
+            improved = False
+            for i in range(n - 1):
+                for j in range(i + 2, n):
+                    if j == i + 1:
+                        continue
+                    a, b, c, d = tour[i], tour[(i+1)%n], tour[j], tour[(j+1)%n]
+                    old = distance_matrix[a, b] + distance_matrix[c, d]
+                    new = distance_matrix[a, c] + distance_matrix[b, d]
+                    if new < old:
+                        tour[i+1:j+1] = np.flip(tour[i+1:j+1])
+                        improved = True
+                        break
+                if improved:
+                    break
+
+        # Compute cost
+        cost = distance_matrix[tour[-1], tour[0]]
+        for k in range(n-1):
+            cost += distance_matrix[tour[k], tour[k+1]]
+
+        if cost < best_cost:
+            best_cost = cost
+            best_tour = tour.copy()
+            report_best_tour(best_tour)
+
+    return best_tour
+
+```
+
+STRATEGY: e2_backbone_exploration
+
+GOAL: Identify the useful shared backbone among the provided parents, then create a new algorithm that preserves that core principle while changing the surrounding mechanism, structure, or execution strategy. The result should be motivated by the parents but clearly not a direct copy.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.
