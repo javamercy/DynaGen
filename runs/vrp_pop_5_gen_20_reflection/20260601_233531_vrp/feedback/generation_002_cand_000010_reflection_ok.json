@@ -1,0 +1,49 @@
+{
+  "candidate_id": "cand_000010",
+  "generation": 2,
+  "gradient": {
+    "aim": "Add a post-merge local search that reassigns customers to reduce maximum route distance.",
+    "avoid": [
+      "Complex savings formulas in merge step",
+      "Removing empty route padding",
+      "Introducing randomness without reproducibility"
+    ],
+    "candidate_id": "cand_000010",
+    "change": [
+      "After merging, iterate relocate moves that lower max route distance",
+      "Optionally consider route swaps for balance improvement"
+    ],
+    "delta_vs_best_parent": -477.2467590214135,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [
+      "cand_000001"
+    ],
+    "preserve": [
+      "Singleton initialization",
+      "Merge criterion minimizing max distance",
+      "Tie-breaking by total distance then indices"
+    ],
+    "problem": "vrp",
+    "score_name": "gap",
+    "score_value": 71.75725239676059,
+    "source": "llm",
+    "summary": "Greedy merging reduces gap to 71.8% but max route distance remains unbalanced.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "vrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the maximum route distance across all trucks while visiting every customer exactly once\nDomain focus: route construction, fleet balancing, split decisions, local search, restart behavior, route validity, report_best_vrp use, and robustness across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:\\n    n = distance_matrix.shape[0]\\n    if n == 1:\\n        return [[0, 0] for _ in range(truck_count)]\\n    routes = [[0, c, 0] for c in range(1, n)]\\n\\n    def route_dist(route):\\n        d = 0\\n        for i in range(len(route)-1):\\n            d += distance_matrix[route[i], route[i+1]]\\n        return d\\n\\n    while len(routes) > truck_count:\\n        best_pair = None\\n        best_max = float('inf')\\n        best_total = float('inf')\\n        for i in range(len(routes)):\\n            for j in range(i+1, len(routes)):\\n                merged = routes[i][:-1] + routes[j][1:]\\n                dist = route_dist(merged)\\n                max_dist = dist\\n                for k in range(len(routes)):\\n                    if k != i and k != j:\\n                        dk = route_dist(routes[k])\\n                        if dk > max_dist:\\n                            max_dist = dk\\n                if (max_dist < best_max) or (max_dist == best_max and dist < best_total):\\n                    best_max = max_dist\\n                    best_total = dist\\n                    best_pair = (i, j, merged)\\n        i, j, merged = best_pair\\n        routes[i] = merged\\n        del routes[j]\\n    while len(routes) < truck_count:\\n        routes.append([0, 0])\\n    report_best_vrp(routes)\\n    return routes\",\"error_details\":null,\"generation\":1,\"id\":\"cand_000010\",\"metrics\":{\"best_gap\":50.856065886070226,\"gap\":71.75725239676059,\"gap_by_instance_size\":{\"100\":71.75725239676059},\"gap_by_instance_source\":{\"data/vrp/train/instances.pkl\":71.75725239676059},\"gap_by_truck_count\":{\"6\":71.75725239676059},\"invalid_route_count\":0,\"max_route_distance_by_instance_size\":{\"100\":3.5137106992223375},\"mean_gap\":71.75725239676059,\"mean_max_route_distance\":3.5137106992223375,\"mean_runtime\":18.120730033898145,\"mean_total_route_distance\":16.373047724630926,\"median_gap\":72.62500020687237,\"partial_timeout_count\":0,\"penalized_mean_gap\":71.75725239676059,\"pool\":\"search_instances\",\"problem\":\"vrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":71.75725239676059},\"score_by_instance_source\":{\"data/vrp/train/instances.pkl\":71.75725239676059},\"score_by_truck_count\":{\"6\":71.75725239676059},\"score_name\":\"gap\",\"scored_count\":10,\"timeout_count\":0,\"timeout_distance\":71.75725239676059,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":92.27712144034729},\"score_name\":\"gap\",\"score_value\":71.75725239676059,\"status\":\"valid\",\"thought\":\"Start with each customer as a singleton route. Repeatedly merge the two routes that minimize the maximum distance of the resulting merged route. Use deterministic tie-breaking: compare max distance first, then total distance, then indices. Pad with empty routes if needed. Call report_best_vrp.\"},\"delta_vs_best_parent\":-477.2467590214135,\"generation\":2,\"goal\":\"minimize the maximum route distance across all trucks while visiting every customer exactly once\",\"parents\":[{\"code\":\"import numpy as np\\nfrom itertools import combinations\\n\\ndef solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:\\n    n = distance_matrix.shape[0]\\n    if n == 1:\\n        return [[0, 0] for _ in range(truck_count)]\\n    customers = list(range(1, n))\\n    routes = [[0, c, 0] for c in customers]\\n    dists = [2 * distance_matrix[0, c] for c in customers]\\n    while len(routes) > truck_count:\\n        best = None\\n        best_i = best_j = None\\n        best_new_max = float('inf')\\n        best_new_dist = float('inf')\\n        current_max = max(dists)\\n        for i, j in combinations(range(len(routes)), 2):\\n            r1 = routes[i]\\n            r2 = routes[j]\\n            # compute new route distance if merged\\n            # option: r1 then r2\\n            new_dist = (dists[i] - distance_matrix[r1[-2], 0] - distance_matrix[0, r2[1]] +\\n                        distance_matrix[r1[-2], r2[1]])\\n            new_max = max(current_max, new_dist)\\n            if (new_max < best_new_max or\\n                (new_max == best_new_max and new_dist < best_new_dist)):\\n                best_new_max = new_max\\n                best_new_dist = new_dist\\n                best = (i, j, new_dist, r1, r2)\\n        i, j, new_dist, r1, r2 = best\\n        # build merged route: r1 without last depot + r2 without first depot\\n        merged = r1[:-1] + r2[1:]\\n        routes[i] = merged\\n        dists[i] = new_dist\\n        # remove j (larger index first to avoid index shift)\\n        del routes[j]\\n        del dists[j]\\n    # if we have fewer routes than truck_count, pad with empty routes\\n    while len(routes) < truck_count:\\n        routes.append([0, 0])\\n        dists.append(0.0)\\n    # report best\\n    report_best_vrp(routes)\\n    return routes\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000001\",\"metrics\":{\"best_gap\":284.57737825088566,\"gap\":549.0040114181741,\"gap_by_instance_size\":{\"100\":549.0040114181741},\"gap_by_instance_source\":{\"data/vrp/train/instances.pkl\":549.0040114181741},\"gap_by_truck_count\":{\"6\":549.0040114181741},\"invalid_route_count\":0,\"max_route_distance_by_instance_size\":{\"100\":13.28575959207738},\"mean_gap\":549.0040114181741,\"mean_max_route_distance\":13.28575959207738,\"mean_runtime\":0.11397782499552704,\"mean_total_route_distance\":19.053121791517267,\"median_gap\":549.8038982136936,\"partial_timeout_count\":0,\"penalized_mean_gap\":549.0040114181741,\"pool\":\"search_instances\",\"problem\":\"vrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":549.0040114181741},\"score_by_instance_source\":{\"data/vrp/train/instances.pkl\":549.0040114181741},\"score_by_truck_count\":{\"6\":549.0040114181741},\"score_name\":\"gap\",\"scored_count\":10,\"timeout_count\":0,\"timeout_distance\":549.0040114181741,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":820.1181806575678},\"score_name\":\"gap\",\"score_value\":549.0040114181741,\"status\":\"valid\",\"thought\":\"Start with each customer as a separate route (depot-customer-depot). Repeatedly merge two routes that minimize the resulting maximum route distance, using Clarke-Wright-style savings to compute merged route distance. Merge until exactly truck_count routes remain. Pad with empty routes if needed. Call report_best_vrp on final solution.\"}],\"problem\":\"vrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Greedy merging reduces gap to 71.8% but max route distance remains unbalanced.\",\n  \"aim\": \"Add a post-merge local search that reassigns customers to reduce maximum route distance.\",\n  \"preserve\": [\n    \"Singleton initialization\",\n    \"Merge criterion minimizing max distance\",\n    \"Tie-breaking by total distance then indices\"\n  ],\n  \"change\": [\n    \"After merging, iterate relocate moves that lower max route distance\",\n    \"Optionally consider route swaps for balance improvement\"\n  ],\n  \"avoid\": [\n    \"Complex savings formulas in merge step\",\n    \"Removing empty route padding\",\n    \"Introducing randomness without reproducibility\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

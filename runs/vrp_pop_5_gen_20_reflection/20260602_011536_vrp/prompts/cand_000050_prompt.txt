@@ -1,0 +1,284 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000039 LLM reflection:
+- Summary: Candidate gap increased from 3.96 to 4.11, indicating the mutation did not improve max route distance.
+- Aim: Reduce max route distance by restoring exploration in reconstruction tie-breaking while preserving balanced ruin-and-recreate.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000039: minimax_balanced_insertion
+Status: valid; gap: 4.11087
+Thought: Minimax construction and ruin-and-recreate with removal weighted by edge contribution, with extra weight on longest-route customers. Reconstruction uses minimax insertion with tie-breaking that prioritizes inserting into a route that is currently not the longest (under the current max). This further balances route lengths to reduce the maximum. Simulated annealing acceptance and limited 2-opt intra-route improvement.
+Mean gap: 4.110867795479427
+Mean max route distance: 2.1374625573964976
+Mean total route distance: 12.375022420953032
+Gap by instance size: {'100': 4.110867795479427}
+Gap by truck count: {'6': 4.110867795479427}
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    dist = distance_matrix.tolist()
+
+    def route_distance(route):
+        if len(route) < 2:
+            return 0
+        return sum(dist[route[i]][route[i+1]] for i in range(len(route)-1))
+
+    def objective(routes):
+        return max(route_distance(r) for r in routes)
+
+    # Initial solution via minimax construction
+    routes = [[0, 0] for _ in range(truck_count)]
+    unassigned = list(range(1, n))
+    while unassigned:
+        best_max = float('inf')
+        best_total = float('inf')
+        best_node = None
+        best_route = None
+        best_pos = None
+        for node in unassigned:
+            for r in range(truck_count):
+                route = routes[r]
+                for pos in range(1, len(route)):
+                    new_dist = 0
+                    prev = route[0]
+                    for k in range(1, len(route)):
+                        if k == pos:
+                            new_dist += dist[prev][node]
+                            prev = node
+                        new_dist += dist[prev][route[k]]
+                        prev = route[k]
+                    current_max = 0
+                    for rr in range(truck_count):
+                        if rr == r:
+                            d = new_dist
+                        else:
+                            d = route_distance(routes[rr])
+                        if d > current_max:
+                            current_max = d
+                    if (current_max < best_max) or (current_max == best_max and new_dist < best_total):
+                        best_max = current_max
+                        best_total = new_dist
+                        best_node = node
+                        best_route = r
+                        best_pos = pos
+        routes[best_route].insert(best_pos, best_node)
+        unassigned.remove(best_node)
+
+    best_routes = [list(r) for r in routes]
+    best_obj = objective(best_routes)
+    current_routes = [list(r) for r in routes]
+    current_obj = best_obj
+
+    # Parameters
+    max_iter = min(50, 2 * n)
+    T_start = 5.0
+    T_end = 0.1
+
+    for iteration in range(max_iter):
+        # Determine removal strategy
+        route_lengths = [route_distance(r) for r in current_routes]
+        max_len_idx = max(range(truck_count), key=lambda i: route_lengths[i])
+
+        # Compute contribution of each customer
+        contribution = {}
+        for r_idx, route in enumerate(current_routes):
+            if len(route) <= 2:
+                continue
+            for i in range(1, len(route)-1):
+                node = route[i]
+                contrib = dist[route[i-1]][node] + dist[node][route[i+1]]
+                if r_idx == max_len_idx:
+                    contrib *= 2.0
+                contribution[node] = contribution.get(node, 0) + contrib
+
+        remove_frac = random.uniform(0.2, 0.4)
+        remove_count = max(1, int(remove_frac * (n-1)))
+
+        if not contribution:
+            selected = set()
+        else:
+            total_contrib = sum(contribution.values())
+            if total_contrib == 0:
+                selected = set(list(contribution.keys())[:remove_count])
+            else:
+                nodes = list(contribution.keys())
+                weights = [contribution[node] / total_contrib for node in nodes]
+                cum_weights = []
+                s = 0
+                for w in weights:
+                    s += w
+                    cum_weights.append(s)
+                selected = set()
+                while len(selected) < remove_count and len(selected) < len(nodes):
+                    r = random.random()
+                    lo, hi = 0, len(cum_weights)-1
+                    while lo < hi:
+                        mid = (lo+hi)//2
+                        if cum_weights[mid] < r:
+                            lo = mid+1
+                        else:
+                            hi = mid
+                    idx = lo
+                    node = nodes[idx]
+                    if node not in selected:
+                        selected.add(node)
+
+        # Remove customers
+        removed_list = []
+        new_routes = []
+        for r_idx, route in enumerate(current_routes):
+            new_route = [route[0]]
+            for node in route[1:-1]:
+                if node in selected:
+                    removed_list.append(node)
+                else:
+                    new_route.append(node)
+            new_route.append(0)
+            new_routes.append(new_route)
+            if len(new_routes[-1]) < 2:
+                new_routes[-1] = [0, 0]
+
+        random.shuffle(removed_list)
+
+        # Reconstruct via minimax insertion with balanced tie-breaking
+        unassigned = removed_list
+        while unassigned:
+            best_candidates = []
+            best_new_max = float('inf')
+            best_total = float('inf')
+            for node in unassigned:
+                for r in range(truck_count):
+                    route = new_routes[r]
+                    for pos in range(1, len(route)):
+                        new_dist = 0
+                        prev = route[0]
+                        for k in range(1, len(route)):
+                            if k == pos:
+                                new_dist += dist[prev][node]
+                                prev = node
+                            new_dist += dist[prev][route[k]]
+                            prev = route[k]
+                        current_max = 0
+                        for rr in range(truck_count):
+                            if rr == r:
+                                d = new_dist
+                            else:
+                                d = route_distance(new_routes[rr])
+                            if d > current_max:
+                                current_max = d
+                        # Tie-breaking: prefer routes that are not the longest currently
+                        old_route_len = route_distance(route)
+                        current_max_old = objective(new_routes)  # not efficient but okay
+                        if current_max < best_new_max:
+                            best_new_max = current_max
+                            best_total = new_dist
+                            best_candidates = [(node, r, pos, old_route_len)]
+                        elif current_max == best_new_max:
+                            if new_dist < best_total:
+                                best_total = new_dist
+                                best_candidates = [(node, r, pos, old_route_len)]
+                            elif new_dist == best_total:
+                                # Among ties, prefer inserting into routes that are not the current max
+                                # But current max may change, so use the route's current length relative to current max
+                                # Actually we want to prioritize routes whose length is less than the current max
+                                # The current max is the max of route_lengths (excluding the candidate insertion)
+                                # We'll compute the old max (before insertion) from the current routes
+                                best_candidates.append((node, r, pos, old_route_len))
+            if not best_candidates:
+                break
+            # Among candidates, select one with smallest old_route_len (to insert into shorter routes)
+            # But we want to avoid inserting into the longest route, so prefer smaller old_route_len
+            # Also break ties randomly
+            min_len = min(c[3] for c in best_candidates)
+            candidates = [c for c in best_candidates if c[3] == min_len]
+            chosen = random.choice(candidates)
+            node, best_route, best_pos, _ = chosen
+            new_routes[best_route].insert(best_pos, node)
+            unassigned.remove(node)
+
+        # Intra-route 2-opt limited
+        for r_idx in range(truck_count):
+            route = new_routes[r_idx]
+            if len(route) <= 3:
+                continue
+            for _ in range(10):
+                improved = False
+                for i in range(1, len(route)-2):
+                    for j in range(i+1, len(route)-1):
+                        new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                        new_d = route_distance(new_route)
+                        old_d = route_distance(route)
+                        if new_d < old_d:
+                            route = new_route
+                            improved = True
+                            break
+                    if improved:
+                        break
+                if not improved:
+                    break
+            new_routes[r_idx] = route
+
+        new_obj = objective(new_routes)
+        if new_obj < best_obj:
+            best_obj = new_obj
+            best_routes = [list(r) for r in new_routes]
+            # report_best_vrp(best_routes)  # uncomment in actual solver
+
+        # Simulated annealing acceptance
+        T = T_start - (T_start - T_end) * (iteration / max_iter)
+        delta = new_obj - current_obj
+        if delta < 0 or random.random() < np.exp(-delta / T):
+            current_routes = new_routes
+            current_obj = new_obj
+
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

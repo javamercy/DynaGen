@@ -1,0 +1,49 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 2,
+  "gradient": {
+    "aim": "Reduce maximum route distance by improving load balancing across trucks via alternative customer ordering or inter-route rebalancing.",
+    "avoid": [
+      "Introducing route invalidations",
+      "Removing 2-opt improvement",
+      "Changing tie-breaking to ignore max distance",
+      "Over-fitting to specific instance sizes"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "Replace descending-distance-from-depot customer ordering with a nearest-neighbor or farthest-insertion heuristic",
+      "Add a post-construction inter-route rebalancing step that moves customers to equalize route distances"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 2,
+    "parent_ids": [],
+    "preserve": [
+      "Insertion that minimizes resulting max distance",
+      "Tie-breaking by marginal cost and route index",
+      "Intra-route 2-opt with bounded iterations",
+      "report_best_vrp usage"
+    ],
+    "problem": "vrp",
+    "score_name": "gap",
+    "score_value": 22.756542286003096,
+    "source": "llm",
+    "summary": "Greedy insertion with max-distance minimization and 2-opt yields valid routes but 22.76% gap.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "vrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the maximum route distance across all trucks while visiting every customer exactly once\nDomain focus: route construction, fleet balancing, split decisions, local search, restart behavior, route validity, report_best_vrp use, and robustness across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_vrp(distance_matrix, truck_count):\\n    n = distance_matrix.shape[0]\\n    routes = [[0,0] for _ in range(truck_count)]\\n    route_dists = [0] * truck_count\\n    customers = list(range(1, n))\\n    customers.sort(key=lambda c: distance_matrix[0][c], reverse=True)\\n    for c in customers:\\n        best_new_max = float('inf')\\n        best_increase = float('inf')\\n        best_r = -1\\n        best_pos = -1\\n        for r in range(truck_count):\\n            route = routes[r]\\n            current_dist = route_dists[r]\\n            for i in range(len(route)-1):\\n                a = route[i]\\n                b = route[i+1]\\n                increase = distance_matrix[a][c] + distance_matrix[c][b] - distance_matrix[a][b]\\n                new_dist = current_dist + increase\\n                other_max = max(route_dists[:r] + route_dists[r+1:])\\n                new_max = max(other_max, new_dist)\\n                if (new_max < best_new_max) or \\\\\\n                   (new_max == best_new_max and increase < best_increase) or \\\\\\n                   (new_max == best_new_max and increase == best_increase and r < best_r) or \\\\\\n                   (new_max == best_new_max and increase == best_increase and r == best_r and i < best_pos):\\n                    best_new_max = new_max\\n                    best_increase = increase\\n                    best_r = r\\n                    best_pos = i\\n        routes[best_r].insert(best_pos+1, c)\\n        route_dists[best_r] += best_increase\\n    best_routes = [list(r) for r in routes]\\n    best_max = max(route_dists)\\n    report_best_vrp(best_routes)\\n    # Intra-route 2-opt improvement\\n    for r in range(truck_count):\\n        route = routes[r]\\n        improved = True\\n        iter_count = 0\\n        max_iter = 100\\n        while improved and iter_count < max_iter:\\n            improved = False\\n            iter_count += 1\\n            for i in range(1, len(route)-2):\\n                for k in range(i+1, len(route)-1):\\n                    new_route = route[:i] + route[i:k+1][::-1] + route[k+1:]\\n                    new_dist = 0\\n                    for j in range(len(new_route)-1):\\n                        new_dist += distance_matrix[new_route[j]][new_route[j+1]]\\n                    if new_dist < route_dists[r]:\\n                        routes[r] = new_route\\n                        route_dists[r] = new_dist\\n                        improved = True\\n                        current_max = max(route_dists)\\n                        if current_max < best_max:\\n                            best_max = current_max\\n                            best_routes = [list(r2) for r2 in routes]\\n                            report_best_vrp(best_routes)\\n                        break\\n                if improved:\\n                    break\\n    final_max = max(route_dists)\\n    if final_max < best_max:\\n        best_routes = [list(r) for r in routes]\\n    return best_routes\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"best_gap\":16.730076548667533,\"gap\":22.756542286003096,\"gap_by_instance_size\":{\"100\":22.756542286003096},\"gap_by_instance_source\":{\"data/vrp/train/instances.pkl\":22.756542286003096},\"gap_by_truck_count\":{\"6\":22.756542286003096},\"invalid_route_count\":0,\"max_route_distance_by_instance_size\":{\"100\":2.512348138242217},\"mean_gap\":22.756542286003096,\"mean_max_route_distance\":2.512348138242217,\"mean_runtime\":0.014881884699570946,\"mean_total_route_distance\":14.433495114642668,\"median_gap\":21.51883314441985,\"partial_timeout_count\":0,\"penalized_mean_gap\":22.756542286003096,\"pool\":\"search_instances\",\"problem\":\"vrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":22.756542286003096},\"score_by_instance_source\":{\"data/vrp/train/instances.pkl\":22.756542286003096},\"score_by_truck_count\":{\"6\":22.756542286003096},\"score_name\":\"gap\",\"scored_count\":10,\"timeout_count\":0,\"timeout_distance\":22.756542286003096,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":35.45682933846176},\"score_name\":\"gap\",\"score_value\":22.756542286003096,\"status\":\"valid\",\"thought\":\"Construct routes by inserting customers one by one in descending order of distance from depot. For each customer, evaluate every feasible insertion position across all routes; choose the insertion that minimizes the resulting maximum route distance, with ties broken by smallest marginal cost increase, then smallest route index, then earliest position. After construction, apply intra-route 2-opt improvement (bounded by 100 iterations per route) to further reduce distances. Report best feasible solution via report_best_vrp after construction and after improvements.\"},\"delta_vs_best_parent\":null,\"generation\":2,\"goal\":\"minimize the maximum route distance across all trucks while visiting every customer exactly once\",\"parents\":[],\"problem\":\"vrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Greedy insertion with max-distance minimization and 2-opt yields valid routes but 22.76% gap.\",\n  \"aim\": \"Reduce maximum route distance by improving load balancing across trucks via alternative customer ordering or inter-route rebalancing.\",\n  \"preserve\": [\n    \"Insertion that minimizes resulting max distance\",\n    \"Tie-breaking by marginal cost and route index\",\n    \"Intra-route 2-opt with bounded iterations\",\n    \"report_best_vrp usage\"\n  ],\n  \"change\": [\n    \"Replace descending-distance-from-depot customer ordering with a nearest-neighbor or farthest-insertion heuristic\",\n    \"Add a post-construction inter-route rebalancing step that moves customers to equalize route distances\"\n  ],\n  \"avoid\": [\n    \"Introducing route invalidations\",\n    \"Removing 2-opt improvement\",\n    \"Changing tie-breaking to ignore max distance\",\n    \"Over-fitting to specific instance sizes\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}
