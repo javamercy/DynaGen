@@ -24,7 +24,7 @@ def execute_tsp_solver_code(
     code: str,
     distance_matrix: np.ndarray,
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> TSPSolverExecutionResult:
     context = _multiprocessing_context()
     distance_matrix_arr = np.asarray(distance_matrix, dtype=float)
@@ -44,7 +44,7 @@ def execute_tsp_solver_code(
             active_tour_index,
         ),
     )
-    timeout_limit = float(timeout_seconds)
+    timeout_limit = float(timeout_seconds) if timeout_seconds is not None else None
     start = time.perf_counter()
     process.start()
     payload = _get_worker_result_until_deadline(
@@ -74,7 +74,11 @@ def execute_tsp_solver_code(
             "timeout",
             reported_value=_reported_tour(best_tour_a, best_tour_b, active_tour_index),
             runtime_seconds=runtime,
-            error=f"Solver timed out after {runtime:.6g}s (timeout_seconds={timeout_limit:.6g})",
+            error=(
+                f"Solver timed out after {runtime:.6g}s (timeout_seconds={timeout_limit:.6g})"
+                if timeout_limit is not None
+                else f"Solver timed out after {runtime:.6g}s"
+            ),
             timeout_limit_seconds=timeout_limit,
         )
     try:
@@ -108,8 +112,16 @@ def execute_tsp_solver_code(
 
 
 def _get_worker_result_until_deadline(
-    result_queue, process, *, start: float, timeout_seconds: float
+    result_queue, process, *, start: float, timeout_seconds: float | None
 ):
+    if timeout_seconds is None:
+        while True:
+            try:
+                return result_queue.get(timeout=0.05)
+            except (queue.Empty, EOFError, OSError, BrokenPipeError):
+                if not process.is_alive():
+                    return None
+
     deadline = start + float(timeout_seconds)
     while True:
         remaining = deadline - time.perf_counter()

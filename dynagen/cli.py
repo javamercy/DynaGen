@@ -22,23 +22,38 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dynagen")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init-run", help="Create a run directory with resolved config")
+    init_parser = subparsers.add_parser(
+        "init-run", help="Create a run directory with resolved config"
+    )
     init_parser.add_argument("--config", required=True, type=Path)
 
-    run_parser = subparsers.add_parser("run", help="Run evolutionary solver/optimizer generation")
+    run_parser = subparsers.add_parser(
+        "run", help="Run evolutionary solver/optimizer generation"
+    )
     run_parser.add_argument("--config", required=True, type=Path)
 
-    eval_parser = subparsers.add_parser("evaluate-candidate",
-                                        help="Evaluate a generated candidate on configured search data")
+    eval_parser = subparsers.add_parser(
+        "evaluate-candidate",
+        help="Evaluate a generated candidate on configured search or test data",
+    )
     eval_candidate_group = eval_parser.add_mutually_exclusive_group(required=True)
     eval_candidate_group.add_argument("--candidate", type=Path)
     eval_candidate_group.add_argument("--candidate-baseline")
     eval_parser.add_argument("--config", required=True, type=Path)
+    eval_parser.add_argument(
+        "--pool",
+        choices=["search_instances", "test_instances"],
+        default="search_instances",
+    )
 
-    summarize_parser = subparsers.add_parser("summarize", help="Print a run final report")
+    summarize_parser = subparsers.add_parser(
+        "summarize", help="Print a run final report"
+    )
     summarize_parser.add_argument("--run", required=True, type=Path)
 
-    compare_parser = subparsers.add_parser("compare-bbob", help="Compare a BBOB candidate against configured baselines")
+    compare_parser = subparsers.add_parser(
+        "compare-bbob", help="Compare a BBOB candidate against configured baselines"
+    )
     compare_candidate_group = compare_parser.add_mutually_exclusive_group()
     compare_candidate_group.add_argument("--candidate", type=Path)
     compare_candidate_group.add_argument("--candidate-baseline")
@@ -50,7 +65,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Evaluate static DVRP baselines on the configured DVRP test pool",
     )
     dvrp_baselines_parser.add_argument("--config", required=True, type=Path)
-    dvrp_baselines_parser.add_argument("--baselines", nargs="*", default=["greedy", "heuristic"])
+    dvrp_baselines_parser.add_argument(
+        "--baselines", nargs="*", default=["greedy", "heuristic"]
+    )
 
     bbob_baselines_parser = subparsers.add_parser(
         "run-bbob-baselines",
@@ -71,7 +88,13 @@ def main(argv: list[str] | None = None) -> int:
     tsp_baselines_parser.add_argument(
         "--baselines",
         nargs="*",
-        default=["random_shuffle", "nearest_neighbor", "two_opt", "cheapest_insertion", "random_restart"],
+        default=[
+            "random_shuffle",
+            "nearest_neighbor",
+            "two_opt",
+            "cheapest_insertion",
+            "random_restart",
+        ],
     )
 
     args = parser.parse_args(argv)
@@ -99,10 +122,14 @@ def main(argv: list[str] | None = None) -> int:
         gradient_config = config.evolution.verbal_gradients
         if gradient_config.enabled:
             feedback_model = gradient_config.llm_model or config.llm.model
-            feedback_provider = provider if feedback_model == config.llm.model else _provider_from_config(
-                config,
-                model_override=feedback_model,
-                configured_budget=None,
+            feedback_provider = (
+                provider
+                if feedback_model == config.llm.model
+                else _provider_from_config(
+                    config,
+                    model_override=feedback_model,
+                    configured_budget=None,
+                )
             )
 
         store = RunStore.create(config.output_dir, config.name, config.to_dict())
@@ -115,7 +142,9 @@ def main(argv: list[str] | None = None) -> int:
             store=store,
         ).run()
         print(store.root)
-        print(f"best={population.best.id} {population.best.score_name}={population.best.score_value}")
+        print(
+            f"best={population.best.id} {population.best.score_name}={population.best.score_value}"
+        )
         return 0
     if args.command == "evaluate-candidate":
         config = load_config(args.config)
@@ -125,11 +154,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
         try:
-            search_evaluator = _build_evaluator(config, pool_name="search_instances")
+            evaluator = _build_evaluator(config, pool_name=args.pool)
         except (RuntimeError, ValueError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        result = search_evaluator.evaluate_code(code)
+        result = evaluator.evaluate_code(code)
         print(build_final_report([]).splitlines()[0])
         print(f"status={result.status} {result.score_name}={result.score}")
         return 0
@@ -152,7 +181,9 @@ def main(argv: list[str] | None = None) -> int:
                     candidate_kind="baseline",
                 )
             elif args.candidate:
-                comparison = compare_bbob_candidate(config, code, candidate_name=args.candidate.stem)
+                comparison = compare_bbob_candidate(
+                    config, code, candidate_name=args.candidate.stem
+                )
             else:
                 comparison = compare_bbob_candidate(config)
         except (RuntimeError, ValueError) as exc:
@@ -172,7 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run-dvrp-baselines":
         config = load_config(args.config)
         if config.problem.type != "dvrp":
-            print("error: run-dvrp-baselines requires problem.type: dvrp", file=sys.stderr)
+            print(
+                "error: run-dvrp-baselines requires problem.type: dvrp", file=sys.stderr
+            )
             return 2
         try:
             evaluator = _build_evaluator(config, pool_name="test_instances")
@@ -194,18 +227,22 @@ def main(argv: list[str] | None = None) -> int:
             result = evaluator.evaluate_code(code)
             store.save_test_result(baseline_name, result)
             store.write_final_report(
-                "\n".join([
-                    f"baseline={baseline_name}",
-                    f"status={result.status}",
-                    f"{result.score_name}={result.score}",
-                ])
+                "\n".join(
+                    [
+                        f"baseline={baseline_name}",
+                        f"status={result.status}",
+                        f"{result.score_name}={result.score}",
+                    ]
+                )
             )
             print(store.root)
         return 0
     if args.command == "run-bbob-baselines":
         config = load_config(args.config)
         if config.problem.type != "bbob":
-            print("error: run-bbob-baselines requires problem.type: bbob", file=sys.stderr)
+            print(
+                "error: run-bbob-baselines requires problem.type: bbob", file=sys.stderr
+            )
             return 2
         try:
             evaluator = _build_evaluator(config, pool_name="test_instances")
@@ -227,18 +264,22 @@ def main(argv: list[str] | None = None) -> int:
             result = evaluator.evaluate_code(code)
             store.save_test_result(baseline_name, result)
             store.write_final_report(
-                "\n".join([
-                    f"baseline={baseline_name}",
-                    f"status={result.status}",
-                    f"{result.score_name}={result.score}",
-                ])
+                "\n".join(
+                    [
+                        f"baseline={baseline_name}",
+                        f"status={result.status}",
+                        f"{result.score_name}={result.score}",
+                    ]
+                )
             )
             print(store.root)
         return 0
     if args.command == "run-tsp-baselines":
         config = load_config(args.config)
         if config.problem.type != "tsp":
-            print("error: run-tsp-baselines requires problem.type: tsp", file=sys.stderr)
+            print(
+                "error: run-tsp-baselines requires problem.type: tsp", file=sys.stderr
+            )
             return 2
         try:
             evaluator = _build_evaluator(config, pool_name="test_instances")
@@ -260,11 +301,13 @@ def main(argv: list[str] | None = None) -> int:
             result = evaluator.evaluate_code(code)
             store.save_test_result(baseline_name, result)
             store.write_final_report(
-                "\n".join([
-                    f"baseline={baseline_name}",
-                    f"status={result.status}",
-                    f"{result.score_name}={result.score}",
-                ])
+                "\n".join(
+                    [
+                        f"baseline={baseline_name}",
+                        f"status={result.status}",
+                        f"{result.score_name}={result.score}",
+                    ]
+                )
             )
             print(store.root)
         return 0
@@ -283,11 +326,15 @@ def _build_evaluator(config: RunConfig, *, pool_name: str):
     return problem_for_config(config).build_evaluator(config, pool_name=pool_name)
 
 
-def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = False) -> str | None:
+def _candidate_code_from_args(
+    config: RunConfig, args, *, allow_none: bool = False
+) -> str | None:
     candidate_baseline = getattr(args, "candidate_baseline", None)
     if candidate_baseline:
         if config.problem.type != "bbob":
-            raise ValueError("--candidate-baseline is only supported for problem.type: bbob")
+            raise ValueError(
+                "--candidate-baseline is only supported for problem.type: bbob"
+            )
         return get_bbob_baseline_code(candidate_baseline)
     candidate_path = getattr(args, "candidate", None)
     if candidate_path is None:
@@ -297,14 +344,16 @@ def _candidate_code_from_args(config: RunConfig, args, *, allow_none: bool = Fal
     try:
         return candidate_path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise ValueError(f"Could not read candidate file {candidate_path}: {exc}") from exc
+        raise ValueError(
+            f"Could not read candidate file {candidate_path}: {exc}"
+        ) from exc
 
 
 def _provider_from_config(
-        config: RunConfig,
-        *,
-        model_override: str | None = None,
-        configured_budget: int | None | object = _UNSET,
+    config: RunConfig,
+    *,
+    model_override: str | None = None,
+    configured_budget: int | None | object = _UNSET,
 ):
     model = model_override or config.llm.model
     if configured_budget is not _UNSET:
@@ -315,14 +364,17 @@ def _provider_from_config(
         budget = scheduled_llm_calls(config)
     if config.llm.provider == "openai":
         from dynagen.llm.openai_provider import OpenAIProvider
+
         provider = OpenAIProvider(model=model, api_key_env=config.llm.api_key_env)
         return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "ollama":
         from dynagen.llm.ollama_provider import OllamaProvider
+
         provider = OllamaProvider(model=model)
         return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "deepseek":
         from dynagen.llm.deepseek_provider import DeepSeekProvider
+
         provider = DeepSeekProvider(
             model=model,
             api_key_env=config.llm.api_key_env,
@@ -331,6 +383,7 @@ def _provider_from_config(
         return CountingLLMProvider(provider, configured_budget=budget)
     elif config.llm.provider == "openrouter":
         from dynagen.llm.openrouter_provider import OpenRouterProvider
+
         provider = OpenRouterProvider(model=model, api_key_env=config.llm.api_key_env)
         return CountingLLMProvider(provider, configured_budget=budget)
     raise RuntimeError(f"Unsupported LLM provider: {config.llm.provider}")

@@ -24,7 +24,7 @@ def run_tsp_solver(
     code: str,
     instance: TSPInstance,
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> TSPSolverRunResult:
     execution = execute_tsp_solver_code(
         code,

@@ -47,7 +47,9 @@ class TSPProblem:
         )
         return TSPCandidateEvaluator(
             instances,
-            timeout_seconds=config.evaluation.timeout_seconds,
+            timeout_seconds=None
+            if pool_name == "test_instances"
+            else config.evaluation.timeout_seconds,
             timeout_penalty=config.evaluation.timeout_penalty,
             pool_name=pool_name,
         )
