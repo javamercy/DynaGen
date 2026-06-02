@@ -1,0 +1,195 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000006 LLM reflection:
+- Summary: Regret-insertion construction with destroy-and-recreate under threshold acceptance produced a gap of 21.85%, worse than the best parent's 13.28%.
+- Aim: Add inter-route relocate and intra-route 2-opt local search after each recreate step to more effectively reduce the maximum route distance.
+
+Parent cand_000004 LLM reflection:
+- Summary: Candidate achieves valid routes with no errors but exhibits a 12.44% gap, indicating unbalanced or suboptimal max route distances.
+- Aim: Improve initial route construction by incorporating a regret-based insertion heuristic to better balance truck loads and minimize max route distance.
+
+Parent cand_000005 LLM reflection:
+- Summary: Candidate achieves 13.28% gap with max route distance 2.32 on 100-customer/6-truck instances, all routes valid, runtime ~2.32s, but improvement loop halts early without restart.
+- Aim: Introduce a controlled restart or perturbation mechanism to escape local optima and reduce the maximum route distance gap.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000006: ruin_and_recreate_threshold
+Status: valid; gap: 21.8453
+Thought: Initialize routes using regret insertion (customers with highest regret between best and second-best insertion in terms of max distance are inserted first). Then iteratively improve by destroying the longest route (remove all its customers) and recreating them using the same regret heuristic. Accept new solutions if their max distance is within a decreasing threshold of the best found (threshold starts at 10% of best, decays linearly). This provides broad exploration via large neighborhood changes and deterministic acceptance control, distinct from the incremental local search of the parents.
+Mean gap: 21.845275796710062
+Mean max route distance: 2.493784470491869
+Mean total route distance: 14.816320347780385
+Gap by instance size: {'100': 21.845275796710062}
+Gap by truck count: {'6': 21.845275796710062}
+Code:
+```python
+import numpy as np
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    if truck_count <= 0:
+        return []
+    if truck_count >= n - 1:
+        routes = [[0, c, 0] for c in customers]
+        routes += [[0, 0]] * (truck_count - len(routes))
+        return routes
+
+    # route distance helper
+    def route_dist(route):
+        d = 0.0
+        for i in range(len(route) - 1):
+            d += distance_matrix[route[i], route[i+1]]
+        return d
+
+    # regret insertion heuristic: insert a list of customers into current routes
+    def regret_insert(unassigned, routes, route_dists):
+        max_dist = max(route_dists) if routes else 0.0
+        inserted = set()
+        while unassigned:
+            best_cust = None
+            best_regret = -1.0
+            # for each customer, compute best and second best insertion
+            for cust in unassigned:
+                best_inc = float('inf')
+                second_inc = float('inf')
+                best_route = -1
+                best_pos = -1
+                for r_idx, route in enumerate(routes):
+                    for pos in range(1, len(route)):
+                        prev = route[pos-1]
+                        nxt = route[pos]
+                        inc = distance_matrix[prev][cust] + distance_matrix[cust][nxt] - distance_matrix[prev][nxt]
+                        new_route_dist = route_dists[r_idx] + inc
+                        # compute new max distance
+                        other_max = max(route_dists[:r_idx] + route_dists[r_idx+1:]) if truck_count > 1 else 0.0
+                        new_max = max(new_route_dist, other_max)
+                        # determine if this is best or second best
+                        if new_max < best_inc - 1e-12:
+                            second_inc = best_inc
+                            best_inc = new_max
+                            best_route = r_idx
+                            best_pos = pos
+                        elif new_max < second_inc - 1e-12:
+                            second_inc = new_max
+                regret = second_inc - best_inc if second_inc < float('inf') else best_inc
+                if regret > best_regret:
+                    best_regret = regret
+                    best_cust = cust
+                    best_route_sel = best_route
+                    best_pos_sel = best_pos
+                elif abs(regret - best_regret) < 1e-12 and cust < best_cust:
+                    best_cust = cust
+                    best_route_sel = best_route
+                    best_pos_sel = best_pos
+            # insert best_cust
+            route = routes[best_route_sel]
+            pos = best_pos_sel
+            prev = route[pos-1]
+            nxt = route[pos]
+            inc = distance_matrix[prev][best_cust] + distance_matrix[best_cust][nxt] - distance_matrix[prev][nxt]
+            route_dists[best_route_sel] += inc
+            route.insert(pos, best_cust)
+            unassigned.remove(best_cust)
+            inserted.add(best_cust)
+
+    # initial construction: routes with depot only
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_dists = [0.0] * truck_count
+    unassigned = set(customers)
+    regret_insert(unassigned, routes, route_dists)
+    best_routes = [list(r) for r in routes]
+    best_max = max(route_dists)
+    report_best_vrp(best_routes)
+
+    # threshold accepting parameters
+    max_iter = min(n * 10, 500)
+    initial_threshold = 0.1 * best_max
+    if initial_threshold < 1e-9:
+        initial_threshold = 1.0
+    threshold = initial_threshold
+
+    for _ in range(max_iter):
+        # choose the route with maximum distance (smallest index if tie)
+        current_max = max(route_dists)
+        max_routes = [i for i, d in enumerate(route_dists) if abs(d - current_max) < 1e-12]
+        destroy_route_idx = min(max_routes)
+        # get customers on that route (excluding depots)
+        destroy_route = routes[destroy_route_idx]
+        if len(destroy_route) <= 2:
+            continue
+        removed_customers = destroy_route[1:-1]
+        # save current state
+        old_routes = [list(r) for r in routes]
+        old_route_dists = list(route_dists)
+        # remove customers
+        routes[destroy_route_idx] = [0, 0]
+        route_dists[destroy_route_idx] = 0.0
+        # reinsert removed customers in deterministic order (ascending index)
+        removed_sorted = sorted(removed_customers)
+        regret_insert(removed_sorted, routes, route_dists)  # modifies sets, but we pass list; function expects set? actually we pass list and it removes items, but since we pass a list we need to convert to set? The function expects a set/mutable collection; we'll pass a list and it will call remove on it. It's okay because we pass a list copy.
+        # compute new max
+        new_max = max(route_dists)
+        # check acceptance
+        if new_max <= best_max + threshold:
+            # accept the new solution
+            if new_max < best_max - 1e-12:
+                best_routes = [list(r) for r in routes]
+                best_max = new_max
+                report_best_vrp(best_routes)
+        else:
+            # revert
+            routes = old_routes
+            route_dists = old_route_dists
+        # decrease threshold
+        threshold = initial_threshold * (1 - (_+1)/max_iter)
+        if threshold < 0:
+            threshold = 0.0
+
+    return best_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

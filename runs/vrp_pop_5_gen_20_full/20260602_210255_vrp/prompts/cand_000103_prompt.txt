@@ -1,0 +1,271 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000066 LLM reflection:
+- Summary: Candidate gap 16.89% is worse than best parent 5.55%; added noise and non-greedy moves degraded solution quality.
+- Aim: Reduce max route distance by eliminating random perturbations and using deterministic best-improvement search.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000066: adaptive_perturb_non_greedy
+Status: valid; gap: 16.8861
+Thought: Cluster-first with farthest seeds perturbed by random noise; then hybrid local search with occasional non-greedy moves to escape local optima, bounded by instance size.
+Mean gap: 16.886101225829833
+Mean max route distance: 2.393956443622499
+Mean total route distance: 14.25910987811514
+Gap by instance size: {'100': 16.886101225829833}
+Gap by truck count: {'6': 16.886101225829833}
+History source: yes
+History bucket: vrp:size:100
+History role: regime specialist
+Code:
+```python
+import numpy as np
+import random
+
+def solve_vrp(distance_matrix, truck_count):
+    random.seed(0)
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    if truck_count >= n - 1:
+        routes = [[0, c, 0] for c in customers]
+        routes += [[0, 0]] * (truck_count - (n - 1))
+        return routes
+    
+    # Step 1: Perturbed farthest-point clustering
+    seed_customers = []
+    # first seed: farthest from depot, with small random perturbation
+    farest = max(customers, key=lambda c: distance_matrix[0][c] + random.uniform(0, 0.001))
+    seed_customers.append(farest)
+    while len(seed_customers) < truck_count:
+        best_cust = None
+        best_score = -1
+        for c in customers:
+            if c in seed_customers:
+                continue
+            min_dist = min(distance_matrix[c][s] for s in seed_customers)
+            # add small noise to break ties
+            score = min_dist + random.uniform(0, 0.001)
+            if score > best_score:
+                best_score = score
+                best_cust = c
+        seed_customers.append(best_cust)
+    
+    routes = [[0, s, 0] for s in seed_customers]
+    route_dist = [distance_matrix[0][s] + distance_matrix[s][0] for s in seed_customers]
+    assigned = set(seed_customers)
+    
+    # Insert remaining customers greedily with noise
+    remaining = [c for c in customers if c not in assigned]
+    remaining.sort(key=lambda c: distance_matrix[0][c], reverse=True)
+    for cust in remaining:
+        best_new_max = float('inf')
+        best_route_idx = -1
+        best_pos = -1
+        for idx, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                prev = route[pos-1]
+                nxt = route[pos]
+                new_route_dist = route_dist[idx] - distance_matrix[prev][nxt] + distance_matrix[prev][cust] + distance_matrix[cust][nxt]
+                # add small noise to encourage exploration
+                new_overall_max = max(route_dist[:idx] + [new_route_dist] + route_dist[idx+1:])
+                if new_overall_max < best_new_max:
+                    best_new_max = new_overall_max
+                    best_route_idx = idx
+                    best_pos = pos
+        route = routes[best_route_idx]
+        pos = best_pos
+        prev = route[pos-1]
+        nxt = route[pos]
+        route_dist[best_route_idx] += -distance_matrix[prev][nxt] + distance_matrix[prev][cust] + distance_matrix[cust][nxt]
+        route.insert(pos, cust)
+        assigned.add(cust)
+    
+    def route_distance(route):
+        dist = 0
+        for i in range(len(route)-1):
+            dist += distance_matrix[route[i]][route[i+1]]
+        return dist
+    
+    best_routes = [r[:] for r in routes]
+    best_max = max(route_distance(r) for r in routes)
+    
+    # Step 2: Intra-route 2-opt improvement
+    max_iter = max(50, n * 2)
+    for _ in range(max_iter):
+        improved = False
+        for idx, route in enumerate(routes):
+            if len(route) <= 4:
+                continue
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    if j == i+1:
+                        continue
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = route_distance(new_route)
+                    if new_dist < route_distance(route):
+                        routes[idx] = new_route
+                        improved = True
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if improved:
+            current_max = max(route_distance(r) for r in routes)
+            if current_max < best_max:
+                best_routes = [r[:] for r in routes]
+                best_max = current_max
+        else:
+            break
+    
+    # Step 3: Inter-route improvement with occasional non-greedy moves
+    def compute_route_dists(routes):
+        return [route_distance(r) for r in routes]
+    
+    # non-greedy acceptance probability
+    non_greedy_prob = 0.1
+    max_outer_iter = max(50, n * 2)
+    for outer in range(max_outer_iter):
+        improved = False
+        local_routes = [r[:] for r in best_routes]
+        local_dists = compute_route_dists(local_routes)
+        initial_max = max(local_dists)
+        best_delta = 0
+        best_move = None
+        best_is_non_greedy = False
+        
+        # Try relocations
+        for i in range(truck_count):
+            if len(local_routes[i]) <= 3:
+                continue
+            for cust in local_routes[i][1:-1]:
+                for j in range(truck_count):
+                    if i == j:
+                        continue
+                    for pos in range(1, len(local_routes[j])):
+                        route_i_new = [c for c in local_routes[i] if c != cust]
+                        route_i_new_dist = route_distance(route_i_new)
+                        prev = local_routes[j][pos-1]
+                        nxt = local_routes[j][pos]
+                        route_j_new = local_routes[j][:pos] + [cust] + local_routes[j][pos:]
+                        route_j_new_dist = route_distance(route_j_new)
+                        new_dists = local_dists[:]
+                        new_dists[i] = route_i_new_dist
+                        new_dists[j] = route_j_new_dist
+                        new_max = max(new_dists)
+                        if new_max < initial_max:
+                            delta = initial_max - new_max
+                            if delta > best_delta:
+                                best_delta = delta
+                                best_move = ('relocate', i, j, cust, pos, route_i_new, route_j_new)
+                                best_is_non_greedy = False
+                        else:
+                            # non-greedy: accept if reduces total distance and random chance
+                            if random.random() < non_greedy_prob:
+                                total_new = sum(new_dists)
+                                total_old = sum(local_dists)
+                                if total_new < total_old:
+                                    delta = 0  # No improvement in max, but we accept
+                                    if delta > best_delta:
+                                        best_delta = delta
+                                        best_move = ('relocate', i, j, cust, pos, route_i_new, route_j_new)
+                                        best_is_non_greedy = True
+        
+        # Try exchanges
+        for i in range(truck_count):
+            if len(local_routes[i]) <= 3:
+                continue
+            for ci in local_routes[i][1:-1]:
+                for j in range(i+1, truck_count):
+                    if len(local_routes[j]) <= 3:
+                        continue
+                    for cj in local_routes[j][1:-1]:
+                        route_i_new = [c if c != ci else cj for c in local_routes[i]]
+                        route_j_new = [c if c != cj else ci for c in local_routes[j]]
+                        route_i_new_dist = route_distance(route_i_new)
+                        route_j_new_dist = route_distance(route_j_new)
+                        new_dists = local_dists[:]
+                        new_dists[i] = route_i_new_dist
+                        new_dists[j] = route_j_new_dist
+                        new_max = max(new_dists)
+                        if new_max < initial_max:
+                            delta = initial_max - new_max
+                            if delta > best_delta:
+                                best_delta = delta
+                                best_move = ('exchange', i, j, ci, cj, route_i_new, route_j_new)
+                                best_is_non_greedy = False
+                        else:
+                            if random.random() < non_greedy_prob:
+                                total_new = sum(new_dists)
+                                total_old = sum(local_dists)
+                                if total_new < total_old:
+                                    delta = 0
+                                    if delta > best_delta:
+                                        best_delta = delta
+                                        best_move = ('exchange', i, j, ci, cj, route_i_new, route_j_new)
+                                        best_is_non_greedy = True
+        
+        if best_move is not None and (best_delta > 0 or best_is_non_greedy):
+            if best_move[0] == 'relocate':
+                _, i, j, cust, pos, route_i_new, route_j_new = best_move
+                best_routes[i] = route_i_new
+                best_routes[j] = route_j_new
+            else:
+                _, i, j, ci, cj, route_i_new, route_j_new = best_move
+                best_routes[i] = route_i_new
+                best_routes[j] = route_j_new
+            improved = True
+            new_max = max(compute_route_dists(best_routes))
+            if new_max < best_max:
+                best_max = new_max
+        
+        if not improved:
+            break
+    
+    return best_routes[:truck_count]
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.

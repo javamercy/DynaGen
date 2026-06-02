@@ -1,0 +1,146 @@
+import numpy as np
+
+def solve_vrp(distance_matrix, truck_count):
+    n = distance_matrix.shape[0]
+    customers = list(range(1, n))
+    
+    # Trivial case
+    if truck_count >= n - 1:
+        routes = [[0, c, 0] for c in customers]
+        routes += [[0, 0]] * (truck_count - (n - 1))
+        return routes
+    
+    # Construction: farthest-point seeds
+    seeds = []
+    # first seed: farthest from depot
+    far = max(customers, key=lambda c: distance_matrix[0][c])
+    seeds.append(far)
+    while len(seeds) < truck_count:
+        best_cust = None
+        best_min_dist = -1
+        for c in customers:
+            if c in seeds:
+                continue
+            min_dist = min(distance_matrix[c][s] for s in seeds)
+            if min_dist > best_min_dist:
+                best_min_dist = min_dist
+                best_cust = c
+        seeds.append(best_cust)
+    
+    # Initial routes from seeds
+    routes = [[0, s, 0] for s in seeds]
+    route_dists = [distance_matrix[0][s] + distance_matrix[s][0] for s in seeds]
+    assigned = set(seeds)
+    
+    # Greedy insertion of remaining customers, farthest first
+    remaining = [c for c in customers if c not in assigned]
+    remaining.sort(key=lambda c: distance_matrix[0][c], reverse=True)
+    
+    for cust in remaining:
+        best_new_max = float('inf')
+        best_route_idx = -1
+        best_pos = -1
+        best_new_dist = None
+        for idx, route in enumerate(routes):
+            for pos in range(1, len(route)):
+                prev = route[pos-1]
+                nxt = route[pos]
+                new_dist = route_dists[idx] - distance_matrix[prev][nxt] + distance_matrix[prev][cust] + distance_matrix[cust][nxt]
+                new_max = max(route_dists[:idx] + [new_dist] + route_dists[idx+1:])
+                if new_max < best_new_max:
+                    best_new_max = new_max
+                    best_route_idx = idx
+                    best_pos = pos
+                    best_new_dist = new_dist
+        routes[best_route_idx].insert(best_pos, cust)
+        route_dists[best_route_idx] = best_new_dist
+        assigned.add(cust)
+    
+    best_routes = [r[:] for r in routes]
+    best_max = max(route_dists)
+    
+    # Helper to compute route distance
+    def route_dist(route):
+        return sum(distance_matrix[route[i]][route[i+1]] for i in range(len(route)-1))
+    
+    # Improvement: limited passes
+    max_passes = min(100, n * 2)
+    for _ in range(max_passes):
+        improved = False
+        # Inter-route relocate
+        for i in range(len(routes)):
+            route_i = routes[i]
+            if len(route_i) <= 3:  # only depot
+                continue
+            # iterate over positions of customers in route_i
+            for pos_i in range(1, len(route_i)-1):
+                cust = route_i[pos_i]
+                for j in range(len(routes)):
+                    if i == j:
+                        continue
+                    route_j = routes[j]
+                    # try all insertion positions in route_j (including at end)
+                    for pos_j in range(1, len(route_j)+1):
+                        # Compute new distances
+                        prev_i = route_i[pos_i-1]
+                        next_i = route_i[pos_i+1]
+                        new_dist_i = route_dists[i] - distance_matrix[prev_i][cust] - distance_matrix[cust][next_i] + distance_matrix[prev_i][next_i]
+                        if len(route_i) == 3:  # removing the only customer -> becomes [0,0]
+                            new_dist_i = 0.0
+                        if pos_j == len(route_j):
+                            prev_j = route_j[pos_j-1]
+                            new_dist_j = route_dists[j] + distance_matrix[prev_j][cust] + distance_matrix[cust][0] - distance_matrix[prev_j][0]
+                        else:
+                            prev_j = route_j[pos_j-1]
+                            next_j = route_j[pos_j]
+                            new_dist_j = route_dists[j] + distance_matrix[prev_j][cust] + distance_matrix[cust][next_j] - distance_matrix[prev_j][next_j]
+                        new_max = max(route_dists[:i] + [new_dist_i] + route_dists[i+1:j] + [new_dist_j] + route_dists[j+1:])
+                        if new_max < best_max:
+                            # Apply move
+                            del routes[i][pos_i]
+                            if len(routes[i]) == 2:  # became [0,0]
+                                routes[i] = [0, 0]
+                            routes[j].insert(pos_j, cust)
+                            route_dists[i] = new_dist_i if len(routes[i]) > 2 else 0.0
+                            route_dists[j] = new_dist_j
+                            best_max = new_max
+                            best_routes = [r[:] for r in routes]
+                            improved = True
+                            report_best_vrp(best_routes)
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if improved:
+            continue
+        # Intra-route 2-opt
+        for idx, route in enumerate(routes):
+            if len(route) <= 4:
+                continue
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    if j == i+1:
+                        continue
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = route_dist(new_route)
+                    if new_dist < route_dists[idx]:
+                        routes[idx] = new_route
+                        route_dists[idx] = new_dist
+                        new_max = max(route_dists)
+                        if new_max < best_max:
+                            best_max = new_max
+                            best_routes = [r[:] for r in routes]
+                            improved = True
+                            report_best_vrp(best_routes)
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if not improved:
+            break
+    
+    return best_routes
