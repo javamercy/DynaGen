@@ -1,0 +1,881 @@
+{
+  "added_count": 11,
+  "bucket_count": 13,
+  "enabled": true,
+  "entries": [
+    {
+      "bucket_scores": {
+        "global": 0.6234455074680924,
+        "vrp:mechanism:nearest": 0.7117420447699548,
+        "vrp:mechanism:route_repair": 0.7117420447699548,
+        "vrp:mechanism:two_opt": 0.7117420447699548,
+        "vrp:runtime:robust": 0.8000385820718173,
+        "vrp:size:100": 0.6234455074680924,
+        "vrp:source:instances.pkl": 0.6234455074680924,
+        "vrp:trucks:6": 0.6234455074680924
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:two_opt",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000007",
+      "code_hash": "95b55994564ae6bbe7a8cfefbe58a3425c0d630dcac6f599e45af722acf80a50",
+      "created_at": "2026-06-02T09:22:47.289066+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "two_opt",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "e2_backbone_exploration"
+      },
+      "diversity_score": 1.0,
+      "generation": 1,
+      "history_score": 1.1784590111932283,
+      "metrics_snapshot": {
+        "best_gap": 3.992077034102397,
+        "gap": 15.09973558319287,
+        "mean_gap": 15.09973558319287,
+        "mean_max_route_distance": 2.3562820923260124,
+        "mean_runtime": 1.0271014855941758,
+        "mean_total_route_distance": 14.061955914714465,
+        "median_gap": 15.795812627938309,
+        "penalized_mean_gap": 15.09973558319287,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 15.09973558319287
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 15.09973558319287
+        },
+        "score_by_truck_count": {
+          "6": 15.09973558319287
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 22.452926373952273
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.6234455074680924,
+      "recency_score": 0.5,
+      "robustness_score": 0.8000385820718173,
+      "score_name": "gap",
+      "score_value": 15.09973558319287,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.4941339704192697,
+        "vrp:mechanism:fleet_balance": 0.5877779544062763,
+        "vrp:mechanism:nearest": 0.5877779544062763,
+        "vrp:mechanism:route_repair": 0.5877779544062763,
+        "vrp:mechanism:savings": 0.5877779544062763,
+        "vrp:mechanism:two_opt": 0.5877779544062763,
+        "vrp:runtime:robust": 0.6814219383932829,
+        "vrp:size:100": 0.4941339704192697,
+        "vrp:source:instances.pkl": 0.4941339704192697,
+        "vrp:trucks:6": 0.4941339704192697
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:savings",
+        "vrp:mechanism:two_opt",
+        "vrp:mechanism:route_repair",
+        "vrp:mechanism:fleet_balance"
+      ],
+      "candidate_id": "cand_000013",
+      "code_hash": "b6470bd8a900d7ef0dcef44d4cbb494ffe19d4dfabdab113c60abb4b88160be7",
+      "created_at": "2026-06-02T09:24:33.325260+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "savings",
+          "two_opt",
+          "route_repair",
+          "fleet_balance"
+        ],
+        "status": "valid",
+        "strategy": "m1_component_replacement"
+      },
+      "diversity_score": 1.0,
+      "generation": 2,
+      "history_score": 1.0326316488569187,
+      "metrics_snapshot": {
+        "best_gap": 14.726082909436887,
+        "gap": 25.593566717923984,
+        "mean_gap": 25.593566717923984,
+        "mean_max_route_distance": 2.569076801047897,
+        "mean_runtime": 35.53694197080331,
+        "mean_total_route_distance": 15.22193007305457,
+        "median_gap": 26.145965272487135,
+        "penalized_mean_gap": 25.593566717923984,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 25.593566717923984
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 25.593566717923984
+        },
+        "score_by_truck_count": {
+          "6": 25.593566717923984
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 37.98305272278805
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.4941339704192697,
+      "recency_score": 1.0,
+      "robustness_score": 0.6814219383932829,
+      "score_name": "gap",
+      "score_value": 25.593566717923984,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.488087721726457,
+        "vrp:mechanism:cluster_first": 0.621608054645624,
+        "vrp:mechanism:nearest": 0.621608054645624,
+        "vrp:mechanism:route_repair": 0.621608054645624,
+        "vrp:mechanism:two_opt": 0.621608054645624,
+        "vrp:runtime:fast": 0.5215258170777249,
+        "vrp:runtime:robust": 0.7551283875647908,
+        "vrp:size:100": 0.488087721726457,
+        "vrp:source:instances.pkl": 0.488087721726457,
+        "vrp:trucks:6": 0.488087721726457
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:fast",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:two_opt",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000006",
+      "code_hash": "95c020c50d5d7bfb79c846412a2df97fbdf74649c667703cf1779cd6f483de80",
+      "created_at": "2026-06-02T09:22:47.288827+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "two_opt",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "e1_radical_exploration"
+      },
+      "diversity_score": 1.0,
+      "generation": 1,
+      "history_score": 1.0273826573741336,
+      "metrics_snapshot": {
+        "best_gap": 17.500850793255047,
+        "gap": 26.22030095649682,
+        "mean_gap": 26.22030095649682,
+        "mean_max_route_distance": 2.589706575297081,
+        "mean_runtime": 0.9174506175040733,
+        "mean_total_route_distance": 13.982159209952453,
+        "median_gap": 24.53082027794538,
+        "penalized_mean_gap": 26.22030095649682,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 26.22030095649682
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 26.22030095649682
+        },
+        "score_by_truck_count": {
+          "6": 26.22030095649682
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 38.14474548226304
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.488087721726457,
+      "recency_score": 0.5,
+      "robustness_score": 0.7551283875647908,
+      "score_name": "gap",
+      "score_value": 26.22030095649682,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.47281895533363116,
+        "vrp:mechanism:fleet_balance": 0.5734297174874263,
+        "vrp:mechanism:nearest": 0.5734297174874263,
+        "vrp:mechanism:route_repair": 0.5734297174874263,
+        "vrp:mechanism:savings": 0.5734297174874263,
+        "vrp:mechanism:two_opt": 0.5734297174874263,
+        "vrp:runtime:robust": 0.6740404796412214,
+        "vrp:size:100": 0.47281895533363116,
+        "vrp:source:instances.pkl": 0.47281895533363116,
+        "vrp:trucks:6": 0.47281895533363116
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:savings",
+        "vrp:mechanism:two_opt",
+        "vrp:mechanism:route_repair",
+        "vrp:mechanism:fleet_balance"
+      ],
+      "candidate_id": "cand_000014",
+      "code_hash": "8810ce1bd787bc05315ed7a20aa3d10781f017927e7710c2fd1853cda7d8144c",
+      "created_at": "2026-06-02T09:24:33.325437+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "savings",
+          "two_opt",
+          "route_repair",
+          "fleet_balance"
+        ],
+        "status": "valid",
+        "strategy": "m2_parameter_schedule_mutation"
+      },
+      "diversity_score": 1.0,
+      "generation": 2,
+      "history_score": 1.0087331232080585,
+      "metrics_snapshot": {
+        "best_gap": 16.99896742415194,
+        "gap": 27.874360720922162,
+        "mean_gap": 27.874360720922162,
+        "mean_max_route_distance": 2.616479100017043,
+        "mean_runtime": 34.98776330749388,
+        "mean_total_route_distance": 15.44812696235988,
+        "median_gap": 28.390431957570335,
+        "penalized_mean_gap": 27.874360720922162,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 27.874360720922162
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 27.874360720922162
+        },
+        "score_by_truck_count": {
+          "6": 27.874360720922162
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 40.961850349678144
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.47281895533363116,
+      "recency_score": 1.0,
+      "robustness_score": 0.6740404796412214,
+      "score_name": "gap",
+      "score_value": 27.874360720922162,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.4543007113534573,
+        "vrp:mechanism:fleet_balance": 0.5648004562871429,
+        "vrp:mechanism:nearest": 0.5648004562871429,
+        "vrp:mechanism:route_repair": 0.5648004562871429,
+        "vrp:mechanism:savings": 0.5648004562871429,
+        "vrp:runtime:robust": 0.6753002012208287,
+        "vrp:size:100": 0.4543007113534573,
+        "vrp:source:instances.pkl": 0.4543007113534573,
+        "vrp:trucks:6": 0.4543007113534573
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:savings",
+        "vrp:mechanism:route_repair",
+        "vrp:mechanism:fleet_balance"
+      ],
+      "candidate_id": "cand_000009",
+      "code_hash": "1c38f29e0163eecfcfd8bc857733204d5cb652b1931170a6a8b105859e041dfc",
+      "created_at": "2026-06-02T09:22:47.289371+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "savings",
+          "route_repair",
+          "fleet_balance"
+        ],
+        "status": "valid",
+        "strategy": "m2_parameter_schedule_mutation"
+      },
+      "diversity_score": 1.0,
+      "generation": 1,
+      "history_score": 0.9656557817807473,
+      "metrics_snapshot": {
+        "best_gap": 17.047466423602074,
+        "gap": 30.029629879996765,
+        "mean_gap": 30.029629879996765,
+        "mean_max_route_distance": 2.6592487838364534,
+        "mean_runtime": 18.122165130608483,
+        "mean_total_route_distance": 15.849931812841811,
+        "median_gap": 28.882508283002565,
+        "penalized_mean_gap": 30.029629879996765,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 30.029629879996765
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 30.029629879996765
+        },
+        "score_by_truck_count": {
+          "6": 30.029629879996765
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 41.97267072557893
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.4543007113534573,
+      "recency_score": 0.5,
+      "robustness_score": 0.6753002012208287,
+      "score_name": "gap",
+      "score_value": 30.029629879996765,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.3741816258868606,
+        "vrp:mechanism:cluster_first": 0.515240484922241,
+        "vrp:mechanism:nearest": 0.515240484922241,
+        "vrp:mechanism:route_repair": 0.515240484922241,
+        "vrp:runtime:robust": 0.6562993439576212,
+        "vrp:size:100": 0.3741816258868606,
+        "vrp:source:instances.pkl": 0.3741816258868606,
+        "vrp:trucks:6": 0.3741816258868606
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000010",
+      "code_hash": "d6940d2db9e73a6deb25b97a0d315cefbee447039b81e570b00b68da6dda7aab",
+      "created_at": "2026-06-02T09:22:47.289467+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "m3_simplify_generalize"
+      },
+      "diversity_score": 1.0,
+      "generation": 1,
+      "history_score": 0.878886396272028,
+      "metrics_snapshot": {
+        "best_gap": 33.872507568916426,
+        "gap": 41.81247359687063,
+        "mean_gap": 41.81247359687063,
+        "mean_max_route_distance": 2.9047919542518943,
+        "mean_runtime": 5.636555069999304,
+        "mean_total_route_distance": 17.265715603531206,
+        "median_gap": 40.06566737449042,
+        "penalized_mean_gap": 41.81247359687063,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 41.81247359687063
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 41.81247359687063
+        },
+        "score_by_truck_count": {
+          "6": 41.81247359687063
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 58.87478894392287
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.3741816258868606,
+      "recency_score": 0.5,
+      "robustness_score": 0.6562993439576212,
+      "score_name": "gap",
+      "score_value": 41.81247359687063,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.29441730127302923,
+        "vrp:mechanism:cluster_first": 0.464351375102511,
+        "vrp:mechanism:nearest": 0.464351375102511,
+        "vrp:mechanism:restart_search": 0.464351375102511,
+        "vrp:mechanism:route_repair": 0.464351375102511,
+        "vrp:mechanism:two_opt": 0.464351375102511,
+        "vrp:runtime:robust": 0.6342854489319928,
+        "vrp:size:100": 0.29441730127302923,
+        "vrp:source:instances.pkl": 0.29441730127302923,
+        "vrp:trucks:6": 0.29441730127302923
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:two_opt",
+        "vrp:mechanism:route_repair",
+        "vrp:mechanism:restart_search"
+      ],
+      "candidate_id": "cand_000012",
+      "code_hash": "2aa9d05e4a64a41243afca501c46aaf20ca8078f35ca8dba64d455b5426d882a",
+      "created_at": "2026-06-02T09:24:33.325053+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "two_opt",
+          "route_repair",
+          "restart_search"
+        ],
+        "status": "valid",
+        "strategy": "e2_backbone_exploration"
+      },
+      "diversity_score": 1.0,
+      "generation": 2,
+      "history_score": 0.8164172083992267,
+      "metrics_snapshot": {
+        "best_gap": 40.314231382731336,
+        "gap": 59.91348807255092,
+        "mean_gap": 59.91348807255092,
+        "mean_max_route_distance": 3.284180396778487,
+        "mean_runtime": 5.822828550398117,
+        "mean_total_route_distance": 13.184398731786072,
+        "median_gap": 62.114164166129285,
+        "penalized_mean_gap": 59.91348807255092,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 59.91348807255092
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 59.91348807255092
+        },
+        "score_by_truck_count": {
+          "6": 59.91348807255092
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 73.22826089732011
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.29441730127302923,
+      "recency_score": 1.0,
+      "robustness_score": 0.6342854489319928,
+      "score_name": "gap",
+      "score_value": 59.91348807255092,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.2812708390673615,
+        "vrp:mechanism:cluster_first": 0.5009230284527324,
+        "vrp:mechanism:nearest": 0.5009230284527324,
+        "vrp:mechanism:route_repair": 0.5009230284527324,
+        "vrp:runtime:fast": 0.7684665012826658,
+        "vrp:runtime:robust": 0.7205752178381033,
+        "vrp:size:100": 0.2812708390673615,
+        "vrp:source:instances.pkl": 0.2812708390673615,
+        "vrp:trucks:6": 0.2812708390673615
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:fast",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000008",
+      "code_hash": "ac3475a3fac149220fbb11a691ebbee4b9f31c8df2d59bbf7deeeb8d94fea325",
+      "created_at": "2026-06-02T09:22:47.289210+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "m1_component_replacement"
+      },
+      "diversity_score": 1.0,
+      "generation": 1,
+      "history_score": 0.8084721653106977,
+      "metrics_snapshot": {
+        "best_gap": 40.87701634849478,
+        "gap": 63.8823032024758,
+        "mean_gap": 63.8823032024758,
+        "mean_max_route_distance": 3.3638538674209384,
+        "mean_runtime": 0.30129289738833903,
+        "mean_total_route_distance": 13.973405987677335,
+        "median_gap": 67.11108883201855,
+        "penalized_mean_gap": 63.8823032024758,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 63.8823032024758
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 63.8823032024758
+        },
+        "score_by_truck_count": {
+          "6": 63.8823032024758
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 78.77865331066667
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.2812708390673615,
+      "recency_score": 0.5,
+      "robustness_score": 0.7205752178381033,
+      "score_name": "gap",
+      "score_value": 63.8823032024758,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.2434727542128649,
+        "vrp:mechanism:cluster_first": 0.4863765519524105,
+        "vrp:mechanism:nearest": 0.4863765519524105,
+        "vrp:mechanism:route_repair": 0.4863765519524105,
+        "vrp:runtime:fast": 0.9419580808114418,
+        "vrp:runtime:robust": 0.7292803496919561,
+        "vrp:size:100": 0.2434727542128649,
+        "vrp:source:instances.pkl": 0.2434727542128649,
+        "vrp:trucks:6": 0.2434727542128649
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:fast",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000004",
+      "code_hash": "a14e957ac29d508dc68034f775c9ff31c17e3cfb53adf18ae726d343904f35a5",
+      "created_at": "2026-06-02T09:21:54.187886+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "initial:4"
+      },
+      "diversity_score": 1.0,
+      "generation": 0,
+      "history_score": 0.7487208766050495,
+      "metrics_snapshot": {
+        "best_gap": 59.412568789425336,
+        "gap": 77.68089372391476,
+        "mean_gap": 77.68089372391476,
+        "mean_max_route_distance": 3.6467557786132936,
+        "mean_runtime": 0.06161836749524809,
+        "mean_total_route_distance": 14.507248770107967,
+        "median_gap": 79.7445806817978,
+        "penalized_mean_gap": 77.68089372391476,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 77.68089372391476
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 77.68089372391476
+        },
+        "score_by_truck_count": {
+          "6": 77.68089372391476
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 94.94157080840047
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.2434727542128649,
+      "recency_score": 0.0,
+      "robustness_score": 0.7292803496919561,
+      "score_name": "gap",
+      "score_value": 77.68089372391476,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.22198065822597893,
+        "vrp:mechanism:fleet_balance": 0.3897562821422783,
+        "vrp:mechanism:nearest": 0.3897562821422783,
+        "vrp:mechanism:route_repair": 0.3897562821422783,
+        "vrp:mechanism:savings": 0.3897562821422783,
+        "vrp:runtime:robust": 0.5575319060585777,
+        "vrp:size:100": 0.22198065822597893,
+        "vrp:source:instances.pkl": 0.22198065822597893,
+        "vrp:trucks:6": 0.22198065822597893
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:savings",
+        "vrp:mechanism:route_repair",
+        "vrp:mechanism:fleet_balance"
+      ],
+      "candidate_id": "cand_000001",
+      "code_hash": "7677014d9a236789669b622e320b93b872d5e7f29ec0a92485430fbed70c8cee",
+      "created_at": "2026-06-02T09:21:54.187722+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "savings",
+          "route_repair",
+          "fleet_balance"
+        ],
+        "status": "valid",
+        "strategy": "initial:1"
+      },
+      "diversity_score": 1.0,
+      "generation": 0,
+      "history_score": 0.6671168253464811,
+      "metrics_snapshot": {
+        "best_gap": 37.4878535443352,
+        "gap": 87.62242485356407,
+        "mean_gap": 87.62242485356407,
+        "mean_max_route_distance": 3.8407724763283104,
+        "mean_runtime": 6.317643828300061,
+        "mean_total_route_distance": 17.712604604731503,
+        "median_gap": 68.14076871535042,
+        "penalized_mean_gap": 87.62242485356407,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 87.62242485356407
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 87.62242485356407
+        },
+        "score_by_truck_count": {
+          "6": 87.62242485356407
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 179.79656010546393
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.22198065822597893,
+      "recency_score": 0.0,
+      "robustness_score": 0.5575319060585777,
+      "score_name": "gap",
+      "score_value": 87.62242485356407,
+      "status": "valid"
+    },
+    {
+      "bucket_scores": {
+        "global": 0.2434727542128649,
+        "vrp:mechanism:cluster_first": 0.48364223151011176,
+        "vrp:mechanism:nearest": 0.48364223151011176,
+        "vrp:mechanism:route_repair": 0.48364223151011176,
+        "vrp:runtime:fast": 0.9055004749141252,
+        "vrp:runtime:robust": 0.7238117088073586,
+        "vrp:size:100": 0.2434727542128649,
+        "vrp:source:instances.pkl": 0.2434727542128649,
+        "vrp:trucks:6": 0.2434727542128649
+      },
+      "buckets": [
+        "global",
+        "vrp:size:100",
+        "vrp:trucks:6",
+        "vrp:source:instances.pkl",
+        "vrp:runtime:fast",
+        "vrp:runtime:robust",
+        "vrp:mechanism:nearest",
+        "vrp:mechanism:cluster_first",
+        "vrp:mechanism:route_repair"
+      ],
+      "candidate_id": "cand_000015",
+      "code_hash": "1e2f4f05fa28bcc8c8949a5411d303c6a262a694e89b2bea3e4bfeb871840307",
+      "created_at": "2026-06-02T09:24:33.325545+00:00",
+      "diversity_features": {
+        "mechanisms": [
+          "nearest",
+          "cluster_first",
+          "route_repair"
+        ],
+        "status": "valid",
+        "strategy": "m3_simplify_generalize"
+      },
+      "diversity_score": 0.2,
+      "generation": 2,
+      "history_score": 0.5968068522954405,
+      "metrics_snapshot": {
+        "best_gap": 59.412568789425336,
+        "gap": 77.68089372391476,
+        "mean_gap": 77.68089372391476,
+        "mean_max_route_distance": 3.6467557786132936,
+        "mean_runtime": 0.10436165159917436,
+        "mean_total_route_distance": 14.507248770107967,
+        "median_gap": 79.7445806817978,
+        "penalized_mean_gap": 77.68089372391476,
+        "runs": 10,
+        "score_by_instance_size": {
+          "100": 77.68089372391476
+        },
+        "score_by_instance_source": {
+          "data/vrp/train/instances.pkl": 77.68089372391476
+        },
+        "score_by_truck_count": {
+          "6": 77.68089372391476
+        },
+        "timeout_fraction": 0.0,
+        "valid_count": 10,
+        "worst_gap": 94.94157080840047
+      },
+      "primary_bucket": "vrp:size:100",
+      "problem": "vrp",
+      "quality_score": 0.2434727542128649,
+      "recency_score": 1.0,
+      "robustness_score": 0.7238117088073586,
+      "score_name": "gap",
+      "score_value": 77.68089372391476,
+      "status": "valid"
+    }
+  ],
+  "final_selection_from_history": 0,
+  "max_per_bucket": 4,
+  "max_size": 20,
+  "offspring_with_history_parent": 6,
+  "parent_selections_from_history": 7,
+  "pruned_count": 0,
+  "rejected_duplicate_count": 0,
+  "rejected_score_count": 0,
+  "rejected_status_count": 4,
+  "size": 11,
+  "top_buckets": [
+    {
+      "bucket": "global",
+      "bucket_score": 0.6234455074680924,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:mechanism:cluster_first",
+      "bucket_score": 0.621608054645624,
+      "candidate_id": "cand_000006",
+      "history_score": 1.0273826573741336
+    },
+    {
+      "bucket": "vrp:mechanism:fleet_balance",
+      "bucket_score": 0.5877779544062763,
+      "candidate_id": "cand_000013",
+      "history_score": 1.0326316488569187
+    },
+    {
+      "bucket": "vrp:mechanism:nearest",
+      "bucket_score": 0.7117420447699548,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:mechanism:restart_search",
+      "bucket_score": 0.464351375102511,
+      "candidate_id": "cand_000012",
+      "history_score": 0.8164172083992267
+    },
+    {
+      "bucket": "vrp:mechanism:route_repair",
+      "bucket_score": 0.7117420447699548,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:mechanism:savings",
+      "bucket_score": 0.5877779544062763,
+      "candidate_id": "cand_000013",
+      "history_score": 1.0326316488569187
+    },
+    {
+      "bucket": "vrp:mechanism:two_opt",
+      "bucket_score": 0.7117420447699548,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:runtime:fast",
+      "bucket_score": 0.9419580808114418,
+      "candidate_id": "cand_000004",
+      "history_score": 0.7487208766050495
+    },
+    {
+      "bucket": "vrp:runtime:robust",
+      "bucket_score": 0.8000385820718173,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:size:100",
+      "bucket_score": 0.6234455074680924,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:source:instances.pkl",
+      "bucket_score": 0.6234455074680924,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    },
+    {
+      "bucket": "vrp:trucks:6",
+      "bucket_score": 0.6234455074680924,
+      "candidate_id": "cand_000007",
+      "history_score": 1.1784590111932283
+    }
+  ],
+  "updated_count": 0
+}

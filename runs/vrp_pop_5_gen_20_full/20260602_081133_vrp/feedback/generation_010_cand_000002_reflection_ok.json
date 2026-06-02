@@ -1,0 +1,46 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 10,
+  "gradient": {
+    "aim": "Improve solution quality by adding a local search phase after construction to reduce max route distance.",
+    "avoid": [
+      "invalid routes",
+      "excessive runtime that loses robustness",
+      "removing the min-max objective from insertion decisions"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "add a 2-opt or relocate local search on each route after construction",
+      "introduce randomness in insertion order to enable multiple restarts"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 10,
+    "parent_ids": [],
+    "preserve": [
+      "greedy insertion that minimizes max route distance per step",
+      "feasibility and fast runtime"
+    ],
+    "problem": "vrp",
+    "score_name": "gap",
+    "score_value": 23.00441043663955,
+    "source": "llm",
+    "summary": "Deterministic greedy insertion minimizing max route distance yields 23% gap, fast and valid but needs better solution quality.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "vrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the maximum route distance across all trucks while visiting every customer exactly once\nDomain focus: route construction, fleet balancing, split decisions, local search, restart behavior, route validity, report_best_vrp use, and robustness across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\nimport math\\nimport random\\n\\ndef solve_vrp(distance_matrix, truck_count):\\n    n = distance_matrix.shape[0]\\n    customers = list(range(1, n))\\n    routes = [[0, 0] for _ in range(truck_count)]\\n    route_distances = [0.0] * truck_count\\n    for cust in customers:\\n        best_new_max = float('inf')\\n        best_new_route_d = float('inf')\\n        best_route_idx = None\\n        best_pos = None\\n        for r_idx in range(truck_count):\\n            route = routes[r_idx]\\n            for pos in range(1, len(route)):\\n                old_d = route_distances[r_idx]\\n                removed = distance_matrix[route[pos-1], route[pos]]\\n                added = distance_matrix[route[pos-1], cust] + distance_matrix[cust, route[pos]]\\n                new_d = old_d - removed + added\\n                other_max = 0.0\\n                for j in range(truck_count):\\n                    if j != r_idx:\\n                        if route_distances[j] > other_max:\\n                            other_max = route_distances[j]\\n                new_max = max(new_d, other_max)\\n                if new_max < best_new_max or (new_max == best_new_max and new_d < best_new_route_d):\\n                    best_new_max = new_max\\n                    best_new_route_d = new_d\\n                    best_route_idx = r_idx\\n                    best_pos = pos\\n        routes[best_route_idx].insert(best_pos, cust)\\n        route_distances[best_route_idx] = best_new_route_d\\n    report_best_vrp(routes)\\n    return routes\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"best_gap\":12.961363827475779,\"gap\":23.00441043663955,\"gap_by_instance_size\":{\"100\":23.00441043663955},\"gap_by_instance_source\":{\"data/vrp/train/instances.pkl\":23.00441043663955},\"gap_by_truck_count\":{\"6\":23.00441043663955},\"history\":{\"buckets\":[\"global\",\"vrp:size:100\",\"vrp:trucks:6\",\"vrp:source:instances.pkl\",\"vrp:runtime:fast\",\"vrp:runtime:robust\",\"vrp:mechanism:nearest\"],\"diversity_score\":1.0,\"history_score\":1.1120026052680576,\"in_history\":true,\"primary_bucket\":\"vrp:size:100\",\"quality_score\":0.52078548142982,\"robustness_score\":0.8320489252521077},\"history_selection\":{\"bucket_score\":0.52078548142982,\"buckets\":[\"global\",\"vrp:size:100\",\"vrp:trucks:6\",\"vrp:source:instances.pkl\",\"vrp:runtime:fast\",\"vrp:runtime:robust\",\"vrp:mechanism:nearest\"],\"history_score\":1.0620026052680576,\"primary_bucket\":\"vrp:size:100\",\"role\":\"regime specialist\"},\"invalid_route_count\":0,\"max_route_distance_by_instance_size\":{\"100\":2.5178884402602435},\"mean_gap\":23.00441043663955,\"mean_max_route_distance\":2.5178884402602435,\"mean_runtime\":0.0074889841896947475,\"mean_total_route_distance\":14.305865812260299,\"median_gap\":22.093863334487118,\"partial_timeout_count\":0,\"penalized_mean_gap\":23.00441043663955,\"pool\":\"search_instances\",\"problem\":\"vrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"100\":23.00441043663955},\"score_by_instance_source\":{\"data/vrp/train/instances.pkl\":23.00441043663955},\"score_by_truck_count\":{\"6\":23.00441043663955},\"score_name\":\"gap\",\"scored_count\":10,\"timeout_count\":0,\"timeout_distance\":23.00441043663955,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":35.77656341474265},\"score_name\":\"gap\",\"score_value\":23.00441043663955,\"status\":\"valid\",\"thought\":\"Construct routes by inserting customers one by one in order of index. For each customer, evaluate all possible insertion positions in all routes, choosing the one that minimizes the new maximum route distance. Tie-break by smaller route distance. This deterministic greedy builds a feasible solution focusing on min-max objective.\"},\"delta_vs_best_parent\":null,\"generation\":10,\"goal\":\"minimize the maximum route distance across all trucks while visiting every customer exactly once\",\"parents\":[],\"problem\":\"vrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Deterministic greedy insertion minimizing max route distance yields 23% gap, fast and valid but needs better solution quality.\",\n  \"aim\": \"Improve solution quality by adding a local search phase after construction to reduce max route distance.\",\n  \"preserve\": [\"greedy insertion that minimizes max route distance per step\", \"feasibility and fast runtime\"],\n  \"change\": [\"add a 2-opt or relocate local search on each route after construction\", \"introduce randomness in insertion order to enable multiple restarts\"],\n  \"avoid\": [\"invalid routes\", \"excessive runtime that loses robustness\", \"removing the min-max objective from insertion decisions\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

@@ -1,0 +1,186 @@
+[system]
+You generate executable, reliable VRP metaheuristics for evolutionary search.
+
+[user]
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000010 LLM reflection:
+- Summary: Candidate (17.06% gap) is slightly worse than parent (16.27% gap) on 100-customer VRP instances, indicating regret-2 insertion and local search need improved selection.
+- Aim: Improve construction and local search to reduce maximum route distance by refining regret computation and intensifying inter-route exchange.
+
+VRP objective: lower maximum route distance across trucks is better. Feasibility is mandatory.
+
+PARENTS:
+Candidate cand_000010: regret_insertion_minimax_simplified
+Status: valid; gap: 17.0565
+Thought: Simplified regret-2 insertion heuristic minimizing makespan (max route distance). For each unassigned customer, compute best and second best insertion makespan across all routes; insert customer with largest regret (best vs second best) ties broken by smallest index. After construction, apply 2-opt intra-route and swap inter-route improvements with bounded iterations, calling report_best_vrp when better solutions found.
+Mean gap: 17.056538546784463
+Mean max route distance: 2.396193668292852
+Mean total route distance: 13.868273245055724
+Gap by instance size: {'100': 17.056538546784463}
+Gap by truck count: {'6': 17.056538546784463}
+History source: yes
+History bucket: vrp:size:100
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def solve_vrp(distance_matrix: np.ndarray, truck_count: int) -> list[list[int]]:
+    n = distance_matrix.shape[0]
+    # Initialize routes with depot at both ends
+    routes = [[0, 0] for _ in range(truck_count)]
+    route_distances = [0.0 for _ in range(truck_count)]
+
+    def compute_route_distance(route):
+        d = 0.0
+        for i in range(len(route)-1):
+            d += distance_matrix[route[i], route[i+1]]
+        return d
+
+    for r in range(truck_count):
+        route_distances[r] = compute_route_distance(routes[r])
+
+    unassigned = set(range(1, n))
+
+    def best_max(customer):
+        best_val = float('inf')
+        best_pos = None
+        second_val = float('inf')
+        for r_idx, route in enumerate(routes):
+            curr_dist = route_distances[r_idx]
+            for i in range(1, len(route)):
+                new_dist = curr_dist - distance_matrix[route[i-1], route[i]] \
+                           + distance_matrix[route[i-1], customer] \
+                           + distance_matrix[customer, route[i]]
+                other_max = max(route_distances[:r_idx] + route_distances[r_idx+1:], default=0.0)
+                cand_max = max(new_dist, other_max)
+                if cand_max < best_val:
+                    second_val = best_val
+                    best_val = cand_max
+                    best_pos = (r_idx, i)
+                elif cand_max < second_val and abs(cand_max - best_val) > 1e-12:
+                    second_val = cand_max
+        return best_val, second_val, best_pos
+
+    while unassigned:
+        regrets = []
+        for c in unassigned:
+            best_val, second_val, _ = best_max(c)
+            regret = second_val - best_val if second_val != float('inf') else 0.0
+            regrets.append((regret, c, best_val, second_val))
+        regrets.sort(key=lambda x: (-x[0], x[1]))
+        selected = regrets[0][1]
+        _, _, best_pos = best_max(selected)
+        r_idx, i = best_pos
+        route = routes[r_idx]
+        route.insert(i, selected)
+        route_distances[r_idx] = compute_route_distance(route)
+        unassigned.remove(selected)
+
+    current_routes = [list(r) for r in routes]
+    current_max = max(route_distances)
+
+    def report_best_vrp(routes):
+        pass
+
+    # Intra-route 2-opt
+    for r_idx in range(truck_count):
+        route = current_routes[r_idx]
+        improved = True
+        max_iters = len(route) * 10
+        it = 0
+        while improved and it < max_iters:
+            improved = False
+            for i in range(1, len(route)-2):
+                for j in range(i+1, len(route)-1):
+                    new_route = route[:i] + route[i:j+1][::-1] + route[j+1:]
+                    new_dist = compute_route_distance(new_route)
+                    if new_dist < route_distances[r_idx] - 1e-12:
+                        route_distances[r_idx] = new_dist
+                        current_routes[r_idx] = new_route
+                        improved = True
+                        new_max = max(route_distances)
+                        if new_max < current_max - 1e-12:
+                            current_max = new_max
+                            report_best_vrp(current_routes)
+                        break
+                if improved:
+                    break
+            it += 1
+
+    # Inter-route swap
+    improved = True
+    max_iters = n * n
+    it = 0
+    while improved and it < max_iters:
+        improved = False
+        for r1 in range(truck_count):
+            for r2 in range(r1+1, truck_count):
+                route1 = current_routes[r1]
+                route2 = current_routes[r2]
+                for i in range(1, len(route1)-1):
+                    for j in range(1, len(route2)-1):
+                        new1 = route1[:i] + [route2[j]] + route1[i+1:]
+                        new2 = route2[:j] + [route1[i]] + route2[j+1:]
+                        new_dist1 = compute_route_distance(new1)
+                        new_dist2 = compute_route_distance(new2)
+                        other_max = max([route_distances[k] for k in range(truck_count) if k != r1 and k != r2] + [new_dist1, new_dist2])
+                        if other_max < current_max - 1e-12:
+                            current_routes[r1] = new1
+                            current_routes[r2] = new2
+                            route_distances[r1] = new_dist1
+                            route_distances[r2] = new_dist2
+                            current_max = other_max
+                            improved = True
+                            report_best_vrp(current_routes)
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        it += 1
+
+    return current_routes
+```
+
+Implement exactly this interface:
+
+def solve_vrp(
+    distance_matrix: np.ndarray,  # (n, n), depot is node 0
+    truck_count: int,
+) -> list[list[int]]:
+
+Rules:
+- VRP is a static multi-truck routing problem; the objective is to minimize the maximum route distance across trucks.
+- Return exactly truck_count routes.
+- Each route must start at depot node 0 and end at depot node 0.
+- Every customer node 1..n-1 must appear exactly once across all routes.
+- An unused truck route must be [0, 0].
+- Use only distance_matrix; do not assume coordinates, instance size, truck count, or dataset details.
+- Keep all search and improvement loops finite and bounded by instance size; never use open-ended loops.
+- Call report_best_vrp(routes) whenever you find a better complete feasible route set, especially before expensive improvement loops.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- Allowed imports only: numpy, math, random, heapq, itertools, collections, time.
+- No module-level mutable globals; the solver may be called many times across instances.
+
+Internal check before final JSON: correct solve_vrp signature, exactly truck_count routes,
+every route starts and ends at 0, every customer appears exactly once, empty trucks use [0, 0],
+finite instance-size-bounded loops, deterministic tie handling, report_best_vrp used for
+incumbents, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short snake_case_or_title name",
+  "thought": "brief public summary of the construction, balancing, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+
+No Markdown, fences, or text outside JSON. The code string must define solve_vrp.
