@@ -1,0 +1,3 @@
+candidate=cand_000101
+status=valid
+distance=0.9228665898556686
