@@ -1,0 +1,106 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000031 LLM reflection:
+- Summary: Regret-based selection with depot penalty and load-based wait threshold reduced gap by 3.5% vs best parent but still 35.5% above optimal.
+- Aim: Reduce gap by more aggressive threshold or better balance between depot-return pressure and truck competition.
+
+Parent cand_000017 LLM reflection:
+- Summary: Candidate with regret-based selection and median-distance wait improved gap by 2.6 over best parent.
+- Aim: Tune wait condition to reduce unnecessary idle time while preserving advantage-based selection.
+
+Parent cand_000026 LLM reflection:
+- Summary: Removal of the parent's waiting condition drastically increased gap from 39.04 to 172.64, showing that waiting when regret is unfavorable is critical.
+- Aim: Reintroduce a conditional wait that returns None when the best regret exceeds a dynamic threshold, to avoid sending a truck to a customer better served by another.
+
+PARENTS:
+Candidate cand_000031: regret_with_depot_penalty_and_balance_wait
+Status: valid; Gap: 35.5109%
+Thought: Regret-based selection with depot-distance penalty and dynamic wait threshold based on truck load balance. Penalizes customers far from depot to reduce remaining tour length. Wait threshold is median distance to customers, adjusted by ratio of current truck's total customer distance to average. If current truck is overburdened, wait more easily.
+Mean gap: 35.51093852825495
+Mean TTT: 3.988445723350556
+Gap by instance size: {'50': 35.51093852825495}
+TTT by instance size: {'50': 3.988445723350556}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+    n_cust = available_customers.shape[0]
+    d_curr = np.linalg.norm(available_customers - current_position, axis=1)
+    n_trucks = truck_positions.shape[0]
+    truck_dists = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(truck_dists)
+    if n_trucks > 1:
+        all_dists = np.linalg.norm(truck_positions[:, np.newaxis, :] - available_customers, axis=2)
+        all_dists[current_idx, :] = np.inf
+        min_other_dist = np.min(all_dists, axis=0)
+    else:
+        min_other_dist = np.full(n_cust, 1e9)
+    regret = d_curr - min_other_dist
+    d_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    alpha = 0.1
+    adjusted_regret = regret + alpha * d_depot
+    best_idx = np.argmin(adjusted_regret)
+    best_adj_regret = adjusted_regret[best_idx]
+    truck_totals = np.linalg.norm(truck_positions[:, np.newaxis, :] - available_customers, axis=2).sum(axis=1)
+    curr_total = truck_totals[current_idx]
+    mean_total = np.mean(truck_totals)
+    if mean_total > 0:
+        balance_ratio = curr_total / mean_total
+    else:
+        balance_ratio = 1.0
+    median_d_curr = np.median(d_curr)
+    threshold = median_d_curr / balance_ratio if balance_ratio > 0 else median_d_curr
+    if best_adj_regret > threshold:
+        return None
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

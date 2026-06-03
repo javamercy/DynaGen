@@ -1,0 +1,90 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000043 LLM reflection:
+- Summary: The candidate improved regret-based selection by weighting cost with alpha=0.1, reducing gap from 41.7 to 30.2, but still high.
+- Aim: Reduce gap further by intensifying depot-return pressure, e.g., adding a penalty for long projected return distances.
+
+PARENTS:
+Candidate cand_000043: penalized_regret
+Status: valid; Gap: 30.2459%
+Thought: Select customer with maximum regret minus alpha*this_cost (penalty for large tour extension). Tie-break with smaller this_cost. Wait if no customers. Alpha=0.1.
+Mean gap: 30.24592198516924
+Mean TTT: 3.8267891883074556
+Gap by instance size: {'50': 30.24592198516924}
+TTT by instance size: {'50': 3.8267891883074556}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+    n_trucks = truck_positions.shape[0]
+    diff = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(diff)
+    best_score = -np.inf
+    best_idx = -1
+    best_this_cost = None
+    alpha = 0.1
+    for i, cust in enumerate(available_customers):
+        this_cost = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        other_costs = [
+            np.linalg.norm(truck_positions[j] - cust) + np.linalg.norm(cust - depot_position)
+            for j in range(n_trucks) if j != current_idx
+        ]
+        if other_costs:
+            other_min = min(other_costs)
+            regret = max(0, other_min - this_cost)
+        else:
+            regret = 0
+        score = regret - alpha * this_cost
+        if score > best_score or (score == best_score and (best_this_cost is None or this_cost < best_this_cost)):
+            best_score = score
+            best_idx = i
+            best_this_cost = this_cost
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

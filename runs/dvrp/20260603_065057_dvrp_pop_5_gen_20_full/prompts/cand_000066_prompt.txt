@@ -1,0 +1,103 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000058 LLM reflection:
+- Summary: Candidate gap rose to 31.50 vs parent 30.25; using max regret worsened performance.
+- Aim: Reduce gap by restoring min-based regret while adding a dynamic penalty for unbalanced truck loads.
+
+Parent cand_000006 LLM reflection:
+- Summary: The candidate scores customers via product of current and depot distances over min other-truck distance, never waits, yielding a gap 12.5% worse than the best parent.
+- Aim: Reduce makespan by introducing a targeted wait decision when no customer offers a sufficient competitive advantage over other trucks.
+
+Parent cand_000035 LLM reflection:
+- Summary: Candidate replicated parent's moderate performance (gap ~30.25%), no improvement over best parent (gap ~20.41%), indicating current regret-cost balance insufficiently reduces last-truck return time.
+- Aim: Explore score function adjustments to more directly penalize delays in the last truck's return, e.g., by emphasizing maximum estimated return time or fleet balance.
+
+PARENTS:
+Candidate cand_000058: regret_max_penalized
+Status: valid; Gap: 31.5046%
+Thought: Select customer maximizing (regret - 0.1*this_cost) where regret is max(0, max_other_cost - this_cost). This encourages the current truck to take customers that would otherwise be very costly for the worst other truck, directly targeting TTT minimization. Tie-break by lower this_cost. Return None if no customers available.
+Mean gap: 31.50455854633484
+Mean TTT: 3.8706902162045855
+Gap by instance size: {'50': 31.50455854633484}
+TTT by instance size: {'50': 3.8706902162045855}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+    n_trucks = truck_positions.shape[0]
+    diff = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(diff)
+    best_score = -np.inf
+    best_customer_idx = -1
+    best_this_cost = np.inf
+    for i in range(available_customers.shape[0]):
+        cust = available_customers[i]
+        this_cost = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        other_costs = []
+        for j in range(n_trucks):
+            if j == current_idx:
+                continue
+            other_cost = np.linalg.norm(truck_positions[j] - cust) + np.linalg.norm(cust - depot_position)
+            other_costs.append(other_cost)
+        if len(other_costs) > 0:
+            other_max = max(other_costs)
+            regret = max(0.0, other_max - this_cost)
+        else:
+            regret = 0.0
+        score = regret - 0.1 * this_cost
+        if score > best_score or (score == best_score and this_cost < best_this_cost):
+            best_score = score
+            best_customer_idx = i
+            best_this_cost = this_cost
+    return best_customer_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

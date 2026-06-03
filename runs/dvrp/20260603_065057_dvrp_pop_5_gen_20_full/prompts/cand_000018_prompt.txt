@@ -1,0 +1,101 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000006 LLM reflection:
+- Summary: The candidate scores customers via product of current and depot distances over min other-truck distance, never waits, yielding a gap 12.5% worse than the best parent.
+- Aim: Reduce makespan by introducing a targeted wait decision when no customer offers a sufficient competitive advantage over other trucks.
+
+PARENTS:
+Candidate cand_000006: min_score_weighted
+Status: valid; Gap: 54.2038%
+Thought: For each customer, compute a score = (current truck distance to customer * customer distance to depot) / (min distance from other trucks to customer + epsilon). Choose the customer minimizing this score, which prioritizes far-depot customers that are relatively close to the current truck but far from others. Never wait; always return a customer index. This is a distinctly different algorithmic family from regret and simulation.
+Mean gap: 54.203835147759854
+Mean TTT: 4.533760556018819
+Gap by instance size: {'50': 54.203835147759854}
+TTT by instance size: {'50': 4.533760556018819}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # identify the current truck's index in truck_positions
+    diff = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(diff)
+
+    n_trucks = truck_positions.shape[0]
+    n_cust = available_customers.shape[0]
+
+    # distances from current truck to each customer
+    d_curr = np.linalg.norm(available_customers - current_position, axis=1)
+    # distances from each customer to depot
+    d_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+
+    # compute minimum distance from other trucks to each customer
+    if n_trucks > 1:
+        # distances from all trucks to all customers
+        # shape (n_trucks, n_cust)
+        all_dists = np.linalg.norm(truck_positions[:, np.newaxis, :] - available_customers, axis=2)
+        # set current truck's distances to infinity so they are not considered
+        all_dists[current_idx, :] = np.inf
+        d_other_min = np.min(all_dists, axis=0)
+    else:
+        # only one truck; set to a large value
+        d_other_min = np.full(n_cust, 1e9)
+
+    # compute score
+    epsilon = 1e-6
+    score = d_curr * d_depot / (d_other_min + epsilon)
+
+    # always return the customer with minimum score (no wait)
+    best_idx = np.argmin(score)
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

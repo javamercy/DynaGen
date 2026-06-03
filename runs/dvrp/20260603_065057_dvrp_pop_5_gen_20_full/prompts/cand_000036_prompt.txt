@@ -1,0 +1,130 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000030 LLM reflection:
+- Summary: Regret with 0.1 cost penalty reduced gap to 30.2%, but large imbalance persists.
+- Aim: Balance total tour lengths across trucks to minimize the maximum completion time.
+
+PARENTS:
+Candidate cand_000025: simplified_multi_step_lookahead
+Status: timeout; Gap: 1e+06%
+Thought: For each candidate action (including wait), simulate greedy assignment of all remaining customers to the nearest truck sequentially, compute resulting last-truck return time, and pick minimizing action. Simplified by removing redundant route storage and merging wait evaluation into same loop.
+Mean gap: None
+Mean TTT: None
+Gap by instance size: {'50': None}
+TTT by instance size: {'50': None}
+Error details: timeout on instances_000 seed 100: DVRP policy timed out after 300.008s (timeout_seconds=300)
+History source: yes
+History bucket: global
+History role: global elite
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+
+    # Find index of the deciding truck
+    truck_idx = None
+    for idx, pos in enumerate(truck_positions):
+        if np.array_equal(pos, current_position):
+            truck_idx = idx
+            break
+    if truck_idx is None:
+        truck_idx = 0  # fallback (should not happen)
+
+    def simulate(action):
+        """Simulate greedy assignment from current state with initial action.
+        action: None for wait, else index into available_customers."""
+        n_trucks = len(truck_positions)
+        cur_pos = truck_positions.copy()
+        total_dist = np.zeros(n_trucks)
+        remaining = list(range(len(available_customers)))
+
+        # Apply initial action
+        if action is not None:
+            d = np.linalg.norm(cur_pos[truck_idx] - available_customers[action])
+            total_dist[truck_idx] += d
+            cur_pos[truck_idx] = available_customers[action]
+            remaining.remove(action)
+
+        # Greedy assignment: repeatedly assign nearest customer to any truck
+        while remaining:
+            best_dist = np.inf
+            best_truck = -1
+            best_cust = -1
+            for t in range(n_trucks):
+                for c in remaining:
+                    d = np.linalg.norm(cur_pos[t] - available_customers[c])
+                    if d < best_dist:
+                        best_dist = d
+                        best_truck = t
+                        best_cust = c
+            # Assign
+            total_dist[best_truck] += best_dist
+            cur_pos[best_truck] = available_customers[best_cust]
+            remaining.remove(best_cust)
+
+        # Add return to depot
+        for t in range(n_trucks):
+            total_dist[t] += np.linalg.norm(cur_pos[t] - depot_position)
+
+        return np.max(total_dist)
+
+    best_score = np.inf
+    best_action = None
+
+    # Evaluate wait
+    wait_score = simulate(None)
+    if wait_score < best_score:
+        best_score = wait_score
+        best_action = None
+
+    # Evaluate each customer
+    for i in range(len(available_customers)):
+        score = simulate(i)
+        if score < best_score:
+            best_score = score
+            best_action = i
+
+    return best_action
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
