@@ -1,0 +1,48 @@
+{
+  "candidate_id": "cand_000003",
+  "generation": 15,
+  "gradient": {
+    "aim": "Add a restart mechanism (e.g., random or greedy reinitialization) to escape local optima and improve average tour length.",
+    "avoid": [
+      "invalid tour mutations that break permutation",
+      "excessive runtime increase hurting robustness",
+      "unfocused changes without clear impact on length"
+    ],
+    "candidate_id": "cand_000003",
+    "change": [
+      "incorporate a multi-start loop with perturbation when 2-opt stalls",
+      "extend 2-opt to 3-opt for enhanced neighborhood search"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 15,
+    "parent_ids": [],
+    "preserve": [
+      "farthest-insertion heuristic",
+      "2-opt local search with delta evaluation",
+      "report_best_tour usage",
+      "valid permutation enforcement"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 11.584004782882175,
+    "source": "llm",
+    "summary": "Farthest-insertion construction with 2-opt local search yields robust, valid tours with fast runtime, yet may benefit from diversification for further length reduction.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n <= 2:\\n        return np.array(range(n))\\n    # farthest insertion construction\\n    # find the farthest pair\\n    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))\\n    tour = [i, j]\\n    remaining = set(range(n)) - {i, j}\\n    while remaining:\\n        # find farthest point from current tour\\n        dists = np.array([min(distance_matrix[c, t] for t in tour) for c in remaining])\\n        farthest_idx = np.argmax(dists)\\n        farthest = list(remaining)[farthest_idx]\\n        # find best insertion position\\n        best_inc = np.inf\\n        best_pos = 0\\n        for k in range(len(tour)):\\n            a = tour[k]\\n            b = tour[(k+1) % len(tour)]\\n            inc = distance_matrix[a, farthest] + distance_matrix[farthest, b] - distance_matrix[a, b]\\n            if inc < best_inc:\\n                best_inc = inc\\n                best_pos = k+1\\n        tour.insert(best_pos, farthest)\\n        remaining.remove(farthest)\\n    tour_arr = np.array(tour)\\n    report_best_tour(tour_arr)\\n    # 2-opt improvement\\n    improved = True\\n    best_tour = tour_arr.copy()\\n    best_cost = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))\\n    while improved:\\n        improved = False\\n        for i in range(n-2):\\n            for j in range(i+2, n):\\n                if j == i+1:\\n                    continue\\n                new_tour = best_tour.copy()\\n                new_tour[i+1:j+1] = best_tour[j:i:-1]  # careful: slice reversal\\n                # compute new tour length difference\\n                # affected edges: (i, i+1) and (j, (j+1)%n) replaced by (i, j) and (i+1, j+1)\\n                a = best_tour[i]\\n                b = best_tour[i+1]\\n                c = best_tour[j]\\n                d = best_tour[(j+1)%n]\\n                delta = (distance_matrix[a,c] + distance_matrix[b,d]) - (distance_matrix[a,b] + distance_matrix[c,d])\\n                if delta < -1e-10:\\n                    best_tour = new_tour\\n                    best_cost += delta\\n                    improved = True\\n                    report_best_tour(best_tour)\\n        # Also consider wrapping around? 2-opt typically handles wrap by modulo indexing, already done.\\n    return best_tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000003\",\"metrics\":{\"best_gap\":null,\"distance\":11.584004782882175,\"gap_by_instance_size\":{\"200\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:two_opt\",\"tsp:mechanism:insertion\"],\"diversity_score\":1.0,\"history_score\":1.6298034589223127,\"in_history\":true,\"primary_bucket\":\"tsp:size:200\",\"quality_score\":0.9885486477365086,\"robustness_score\":0.9750137462451542},\"history_selection\":{\"bucket_score\":0.9885486477365086,\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:two_opt\",\"tsp:mechanism:insertion\"],\"history_score\":1.5798034589223127,\"primary_bucket\":\"tsp:size:200\",\"role\":\"regime specialist\"},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.2473983205993136,\"mean_tour_length\":11.584004782882175,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"200\":11.584004782882175},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.584004782882175},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":600.0,\"tour_length_by_instance_size\":{\"200\":11.584004782882175},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.584004782882175},\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":11.584004782882175,\"status\":\"valid\",\"thought\":\"Farthest-insertion heuristic to construct initial tour, followed by 2-opt local search. The heuristic starts with the farthest pair, then repeatedly inserts the farthest node from the tour at the best position. 2-opt improves the tour by reversing segments that reduce total length. Report best tour after construction and after each improvement.\"},\"delta_vs_best_parent\":null,\"generation\":15,\"goal\":\"minimize TSP tour length while always returning a valid permutation\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Farthest-insertion construction with 2-opt local search yields robust, valid tours with fast runtime, yet may benefit from diversification for further length reduction.\",\n  \"aim\": \"Add a restart mechanism (e.g., random or greedy reinitialization) to escape local optima and improve average tour length.\",\n  \"preserve\": [\"farthest-insertion heuristic\", \"2-opt local search with delta evaluation\", \"report_best_tour usage\", \"valid permutation enforcement\"],\n  \"change\": [\"incorporate a multi-start loop with perturbation when 2-opt stalls\", \"extend 2-opt to 3-opt for enhanced neighborhood search\"],\n  \"avoid\": [\"invalid tour mutations that break permutation\", \"excessive runtime increase hurting robustness\", \"unfocused changes without clear impact on length\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

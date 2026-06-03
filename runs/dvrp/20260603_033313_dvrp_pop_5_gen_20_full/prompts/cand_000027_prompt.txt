@@ -1,0 +1,83 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000006 LLM reflection:
+- Summary: Gap reduced to 43.23% (from best parent 48.47%) by using nearest-truck exclusivity, but waits increased to 21.5, suggesting room to improve selection among eligible customers.
+- Aim: Reduce gap further by incorporating depot-return distance into selection among nearest-truck-eligible customers to favor shorter last return times.
+
+Parent cand_000008 LLM reflection:
+- Summary: Regret-based selection improved gap from 48.47 to 39.04 but remains high; lacks explicit makespan minimization.
+- Aim: Reduce makespan by incorporating a fleet-balance penalty that amplifies regret when the current truck's return via a customer exceeds the maximum among other trucks.
+
+PARENTS:
+Candidate cand_000006: voronoi_heuristic
+Status: valid; Gap: 43.2322%
+Thought: For each customer, determine the nearest truck. The active truck only considers customers for which it is the unique nearest (or tie-breaking by lower index). Among those, pick the one with the smallest distance from current position. If no such customer, return None to wait.
+Mean gap: 43.23222894768441
+Mean TTT: 4.205978250510265
+Gap by instance size: {'50': 43.23222894768441}
+TTT by instance size: {'50': 4.205978250510265}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    n_cust = available_customers.shape[0]
+    if n_cust == 0:
+        return None
+    # Identify active truck index
+    dists_to_trucks = np.linalg.norm(truck_positions - current_position, axis=1)
+    active_idx = np.argmin(dists_to_trucks)
+    best_idx = None
+    best_dist = float('inf')
+    for i, cust in enumerate(available_customers):
+        dists = np.linalg.norm(truck_positions - cust, axis=1)
+        min_dist = np.min(dists)
+        # Check if active truck is a nearest truck (or tie with lower index)
+        if np.isclose(dists[active_idx], min_dist):
+            # To break ties, ensure active_idx is the smallest index among those with min_dist
+            if active_idx == np.argmin(dists):
+                dist_current = np.linalg.norm(current_position - cust)
+                if dist_current < best_dist:
+                    best_dist = dist_current
+                    best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

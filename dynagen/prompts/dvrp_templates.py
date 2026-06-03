@@ -9,7 +9,6 @@ def choose_next_customer(
     depot_position: np.ndarray,          # (2,)
     truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
     available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
-    current_time: float,
 ) -> int | None:
 
 Rules:
@@ -68,10 +67,12 @@ def _render_dvrp_candidate(candidate: Candidate) -> str:
     history_context = format_history_parent_context(candidate)
     if history_context:
         parts.append(history_context)
-    parts.extend([
-        "Code:",
-        "```python",
-        candidate.code,
-        "```",
-    ])
+    parts.extend(
+        [
+            "Code:",
+            "```python",
+            candidate.code,
+            "```",
+        ]
+    )
     return "\n".join(parts)

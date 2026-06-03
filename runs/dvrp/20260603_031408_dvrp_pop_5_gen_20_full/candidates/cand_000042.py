@@ -1,0 +1,37 @@
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # Current distances from each truck to depot
+    truck_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    overall_max = np.max(truck_to_depot)
+
+    active_dist_to_depot = np.linalg.norm(current_position - depot_position)
+
+    # Compute distances for each available customer
+    dist_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    new_return_times = dist_to_cust + cust_to_depot
+
+    # Candidate max: new return time vs current max (including active)
+    candidate_max = np.maximum(new_return_times, overall_max)
+
+    # Choose customer minimizing candidate max; tie-break by new return time
+    best_idx = int(np.argmin(candidate_max))
+    min_val = candidate_max[best_idx]
+    ties = np.where(candidate_max == min_val)[0]
+    if len(ties) > 1:
+        best_idx = int(ties[np.argmin(new_return_times[ties])])
+
+    # Wait condition: active close to depot and best customer would worsen max
+    if active_dist_to_depot < 0.3 * overall_max and new_return_times[best_idx] > overall_max:
+        return None
+
+    return best_idx

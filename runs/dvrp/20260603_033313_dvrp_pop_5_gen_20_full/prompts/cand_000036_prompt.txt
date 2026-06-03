@@ -1,0 +1,111 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000006 LLM reflection:
+- Summary: Gap reduced to 43.23% (from best parent 48.47%) by using nearest-truck exclusivity, but waits increased to 21.5, suggesting room to improve selection among eligible customers.
+- Aim: Reduce gap further by incorporating depot-return distance into selection among nearest-truck-eligible customers to favor shorter last return times.
+
+Parent cand_000016 LLM reflection:
+- Summary: The candidate regret with max-alt penalty achieved a slightly worse gap (39.45) than the parent (39.04), indicating that penalizing slowness may cause excessive waiting or misallocation.
+- Aim: Refine the waiting logic and regret calculation to better balance fleet completion time, reducing the gap by at least 0.5 points on the current evaluation set.
+
+PARENTS:
+Candidate cand_000028: balance_makespan
+Status: valid; Gap: 94.1848%
+Thought: Balance truck workloads by adjusting dispatch based on active truck's distance to depot relative to others. If active truck is farther than average from depot, pick the customer that minimizes its total remaining travel (distance to customer + customer to depot). If active is closer than average (underutilized), pick the farthest-from-depot customer among those where active is closest (or overall if not closest) to take on long routes and relieve other trucks.
+Mean gap: 94.18482099532528
+Mean TTT: 5.716041678795249
+Gap by instance size: {'50': 94.18482099532528}
+TTT by instance size: {'50': 5.716041678795249}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+
+    # distances
+    dist_active_to_customers = np.linalg.norm(available_customers - current_position, axis=1)
+    dist_cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    active_to_depot = np.linalg.norm(current_position - depot_position)
+
+    # find active truck index
+    active_index = np.where(np.all(truck_positions == current_position, axis=1))[0][0]
+    all_truck_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    other_depot_dists = np.delete(all_truck_depot, active_index)
+
+    if other_depot_dists.size > 0:
+        mean_other_depot = np.mean(other_depot_dists)
+    else:
+        mean_other_depot = active_to_depot
+
+    # distances to all customers from all trucks
+    all_truck_dists = np.linalg.norm(
+        available_customers[:, np.newaxis, :] - truck_positions[np.newaxis, :, :], axis=2
+    )
+    other_dists = np.copy(all_truck_dists)
+    other_dists[:, active_index] = np.inf
+    min_other_dists = np.min(other_dists, axis=1)
+    active_is_closest = all_truck_dists[:, active_index] <= min_other_dists
+
+    if np.any(active_is_closest):
+        candidates = np.where(active_is_closest)[0]
+        if active_to_depot > mean_other_depot:
+            # active is far: minimize total trip (dist to customer + customer to depot)
+            total = dist_active_to_customers[candidates] + dist_cust_to_depot[candidates]
+            best_idx = candidates[np.argmin(total)]
+        else:
+            # active is near: maximize customer distance to depot
+            best_idx = candidates[np.argmax(dist_cust_to_depot[candidates])]
+    else:
+        # active is not closest to any customer
+        if active_to_depot > mean_other_depot:
+            total = dist_active_to_customers + dist_cust_to_depot
+            best_idx = np.argmin(total)
+        else:
+            best_idx = np.argmax(dist_cust_to_depot)
+
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

@@ -1,0 +1,3 @@
+baseline=nearest_neighbor
+status=valid
+distance=25.894000396950087

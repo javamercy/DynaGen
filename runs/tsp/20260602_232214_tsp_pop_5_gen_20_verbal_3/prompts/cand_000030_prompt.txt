@@ -1,0 +1,118 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000013: farthest_cheapest_2opt
+
+Status: valid; distance: 11.8025
+
+Thought: Hybrid of farthest insertion initialization and cheapest (greedy) insertion, followed by 2-opt improvement. Start with the farthest pair to spread the tour, then repeatedly insert the city with the minimum insertion cost, breaking ties by choosing the smallest city index. Finally apply 2-opt until local optimum.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    # farthest pair initialization
+    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [i, j]
+    unvisited = set(range(n)) - {i, j}
+    # cheapest insertion
+    while unvisited:
+        best_cost = {}
+        best_pos = {}
+        for city in unvisited:
+            best = float('inf')
+            pos = 0
+            for k in range(len(tour)):
+                a = tour[k]
+                b = tour[(k+1) % len(tour)]
+                cost = distance_matrix[a, city] + distance_matrix[city, b] - distance_matrix[a, b]
+                if cost < best - 1e-10:
+                    best = cost
+                    pos = k+1
+            best_cost[city] = best
+            best_pos[city] = pos
+        # choose city with minimum best cost, tie-break by city index
+        min_cost = min(best_cost.values())
+        candidates = [c for c in unvisited if abs(best_cost[c] - min_cost) < 1e-10]
+        chosen = min(candidates)
+        pos = best_pos[chosen]
+        tour.insert(pos, chosen)
+        unvisited.remove(chosen)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    n_cities = n
+    improved = True
+    best_tour = tour_arr.copy()
+    best_dist = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n_cities]] for i in range(n_cities))
+    while improved:
+        improved = False
+        for i in range(n_cities-2):
+            for j in range(i+2, n_cities):
+                a = best_tour[i]
+                b = best_tour[i+1]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n_cities]
+                delta = distance_matrix[a,c] + distance_matrix[b,d] - distance_matrix[a,b] - distance_matrix[c,d]
+                if delta < -1e-10:
+                    new_tour = best_tour.copy()
+                    new_tour[i+1:j+1] = best_tour[j:i:-1]
+                    new_dist = best_dist + delta
+                    best_tour = new_tour
+                    best_dist = new_dist
+                    improved = True
+                    report_best_tour(best_tour)
+    return best_tour
+
+```
+
+STRATEGY: m3_simplify_generalize
+
+GOAL: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

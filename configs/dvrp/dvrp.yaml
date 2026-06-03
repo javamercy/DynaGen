@@ -1,5 +1,5 @@
 run:
-  name: dvrp_calls_20_gen_5_pop
+  name: dvrp_pop_5_gen_20_full
   output_dir: runs/dvrp
   seed: 100
 
@@ -21,7 +21,7 @@ evolution:
   offspring_per_strategy: 1
   history:
     enabled: true
-    max_size: 64
+    max_size: 30
     max_per_bucket: 4
     add_statuses: [ valid, evaluated, timeout ]
     parent_sample_probability: 0.35
@@ -30,16 +30,16 @@ evolution:
     deduplicate_code: true
     diversity_weight: 0.25
     recency_weight: 0.05
-    robustness_weight: 0.35
+    robustness_weight: 0.30
   verbal_gradients:
     enabled: true
-    llm_every_n_generations: 2
+    llm_every_n_generations: 3
     max_llm_calls_per_generation: 5
     llm_model: deepseek-v4-flash
     temperature: 0.3
 
 evaluation:
-  timeout_seconds: 180
+  timeout_seconds: 300
   timeout_penalty: 0
   seeds: [ 100 ]
   metric: mean_gap

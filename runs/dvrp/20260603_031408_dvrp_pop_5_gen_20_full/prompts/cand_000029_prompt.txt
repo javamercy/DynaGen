@@ -1,0 +1,88 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000002 LLM reflection:
+- Summary: Candidate achieves 54.1% gap on small DVRP (50 customers, 3 trucks) by serving isolated customers first but ignores depot distance and truck balance, resulting in long last-return times.
+- Aim: Reduce last truck return time by adding depot-return pressure and truck competition awareness to the scoring function.
+
+PARENTS:
+Candidate cand_000002: anticipated_insertion_planner
+Status: valid; Gap: 54.1017%
+Thought: Selects the customer that maximizes (distance to nearest other available customer) - (distance from current truck). This heuristic serves isolated customers first (anticipating future reveals may cluster elsewhere) while penalizing distant ones. If all scores negative, picks the least negative (still serves). Never waits unless no customers.
+Mean gap: 54.10166336895209
+Mean TTT: 4.514266872069122
+Gap by instance size: {'50': 54.10166336895209}
+TTT by instance size: {'50': 4.514266872069122}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    best_idx = None
+    best_score = -np.inf
+    cur = current_position
+    avail = available_customers
+    n = len(avail)
+    for i in range(n):
+        d_cur = np.linalg.norm(cur - avail[i])
+        # nearest neighbor distance excluding i
+        if n == 1:
+            min_nn = 0.0
+        else:
+            min_nn = np.inf
+            for j in range(n):
+                if i != j:
+                    d = np.linalg.norm(avail[i] - avail[j])
+                    if d < min_nn:
+                        min_nn = d
+        score = min_nn - d_cur
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

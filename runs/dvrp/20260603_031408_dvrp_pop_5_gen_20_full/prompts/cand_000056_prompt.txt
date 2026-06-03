@@ -1,0 +1,84 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000001 LLM reflection:
+- Summary: Candidate achieves 36.2% gap on 3-truck 50-customer instances, with high mean waits (7.9) and no explicit makespan consideration.
+- Aim: Reduce last truck return time by adding a term that balances truck workloads or penalizes long depot-return distance when trucks are idle.
+
+PARENTS:
+Candidate cand_000054: AdaptiveFarDispatch
+Status: valid; Gap: 44.0372%
+Thought: Dispatch to customer maximizing (dist_to_depot - dist_to_truck + lambda * min_distance_to_other_truck), where lambda adaptively decreases as the current truck's distance to depot increases relative to the average distance of other trucks. This reduces the weight of avoiding other trucks when the truck is far, focusing on its own travel efficiency. No wait; if no available customers, return None.
+Mean gap: 44.03716422164361
+Mean TTT: 4.231575865590205
+Gap by instance size: {'50': 44.03716422164361}
+TTT by instance size: {'50': 4.231575865590205}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_idx = None
+    best_score = -float('inf')
+    my_dist_to_depot = np.linalg.norm(current_position - depot_position)
+    other_dists = []
+    for pos in truck_positions:
+        if not np.array_equal(pos, current_position):
+            other_dists.append(np.linalg.norm(pos - depot_position))
+    avg_other_dist = np.mean(other_dists) if len(other_dists) > 0 else 1.0
+    lambda_val = 1.0 / (1.0 + my_dist_to_depot / (avg_other_dist + 1e-6))
+    for i, cust in enumerate(available_customers):
+        cust_to_depot = np.linalg.norm(depot_position - cust)
+        cust_to_truck = np.linalg.norm(current_position - cust)
+        min_ot = float('inf')
+        for pos in truck_positions:
+            if not np.array_equal(pos, current_position):
+                d = np.linalg.norm(pos - cust)
+                if d < min_ot:
+                    min_ot = d
+        if min_ot == float('inf'):
+            min_ot = 0.0
+        score = cust_to_depot - cust_to_truck + lambda_val * min_ot
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

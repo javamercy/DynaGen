@@ -1,0 +1,89 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000070 LLM reflection:
+- Summary: Regret-based selection achieves 32.997% gap with high completion and moderate waits, but doesn't explicitly minimize last-return time.
+- Aim: Add a depot-return pressure term to the selection score to favor customers that reduce estimated last-truck return time.
+
+PARENTS:
+Candidate cand_000070: regret_based_wait_simple
+Status: valid; Gap: 32.9974%
+Thought: For each available customer, compute regret = cost of serving by current truck minus best cost among other trucks. If any customer has regret <= 0 (current truck is competitive), pick the one with most negative regret (largest advantage) and tie-break by current cost. If all regrets > 0, wait. Single-truck case always picks minimal cost.
+Mean gap: 32.99740369211181
+Mean TTT: 3.916353112940746
+Gap by instance size: {'50': 32.99740369211181}
+TTT by instance size: {'50': 3.916353112940746}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    n_trucks = truck_positions.shape[0]
+    cost_me = np.linalg.norm(current_position - available_customers, axis=1) + np.linalg.norm(available_customers - depot_position, axis=1)
+    if n_trucks == 1:
+        return int(np.argmin(cost_me))
+    # for each customer, compute best cost among other trucks
+    best_other = np.full(len(available_customers), np.inf)
+    for j, cust in enumerate(available_customers):
+        for k in range(n_trucks):
+            if np.array_equal(truck_positions[k], current_position):
+                continue
+            other_cost = np.linalg.norm(truck_positions[k] - cust) + np.linalg.norm(cust - depot_position)
+            if other_cost < best_other[j]:
+                best_other[j] = other_cost
+    regret = cost_me - best_other
+    min_regret = np.min(regret)
+    if min_regret > 0:
+        return None
+    # among those with regret <= 0, pick smallest regret (most negative) then smallest cost_me
+    candidates = np.where(regret <= 0)[0]
+    best_idx = candidates[0]
+    best_regret = regret[best_idx]
+    best_cost = cost_me[best_idx]
+    for idx in candidates:
+        if regret[idx] < best_regret or (regret[idx] == best_regret and cost_me[idx] < best_cost):
+            best_idx = idx
+            best_regret = regret[idx]
+            best_cost = cost_me[idx]
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

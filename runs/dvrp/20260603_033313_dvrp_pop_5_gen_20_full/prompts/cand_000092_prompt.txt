@@ -1,0 +1,100 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000087 LLM reflection:
+- Summary: Candidate achieved a slight gap improvement (30.48 vs parent 31.65) but shows high variance (worst gap 50.34) and moderate waits (6.6), indicating need for better robustness and fleet balancing.
+- Aim: Reduce the gap further by improving the wait threshold to better reflect fleet balance and depot-return pressure, aiming for more consistent performance across runs.
+
+Parent cand_000052 LLM reflection:
+- Summary: Regret with penalty_factor=1.5 on max alternative and no waiting yields gap 39.37, slightly worse than simpler regret baseline (39.04).
+- Aim: Re-introduce depot waiting when regret is positive to avoid forcing trucks into unbalanced long trips, targeting gap < 39.04.
+
+Parent cand_000081 LLM reflection:
+- Summary: Candidate improved gap from 45.99 to 34.73 by selecting customers far from depot but close to active truck, while keeping waiting low.
+- Aim: Reduce maximum route length by adjusting the priority score to more directly penalize assignments that delay the active truck's return to depot.
+
+PARENTS:
+Candidate cand_000087: adaptive_regret_relative_wait
+Status: valid; Gap: 30.483%
+Thought: Regret-based dispatch with adaptive penalty (scaled by min_alt/max_alt) and relative wait threshold (wait only if best_cost > 1.1*best_min_alt), aiming to reduce unnecessary waits.
+Mean gap: 30.483049236816804
+Mean TTT: 3.8377393327618554
+Gap by instance size: {'50': 30.483049236816804}
+TTT by instance size: {'50': 3.8377393327618554}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_regret = float('inf')
+    best_idx = None
+    best_cost_now = float('inf')
+    best_min_alt = float('inf')
+    for i, cust in enumerate(available_customers):
+        cost_now = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        all_costs = [np.linalg.norm(truck - cust) + np.linalg.norm(cust - depot_position) for truck in truck_positions]
+        sorted_costs = sorted(all_costs)
+        # Find min alternative cost (excluding current truck's contribution)
+        min_alt = sorted_costs[0]
+        if np.isclose(min_alt, cost_now, atol=1e-8) and len(sorted_costs) > 1:
+            min_alt = sorted_costs[1]
+        # Find max alternative cost (excluding current truck's contribution)
+        max_alt = sorted_costs[-1]
+        if np.isclose(max_alt, cost_now, atol=1e-8) and len(sorted_costs) > 1:
+            max_alt = sorted_costs[-2]
+        # Adaptive penalty factor
+        if max_alt > 0:
+            penalty = 1.0 + 0.5 * (min_alt / max_alt)
+        else:
+            penalty = 1.5
+        regret = (cost_now - min_alt) + penalty * max(0, cost_now - max_alt)
+        if regret < best_regret:
+            best_regret = regret
+            best_idx = i
+            best_cost_now = cost_now
+            best_min_alt = min_alt
+    # Wait if best regret is positive and cost is significantly higher than best alternative
+    if best_regret > 0 and best_cost_now > 1.1 * best_min_alt:
+        return None
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

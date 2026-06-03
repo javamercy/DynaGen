@@ -1,0 +1,3 @@
+baseline=random_shuffle
+status=valid
+distance=2196.18066272838

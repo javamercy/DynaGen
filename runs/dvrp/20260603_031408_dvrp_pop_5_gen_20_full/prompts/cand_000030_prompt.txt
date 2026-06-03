@@ -1,0 +1,104 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m3_simplify_generalize: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000012: max_regret_hybrid
+Status: valid; Gap: 59.8221%
+Thought: Dispatch to customer that minimizes the max return time (active truck's return vs. other trucks' current depot distances). Among ties, choose the one with smallest regret cost (dist_to_truck - 0.5*dist_to_depot - 0.3*min_other_truck_distance) to favor far, close-to-truck, isolated customers. Never wait.
+Mean gap: 59.82207912984309
+Mean TTT: 4.701862996152698
+Gap by instance size: {'50': 59.82207912984309}
+TTT by instance size: {'50': 4.701862996152698}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # distances from active truck to each customer
+    dist_active_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    # distances from each customer to depot
+    dist_cust_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    # new return time for active truck if it serves customer i
+    new_return = dist_active_cust + dist_cust_depot
+
+    # current max distance from other trucks to depot (including active truck's current position? but active truck is moving, so we use its current distance to depot as part of 'others'? Actually we consider other trucks as they are now. The active truck's current distance to depot is not included because it will change. So we compute distances from all truck positions to depot, but exclude the active truck? The description says max other truck distances to depot. In balanced_isolation, they computed truck_to_depot for all trucks, and then max_other_truck = np.max(truck_to_depot). That includes the active truck's current distance to depot. But that is not correct because the active truck will move. However, the active truck's current distance to depot is part of the snapshot, but after serving, it will have a new return time. In the max, we only compare new_return with the current depot distances of other trucks (excluding the active truck). But balanced_isolation included all trucks. Let's check their code: truck_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1); max_other_truck = np.max(truck_to_depot). That includes the active truck. That might be a flaw. But for consistency with the parent, we should replicate that? However, we are creating a new policy. I think it's more reasonable to exclude the active truck's current distance because it will be replaced by new_return. So we should compute max_other = maximum of distances from all trucks except the active one. But we don't know which truck is active? The function receives current_position for the deciding truck, so we can identify its index? Actually truck_positions is an array of all trucks, and current_position is the position of the deciding truck. We can find its index by comparing positions, but that's approximate due to floating point. Better: we can assume that the active truck's position is included in truck_positions. But we can compute distances to depot for all trucks, then set the active truck's distance to a very small value so it doesn't affect max? Or simply compute max of all and then subtract the active truck's contribution? Actually, we want max of other trucks' distances to depot. So we can compute depot_distances = np.linalg.norm(truck_positions - depot_position, axis=1). Then find the index of the truck closest to current_position? That could be ambiguous. Alternatively, we can compute the max of depot_distances and ignore the active truck by temporarily setting its distance to -inf. But we don't know which index. Another approach: compute the current_max = np.max(depot_distances). Then if the active truck's own distance is the maximum, we need the second max. But balanced_isolation used all, which might be a mistake. For our policy, we can treat it as: the other trucks are all trucks except the one making decision. Since the decision truck is at current_position, we can compute distances for all trucks and then replace the one that matches current_position? But due to floating point, we can compute distances to current_position from each truck position and take the argmin? That might be heavy. Simpler: since we have truck_positions, we can assume that current_position is one of them, and we can compute distances from each truck to depot, then sort, and take the maximum that is not the active truck? But to keep it simple and in line with the parent's spirit, I'll follow balanced_isolation and include all trucks. That might be fine as a heuristic. So compute depot_dist = np.linalg.norm(truck_positions - depot_position, axis=1), max_other = np.max(depot_dist). (Including active truck's current depot distance). That's easier and matches the parent. So I'll do that.
+
+    max_other = np.max(np.linalg.norm(truck_positions - depot_position, axis=1))
+
+    candidate_max = np.maximum(new_return, max_other)
+    min_cand = np.min(candidate_max)
+    ties = np.where(candidate_max == min_cand)[0]
+
+    if len(ties) == 1:
+        return int(ties[0])
+
+    # tie-breaking: smallest regret cost
+    best_idx = None
+    best_cost = np.inf
+    for idx in ties:
+        cust = available_customers[idx]
+        dist_to_truck = np.linalg.norm(current_position - cust)
+        dist_to_depot = np.linalg.norm(depot_position - cust)
+        dists_to_trucks = np.linalg.norm(truck_positions - cust, axis=1)
+        sorted_dists = np.sort(dists_to_trucks)
+        if len(sorted_dists) >= 2:
+            min_other_dist = sorted_dists[1]
+        else:
+            min_other_dist = sorted_dists[0]
+        cost = dist_to_truck - 0.5 * dist_to_depot - 0.3 * min_other_dist
+        if cost < best_cost:
+            best_cost = cost
+            best_idx = idx
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

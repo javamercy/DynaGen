@@ -1,0 +1,77 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000010 LLM reflection:
+- Summary: Candidate's simplified heuristic worsened gap to 42.83 (parent 36.16), indicating that ignoring truck competition harms last-return time.
+- Aim: Reintroduce truck-competition awareness via a distance-to-nearest-other-truck term, balancing depot distance and isolation to reduce long detours.
+
+Parent cand_000023 LLM reflection:
+- Summary: The candidate's makespan-aware dispatch increased gap to 53.62% from parent's 36.16%, indicating poor balance between travel cost and fleet balance.
+- Aim: Reduce gap by better weighting the impact on maximum return time while maintaining efficient travel distances.
+
+Parent cand_000028 LLM reflection:
+- Summary: Adding a competition penalty (-0.5 * min_dist_other) increased gap from 42.83 to 49.95, worsening performance.
+- Aim: Reduce gap by improving customer selection to better balance proximity and depot return pressure, focusing on the last truck's completion time.
+
+PARENTS:
+Candidate cand_000010: FarFirstDispatch
+Status: valid; Gap: 42.8251%
+Thought: Dispatch to customer maximizing dist_to_depot minus dist_to_truck, favoring far-from-depot customers that are close to the truck. Wait if no customers.
+Mean gap: 42.825122380828525
+Mean TTT: 4.195611391037662
+Gap by instance size: {'50': 42.825122380828525}
+TTT by instance size: {'50': 4.195611391037662}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_idx = None
+    best_cost = -float('inf')
+    for i, cust in enumerate(available_customers):
+        dist_to_truck = np.linalg.norm(current_position - cust)
+        dist_to_depot = np.linalg.norm(depot_position - cust)
+        cost = dist_to_depot - dist_to_truck
+        if cost > best_cost:
+            best_cost = cost
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

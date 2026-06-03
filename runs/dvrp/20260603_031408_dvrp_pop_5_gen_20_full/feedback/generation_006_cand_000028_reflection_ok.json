@@ -1,0 +1,46 @@
+{
+  "candidate_id": "cand_000028",
+  "generation": 6,
+  "gradient": {
+    "aim": "Reduce gap by improving customer selection to better balance proximity and depot return pressure, focusing on the last truck's completion time.",
+    "avoid": [
+      "Adding multiple new terms without clear justification",
+      "Increasing waiting time without evidence of benefit",
+      "Overfitting to the current instance size or truck count"
+    ],
+    "candidate_id": "cand_000028",
+    "change": [
+      "Remove or reverse the competition term (e.g., +0.5 * min_dist_other to favor isolated customers) to reduce unnecessary waiting and improve fleet balance."
+    ],
+    "delta_vs_best_parent": 7.123386157605573,
+    "evidence": {},
+    "generation": 6,
+    "parent_ids": [
+      "cand_000010"
+    ],
+    "preserve": [
+      "Use dist_to_depot and dist_to_truck as base features"
+    ],
+    "problem": "dvrp",
+    "score_name": "gap",
+    "score_value": 49.9485085384341,
+    "source": "llm",
+    "summary": "Adding a competition penalty (-0.5 * min_dist_other) increased gap from 42.83 to 49.95, worsening performance.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "dvrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the time until the last truck returns to the depot using only online dispatch state\nDomain focus: customer ranking, waiting behavior, fleet balance, depot-return pressure, spatial clustering, truck competition, per-call cost, and generalization across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef choose_next_customer(current_position, depot_position, truck_positions, available_customers):\\n    if len(available_customers) == 0:\\n        return None\\n    best_idx = None\\n    best_score = -float('inf')\\n    for i, cust in enumerate(available_customers):\\n        dist_to_truck = np.linalg.norm(current_position - cust)\\n        dist_to_depot = np.linalg.norm(depot_position - cust)\\n        dists_to_all_trucks = np.linalg.norm(truck_positions - cust, axis=1)\\n        sorted_dists = np.sort(dists_to_all_trucks)\\n        if len(sorted_dists) >= 2:\\n            min_dist_other = sorted_dists[1]\\n        else:\\n            min_dist_other = 0.0\\n        score = dist_to_depot - dist_to_truck - 0.5 * min_dist_other\\n        if score > best_score:\\n            best_score = score\\n            best_idx = i\\n    return best_idx\",\"error_details\":null,\"generation\":5,\"id\":\"cand_000028\",\"metrics\":{\"best_gap\":30.093373968443434,\"budget\":1,\"gap\":49.9485085384341,\"gap_by_instance_size\":{\"50\":49.9485085384341},\"gap_by_instance_source\":{\"data/dvrp/train/instances.pkl\":49.9485085384341},\"gap_by_truck_count\":{\"3\":49.9485085384341},\"history\":{\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"diversity_score\":0.2,\"history_score\":0.6846865031223273,\"in_history\":true,\"primary_bucket\":\"dvrp:size:50\",\"quality_score\":0.33356234149982894,\"robustness_score\":0.8370805387416607},\"invalid_count\":0,\"mean_completed_count\":49.0,\"mean_decisions\":49.0,\"mean_gap\":49.9485085384341,\"mean_runtime\":0.015854804199625504,\"mean_ttt\":4.406230791586814,\"mean_waits\":6.9,\"median_gap\":48.116167158821284,\"penalized_mean_gap\":49.9485085384341,\"penalized_mean_ttt\":4.406230791586814,\"pool\":\"search_instances\",\"problem\":\"dvrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"50\":49.9485085384341},\"score_by_instance_source\":{\"data/dvrp/train/instances.pkl\":49.9485085384341},\"score_by_truck_count\":{\"3\":49.9485085384341},\"score_name\":\"gap\",\"scored_count\":10,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_gap\":49.9485085384341,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"timeout_ttt\":4.406230791586814,\"ttt_by_instance_size\":{\"50\":4.406230791586814},\"ttt_by_instance_source\":{\"data/dvrp/train/instances.pkl\":4.406230791586814},\"ttt_by_truck_count\":{\"3\":4.406230791586814},\"valid_count\":10,\"worst_gap\":73.5212479186399},\"score_name\":\"gap\",\"score_value\":49.9485085384341,\"status\":\"valid\",\"thought\":\"Dispatch to customer maximizing (distance to depot - distance to current truck - 0.5 * distance to nearest other truck), to balance far-depot customers with proximity to trucks and avoid isolation. Wait if no customers.\"},\"delta_vs_best_parent\":7.123386157605573,\"generation\":6,\"goal\":\"minimize the time until the last truck returns to the depot using only online dispatch state\",\"parents\":[{\"code\":\"def choose_next_customer(current_position, depot_position, truck_positions, available_customers):\\n    if len(available_customers) == 0:\\n        return None\\n    best_idx = None\\n    best_cost = -float('inf')\\n    for i, cust in enumerate(available_customers):\\n        dist_to_truck = np.linalg.norm(current_position - cust)\\n        dist_to_depot = np.linalg.norm(depot_position - cust)\\n        cost = dist_to_depot - dist_to_truck\\n        if cost > best_cost:\\n            best_cost = cost\\n            best_idx = i\\n    return best_idx\",\"error_details\":null,\"generation\":1,\"id\":\"cand_000010\",\"metrics\":{\"best_gap\":24.667829407131464,\"budget\":1,\"gap\":42.825122380828525,\"gap_by_instance_size\":{\"50\":42.825122380828525},\"gap_by_instance_source\":{\"data/dvrp/train/instances.pkl\":42.825122380828525},\"gap_by_truck_count\":{\"3\":42.825122380828525},\"history\":{\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"diversity_score\":1.0,\"history_score\":0.9249924569134492,\"in_history\":true,\"primary_bucket\":\"dvrp:size:50\",\"quality_score\":0.36859498549266917,\"robustness_score\":0.8546582380692667},\"invalid_count\":0,\"mean_completed_count\":49.0,\"mean_decisions\":49.0,\"mean_gap\":42.825122380828525,\"mean_runtime\":0.009905158301990014,\"mean_ttt\":4.195611391037662,\"mean_waits\":5.9,\"median_gap\":38.23683162376879,\"penalized_mean_gap\":42.825122380828525,\"penalized_mean_ttt\":4.195611391037662,\"pool\":\"search_instances\",\"problem\":\"dvrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"50\":42.825122380828525},\"score_by_instance_source\":{\"data/dvrp/train/instances.pkl\":42.825122380828525},\"score_by_truck_count\":{\"3\":42.825122380828525},\"score_name\":\"gap\",\"scored_count\":10,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_gap\":42.825122380828525,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"timeout_ttt\":4.195611391037662,\"ttt_by_instance_size\":{\"50\":4.195611391037662},\"ttt_by_instance_source\":{\"data/dvrp/train/instances.pkl\":4.195611391037662},\"ttt_by_truck_count\":{\"3\":4.195611391037662},\"valid_count\":10,\"worst_gap\":60.95205362065441},\"score_name\":\"gap\",\"score_value\":42.825122380828525,\"status\":\"valid\",\"thought\":\"Dispatch to customer maximizing dist_to_depot minus dist_to_truck, favoring far-from-depot customers that are close to the truck. Wait if no customers.\"}],\"problem\":\"dvrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Adding a competition penalty (-0.5 * min_dist_other) increased gap from 42.83 to 49.95, worsening performance.\",\n  \"aim\": \"Reduce gap by improving customer selection to better balance proximity and depot return pressure, focusing on the last truck's completion time.\",\n  \"preserve\": [\"Use dist_to_depot and dist_to_truck as base features\"],\n  \"change\": [\"Remove or reverse the competition term (e.g., +0.5 * min_dist_other to favor isolated customers) to reduce unnecessary waiting and improve fleet balance.\"],\n  \"avoid\": [\"Adding multiple new terms without clear justification\", \"Increasing waiting time without evidence of benefit\", \"Overfitting to the current instance size or truck count\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

@@ -1,0 +1,32 @@
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    n_available = len(available_customers)
+    # Adaptive penalty factor: increases with number of available customers, more aggressive than parent
+    penalty_factor = 1.0 + n_available / (n_available + 5.0)
+    best_regret = float('inf')
+    best_idx = None
+    best_cost_now = float('inf')
+    for i, cust in enumerate(available_customers):
+        cost_now = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        all_costs = [np.linalg.norm(truck - cust) + np.linalg.norm(cust - depot_position) for truck in truck_positions]
+        sorted_costs = sorted(all_costs)
+        if len(sorted_costs) > 1 and np.isclose(sorted_costs[0], cost_now, atol=1e-8):
+            min_alt = sorted_costs[1]
+        else:
+            min_alt = sorted_costs[0]
+        if len(sorted_costs) > 1 and np.isclose(sorted_costs[-1], cost_now, atol=1e-8):
+            max_alt = sorted_costs[-2]
+        else:
+            max_alt = sorted_costs[-1]
+        regret = (cost_now - min_alt) + penalty_factor * max(0, cost_now - max_alt)
+        if regret < best_regret or (regret == best_regret and cost_now < best_cost_now):
+            best_regret = regret
+            best_idx = i
+            best_cost_now = cost_now
+    # Wait only if regret is positive and significant relative to cost_now; lowered threshold to reduce waits
+    if best_regret > 0 and best_regret > 0.05 * best_cost_now:
+        return None
+    return best_idx

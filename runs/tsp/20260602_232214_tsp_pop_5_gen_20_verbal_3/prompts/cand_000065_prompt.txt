@@ -1,0 +1,108 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000058: random_init_sa
+
+Status: valid; distance: 10.8669
+
+Thought: Replaced nearest neighbor initialization with random permutation. Simulated annealing with 2-opt moves, geometric cooling, and early reporting remains unchanged.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+
+    def tour_cost(tour):
+        total = 0
+        for i in range(n):
+            total += distance_matrix[tour[i], tour[(i+1)%n]]
+        return total
+
+    # Random initialization
+    rng = np.random.default_rng()
+    tour = rng.permutation(n).astype(int)
+    current_cost = tour_cost(tour)
+    best_tour = tour.copy()
+    best_cost = current_cost
+    report_best_tour(tour)
+
+    T0 = current_cost * 0.1
+    if T0 == 0:
+        T0 = 1
+    T = T0
+    alpha = 0.99
+    epsilon = 1e-3
+    max_iters_per_temp = n * 50
+
+    while T > epsilon:
+        for _ in range(max_iters_per_temp):
+            i = rng.integers(0, n-2)
+            j = rng.integers(i+2, n)
+            a = tour[i]
+            b = tour[i+1]
+            c = tour[j]
+            d = tour[(j+1)%n]
+            delta = distance_matrix[a,c] + distance_matrix[b,d] - distance_matrix[a,b] - distance_matrix[c,d]
+            if delta < 0:
+                accept = True
+            else:
+                accept = rng.random() < np.exp(-delta / T)
+            if accept:
+                tour = np.concatenate([tour[:i+1], tour[i+1:j+1][::-1], tour[j+1:]])
+                current_cost += delta
+                if current_cost < best_cost:
+                    best_cost = current_cost
+                    best_tour = tour.copy()
+                    report_best_tour(best_tour)
+        T *= alpha
+
+    return best_tour
+
+```
+
+STRATEGY: m3_simplify_generalize
+
+GOAL: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

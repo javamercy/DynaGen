@@ -1,0 +1,269 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000008: regret_insert_sa
+
+Status: valid; distance: 11.2147
+
+Thought: Construct tour using regret heuristic (insert unvisited city with highest regret, tie-break by lower insertion cost). Then improve using simulated annealing with 2-opt neighborhood: accept improving moves always, uphill moves with probability exp(-delta/T). Temperature cools geometrically.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+import math
+import random
+
+def solve_tsp(distance_matrix):
+    n = distance_matrix.shape[0]
+    if n <= 3:
+        return np.arange(n)
+    
+    # Regret insertion construction
+    tour = [0]
+    first = np.argmin(distance_matrix[0][1:]) + 1
+    tour.append(first)
+    unvisited = set(range(n)) - set(tour)
+    
+    while unvisited:
+        best_insert = {}
+        second_best = {}
+        for city in unvisited:
+            best = float('inf')
+            sec = float('inf')
+            best_idx = None
+            for pos in range(len(tour)):
+                i = tour[pos]
+                j = tour[(pos+1)%len(tour)]
+                cost = distance_matrix[i][city] + distance_matrix[city][j] - distance_matrix[i][j]
+                if cost < best:
+                    sec = best
+                    best = cost
+                    best_idx = pos
+                elif cost < sec:
+                    sec = cost
+            best_insert[city] = (best_idx, best)
+            second_best[city] = sec if sec != float('inf') else best
+        regret = {c: second_best[c] - best_insert[c][1] for c in unvisited}
+        chosen = max(unvisited, key=lambda c: (regret[c], -best_insert[c][1]))
+        idx, _ = best_insert[chosen]
+        tour.insert(idx+1, chosen)
+        unvisited.remove(chosen)
+    
+    best_tour = np.array(tour)
+    best_dist = sum(distance_matrix[best_tour[i]][best_tour[(i+1)%n]] for i in range(n))
+    report_best_tour(best_tour)
+    
+    # Simulated annealing with 2-opt
+    current_tour = best_tour.copy()
+    current_dist = best_dist
+    T0 = 1000.0
+    T = T0
+    alpha = 0.99
+    max_iter = 10000
+    for iteration in range(max_iter):
+        i = random.randint(0, n-1)
+        j = random.randint(0, n-1)
+        if i == j or (i+1)%n == j or (j+1)%n == i:
+            continue
+        if i > j:
+            i, j = j, i
+        a = current_tour[i]
+        b = current_tour[(i+1)%n]
+        c = current_tour[j]
+        d = current_tour[(j+1)%n]
+        delta = distance_matrix[a][c] + distance_matrix[b][d] - (distance_matrix[a][b] + distance_matrix[c][d])
+        if delta < 0 or (delta > 0 and random.random() < math.exp(-delta / T)):
+            new_tour = np.concatenate([current_tour[:i+1], current_tour[i+1:j+1][::-1], current_tour[j+1:]])
+            new_dist = current_dist + delta
+            if new_dist < best_dist - 1e-12:
+                best_tour = new_tour
+                best_dist = new_dist
+                report_best_tour(best_tour)
+            current_tour = new_tour
+            current_dist = new_dist
+        T *= alpha
+        if T < 1e-8:
+            break
+    
+    return best_tour
+
+```
+
+Candidate cand_000003: farthest_insertion
+
+Status: valid; distance: 11.584
+
+Thought: Farthest-insertion heuristic to construct initial tour, followed by 2-opt local search. The heuristic starts with the farthest pair, then repeatedly inserts the farthest node from the tour at the best position. 2-opt improves the tour by reversing segments that reduce total length. Report best tour after construction and after each improvement.
+
+Code:
+
+```python
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        return np.array(range(n))
+    # farthest insertion construction
+    # find the farthest pair
+    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [i, j]
+    remaining = set(range(n)) - {i, j}
+    while remaining:
+        # find farthest point from current tour
+        dists = np.array([min(distance_matrix[c, t] for t in tour) for c in remaining])
+        farthest_idx = np.argmax(dists)
+        farthest = list(remaining)[farthest_idx]
+        # find best insertion position
+        best_inc = np.inf
+        best_pos = 0
+        for k in range(len(tour)):
+            a = tour[k]
+            b = tour[(k+1) % len(tour)]
+            inc = distance_matrix[a, farthest] + distance_matrix[farthest, b] - distance_matrix[a, b]
+            if inc < best_inc:
+                best_inc = inc
+                best_pos = k+1
+        tour.insert(best_pos, farthest)
+        remaining.remove(farthest)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    improved = True
+    best_tour = tour_arr.copy()
+    best_cost = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))
+    while improved:
+        improved = False
+        for i in range(n-2):
+            for j in range(i+2, n):
+                if j == i+1:
+                    continue
+                new_tour = best_tour.copy()
+                new_tour[i+1:j+1] = best_tour[j:i:-1]  # careful: slice reversal
+                # compute new tour length difference
+                # affected edges: (i, i+1) and (j, (j+1)%n) replaced by (i, j) and (i+1, j+1)
+                a = best_tour[i]
+                b = best_tour[i+1]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n]
+                delta = (distance_matrix[a,c] + distance_matrix[b,d]) - (distance_matrix[a,b] + distance_matrix[c,d])
+                if delta < -1e-10:
+                    best_tour = new_tour
+                    best_cost += delta
+                    improved = True
+                    report_best_tour(best_tour)
+        # Also consider wrapping around? 2-opt typically handles wrap by modulo indexing, already done.
+    return best_tour
+
+```
+
+Candidate cand_000006: sa_swap
+
+Status: valid; distance: 75.272
+
+Thought: Simulated annealing starting from a random initial tour, using random swap moves to generate neighbors. Accepts improving moves always, and worsening moves with probability exp(-delta/T). Temperature decays geometrically. Reports best tour found.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 3:
+        tour = np.array(range(n))
+        report_best_tour(tour)
+        return tour
+    
+    def tour_distance(tour):
+        total = 0.0
+        for i in range(n):
+            total += distance_matrix[tour[i], tour[(i+1)%n]]
+        return total
+    
+    # random initial tour
+    best_tour = np.random.permutation(n)
+    best_dist = tour_distance(best_tour)
+    report_best_tour(best_tour)
+    
+    current_tour = best_tour.copy()
+    current_dist = best_dist
+    
+    # simulated annealing parameters
+    T = 100.0
+    T_min = 0.1
+    cooling_rate = 0.995
+    
+    while T > T_min:
+        # generate neighbor by swapping two random cities
+        i, j = np.random.randint(n), np.random.randint(n)
+        while i == j:
+            j = np.random.randint(n)
+        
+        new_tour = current_tour.copy()
+        new_tour[i], new_tour[j] = new_tour[j], new_tour[i]
+        new_dist = tour_distance(new_tour)
+        delta = new_dist - current_dist
+        
+        if delta < 0 or np.random.rand() < np.exp(-delta / T):
+            current_tour = new_tour
+            current_dist = new_dist
+            if current_dist < best_dist:
+                best_tour = current_tour.copy()
+                best_dist = current_dist
+                report_best_tour(best_tour)
+        
+        T *= cooling_rate
+    
+    return best_tour
+
+```
+
+STRATEGY: e1_radical_exploration
+
+GOAL: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

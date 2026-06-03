@@ -1,3 +1,0 @@
-baseline=nearest_neighbor
-status=valid
-distance=27.136791788552664

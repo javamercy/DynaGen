@@ -1,0 +1,151 @@
+{
+  "data": {
+    "search_instances": "data/dvrp/train/instances.pkl",
+    "test_instances": "data/dvrp/test"
+  },
+  "evaluation": {
+    "budget": null,
+    "metric": "mean_gap",
+    "seeds": [
+      100
+    ],
+    "timeout_penalty": 0.0,
+    "timeout_seconds": 300.0
+  },
+  "evolution": {
+    "archive_mode_strategy_weights": null,
+    "archive_mode_strategy_weights_after_generation": 0,
+    "archive_niche_replacement": true,
+    "committee_recovery_strategies": [
+      "e1_radical_exploration",
+      "e2_backbone_exploration",
+      "m1_component_replacement"
+    ],
+    "committee_size": 3,
+    "committee_test_budget": 1000,
+    "generations": 20,
+    "history": {
+      "add_statuses": [
+        "valid",
+        "evaluated",
+        "timeout"
+      ],
+      "deduplicate_code": true,
+      "diversity_weight": 0.25,
+      "enabled": true,
+      "final_selection_uses_history": true,
+      "max_per_bucket": 4,
+      "max_size": 30,
+      "parent_sample_probability": 0.35,
+      "recency_weight": 0.05,
+      "robustness_weight": 0.3,
+      "s3_history_parent_min": 1
+    },
+    "niche": {
+      "cadence_generations": 10,
+      "improvement_power": 0.7,
+      "improvement_weight": true
+    },
+    "niche_population_mix": false,
+    "offspring_per_strategy": 1,
+    "output_mode": "single",
+    "population_size": 5,
+    "strategies": [
+      "e1_radical_exploration",
+      "e2_backbone_exploration",
+      "m1_component_replacement",
+      "m2_parameter_schedule_mutation",
+      "m3_simplify_generalize"
+    ],
+    "strategy_weights": {},
+    "verbal_gradients": {
+      "enabled": true,
+      "llm_every_n_generations": 3,
+      "llm_model": "deepseek-v4-flash",
+      "max_llm_calls_per_generation": 5,
+      "temperature": 0.3
+    }
+  },
+  "llm": {
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "llm_call_budget": null,
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "reasoning_effort": null,
+    "temperature": 0.7
+  },
+  "name": "dvrp_pop_5_gen_20_full",
+  "output_dir": "runs/dvrp",
+  "problem": {
+    "aocc_lower_bound": 1e-08,
+    "aocc_upper_bound": 100.0,
+    "bounds": [
+      -5.0,
+      5.0
+    ],
+    "comparison_baselines": [
+      "random_search",
+      "differential_evolution"
+    ],
+    "dimension": 5,
+    "dvrp_search_limit": 10,
+    "dvrp_test_limit_per_size": 64,
+    "dvrp_test_sizes": [
+      10,
+      20,
+      50,
+      100,
+      200
+    ],
+    "function_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "search_instances": [
+      1,
+      2,
+      3
+    ],
+    "test_dimensions": [
+      5
+    ],
+    "test_instances": [
+      1,
+      2,
+      3
+    ],
+    "type": "dvrp",
+    "vrp_search_limit": 8,
+    "vrp_test_limit_per_size": 64,
+    "vrp_test_sizes": [
+      10,
+      20,
+      50,
+      100,
+      200
+    ]
+  },
+  "seed": 100
+}

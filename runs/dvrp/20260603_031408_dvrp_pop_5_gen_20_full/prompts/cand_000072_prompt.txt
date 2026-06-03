@@ -1,0 +1,94 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000059 LLM reflection:
+- Summary: Small gap improvement from 40.4 to 38.9 by increasing isolation weight to 0.7, but still high gap and limited to 3-truck 50-customer instances.
+- Aim: Reduce gap further by incorporating depot-return pressure to balance when trucks finish and minimize the last truck's travel time.
+
+Parent cand_000001 LLM reflection:
+- Summary: Candidate achieves 36.2% gap on 3-truck 50-customer instances, with high mean waits (7.9) and no explicit makespan consideration.
+- Aim: Reduce last truck return time by adding a term that balances truck workloads or penalizes long depot-return distance when trucks are idle.
+
+PARENTS:
+Candidate cand_000060: minmax_no_wait
+Status: valid; Gap: 57.8334%
+Thought: Minimize the overall max return time by choosing customer that minimizes the max of (active truck's new return time vs current max of all trucks). Tie-break by smaller new return time. No wait condition to avoid excessive idle.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # Current distances from each truck to depot
+    truck_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    overall_max = np.max(truck_to_depot)
+
+    # Compute distances for each available customer
+    dist_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    new_return_times = dist_to_cust + cust_to_depot
+
+    # Candidate max: new return time vs current max (including active)
+    candidate_max = np.maximum(new_return_times, overall_max)
+
+    # Choose customer minimizing candidate max; tie-break by new return time
+    best_idx = int(np.argmin(candidate_max))
+    min_val = candidate_max[best_idx]
+    ties = np.where(candidate_max == min_val)[0]
+    if len(ties) > 1:
+        best_idx = int(ties[np.argmin(new_return_times[ties])])
+
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

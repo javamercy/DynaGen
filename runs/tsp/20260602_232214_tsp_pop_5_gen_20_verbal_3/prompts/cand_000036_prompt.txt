@@ -1,0 +1,148 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000012: dual_insert_2opt
+
+Status: valid; distance: 11.2692
+
+Thought: Hybrid insertion heuristic combining regret and farthest distance: start with farthest pair, then iteratively insert the unvisited city maximizing the sum of regret (second-best minus best insertion cost) and farthest distance (minimum distance to the current tour), tie-breaking by lower best insertion cost. Then apply 2-opt local search until no improvement.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    # start with farthest pair
+    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [i, j]
+    unvisited = set(range(n)) - {i, j}
+    
+    while unvisited:
+        best_costs = {}
+        second_costs = {}
+        min_dists = {}
+        best_positions = {}
+        for city in unvisited:
+            best = float('inf')
+            second = float('inf')
+            pos = 0
+            min_dist = float('inf')
+            for k in range(len(tour)):
+                a = tour[k]
+                b = tour[(k+1) % len(tour)]
+                cost = distance_matrix[a, city] + distance_matrix[city, b] - distance_matrix[a, b]
+                if cost < best:
+                    second = best
+                    best = cost
+                    pos = k+1
+                elif cost < second:
+                    second = cost
+                # track minimum distance to tour nodes
+                d = distance_matrix[city, a]
+                if d < min_dist:
+                    min_dist = d
+                d = distance_matrix[city, b]
+                if d < min_dist:
+                    min_dist = d
+            best_costs[city] = best
+            second_costs[city] = second if second != float('inf') else best
+            best_positions[city] = pos
+            min_dists[city] = min_dist
+        
+        # choose city maximizing regret + min_dist, tie-break by lower best cost
+        def score(c):
+            regret = second_costs[c] - best_costs[c]
+            return regret + min_dists[c]
+        best_score = max(score(c) for c in unvisited)
+        candidates = [c for c in unvisited if score(c) == best_score]
+        chosen = min(candidates, key=lambda c: best_costs[c])
+        
+        pos = best_positions[chosen]
+        tour.insert(pos, chosen)
+        unvisited.remove(chosen)
+    
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    
+    # 2-opt improvement
+    improved = True
+    best_tour = tour_arr.copy()
+    best_dist = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))
+    while improved:
+        improved = False
+        for i in range(n-2):
+            for j in range(i+2, n):
+                a = best_tour[i]
+                b = best_tour[i+1]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n]
+                delta = distance_matrix[a,c] + distance_matrix[b,d] - distance_matrix[a,b] - distance_matrix[c,d]
+                if delta < -1e-10:
+                    new_tour = best_tour.copy()
+                    new_tour[i+1:j+1] = best_tour[j:i:-1]
+                    new_dist = best_dist + delta
+                    best_tour = new_tour
+                    best_dist = new_dist
+                    improved = True
+                    report_best_tour(best_tour)
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000012 LLM reflection:
+- Summary: Candidate scored 11.269, 0.85% worse than best parent (11.174) on synthetic 200-city instances.
+- Aim: Improve construction heuristic to produce lower initial tour cost, enabling 2-opt to find better local optima.
+
+Parent cand_000018 LLM reflection:
+- Summary: Candidate improved tour length by ~0.107 over parent using regret-2 insertion, 2-opt, and 5 ILS double-bridge perturbations, with valid tours and moderate runtime.
+- Aim: Reduce mean tour length further by increasing ILS iterations to escape more local optima while maintaining valid permutations.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

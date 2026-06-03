@@ -93,15 +93,17 @@ DVRPPolicy = Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float], o
 
 
 def load_dvrp_instances(
-        path: str | Path | None,
-        *,
-        pool_name: str,
-        search_limit: int = 8,
-        test_sizes: tuple[int, ...] | list[int] = PAPER_TEST_SIZES,
-        test_limit_per_size: int = 64,
+    path: str | Path | None,
+    *,
+    pool_name: str,
+    search_limit: int = 8,
+    test_sizes: tuple[int, ...] | list[int] = PAPER_TEST_SIZES,
+    test_limit_per_size: int = 64,
 ) -> list[DVRPInstance]:
     if not path:
-        raise ValueError("DVRP data.search_instances and data.test_instances must be specified")
+        raise ValueError(
+            "DVRP data.search_instances and data.test_instances must be specified"
+        )
     path = Path(path)
     if path.is_file():
         limit = search_limit if pool_name == "search_instances" else test_limit_per_size
@@ -119,11 +121,11 @@ def load_dvrp_instances(
 
 
 def simulate_dvrp_policy(
-        instance: DVRPInstance,
-        policy: DVRPPolicy,
-        *,
-        seed: int,
-        budget: int,
+    instance: DVRPInstance,
+    policy: DVRPPolicy,
+    *,
+    seed: int,
+    budget: int,
 ) -> DVRPSimulationResult:
     requests = _RequestState(instance.coordinates, instance.arrival_times)
     trucks = [_TruckState(requests) for _ in range(instance.truck_count)]
@@ -153,14 +155,17 @@ def simulate_dvrp_policy(
             waits += 1
             continue
 
-        customer_positions = np.asarray([instance.coordinates[node].copy() for node in available_nodes], dtype=float)
-        truck_positions = np.asarray([item.position.copy() for item in trucks], dtype=float)
+        customer_positions = np.asarray(
+            [instance.coordinates[node].copy() for node in available_nodes], dtype=float
+        )
+        truck_positions = np.asarray(
+            [item.position.copy() for item in trucks], dtype=float
+        )
         choice = policy(
             truck.position.copy(),
             instance.depot.copy(),
             truck_positions,
             customer_positions,
-            float(requests.current_time),
         )
         decisions += 1
 
@@ -195,12 +200,14 @@ def _load_dvrp_pickle(path: Path, *, limit: int | None = None) -> list[DVRPInsta
         raw_items = pickle.load(handle)
     if not isinstance(raw_items, list):
         raise ValueError(f"DVRP pickle must contain a list: {path}")
-    selected = raw_items if limit is None else raw_items[:int(limit)]
+    selected = raw_items if limit is None else raw_items[: int(limit)]
     instances = []
     for index, item in enumerate(selected):
         instances.append(_instance_from_pickle_item(path, index, item))
     if limit is not None and len(instances) != int(limit):
-        raise ValueError(f"DVRP file {path} has {len(instances)} instances, expected {limit}")
+        raise ValueError(
+            f"DVRP file {path} has {len(instances)} instances, expected {limit}"
+        )
     return instances
 
 
@@ -264,12 +271,16 @@ def _as_customer_index(value: object, size: int) -> int:
             raise ValueError
         numeric = float(arr.reshape(-1)[0])
     except Exception as exc:
-        raise DVRPSimulationError("Policy must return an integer customer index or None") from exc
+        raise DVRPSimulationError(
+            "Policy must return an integer customer index or None"
+        ) from exc
     if not np.isfinite(numeric) or int(numeric) != numeric:
         raise DVRPSimulationError("Policy returned a non-integer customer index")
     index = int(numeric)
     if index < 0 or index >= int(size):
-        raise DVRPSimulationError(f"Policy returned customer index {index}, but {size} are available")
+        raise DVRPSimulationError(
+            f"Policy returned customer index {index}, but {size} are available"
+        )
     return index
 
 
@@ -277,10 +288,14 @@ def _validate_routes(routes: list[list[int]], dimension: int) -> None:
     visited = [node for route in routes for node in route if node != 0]
     expected = list(range(1, int(dimension)))
     if sorted(visited) != expected:
-        raise DVRPSimulationError("DVRP rollout did not visit every customer exactly once")
+        raise DVRPSimulationError(
+            "DVRP rollout did not visit every customer exactly once"
+        )
     for route in routes:
         if len(route) < 2 or route[0] != 0 or route[-1] != 0:
-            raise DVRPSimulationError("Each DVRP truck route must start and end at the depot")
+            raise DVRPSimulationError(
+                "Each DVRP truck route must start and end at the depot"
+            )
 
 
 class _RequestState:
@@ -343,7 +358,9 @@ class _TruckState:
     def set_dest(self, node: int) -> None:
         if self._dest is not None or self._wait_left != 0.0:
             raise DVRPSimulationError("Truck received a new destination while busy")
-        self.requests.currently_at(self.cur_node(), self.current_time, self.current_time)
+        self.requests.currently_at(
+            self.cur_node(), self.current_time, self.current_time
+        )
         if self.cur_node() == node:
             self.wait()
             return
@@ -357,7 +374,9 @@ class _TruckState:
 
     def cur_node(self) -> int:
         if self._dest is not None:
-            raise DVRPSimulationError("Cannot ask for current node while truck is moving")
+            raise DVRPSimulationError(
+                "Cannot ask for current node while truck is moving"
+            )
         return int(self.route[-1])
 
     def wait(self) -> None:
@@ -371,7 +390,9 @@ class _TruckState:
         if self._dest is None:
             if step > self._wait_left + 1e-8:
                 raise DVRPSimulationError("Wait step exceeds remaining wait time")
-            self.requests.currently_at(self.cur_node(), self.current_time - step, self.current_time)
+            self.requests.currently_at(
+                self.cur_node(), self.current_time - step, self.current_time
+            )
             self._wait_left -= step
             self._time_waited += step
             if self._wait_left <= 1e-8:
@@ -386,12 +407,16 @@ class _TruckState:
         if abs(step - distance) <= 1e-8:
             self.position = np.array(self._dest, dtype=float)
             self._dest = None
-            self.requests.currently_at(self.cur_node(), self.current_time, self.current_time)
+            self.requests.currently_at(
+                self.cur_node(), self.current_time, self.current_time
+            )
 
     def go_home(self) -> None:
         if self._dest is None:
             self.current_time += self._wait_left
-            self.requests.currently_at(self.cur_node(), self.current_time - self._wait_left, self.current_time)
+            self.requests.currently_at(
+                self.cur_node(), self.current_time - self._wait_left, self.current_time
+            )
             self._time_waited += self._wait_left
             self._wait_left = 0.0
         else:
@@ -400,7 +425,9 @@ class _TruckState:
             self.position = np.array(self._dest, dtype=float)
             self._time_moving += distance
             self._dest = None
-            self.requests.currently_at(self.cur_node(), self.current_time, self.current_time)
+            self.requests.currently_at(
+                self.cur_node(), self.current_time, self.current_time
+            )
         self.route.append(0)
         self._time_moving += float(np.linalg.norm(self.position - self.depot))
         self.position = np.array(self.depot, dtype=float)

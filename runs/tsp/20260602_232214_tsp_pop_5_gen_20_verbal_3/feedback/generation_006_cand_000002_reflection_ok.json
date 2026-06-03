@@ -1,0 +1,49 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 6,
+  "gradient": {
+    "aim": "Reduce average tour length by post-construction 2-opt local search while keeping the insertion method intact.",
+    "avoid": [
+      "Breaking permutation validity",
+      "increasing runtime beyond robust threshold",
+      "removing the constructive heuristic entirely",
+      "adding complex or slow neighborhoods"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "Add 2-opt improvement loop after construction",
+      "or add random restart with insertion from different initial pair"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 6,
+    "parent_ids": [],
+    "preserve": [
+      "Fast greedy insertion",
+      "deterministic start [0,1]",
+      "report_best_tour usage",
+      "valid permutation guarantee"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 12.648025116626604,
+    "source": "llm",
+    "summary": "Candidate uses greedy insertion constructive heuristic achieving validity and fast runtime but tour length (12.648) remains high on 200-city instances.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n == 1:\\n        tour = np.array([0])\\n        report_best_tour(tour)\\n        return tour\\n    if n == 2:\\n        tour = np.array([0, 1])\\n        report_best_tour(tour)\\n        return tour\\n\\n    tour = [0, 1]\\n    unvisited = set(range(2, n))\\n\\n    while unvisited:\\n        best_city = None\\n        best_pos = None\\n        best_increase = float('inf')\\n        m = len(tour)\\n        for city in unvisited:\\n            for i in range(m):\\n                prev = tour[i]\\n                nxt = tour[(i + 1) % m]\\n                increase = distance_matrix[prev, city] + distance_matrix[city, nxt] - distance_matrix[prev, nxt]\\n                if increase < best_increase:\\n                    best_increase = increase\\n                    best_city = city\\n                    best_pos = i + 1  # insert after prev\\n        tour.insert(best_pos, best_city)\\n        unvisited.remove(best_city)\\n\\n    tour_arr = np.array(tour)\\n    report_best_tour(tour_arr)\\n    return tour_arr\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"best_gap\":null,\"distance\":12.648025116626604,\"gap_by_instance_size\":{\"200\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:insertion\"],\"diversity_score\":1.0,\"history_score\":1.6241382236791027,\"in_history\":true,\"primary_bucket\":\"tsp:size:200\",\"quality_score\":0.9875099493576064,\"robustness_score\":0.9617950694899895},\"history_selection\":{\"bucket_score\":0.9875099493576064,\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:insertion\"],\"history_score\":1.5741382236791026,\"primary_bucket\":\"tsp:size:200\",\"role\":\"regime specialist\"},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.48333637099931365,\"mean_tour_length\":12.648025116626604,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"200\":12.648025116626604},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":12.648025116626604},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":600.0,\"tour_length_by_instance_size\":{\"200\":12.648025116626604},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":12.648025116626604},\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":12.648025116626604,\"status\":\"valid\",\"thought\":\"Build tour by repeatedly inserting the unvisited city that causes the smallest increase in total tour length (circular insertion cost). Start with two cities [0,1]. Report final tour as best.\"},\"delta_vs_best_parent\":null,\"generation\":6,\"goal\":\"minimize TSP tour length while always returning a valid permutation\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Candidate uses greedy insertion constructive heuristic achieving validity and fast runtime but tour length (12.648) remains high on 200-city instances.\",\n  \"aim\": \"Reduce average tour length by post-construction 2-opt local search while keeping the insertion method intact.\",\n  \"preserve\": [\"Fast greedy insertion\", \"deterministic start [0,1]\", \"report_best_tour usage\", \"valid permutation guarantee\"],\n  \"change\": [\"Add 2-opt improvement loop after construction\", \"or add random restart with insertion from different initial pair\"],\n  \"avoid\": [\"Breaking permutation validity\", \"increasing runtime beyond robust threshold\", \"removing the constructive heuristic entirely\", \"adding complex or slow neighborhoods\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

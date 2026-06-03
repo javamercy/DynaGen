@@ -1,0 +1,101 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000007: balanced_isolation_heuristic
+Status: valid; Gap: 58.4228%
+Thought: Primary: minimize max( active truck's return time , max other truck distances to depot ). Tie-break: among those with equal minimal candidate max, pick the customer farthest from its nearest other available customer (isolated first). Never wait (dispatch if any customer available).
+Mean gap: 58.42284232701752
+Mean TTT: 4.665146358089563
+Gap by instance size: {'50': 58.42284232701752}
+TTT by instance size: {'50': 4.665146358089563}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # Distance from each truck to depot
+    truck_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    max_other_truck = np.max(truck_to_depot)
+
+    # For each available customer, compute new return time for active truck
+    dist_active_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    dist_cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    new_return_times = dist_active_to_cust + dist_cust_to_depot
+
+    candidate_max = np.maximum(new_return_times, max_other_truck)
+    min_candidate_max = np.min(candidate_max)
+    ties = np.where(candidate_max == min_candidate_max)[0]
+
+    if len(ties) == 1:
+        return int(ties[0])
+
+    # Tie-breaking: among ties, pick isolated customer (largest nearest-neighbor distance)
+    best_idx = ties[0]
+    best_nn_dist = -np.inf
+    n_avail = len(available_customers)
+    for idx in ties:
+        # compute nearest neighbor distance excluding itself
+        nn_dist = np.inf
+        for j in range(n_avail):
+            if j != idx:
+                dd = np.linalg.norm(available_customers[idx] - available_customers[j])
+                if dd < nn_dist:
+                    nn_dist = dd
+        # if only one customer, nn_dist stays inf, but then ties length 1, so we won't get here
+        if nn_dist > best_nn_dist:
+            best_nn_dist = nn_dist
+            best_idx = idx
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

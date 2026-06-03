@@ -1,0 +1,85 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000041 LLM reflection:
+- Summary: Increasing the isolation weight to 1.5 increased gap from 35.95 to 46.00, indicating excessive emphasis on truck competition leads to imbalance.
+- Aim: Re-balance the scoring by reducing the isolation weight and/or adding a term that favors serving customers near the depot to prevent long final returns.
+
+Parent cand_000010 LLM reflection:
+- Summary: Candidate's simplified heuristic worsened gap to 42.83 (parent 36.16), indicating that ignoring truck competition harms last-return time.
+- Aim: Reintroduce truck-competition awareness via a distance-to-nearest-other-truck term, balancing depot distance and isolation to reduce long detours.
+
+Parent cand_000042 LLM reflection:
+- Summary: Wait condition (active close to depot + would increase max) caused excessive idle and worsened gap by 31 points vs best parent.
+- Aim: Eliminate or soften the harmful wait rule to reduce idle time and improve makespan.
+
+PARENTS:
+Candidate cand_000041: IsolatedFarDispatch_v2
+Status: valid; Gap: 45.9962%
+Thought: Dispatch to customer maximizing dist_to_depot - dist_to_current_truck + 1.5 * min_distance_to_other_truck. This increases weight on isolation to avoid leaving far customers for other trucks, reducing last-truck return time. Returns None only if available_customers empty.
+Mean gap: 45.99615307072172
+Mean TTT: 4.2775103598799395
+Gap by instance size: {'50': 45.99615307072172}
+TTT by instance size: {'50': 4.2775103598799395}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_idx = None
+    best_score = -float('inf')
+    for i, cust in enumerate(available_customers):
+        cust_to_depot = np.linalg.norm(depot_position - cust)
+        cust_to_truck = np.linalg.norm(current_position - cust)
+        min_ot = float('inf')
+        for pos in truck_positions:
+            if not np.array_equal(pos, current_position):
+                d = np.linalg.norm(pos - cust)
+                if d < min_ot:
+                    min_ot = d
+        if min_ot == float('inf'):
+            min_ot = 0.0
+        score = cust_to_depot - cust_to_truck + 1.5 * min_ot
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

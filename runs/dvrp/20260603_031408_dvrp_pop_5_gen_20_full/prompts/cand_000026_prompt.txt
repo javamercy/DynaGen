@@ -1,0 +1,79 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000001 LLM reflection:
+- Summary: Candidate achieves 36.2% gap on 3-truck 50-customer instances, with high mean waits (7.9) and no explicit makespan consideration.
+- Aim: Reduce last truck return time by adding a term that balances truck workloads or penalizes long depot-return distance when trucks are idle.
+
+Parent cand_000004 LLM reflection:
+- Summary: Candidate greedily minimizes immediate max return time but achieves 57.8% gap, indicating poor fleet balance and lack of waiting.
+- Aim: Introduce a waiting mechanism that holds active truck at depot or near clustered customers when its projected return time is already low relative to current makespan.
+
+PARENTS:
+Candidate cand_000001: RegretDispatch
+Status: valid; Gap: 36.1576%
+Thought: Dispatch truck to customer with smallest weighted cost: dist_to_truck - 0.5*dist_to_depot - 0.3*min_dist_to_other_truck, to prioritize distant and isolated customers. Wait if no customers.
+Mean gap: 36.15758334983475
+Mean TTT: 4.005777150573747
+Gap by instance size: {'50': 36.15758334983475}
+TTT by instance size: {'50': 4.005777150573747}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_idx = None
+    best_cost = float('inf')
+    for i, cust in enumerate(available_customers):
+        dist_to_truck = np.linalg.norm(current_position - cust)
+        dist_to_depot = np.linalg.norm(depot_position - cust)
+        dists_to_trucks = np.linalg.norm(truck_positions - cust, axis=1)
+        sorted_dists = np.sort(dists_to_trucks)
+        if len(sorted_dists) >= 2:
+            min_other_dist = sorted_dists[1]
+        else:
+            min_other_dist = sorted_dists[0]
+        cost = dist_to_truck - 0.5 * dist_to_depot - 0.3 * min_other_dist
+        if cost < best_cost:
+            best_cost = cost
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

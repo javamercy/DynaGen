@@ -1,0 +1,221 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY e1_radical_exploration: Create a new algorithm from a substantially different algorithmic family than the provided parents. Avoid reusing the parents' dominant representation, search pattern, update rule, and control flow. The goal is broad exploration of the design space, not incremental improvement.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000005: regret_based_min_cost
+Status: valid; Gap: 48.4741%
+Thought: For each customer, compute regret = cost_now - min_alternative_cost. cost_now = distance(current_position, customer) + distance(customer, depot). Min alternative cost = min over all trucks of (distance(truck, customer) + distance(customer, depot)). Pick customer with smallest regret. Tie-break by smaller cost_now. Wait if at depot and best_regret > 0.
+Mean gap: 48.47409341392579
+Mean TTT: 4.354257910505162
+Gap by instance size: {'50': 48.47409341392579}
+TTT by instance size: {'50': 4.354257910505162}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    best_regret = float('inf')
+    best_idx = None
+    best_cost_now = float('inf')
+    for i, cust in enumerate(available_customers):
+        cost_now = np.linalg.norm(current_position - cust) + np.linalg.norm(cust - depot_position)
+        alt_costs = [np.linalg.norm(truck - cust) + np.linalg.norm(cust - depot_position) for truck in truck_positions]
+        min_alt = min(alt_costs)
+        regret = cost_now - min_alt
+        if regret < best_regret or (regret == best_regret and cost_now < best_cost_now):
+            best_regret = regret
+            best_idx = i
+            best_cost_now = cost_now
+    if best_regret > 0 and np.linalg.norm(current_position - depot_position) < 1e-6:
+        return None
+    return best_idx
+```
+
+Candidate cand_000003: multi_step_lookahead
+Status: valid; Gap: 104.222%
+Thought: Simulate entire dispatch with nearest neighbor for all trucks for each candidate decision; choose minimizing max return time.
+Mean gap: 104.22168667079514
+Mean TTT: 5.9789399226619535
+Gap by instance size: {'50': 104.22168667079514}
+TTT by instance size: {'50': 5.9789399226619535}
+Code:
+```python
+import numpy as np
+import heapq
+
+def simulate_TTT(active_idx, truck_positions, depot, customers, active_assignment):
+    n_trucks = len(truck_positions)
+    # Mutable copies
+    truck_pos = [truck_positions[i].copy() for i in range(n_trucks)]
+    unserved = [c.copy() for c in customers]
+    truck_dest = [None] * n_trucks
+    truck_arrival = [None] * n_trucks
+    last_service_time = [0.0] * n_trucks
+    current_time = 0.0
+    event_queue = []
+    
+    # Handle active truck assignment
+    if active_assignment is not None:
+        # Remove customer from unserved; assume index is valid
+        dest = unserved.pop(active_assignment)
+        truck_dest[active_idx] = dest
+        dist = np.linalg.norm(truck_pos[active_idx] - dest)
+        truck_arrival[active_idx] = current_time + dist
+        heapq.heappush(event_queue, (truck_arrival[active_idx], active_idx))
+    
+    # Initial dispatch for idle trucks (including active if not assigned)
+    for t in range(n_trucks):
+        if truck_dest[t] is None and unserved:
+            # Find nearest unserved customer
+            dists = [np.linalg.norm(truck_pos[t] - c) for c in unserved]
+            nearest_idx = np.argmin(dists)
+            dest = unserved.pop(nearest_idx)
+            truck_dest[t] = dest
+            dist = dists[nearest_idx]
+            truck_arrival[t] = current_time + dist
+            heapq.heappush(event_queue, (truck_arrival[t], t))
+    
+    # Event loop
+    while event_queue or unserved:
+        if not event_queue and unserved:
+            # All trucks idle, but customers remain (should not happen if unserved handled)
+            # Dispatch all idle trucks immediately
+            for t in range(n_trucks):
+                if truck_dest[t] is None and unserved:
+                    dists = [np.linalg.norm(truck_pos[t] - c) for c in unserved]
+                    nearest_idx = np.argmin(dists)
+                    dest = unserved.pop(nearest_idx)
+                    truck_dest[t] = dest
+                    dist = dists[nearest_idx]
+                    truck_arrival[t] = current_time + dist
+                    heapq.heappush(event_queue, (truck_arrival[t], t))
+        # Process next event
+        time, t_idx = heapq.heappop(event_queue)
+        current_time = time
+        # Truck arrives at destination
+        truck_pos[t_idx] = truck_dest[t_idx].copy()
+        last_service_time[t_idx] = current_time
+        truck_dest[t_idx] = None
+        # If customers remain, assign nearest
+        if unserved:
+            dists = [np.linalg.norm(truck_pos[t_idx] - c) for c in unserved]
+            nearest_idx = np.argmin(dists)
+            dest = unserved.pop(nearest_idx)
+            truck_dest[t_idx] = dest
+            dist = dists[nearest_idx]
+            truck_arrival[t_idx] = current_time + dist
+            heapq.heappush(event_queue, (truck_arrival[t_idx], t_idx))
+    
+    # All customers served, compute return times
+    max_return = 0.0
+    for t in range(n_trucks):
+        return_dist = np.linalg.norm(truck_pos[t] - depot)
+        return_time = last_service_time[t] + return_dist
+        if return_time > max_return:
+            max_return = return_time
+    return max_return
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    # Find index of active truck (position match)
+    active_idx = np.where((truck_positions == current_position).all(axis=1))[0]
+    if len(active_idx) == 0:
+        # Fallback: nearest truck
+        dists = np.linalg.norm(truck_positions - current_position, axis=1)
+        active_idx = np.argmin(dists)
+    else:
+        active_idx = active_idx[0]
+    
+    best_ttt = float('inf')
+    best_candidate = None
+    # Evaluate each customer index and the wait option (None)
+    candidates = list(range(len(available_customers))) + [None]
+    for cand in candidates:
+        ttt = simulate_TTT(active_idx, truck_positions, depot_position, available_customers, cand)
+        if ttt < best_ttt:
+            best_ttt = ttt
+            best_candidate = cand
+    return best_candidate
+```
+
+Candidate cand_000001: spatiotemporal_heuristic
+Status: valid; Gap: 59.0659%
+Thought: For each available customer, compute cost = distance from current truck + 0.8 * distance to depot - 0.3 * distance to nearest other truck. Pick customer with smallest cost; tie-break by index. Return None if none available.
+Mean gap: 59.06588832037412
+Mean TTT: 4.664036246703708
+Gap by instance size: {'50': 59.06588832037412}
+TTT by instance size: {'50': 4.664036246703708}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    import numpy as np
+    if available_customers.shape[0] == 0:
+        return None
+    # identify current truck index in truck_positions
+    dists = np.linalg.norm(truck_positions - current_position, axis=1)
+    current_idx = np.argmin(dists)
+    # other trucks mask
+    mask = np.ones(truck_positions.shape[0], dtype=bool)
+    mask[current_idx] = False
+    other_trucks = truck_positions[mask]
+    # compute per customer
+    n_cust = available_customers.shape[0]
+    costs = np.zeros(n_cust)
+    for i in range(n_cust):
+        cust = available_customers[i]
+        d_current = np.linalg.norm(cust - current_position)
+        d_depot = np.linalg.norm(cust - depot_position)
+        if other_trucks.shape[0] > 0:
+            d_other = np.min(np.linalg.norm(other_trucks - cust, axis=1))
+        else:
+            d_other = 0.0  # no other trucks, ignore
+        costs[i] = d_current + 0.8 * d_depot - 0.3 * d_other
+    best_idx = int(np.argmin(costs))
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

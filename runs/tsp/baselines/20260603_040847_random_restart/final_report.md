@@ -1,0 +1,3 @@
+baseline=random_restart
+status=valid
+distance=4.6292120364195295

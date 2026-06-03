@@ -1,0 +1,92 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000002 LLM reflection:
+- Summary: The candidate uses a max-min other-truck distance heuristic with tie-break by self-distance, achieving a 238.16 gap and 9.91 TTT on 3-truck size-50 instances.
+- Aim: Reduce the last-truck return time by incorporating depot-return pressure, such as prioritizing customers that lead toward the depot or penalizing those far from it.
+
+PARENTS:
+Candidate cand_000002: farthest_from_other_truck
+Status: valid; Gap: 238.156%
+Thought: Choose the available customer that is farthest from the nearest other truck, with tie-break to minimize distance from current position. If only one truck, serve nearest available customer. This anticipatory heuristic prioritizes customers that are isolated and would otherwise cause long detours, potentially delaying the last-truck return.
+Mean gap: 238.15589243933294
+Mean TTT: 9.914853608938797
+Gap by instance size: {'50': 238.15589243933294}
+TTT by instance size: {'50': 9.914853608938797}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Find index of the current truck
+    # Since current_position is exactly the position of this truck, we find the closest position
+    idx_self = np.argmin(np.linalg.norm(truck_positions - current_position, axis=1))
+    n_trucks = truck_positions.shape[0]
+    if n_trucks == 1:
+        # Only one truck: go to nearest customer
+        dists = np.linalg.norm(available_customers - current_position, axis=1)
+        return int(np.argmin(dists))
+    else:
+        best_idx = -1
+        best_min_other = -np.inf
+        best_dist_self = np.inf
+        for i, cust in enumerate(available_customers):
+            dists = np.linalg.norm(truck_positions - cust, axis=1)
+            dists[idx_self] = np.inf  # ignore this truck
+            min_other = np.min(dists)
+            dist_self = np.linalg.norm(current_position - cust)
+            # Maximize min_other, then minimize dist_self
+            if min_other > best_min_other or (min_other == best_min_other and dist_self < best_dist_self):
+                best_min_other = min_other
+                best_dist_self = dist_self
+                best_idx = i
+        return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

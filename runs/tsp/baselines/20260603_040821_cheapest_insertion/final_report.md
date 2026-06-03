@@ -1,0 +1,3 @@
+baseline=cheapest_insertion
+status=valid
+distance=17.40365980316938

@@ -1,0 +1,85 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m3_simplify_generalize: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000065: depot_return_pressure_isolation
+Status: valid; Gap: 35.9195%
+Thought: Combine isolation penalty (0.7 * min distance to other trucks) with a depot-return pressure term that penalizes customers that would make the current truck's remaining route (customer + return to depot) exceed the current maximum distance from depot among other trucks. The penalty weight is 0.5 to balance workload and reduce last-truck return time.
+Mean gap: 35.91950576799566
+Mean TTT: 4.00029626746954
+Gap by instance size: {'50': 35.91950576799566}
+TTT by instance size: {'50': 4.00029626746954}
+Code:
+```python
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    # compute current max other truck distance to depot
+    other_dists = []
+    for pos in truck_positions:
+        if not np.array_equal(pos, current_position):
+            other_dists.append(np.linalg.norm(depot_position - pos))
+    max_other = max(other_dists) if other_dists else 0.0
+    best_idx = None
+    best_score = -float('inf')
+    for i, cust in enumerate(available_customers):
+        cust_to_depot = np.linalg.norm(depot_position - cust)
+        cust_to_truck = np.linalg.norm(current_position - cust)
+        # isolation: distance to nearest other truck
+        min_ot = float('inf')
+        for pos in truck_positions:
+            if not np.array_equal(pos, current_position):
+                d = np.linalg.norm(pos - cust)
+                if d < min_ot:
+                    min_ot = d
+        if min_ot == float('inf'):
+            min_ot = 0.0
+        # depot-return pressure: estimated travel if go to cust then depot
+        finish = cust_to_truck + cust_to_depot
+        penalty = max(0.0, finish - max_other)
+        score = cust_to_depot - cust_to_truck + 0.7 * min_ot - 0.5 * penalty
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

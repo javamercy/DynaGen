@@ -1,0 +1,106 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000004 LLM reflection:
+- Summary: Candidate greedily minimizes immediate max return time but achieves 57.8% gap, indicating poor fleet balance and lack of waiting.
+- Aim: Introduce a waiting mechanism that holds active truck at depot or near clustered customers when its projected return time is already low relative to current makespan.
+
+Parent cand_000002 LLM reflection:
+- Summary: Candidate achieves 54.1% gap on small DVRP (50 customers, 3 trucks) by serving isolated customers first but ignores depot distance and truck balance, resulting in long last-return times.
+- Aim: Reduce last truck return time by adding depot-return pressure and truck competition awareness to the scoring function.
+
+Parent cand_000010 LLM reflection:
+- Summary: Candidate's simplified heuristic worsened gap to 42.83 (parent 36.16), indicating that ignoring truck competition harms last-return time.
+- Aim: Reintroduce truck-competition awareness via a distance-to-nearest-other-truck term, balancing depot distance and isolation to reduce long detours.
+
+PARENTS:
+Candidate cand_000004: min_max_heuristic
+Status: valid; Gap: 57.8334%
+Thought: For each available customer, compute the new return time for the active truck (distance to customer + customer-to-depot). Choose the customer that minimizes the maximum of that new return time and the current max distance to depot among all other trucks. This balances the makespan by preventing any truck from becoming too far. No waiting: always dispatch if customers exist.
+Mean gap: 57.83337750686987
+Mean TTT: 4.651370268198964
+Gap by instance size: {'50': 57.83337750686987}
+TTT by instance size: {'50': 4.651370268198964}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if available_customers.shape[0] == 0:
+        return None
+
+    # Compute distances from each truck to depot
+    truck_to_depot = np.linalg.norm(truck_positions - depot_position, axis=1)
+    
+    # For active truck, its current distance to depot
+    active_dist = np.linalg.norm(current_position - depot_position)
+    
+    # For each available customer, compute new return time for active truck
+    # dist(current, customer) + dist(customer, depot)
+    dist_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    new_return_times = dist_to_cust + cust_to_depot
+    
+    # Current max of other trucks' distances (excluding active truck? Actually we don't know index of active truck in truck_positions. We'll compute max of all trucks, but active truck's distance will be replaced by new_return_time, so we need max of others. We can compute max of all trucks, then for each candidate, new_max = max(new_return_time, max_other). But max_other = max of truck_to_depot excluding active? Since we don't know which index is active, we can compute overall max, but careful: If active truck is the current max, then new_max might be different. Better: compute max of all trucks, but then for each candidate, the new max is max(new_return_time, max_of_all_except_active). To get max_of_all_except_active, we can compute overall max and then if active truck is the max, we need the second max. But that's tricky. Instead, we can compute the max of all truck distances, then for each candidate, compute the new max as max(new_return_time, overall_max) but that's an overestimate if active truck is not the max and new_return_time is less than max. Actually, if active truck is not the max, the max stays the same if new_return_time <= max_other, else becomes new_return_time. But we don't know active truck index. Simpler: assume we can identify active truck's distance among truck_positions? The function doesn't provide its index. We can compute distance from current_position to depot, and compare to each truck distance to find which truck is at current_position? But multiple trucks could be at same position? Not likely but possible. We'll just treat all trucks equally and compute overall max including active. Then for each customer, new overall max = max(new_return_time, overall_max) but if active truck is the max, overall_max includes active's current distance, and new_return_time >= that, so it's fine. But if active is not the max, overall_max is from another truck, and new_return_time might be smaller than that max, so new overall max = overall_max, which is correct. So we can just use overall_max (including active). That works because if active is not the max, overall_max stays same even if new_return_time < that max. So it's correct.
+    overall_max = np.max(truck_to_depot)
+    
+    candidate_max = np.maximum(new_return_times, overall_max)
+    
+    # Choose customer with smallest candidate_max
+    best_idx = np.argmin(candidate_max)
+    
+    # But if multiple with same candidate_max, tie-break by new_return_time (smaller better)
+    # Or by distance to customer? We'll use new_return_time.
+    # To implement tie-breaking, get indices where candidate_max == candidate_max[best_idx], then pick smallest new_return_time.
+    min_val = candidate_max[best_idx]
+    ties = np.where(candidate_max == min_val)[0]
+    if len(ties) > 1:
+        # among ties, pick smallest new_return_time
+        best_idx_in_ties = np.argmin(new_return_times[ties])
+        best_idx = ties[best_idx_in_ties]
+    
+    return int(best_idx)
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

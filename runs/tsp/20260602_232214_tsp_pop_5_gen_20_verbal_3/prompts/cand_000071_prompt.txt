@@ -1,0 +1,128 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000060: simplified_sa_tsp
+
+Status: valid; distance: 10.8159
+
+Thought: Nearest neighbor initialization, then simulated annealing with 2-opt moves, exponential cooling, accept worsening moves with probability exp(-delta/T), report best tour.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = distance_matrix.shape[0]
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+
+    def nearest_neighbor():
+        start = 0
+        tour = [start]
+        visited = {start}
+        current = start
+        for _ in range(n-1):
+            best = None
+            best_dist = np.inf
+            for v in range(n):
+                if v not in visited and distance_matrix[current, v] < best_dist:
+                    best_dist = distance_matrix[current, v]
+                    best = v
+            tour.append(best)
+            visited.add(best)
+            current = best
+        return np.array(tour)
+
+    def tour_cost(tour):
+        total = 0
+        for i in range(n):
+            total += distance_matrix[tour[i], tour[(i+1)%n]]
+        return total
+
+    tour = nearest_neighbor()
+    current_cost = tour_cost(tour)
+    best_tour = tour.copy()
+    best_cost = current_cost
+    report_best_tour(tour)
+
+    T = current_cost * 0.1
+    if T == 0:
+        T = 1
+    rng = np.random.default_rng()
+    alpha = 0.99
+    epsilon = 1e-3
+    max_iters = n * 50
+
+    while T > epsilon:
+        for _ in range(max_iters):
+            i = rng.integers(0, n-2)
+            j = rng.integers(i+2, n)
+            a, b, c, d = tour[i], tour[i+1], tour[j], tour[(j+1)%n]
+            delta = distance_matrix[a,c] + distance_matrix[b,d] - distance_matrix[a,b] - distance_matrix[c,d]
+            if delta < 0 or rng.random() < np.exp(-delta/T):
+                tour = np.concatenate([tour[:i+1], tour[i+1:j+1][::-1], tour[j+1:]])
+                current_cost += delta
+                if current_cost < best_cost:
+                    best_cost = current_cost
+                    best_tour = tour.copy()
+                    report_best_tour(best_tour)
+        T *= alpha
+
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000060 LLM reflection:
+- Summary: Candidate improved tour length by 0.5% over parent via simulated annealing with 2-opt moves, but runtime increased by 58%.
+- Aim: Reduce runtime while maintaining or improving tour quality by adding a restart mechanism or adaptive cooling schedule.
+
+Parent cand_000006 LLM reflection:
+- Summary: Candidate uses random initial tour and random swap moves in simulated annealing, yielding poor tour quality (distance 75.27) compared to constructive heuristics (~11-12).
+- Aim: Incorporate a constructive initial tour and replace random swaps with 2-opt neighborhood to dramatically improve solution quality.
+
+Parent cand_000059 LLM reflection:
+- Summary: Added multiple construction heuristics (NN, FI, RI, random) and ILS improved tour length by 0.6% over regret-only parent but increased runtime by 78%.
+- Aim: Reduce runtime while maintaining or improving tour length by focusing on the most effective construction heuristic and introducing occasional worsening moves in ILS for better exploration.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

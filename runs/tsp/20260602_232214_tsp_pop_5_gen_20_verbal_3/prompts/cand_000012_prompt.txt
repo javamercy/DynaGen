@@ -1,0 +1,270 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000003: farthest_insertion
+
+Status: valid; distance: 11.584
+
+Thought: Farthest-insertion heuristic to construct initial tour, followed by 2-opt local search. The heuristic starts with the farthest pair, then repeatedly inserts the farthest node from the tour at the best position. 2-opt improves the tour by reversing segments that reduce total length. Report best tour after construction and after each improvement.
+
+Code:
+
+```python
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        return np.array(range(n))
+    # farthest insertion construction
+    # find the farthest pair
+    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [i, j]
+    remaining = set(range(n)) - {i, j}
+    while remaining:
+        # find farthest point from current tour
+        dists = np.array([min(distance_matrix[c, t] for t in tour) for c in remaining])
+        farthest_idx = np.argmax(dists)
+        farthest = list(remaining)[farthest_idx]
+        # find best insertion position
+        best_inc = np.inf
+        best_pos = 0
+        for k in range(len(tour)):
+            a = tour[k]
+            b = tour[(k+1) % len(tour)]
+            inc = distance_matrix[a, farthest] + distance_matrix[farthest, b] - distance_matrix[a, b]
+            if inc < best_inc:
+                best_inc = inc
+                best_pos = k+1
+        tour.insert(best_pos, farthest)
+        remaining.remove(farthest)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    improved = True
+    best_tour = tour_arr.copy()
+    best_cost = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))
+    while improved:
+        improved = False
+        for i in range(n-2):
+            for j in range(i+2, n):
+                if j == i+1:
+                    continue
+                new_tour = best_tour.copy()
+                new_tour[i+1:j+1] = best_tour[j:i:-1]  # careful: slice reversal
+                # compute new tour length difference
+                # affected edges: (i, i+1) and (j, (j+1)%n) replaced by (i, j) and (i+1, j+1)
+                a = best_tour[i]
+                b = best_tour[i+1]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n]
+                delta = (distance_matrix[a,c] + distance_matrix[b,d]) - (distance_matrix[a,b] + distance_matrix[c,d])
+                if delta < -1e-10:
+                    best_tour = new_tour
+                    best_cost += delta
+                    improved = True
+                    report_best_tour(best_tour)
+        # Also consider wrapping around? 2-opt typically handles wrap by modulo indexing, already done.
+    return best_tour
+
+```
+
+Candidate cand_000001: regret_insert_2opt
+
+Status: valid; distance: 11.1744
+
+Thought: Start with a 2-node tour (node 0 and its nearest neighbor). Repeatedly insert the unvisited city with the highest regret (difference between second-best and best insertion cost), tie-breaking by lower best insertion cost. Then apply 2-opt improvements until local optimum.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = distance_matrix.shape[0]
+    if n <= 3:
+        return np.arange(n)
+    
+    def tour_dist(tour):
+        total = 0
+        for i in range(n):
+            total += distance_matrix[tour[i]][tour[(i+1)%n]]
+        return total
+    
+    tour = [0]
+    first = np.argmin(distance_matrix[0][1:]) + 1
+    tour.append(first)
+    unvisited = set(range(n)) - set(tour)
+    
+    while unvisited:
+        best_insert = {}
+        second_best = {}
+        for city in unvisited:
+            best = float('inf')
+            sec = float('inf')
+            best_idx = None
+            for pos in range(len(tour)):
+                i = tour[pos]
+                j = tour[(pos+1)%len(tour)]
+                cost = distance_matrix[i][city] + distance_matrix[city][j] - distance_matrix[i][j]
+                if cost < best:
+                    sec = best
+                    best = cost
+                    best_idx = pos
+                elif cost < sec:
+                    sec = cost
+            best_insert[city] = (best_idx, best)
+            second_best[city] = sec if sec != float('inf') else best
+        regret = {c: second_best[c] - best_insert[c][1] for c in unvisited}
+        chosen = max(unvisited, key=lambda c: (regret[c], -best_insert[c][1]))
+        idx, _ = best_insert[chosen]
+        tour.insert(idx+1, chosen)
+        unvisited.remove(chosen)
+    
+    best_tour = np.array(tour)
+    report_best_tour(best_tour)
+    best_dist = tour_dist(best_tour)
+    
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n):
+            for j in range(i+2, n):
+                a = best_tour[i]
+                b = best_tour[(i+1)%n]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n]
+                old = distance_matrix[a][b] + distance_matrix[c][d]
+                new = distance_matrix[a][c] + distance_matrix[b][d]
+                if new < old:
+                    new_tour = np.concatenate([best_tour[:i+1], best_tour[i+1:j+1][::-1], best_tour[j+1:]])
+                    new_dist = tour_dist(new_tour)
+                    if new_dist < best_dist:
+                        best_tour = new_tour
+                        best_dist = new_dist
+                        improved = True
+                        report_best_tour(best_tour)
+    return best_tour
+
+```
+
+Candidate cand_000007: regret_farthest_2opt
+
+Status: valid; distance: 11.2031
+
+Thought: Hybrid of farthest insertion initialization and regret-based insertion (difference between best and second-best insertion cost), followed by 2-opt improvement. Start with the farthest pair to spread the tour, then insert cities with highest regret to balance cost and foresight. Finally apply 2-opt until local optimum.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n <= 2:
+        tour = np.arange(n)
+        report_best_tour(tour)
+        return tour
+    # find farthest pair
+    i, j = np.unravel_index(np.argmax(distance_matrix), (n, n))
+    tour = [i, j]
+    unvisited = set(range(n)) - {i, j}
+    # regret insertion
+    while unvisited:
+        best_cost = {}
+        second_cost = {}
+        best_pos = {}
+        for city in unvisited:
+            best = float('inf')
+            second = float('inf')
+            pos = 0
+            for k in range(len(tour)):
+                a = tour[k]
+                b = tour[(k+1) % len(tour)]
+                cost = distance_matrix[a, city] + distance_matrix[city, b] - distance_matrix[a, b]
+                if cost < best:
+                    second = best
+                    best = cost
+                    pos = k+1
+                elif cost < second:
+                    second = cost
+            best_cost[city] = best
+            second_cost[city] = second if second != float('inf') else best
+            best_pos[city] = pos
+        # choose city with max regret, tie-break by lower best cost
+        max_regret = max(second_cost[c] - best_cost[c] for c in unvisited)
+        candidates = [c for c in unvisited if second_cost[c] - best_cost[c] == max_regret]
+        if len(candidates) > 1:
+            chosen = min(candidates, key=lambda c: best_cost[c])
+        else:
+            chosen = candidates[0]
+        pos = best_pos[chosen]
+        tour.insert(pos, chosen)
+        unvisited.remove(chosen)
+    tour_arr = np.array(tour)
+    report_best_tour(tour_arr)
+    # 2-opt improvement
+    n_cities = n
+    improved = True
+    best_tour = tour_arr.copy()
+    best_dist = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n_cities]] for i in range(n_cities))
+    while improved:
+        improved = False
+        for i in range(n_cities-2):
+            for j in range(i+2, n_cities):
+                a = best_tour[i]
+                b = best_tour[i+1]
+                c = best_tour[j]
+                d = best_tour[(j+1)%n_cities]
+                delta = distance_matrix[a,c] + distance_matrix[b,d] - distance_matrix[a,b] - distance_matrix[c,d]
+                if delta < -1e-10:
+                    new_tour = best_tour.copy()
+                    new_tour[i+1:j+1] = best_tour[j:i:-1]
+                    new_dist = best_dist + delta
+                    best_tour = new_tour
+                    best_dist = new_dist
+                    improved = True
+                    report_best_tour(best_tour)
+    return best_tour
+
+```
+
+STRATEGY: e2_backbone_exploration
+
+GOAL: Identify the useful shared backbone among the provided parents, then create a new algorithm that preserves that core principle while changing the surrounding mechanism, structure, or execution strategy. The result should be motivated by the parents but clearly not a direct copy.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

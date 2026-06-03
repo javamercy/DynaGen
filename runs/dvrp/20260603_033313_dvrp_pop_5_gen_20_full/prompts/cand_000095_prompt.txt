@@ -1,0 +1,139 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000053 LLM reflection:
+- Summary: Plain nearest-neighbor simulation reduced gap by 33.9% over weighted parent, with fewer waits and lower TTT.
+- Aim: Integrate a mild depot-return bias into nearest-neighbor selection without increasing waiting times, to further reduce last-truck return time.
+
+PARENTS:
+Candidate cand_000053: lookahead_plain_nn
+Status: valid; Gap: 104.222%
+Thought: Simulate remaining dispatch with plain nearest-neighbor (no depot weighting) for each candidate customer including wait, then pick the one minimizing predicted last-truck return time.
+Mean gap: 104.22168667079514
+Mean TTT: 5.9789399226619535
+Gap by instance size: {'50': 104.22168667079514}
+TTT by instance size: {'50': 5.9789399226619535}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+import heapq
+
+def simulate_plain_nn(active_idx, truck_positions, depot, available_customers, active_assignment):
+    n = len(truck_positions)
+    pos = [p.copy() for p in truck_positions]
+    unserved = [c.copy() for c in available_customers]
+    dest = [None] * n
+    arrival = [0.0] * n
+    last_service = [0.0] * n
+    current_time = 0.0
+    event_queue = []
+
+    # handle active assignment
+    if active_assignment is not None:
+        cust = unserved.pop(active_assignment)
+        dest[active_idx] = cust
+        dist = np.linalg.norm(pos[active_idx] - cust)
+        arrival[active_idx] = current_time + dist
+        heapq.heappush(event_queue, (arrival[active_idx], active_idx))
+
+    # initial dispatch for idle trucks (including active if not assigned)
+    for t in range(n):
+        if dest[t] is None and unserved:
+            nearest_idx = np.argmin([np.linalg.norm(pos[t] - c) for c in unserved])
+            cust = unserved.pop(nearest_idx)
+            dest[t] = cust
+            dist = np.linalg.norm(pos[t] - cust)
+            arrival[t] = current_time + dist
+            heapq.heappush(event_queue, (arrival[t], t))
+
+    while event_queue or unserved:
+        if not event_queue and unserved:
+            for t in range(n):
+                if dest[t] is None and unserved:
+                    nearest_idx = np.argmin([np.linalg.norm(pos[t] - c) for c in unserved])
+                    cust = unserved.pop(nearest_idx)
+                    dest[t] = cust
+                    dist = np.linalg.norm(pos[t] - cust)
+                    arrival[t] = current_time + dist
+                    heapq.heappush(event_queue, (arrival[t], t))
+        time, t_idx = heapq.heappop(event_queue)
+        current_time = time
+        pos[t_idx] = dest[t_idx].copy()
+        last_service[t_idx] = current_time
+        dest[t_idx] = None
+        if unserved:
+            nearest_idx = np.argmin([np.linalg.norm(pos[t_idx] - c) for c in unserved])
+            cust = unserved.pop(nearest_idx)
+            dest[t_idx] = cust
+            dist = np.linalg.norm(pos[t_idx] - cust)
+            arrival[t_idx] = current_time + dist
+            heapq.heappush(event_queue, (arrival[t_idx], t_idx))
+
+    max_return = 0.0
+    for t in range(n):
+        return_dist = np.linalg.norm(pos[t] - depot)
+        return_time = last_service[t] + return_dist
+        if return_time > max_return:
+            max_return = return_time
+    return max_return
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    active_idx = np.where((truck_positions == current_position).all(axis=1))[0]
+    if len(active_idx) == 0:
+        dists = np.linalg.norm(truck_positions - current_position, axis=1)
+        active_idx = np.argmin(dists)
+    else:
+        active_idx = active_idx[0]
+    best_ttt = float('inf')
+    best_candidate = None
+    candidates = list(range(len(available_customers))) + [None]
+    for cand in candidates:
+        ttt = simulate_plain_nn(active_idx, truck_positions, depot_position, available_customers, cand)
+        if ttt < best_ttt:
+            best_ttt = ttt
+            best_candidate = cand
+    return best_candidate
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
