@@ -1,0 +1,137 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000065: adaptive_threshold_remaining_customers
+Status: valid; Gap: 32.117%
+Thought: Regret-based dispatch with adaptive waiting threshold: threshold alpha is adjusted based on number of available customers (fewer customers -> higher threshold, more willing to wait) to balance idle waiting and return pressure, reducing TTT.
+Mean gap: 32.116958012355205
+Mean TTT: 3.8888291452040185
+Gap by instance size: {'50': 32.116958012355205}
+TTT by instance size: {'50': 3.8888291452040185}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+    
+    def dist(a, b):
+        return np.linalg.norm(a - b)
+    
+    n_trucks = len(truck_positions)
+    n_avail = len(available_customers)
+    
+    # Adaptive alpha: fewer remaining customers -> more willing to wait (higher alpha)
+    if n_avail > 10:
+        alpha = 0.15
+    elif n_avail > 5:
+        alpha = 0.2
+    elif n_avail > 2:
+        alpha = 0.3
+    else:
+        alpha = 0.4
+    
+    best_negative_candidate = None
+    best_negative_regret = float('inf')
+    best_negative_immediate = float('inf')
+    
+    # First pass: find best customer with negative regret
+    for i, cust in enumerate(available_customers):
+        cust_return = dist(cust, depot_position)
+        immediate_total = dist(current_position, cust) + cust_return
+        
+        if n_trucks > 1:
+            best_other = float('inf')
+            for j, pos in enumerate(truck_positions):
+                if np.array_equal(pos, current_position):
+                    continue
+                deferred = dist(pos, cust) + cust_return
+                if deferred < best_other:
+                    best_other = deferred
+            regret = immediate_total - best_other
+        else:
+            regret = -1.0
+        
+        if regret < 0:
+            if regret < best_negative_regret or (regret == best_negative_regret and immediate_total < best_negative_immediate):
+                best_negative_regret = regret
+                best_negative_immediate = immediate_total
+                best_negative_candidate = i
+    
+    if best_negative_candidate is not None:
+        return best_negative_candidate
+    
+    # No negative regret: use threshold based on adaptive alpha
+    best_threshold_candidate = None
+    best_threshold_regret = float('inf')
+    best_threshold_immediate = float('inf')
+    
+    for i, cust in enumerate(available_customers):
+        cust_return = dist(cust, depot_position)
+        immediate_total = dist(current_position, cust) + cust_return
+        
+        if n_trucks > 1:
+            best_other = float('inf')
+            for j, pos in enumerate(truck_positions):
+                if np.array_equal(pos, current_position):
+                    continue
+                deferred = dist(pos, cust) + cust_return
+                if deferred < best_other:
+                    best_other = deferred
+            regret = immediate_total - best_other
+        else:
+            regret = -1.0
+        
+        if regret < alpha * dist(current_position, depot_position):
+            if regret < best_threshold_regret or (regret == best_threshold_regret and immediate_total < best_threshold_immediate):
+                best_threshold_regret = regret
+                best_threshold_immediate = immediate_total
+                best_threshold_candidate = i
+    
+    return best_threshold_candidate
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

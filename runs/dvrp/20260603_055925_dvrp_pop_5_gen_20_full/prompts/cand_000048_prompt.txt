@@ -1,0 +1,130 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000030 LLM reflection:
+- Summary: Adding a ratio-based second pass (ratio ≤ 1.2) reduced mean waits from 10.8 to 6.3 but increased gap by 1.37% due to suboptimal customer assignments.
+- Aim: Reduce last-return time by improving assignment decisions when no negative regret exists, without increasing waiting harmfully.
+
+PARENTS:
+Candidate cand_000030: regret_adjusted
+Status: valid; Gap: 34.3639%
+Thought: Use regret-based selection with an adjusted threshold: if negative regret exists, choose best (most negative, tie by shortest immediate distance). If none, compute ratio of immediate_total to best_other; if any ratio <= 1.2, serve the customer with smallest ratio (closest to break-even). Otherwise wait. This reduces idle waiting without sacrificing too much, as per parent reflection.
+Mean gap: 34.363875240689865
+Mean TTT: 3.957764373393921
+Gap by instance size: {'50': 34.363875240689865}
+TTT by instance size: {'50': 3.957764373393921}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(current_position, depot_position, truck_positions, available_customers):
+    if len(available_customers) == 0:
+        return None
+
+    def dist(a, b):
+        return np.linalg.norm(a - b)
+
+    n_trucks = len(truck_positions)
+    best_candidate = None
+    best_regret = float('inf')
+    best_dist = float('inf')
+    
+    # First pass: negative regret candidates
+    for i, cust in enumerate(available_customers):
+        cust_return = dist(cust, depot_position)
+        immediate_total = dist(current_position, cust) + cust_return
+        
+        if n_trucks > 1:
+            best_other = float('inf')
+            for j, pos in enumerate(truck_positions):
+                if np.array_equal(pos, current_position):
+                    continue
+                deferred = dist(pos, cust) + cust_return
+                if deferred < best_other:
+                    best_other = deferred
+            regret = immediate_total - best_other
+        else:
+            regret = -1.0
+        
+        if regret < 0:
+            if regret < best_regret or (regret == best_regret and immediate_total < best_dist):
+                best_regret = regret
+                best_dist = immediate_total
+                best_candidate = i
+    
+    if best_candidate is not None:
+        return best_candidate
+    
+    # Second pass: positive regret with small overhead
+    best_ratio = float('inf')
+    best_immediate = float('inf')
+    best_candidate = None
+    for i, cust in enumerate(available_customers):
+        cust_return = dist(cust, depot_position)
+        immediate_total = dist(current_position, cust) + cust_return
+        
+        if n_trucks > 1:
+            best_other = float('inf')
+            for j, pos in enumerate(truck_positions):
+                if np.array_equal(pos, current_position):
+                    continue
+                deferred = dist(pos, cust) + cust_return
+                if deferred < best_other:
+                    best_other = deferred
+            if best_other <= 0:
+                continue
+            ratio = immediate_total / best_other
+        else:
+            # single truck: always serve (ratio effectively 0)
+            ratio = 0.0
+        
+        # Accept if ratio <= 1.2 (and ratio >= 1? but ratio=0 also fine)
+        if ratio <= 1.2:
+            if ratio < best_ratio or (ratio == best_ratio and immediate_total < best_immediate):
+                best_ratio = ratio
+                best_immediate = immediate_total
+                best_candidate = i
+    
+    return best_candidate
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

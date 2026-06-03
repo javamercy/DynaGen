@@ -1,0 +1,109 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000020: urgent_regret_return
+Status: valid; Gap: 32.9974%
+Thought: Assign customer that minimizes expected return time to depot, computed as distance from truck to customer plus customer to depot; positive regret indicates current truck can serve and return sooner than any other; else wait.
+Mean gap: 32.997403692111824
+Mean TTT: 3.9163531129407465
+Gap by instance size: {'50': 32.997403692111824}
+TTT by instance size: {'50': 3.9163531129407465}
+Code:
+```python
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    n_trucks = len(truck_positions)
+    if n_trucks == 1:
+        # Only one truck: go to nearest customer
+        distances = np.linalg.norm(available_customers - current_position, axis=1)
+        return int(np.argmin(distances))
+    
+    # Find index of current truck (the one at current_position)
+    current_truck_idx = int(np.argmin(np.linalg.norm(truck_positions - current_position, axis=1)))
+    
+    # Precompute distance from each customer to depot
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    best_regret = -float('inf')
+    best_idx = None
+    best_secondary = -float('inf')
+    
+    for i, cust in enumerate(available_customers):
+        # Distance from current truck to this customer
+        curr_to_cust = np.linalg.norm(current_position - cust)
+        # Potential return time if current truck serves this customer and goes back to depot
+        pot_return_curr = curr_to_cust + cust_to_depot[i]
+        
+        # Compute potential return times for other trucks
+        other_returns = []
+        for j, pos in enumerate(truck_positions):
+            if j == current_truck_idx:
+                continue
+            other_to_cust = np.linalg.norm(pos - cust)
+            other_return = other_to_cust + cust_to_depot[i]
+            other_returns.append(other_return)
+        min_other = min(other_returns) if other_returns else float('inf')
+        
+        # Regret: how much better (or worse) it is for current truck to serve this customer
+        regret = min_other - pot_return_curr
+        # Secondary criterion: smaller pot_return_curr is better for tie-breaking
+        secondary = -pot_return_curr
+        
+        if (regret > best_regret) or (regret == best_regret and secondary > best_secondary):
+            best_regret = regret
+            best_idx = i
+            best_secondary = secondary
+    
+    # Only assign if regret >= 0 (current truck can serve and return at least as fast as any other)
+    if best_regret >= 0:
+        return best_idx
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

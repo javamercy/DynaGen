@@ -1,0 +1,101 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000010 LLM reflection:
+- Summary: Regret-based dispatch achieved 32.997% gap with mean TTT 3.92, identical to parent, and served 49/50 customers.
+- Aim: Reduce mean waits and improve completion rate by adding depot-return incentive when few customers remain.
+
+Parent cand_000024 LLM reflection:
+- Summary: Relaxing regret threshold reduced waits but increased gap by 1.8%, indicating that permissive assignments harm last-return time.
+- Aim: Tighten regret threshold to avoid assignments that increase the current truck's return beyond the fleet average, while considering remaining customer density.
+
+Parent cand_000013 LLM reflection:
+- Summary: Average-deferred regret reduced gap from 32.997 to 32.995, but worst-case gap remains high (56.27), indicating unbalanced fleet.
+- Aim: Improve worst-case gap by incorporating a term that penalizes customers worsening the max remaining time across trucks.
+
+PARENTS:
+Candidate cand_000010: regret_based_dispatch
+Status: valid; Gap: 32.9974%
+Thought: For each available customer, compute regret = distance to second-closest truck minus distance to current truck. If current truck is closest to any customer (positive regret), serve the customer with highest regret (smallest current distance tie-breaker removed for simplicity). Otherwise wait. This minimizes TTT by balancing workload.
+Mean gap: 32.997403692111824
+Mean TTT: 3.9163531129407465
+Gap by instance size: {'50': 32.997403692111824}
+TTT by instance size: {'50': 3.9163531129407465}
+Code:
+```python
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    n_trucks = len(truck_positions)
+    if n_trucks == 1:
+        # Only one truck: go to nearest customer
+        distances = np.linalg.norm(available_customers - current_position, axis=1)
+        return int(np.argmin(distances))
+    
+    # Find index of current truck
+    current_truck_idx = int(np.argmin(np.linalg.norm(truck_positions - current_position, axis=1)))
+    
+    # Precompute distances from current truck to all customers
+    current_dists = np.linalg.norm(available_customers - current_position, axis=1)
+    
+    # For each customer, find distance to nearest other truck
+    other_dists = []
+    for i, cust in enumerate(available_customers):
+        dists_to_other_trucks = np.linalg.norm(truck_positions - cust, axis=1)
+        # exclude current truck's distance
+        dists_to_other_trucks = np.delete(dists_to_other_trucks, current_truck_idx)
+        min_other = np.min(dists_to_other_trucks) if len(dists_to_other_trucks) > 0 else float('inf')
+        other_dists.append(min_other)
+    other_dists = np.array(other_dists)
+    
+    regrets = other_dists - current_dists
+    max_regret = np.max(regrets)
+    if max_regret >= 0:
+        # Return the first customer achieving max regret (argmax)
+        return int(np.argmax(regrets))
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
