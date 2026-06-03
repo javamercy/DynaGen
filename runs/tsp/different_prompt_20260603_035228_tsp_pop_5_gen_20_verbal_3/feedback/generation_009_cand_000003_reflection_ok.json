@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000003",
+  "generation": 9,
+  "gradient": {
+    "aim": "Improve solution quality by introducing randomized restart or greedy randomized adaptive search procedure to escape local optima.",
+    "avoid": [
+      "overly complex local search that increases runtime significantly",
+      "breaking valid permutation guarantee",
+      "removing report_best_tour updates"
+    ],
+    "candidate_id": "cand_000003",
+    "change": [
+      "replace deterministic nearest neighbor with a randomized greedy construction (e.g., randomized nearest neighbor or greedy randomized with candidate lists)",
+      "add a perturbation mechanism after 2-opt to restart from a modified tour"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 9,
+    "parent_ids": [],
+    "preserve": [
+      "nearest neighbor construction for fast valid initialization",
+      "2-opt local search with delta evaluation",
+      "best tour tracking with report_best_tour"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 11.405959133637383,
+    "source": "llm",
+    "summary": "Nearest neighbor construction plus 2-opt yields valid tours with moderate quality; potential for lower mean tour length via richer construction or multi-start.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n <= 1:\\n        tour = np.arange(n)\\n        report_best_tour(tour)\\n        return tour\\n    # Nearest neighbor construction\\n    tour = [0]\\n    visited = [False] * n\\n    visited[0] = True\\n    for _ in range(n - 1):\\n        last = tour[-1]\\n        best = -1\\n        bestd = float('inf')\\n        for j in range(n):\\n            if not visited[j] and distance_matrix[last, j] < bestd:\\n                bestd = distance_matrix[last, j]\\n                best = j\\n        tour.append(best)\\n        visited[best] = True\\n    # Total distance\\n    total = sum(distance_matrix[tour[i], tour[(i + 1) % n]] for i in range(n))\\n    best_total = total\\n    best_tour = tour[:]\\n    report_best_tour(np.array(tour))\\n    # 2-opt improvement\\n    improved = True\\n    while improved:\\n        improved = False\\n        for i in range(n - 2):\\n            for j in range(i + 2, n):\\n                # delta = old - new\\n                if j == n - 1:\\n                    delta = (distance_matrix[tour[i], tour[i+1]] +\\n                             distance_matrix[tour[j], tour[0]] -\\n                             distance_matrix[tour[i], tour[j]] -\\n                             distance_matrix[tour[i+1], tour[0]])\\n                else:\\n                    delta = (distance_matrix[tour[i], tour[i+1]] +\\n                             distance_matrix[tour[j], tour[j+1]] -\\n                             distance_matrix[tour[i], tour[j]] -\\n                             distance_matrix[tour[i+1], tour[j+1]])\\n                if delta > 0:\\n                    tour[i+1:j+1] = reversed(tour[i+1:j+1])\\n                    improved = True\\n                    total -= delta\\n                    if total < best_total:\\n                        best_total = total\\n                        best_tour = tour[:]\\n                        report_best_tour(np.array(tour))\\n    # Return best found\\n    tour_arr = np.array(best_tour)\\n    report_best_tour(tour_arr)\\n    return tour_arr\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000003\",\"metrics\":{\"best_gap\":null,\"distance\":11.405959133637383,\"gap_by_instance_size\":{\"200\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"diversity_score\":1.0,\"history_score\":1.6352471558006774,\"in_history\":true,\"primary_bucket\":\"tsp:size:200\",\"quality_score\":0.9887226696356352,\"robustness_score\":0.9900699604715493},\"history_selection\":{\"bucket_score\":0.9887226696356352,\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"history_score\":1.5852471558006773,\"primary_bucket\":\"tsp:size:200\",\"role\":\"regime specialist\"},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.05103004000011424,\"mean_tour_length\":11.405959133637383,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"200\":11.405959133637383},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.405959133637383},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":600.0,\"tour_length_by_instance_size\":{\"200\":11.405959133637383},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.405959133637383},\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":11.405959133637383,\"status\":\"valid\",\"thought\":\"Construct initial tour using nearest neighbor heuristic starting from node 0. Then apply deterministic 2-opt local search with steepest descent, using delta evaluation and incremental distance update to quickly find improvements. Report best tour whenever improved.\"},\"delta_vs_best_parent\":null,\"generation\":9,\"goal\":\"minimize TSP tour length while always returning a valid permutation\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Nearest neighbor construction plus 2-opt yields valid tours with moderate quality; potential for lower mean tour length via richer construction or multi-start.\",\n  \"aim\": \"Improve solution quality by introducing randomized restart or greedy randomized adaptive search procedure to escape local optima.\",\n  \"preserve\": [\"nearest neighbor construction for fast valid initialization\", \"2-opt local search with delta evaluation\", \"best tour tracking with report_best_tour\"],\n  \"change\": [\"replace deterministic nearest neighbor with a randomized greedy construction (e.g., randomized nearest neighbor or greedy randomized with candidate lists)\", \"add a perturbation mechanism after 2-opt to restart from a modified tour\"],\n  \"avoid\": [\"overly complex local search that increases runtime significantly\", \"breaking valid permutation guarantee\", \"removing report_best_tour updates\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

@@ -1,0 +1,48 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+# Initial Candidate Identity
+
+Candidate ID: 5
+
+Role: The Graph Theory Mathematician
+
+Intended bias: You are a Graph Theory Mathematician. You approach the TSP by analyzing graph properties. Your 
+strategies involve Minimum Spanning Trees (MST), Eulerian circuits, Christofides-inspired 
+approximations, and manipulating node degrees or spanning forest topologies to build high-quality tours.
+
+# Internal Quality Checklist
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+# Solver Contract
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+# Response Format
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

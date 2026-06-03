@@ -1,0 +1,149 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000024: farthest_insertion_2opt
+
+Status: valid; distance: 11.3053
+
+Thought: Farthest insertion construction provides a good initial tour. Then 2-opt first improvement local search until local optimum. Repeat for 5 random restarts (different start nodes) to diversify, keeping the best tour. Report best each time it improves.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n == 1:
+        tour = np.array([0])
+        report_best_tour(tour)
+        return tour
+    if n == 2:
+        tour = np.array([0, 1])
+        report_best_tour(tour)
+        return tour
+
+    def total_dist(t):
+        idx = np.array(t)
+        return distance_matrix[idx[-1], idx[0]] + np.sum(distance_matrix[idx[:-1], idx[1:]])
+
+    def two_opt_first(tour):
+        improved = True
+        while improved:
+            improved = False
+            for i in range(n - 1):
+                for j in range(i + 2, n):
+                    if j == n - 1:
+                        delta = (distance_matrix[tour[i], tour[i+1]] +
+                                 distance_matrix[tour[j], tour[0]] -
+                                 distance_matrix[tour[i], tour[j]] -
+                                 distance_matrix[tour[i+1], tour[0]])
+                    else:
+                        delta = (distance_matrix[tour[i], tour[i+1]] +
+                                 distance_matrix[tour[j], tour[j+1]] -
+                                 distance_matrix[tour[i], tour[j]] -
+                                 distance_matrix[tour[i+1], tour[j+1]])
+                    if delta > 1e-12:
+                        tour[i+1:j+1] = reversed(tour[i+1:j+1])
+                        improved = True
+                        break
+                if improved:
+                    break
+        return tour
+
+    def farthest_insertion(start):
+        tour = [start]
+        visited = {start}
+        while len(tour) < n:
+            # Find farthest unvisited node from the tour
+            farthest_node = None
+            farthest_dist = -1
+            for v in range(n):
+                if v not in visited:
+                    min_dist = min(distance_matrix[v, tour_node] for tour_node in tour)
+                    if min_dist > farthest_dist:
+                        farthest_dist = min_dist
+                        farthest_node = v
+            # Insert farthest_node at best position
+            best_gain = float('inf')
+            best_pos = 0
+            for pos in range(len(tour)):
+                # Insert between tour[pos] and tour[(pos+1)%len(tour)]
+                next_pos = (pos + 1) % len(tour)
+                gain = (distance_matrix[tour[pos], farthest_node] +
+                        distance_matrix[farthest_node, tour[next_pos]] -
+                        distance_matrix[tour[pos], tour[next_pos]])
+                if gain < best_gain:
+                    best_gain = gain
+                    best_pos = pos + 1
+            tour.insert(best_pos, farthest_node)
+            visited.add(farthest_node)
+        return tour
+
+    best_tour = None
+    best_dist = float('inf')
+    max_restarts = 5
+    for restart in range(max_restarts):
+        start_node = restart % n
+        tour = farthest_insertion(start_node)
+        tour = two_opt_first(tour)
+        cur_dist = total_dist(tour)
+        if cur_dist < best_dist - 1e-12:
+            best_dist = cur_dist
+            best_tour = np.array(tour)
+            report_best_tour(best_tour)
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000024 LLM reflection:
+- Summary: Candidate (farthest insertion + 5 restarts + 2-opt first improvement) achieved tour length 11.305, which is 2.0% worse than parent's 11.084, indicating that the restart-only diversification underperforms the parent's perturbation-based iterative search.
+- Aim: Improve tour length by enhancing local search quality or diversification, e.g., adopting steepest descent or adding perturbation between restarts.
+
+Parent cand_000059 LLM reflection:
+- Summary: Slight tour length improvement (0.03) achieved by increasing restarts and cycles, with all 10 runs valid and no errors.
+- Aim: Further reduce tour length by improving initial tour quality or escape mechanism, without increasing runtime excessively.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

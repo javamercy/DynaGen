@@ -1,0 +1,137 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000020: double_bridge_ils
+
+Status: valid; distance: 11.0723
+
+Thought: Nearest neighbor construction, then iterative local search: 2-opt steepest descent (first improvement) until local optimum, then double-bridge perturbation to escape. Repeat for 50 cycles to deepen search. Reports each new best tour.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n == 1:
+        tour = np.array([0])
+        report_best_tour(tour)
+        return tour
+    if n == 2:
+        tour = np.array([0, 1])
+        report_best_tour(tour)
+        return tour
+
+    # Nearest neighbor construction
+    tour = [0]
+    visited = [False] * n
+    visited[0] = True
+    for _ in range(n - 1):
+        last = tour[-1]
+        best = -1
+        bestd = float('inf')
+        for j in range(n):
+            if not visited[j] and distance_matrix[last, j] < bestd:
+                bestd = distance_matrix[last, j]
+                best = j
+        tour.append(best)
+        visited[best] = True
+    tour = np.array(tour, dtype=int)
+
+    def total_dist(t):
+        return distance_matrix[t[-1], t[0]] + np.sum(distance_matrix[t[:-1], t[1:]])
+
+    best_tour = tour.copy()
+    best_dist = total_dist(tour)
+    report_best_tour(best_tour)
+
+    max_iters = 50
+    for _ in range(max_iters):
+        # 2-opt steepest descent (first improvement)
+        improved = True
+        while improved:
+            improved = False
+            cur_dist = total_dist(tour)
+            for i in range(n - 2):
+                for j in range(i + 2, n):
+                    if j == n - 1:
+                        delta = (distance_matrix[tour[i], tour[i+1]] +
+                                 distance_matrix[tour[j], tour[0]] -
+                                 distance_matrix[tour[i], tour[j]] -
+                                 distance_matrix[tour[i+1], tour[0]])
+                    else:
+                        delta = (distance_matrix[tour[i], tour[i+1]] +
+                                 distance_matrix[tour[j], tour[j+1]] -
+                                 distance_matrix[tour[i], tour[j]] -
+                                 distance_matrix[tour[i+1], tour[j+1]])
+                    if delta > 1e-12:
+                        tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                        improved = True
+                        cur_dist -= delta
+                        if cur_dist < best_dist - 1e-12:
+                            best_dist = cur_dist
+                            best_tour = tour.copy()
+                            report_best_tour(best_tour)
+                        break
+                if improved:
+                    break
+        # Double-bridge perturbation
+        if _ < max_iters - 1:
+            cuts = sorted(np.random.choice(range(1, n), 3, replace=False))
+            segments = [tour[:cuts[0]].tolist(), tour[cuts[0]:cuts[1]].tolist(),
+                        tour[cuts[1]:cuts[2]].tolist(), tour[cuts[2]:].tolist()]
+            new_tour = np.array(segments[0] + segments[2] + segments[1] + segments[3])
+            tour = new_tour
+            new_dist = total_dist(tour)
+            if new_dist < best_dist - 1e-12:
+                best_dist = new_dist
+                best_tour = tour.copy()
+                report_best_tour(best_tour)
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000012 LLM reflection:
+- Summary: Improved tour length by 1.6% over best parent using combined double-bridge and random reversal perturbations in iterative 2-opt search, though runtime increased tenfold.
+- Aim: Further reduce tour length by enhancing diversification without linearly increasing runtime, possibly by adding an adaptive restart or adjusting perturbation strength based on stagnation.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

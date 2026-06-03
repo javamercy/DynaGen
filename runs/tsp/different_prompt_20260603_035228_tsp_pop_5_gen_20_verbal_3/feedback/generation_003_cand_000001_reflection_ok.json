@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000001",
+  "generation": 3,
+  "gradient": {
+    "aim": "Reduce mean tour length by adding multiple restarts with random starting cities or tie-breaking in nearest neighbor, while preserving validity.",
+    "avoid": [
+      "introducing invalid tours or cycles",
+      "infinite loops from non-terminating local search",
+      "overly complex code that obscures core logic"
+    ],
+    "candidate_id": "cand_000001",
+    "change": [
+      "Add restart loop with different starting towns or random choices during construction"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 3,
+    "parent_ids": [],
+    "preserve": [
+      "nearest neighbor construction",
+      "2-opt local search",
+      "report_best_tour calls",
+      "valid permutation guarantee"
+    ],
+    "problem": "tsp",
+    "score_name": "distance",
+    "score_value": 11.349794163612426,
+    "source": "llm",
+    "summary": "Nearest neighbor with 2-opt achieved mean tour length 11.35 on 200-city TSP instances with 100% validity and no errors.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "tsp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize TSP tour length while always returning a valid permutation\nDomain focus: construction heuristic, local-search neighborhood, restart/diversification behavior, report_best_tour use, and size robustness\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:\\n    n = len(distance_matrix)\\n    if n == 0:\\n        return np.array([], dtype=int)\\n    if n == 1:\\n        return np.array([0])\\n    # Nearest neighbor construction\\n    tour = [0]\\n    unvisited = set(range(1, n))\\n    current = 0\\n    while unvisited:\\n        next_node = min(unvisited, key=lambda x: distance_matrix[current, x])\\n        tour.append(next_node)\\n        unvisited.remove(next_node)\\n        current = next_node\\n    tour = np.array(tour, dtype=int)\\n    # report initial tour\\n    report_best_tour(tour)\\n    # 2-opt improvement\\n    improved = True\\n    while improved:\\n        improved = False\\n        for i in range(n - 1):\\n            for j in range(i + 1, n):\\n                if j - i == 1:\\n                    continue\\n                # edges (i, i+1) and (j, (j+1)%n)\\n                a, b = tour[i], tour[(i + 1) % n]\\n                c, d = tour[j], tour[(j + 1) % n]\\n                delta = distance_matrix[a, c] + distance_matrix[b, d] - distance_matrix[a, b] - distance_matrix[c, d]\\n                if delta < -1e-9:\\n                    # reverse segment from i+1 to j\\n                    tour[i+1:j+1] = tour[i+1:j+1][::-1]\\n                    improved = True\\n                    report_best_tour(tour)\\n    return tour\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000001\",\"metrics\":{\"best_gap\":null,\"distance\":11.349794163612426,\"gap_by_instance_size\":{\"200\":null},\"gap_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":null},\"history\":{\"buckets\":[\"global\",\"tsp:size:200\",\"tsp:source:synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\",\"tsp:runtime:fast\",\"tsp:runtime:robust\",\"tsp:mechanism:nearest_neighbor\",\"tsp:mechanism:two_opt\"],\"diversity_score\":1.0,\"history_score\":1.6353700510515055,\"in_history\":true,\"primary_bucket\":\"tsp:size:200\",\"quality_score\":0.988777578015924,\"robustness_score\":0.9902642086730895},\"invalid_tour_count\":0,\"mean_gap\":null,\"mean_runtime\":0.04916052999997191,\"mean_tour_length\":11.349794163612426,\"median_gap\":null,\"partial_timeout_count\":0,\"penalized_mean_gap\":null,\"pool\":\"search_instances\",\"problem\":\"tsp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"200\":11.349794163612426},\"score_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.349794163612426},\"score_name\":\"distance\",\"scored_count\":0,\"timeout_count\":0,\"timeout_distance\":null,\"timeout_fraction\":0.0,\"timeout_penalty\":0.0,\"timeout_seconds\":600.0,\"tour_length_by_instance_size\":{\"200\":11.349794163612426},\"tour_length_by_instance_source\":{\"synthetic:tsp_construct:n_instance=10:n_cities=200:seed=2024\":11.349794163612426},\"unscored_timeout_count\":0,\"valid_count\":10,\"worst_gap\":null},\"score_name\":\"distance\",\"score_value\":11.349794163612426,\"status\":\"valid\",\"thought\":\"Construct initial tour via nearest neighbor heuristic (start from node 0), then apply 2-opt local search until no improvement. Report new best tours during construction and each 2-opt improvement.\"},\"delta_vs_best_parent\":null,\"generation\":3,\"goal\":\"minimize TSP tour length while always returning a valid permutation\",\"parents\":[],\"problem\":\"tsp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Nearest neighbor with 2-opt achieved mean tour length 11.35 on 200-city TSP instances with 100% validity and no errors.\",\n  \"aim\": \"Reduce mean tour length by adding multiple restarts with random starting cities or tie-breaking in nearest neighbor, while preserving validity.\",\n  \"preserve\": [\n    \"nearest neighbor construction\",\n    \"2-opt local search\",\n    \"report_best_tour calls\",\n    \"valid permutation guarantee\"\n  ],\n  \"change\": [\n    \"Add restart loop with different starting towns or random choices during construction\"\n  ],\n  \"avoid\": [\n    \"introducing invalid tours or cycles\",\n    \"infinite loops from non-terminating local search\",\n    \"overly complex code that obscures core logic\"\n  ]\n}",
+  "status": "ok",
+  "type": "reflection"
+}
