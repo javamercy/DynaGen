@@ -159,7 +159,7 @@ def load_candidates(results_base):
 
 def main():
     base = Path(__file__).resolve().parent
-    root = base.parents[4]  # DynaGen project root
+    root = base.parents[3]  # DynaGen project root
     results_base = str(base)
     test_dir = root / "data" / "tsp" / "test_instances"
 
