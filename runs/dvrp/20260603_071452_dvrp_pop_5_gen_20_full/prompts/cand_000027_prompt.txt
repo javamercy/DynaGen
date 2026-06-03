@@ -1,0 +1,115 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000005 LLM reflection:
+- Summary: Candidate achieves ~33% gap on small instances but waits excessively (10.8 mean waits), limiting last-truck return time improvement.
+- Aim: Reduce mean waiting count by allowing proactive assignment when active cost is only slightly higher than best other, to speed overall fleet completion.
+
+Parent cand_000010 LLM reflection:
+- Summary: Candidate achieved equal gap (32.997%) but lower runtime (0.0077s) vs parent (0.012s), improving efficiency without performance loss.
+- Aim: Reduce gap by incorporating depot-return pressure or waiting behavior to expedite last-truck return.
+
+PARENTS:
+Candidate cand_000005: regret_based_dispatch
+Status: valid; Gap: 32.9974%
+Thought: For each available customer, compute the cost (distance from current position to customer + customer to depot) for the active truck and for every other truck. Identify customers where the active truck has the lowest cost (i.e., is uniquely best). If no such customer, wait (return None). Otherwise, select the customer with the largest savings (difference between second-best cost and active cost) to maximize benefit of assigning now. Tie-break by active cost (choose nearest). If only one truck, always serve the customer minimizing active cost.
+Mean gap: 32.997403692111824
+Mean TTT: 3.9163531129407465
+Gap by instance size: {'50': 32.997403692111824}
+TTT by instance size: {'50': 3.9163531129407465}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    n_trucks = len(truck_positions)
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+    
+    # Compute costs for each customer: active truck cost and all truck costs
+    # Cost = dist(truck_pos, customer) + dist(customer, depot)
+    delta = available_customers - depot_position  # for depot distance
+    depot_dist = np.linalg.norm(delta, axis=1)
+    
+    best = None  # best customer index
+    best_savings = -np.inf
+    
+    for i in range(len(available_customers)):
+        active_cost = np.linalg.norm(current_position - available_customers[i]) + depot_dist[i]
+        # compute costs for other trucks
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - available_customers[i]) + depot_dist[i]
+            other_costs.append(cost)
+        
+        if n_trucks == 1:
+            min_other = np.inf
+            best_cost = active_cost
+        else:
+            min_other = min(other_costs)
+            best_cost = min(active_cost, min_other)
+        
+        if active_cost <= min_other:
+            savings = min_other - active_cost
+            if savings > best_savings or (savings == best_savings and active_cost < best_cost_compare):
+                best_savings = savings
+                best = i
+                best_cost_compare = active_cost
+    
+    if best is None:
+        return None
+    return best
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

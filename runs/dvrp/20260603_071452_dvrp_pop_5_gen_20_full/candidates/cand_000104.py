@@ -1,0 +1,81 @@
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+
+    n_trucks = len(truck_positions)
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+
+    best_index = None
+    best_savings = -np.inf
+    best_active_cost = np.inf
+    fallback_indices = []
+
+    # Adaptive base threshold based on number of available customers
+    n_avail = len(available_customers)
+    if n_avail <= 5:
+        base_threshold = 1.2
+    else:
+        base_threshold = 1.1
+
+    # Additional modulation based on active truck's distance to depot relative to median
+    dist_active_to_depot = np.linalg.norm(current_position - depot_position)
+    truck_depot_dists = np.linalg.norm(truck_positions - depot_position, axis=1)
+    median_depot_dist = np.median(truck_depot_dists)
+    if dist_active_to_depot > median_depot_dist:
+        base_threshold -= 0.05
+    # Ensure threshold >= 1.0
+    base_threshold = max(base_threshold, 1.0)
+
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            other_costs.append(cost)
+
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_index = i
+                best_active_cost = active_cost
+            continue
+
+        min_other = min(other_costs)
+
+        if active_cost <= min_other:
+            savings = min_other - active_cost
+            # Tie-break by depot distance (far preferred)
+            if savings > best_savings or (savings == best_savings and depot_dists[i] > (depot_dists[best_index] if best_index is not None else -1)):
+                best_savings = savings
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            if active_cost <= base_threshold * min_other:
+                fallback_indices.append((i, depot_dists[i]))
+
+    if best_index is not None:
+        return best_index
+    elif fallback_indices:
+        # Choose the fallback customer with largest depot distance
+        fallback_indices.sort(key=lambda x: x[1], reverse=True)
+        return fallback_indices[0][0]
+    else:
+        return None

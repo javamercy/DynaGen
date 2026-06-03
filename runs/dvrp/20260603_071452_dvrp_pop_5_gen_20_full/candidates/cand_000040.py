@@ -1,0 +1,60 @@
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    n_trucks = truck_positions.shape[0]
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+    
+    # Precompute distances from each customer to depot
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    # Active truck's cost for each customer
+    active_dists = np.linalg.norm(available_customers - current_position, axis=1)
+    active_costs = active_dists + depot_dists
+    
+    if n_trucks == 1:
+        best_idx = np.argmin(active_costs)
+        return int(best_idx)
+    
+    # Compute costs for other trucks (excluding active)
+    mask = np.ones(n_trucks, dtype=bool)
+    mask[active_idx] = False
+    other_positions = truck_positions[mask]
+    # other_costs: shape (n_available, n_other_trucks)
+    other_dists = np.linalg.norm(available_customers[:, np.newaxis, :] - other_positions[np.newaxis, :, :], axis=2)
+    other_costs = other_dists + depot_dists[:, np.newaxis]
+    min_other = np.min(other_costs, axis=1)
+    savings = min_other - active_costs
+    
+    # Primary: active <= min_other
+    primary_mask = active_costs <= min_other
+    if np.any(primary_mask):
+        primary_savings = savings[primary_mask]
+        primary_active = active_costs[primary_mask]
+        # Among primary, maximize savings, then minimize active cost
+        # Use lexsort: first key: -savings (descending), second: active (ascending)
+        order = np.lexsort((primary_active, -primary_savings))
+        best_primary_idx = np.where(primary_mask)[0][order[0]]
+        return int(best_primary_idx)
+    
+    # Fallback: active <= 1.1 * min_other
+    fallback_mask = active_costs <= 1.1 * min_other
+    if np.any(fallback_mask):
+        fallback_active = active_costs[fallback_mask]
+        best_fallback_idx = np.where(fallback_mask)[0][np.argmin(fallback_active)]
+        return int(best_fallback_idx)
+    
+    return None

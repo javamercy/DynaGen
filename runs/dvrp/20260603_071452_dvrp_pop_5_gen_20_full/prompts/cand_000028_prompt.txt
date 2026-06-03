@@ -1,0 +1,118 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m1_component_replacement: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000022: proactive_threshold_dispatch_v2
+Status: valid; Gap: 36.4498%
+Thought: Use a higher threshold (1.3) to reduce waiting: assign active truck if its cost is at most 30% worse than the best other truck. Among eligible customers, select the one with smallest cost ratio (active_cost / min_other), tie-breaking by smallest active cost. For a single truck, always serve nearest customer.
+Mean gap: 36.44983667520232
+Mean TTT: 4.010811106806065
+Gap by instance size: {'50': 36.44983667520232}
+TTT by instance size: {'50': 4.010811106806065}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+
+    n_trucks = len(truck_positions)
+    # identify active truck index
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+
+    # precompute distances from each customer to depot
+    delta = available_customers - depot_position
+    depot_dist = np.linalg.norm(delta, axis=1)
+
+    threshold = 1.3  # allow up to 30% worse than best
+    best_idx = None
+    best_ratio = np.inf
+    best_active_cost = np.inf
+
+    for i in range(len(available_customers)):
+        active_cost = np.linalg.norm(current_position - available_customers[i]) + depot_dist[i]
+
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_idx = i
+                best_active_cost = active_cost
+            continue
+
+        # compute costs for other trucks
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - available_customers[i]) + depot_dist[i]
+            other_costs.append(cost)
+        min_other = min(other_costs)
+
+        # avoid division by zero
+        if min_other == 0:
+            ratio = 1.0 if active_cost == 0 else np.inf
+        else:
+            ratio = active_cost / min_other
+
+        if ratio <= threshold:
+            if ratio < best_ratio or (ratio == best_ratio and active_cost < best_active_cost):
+                best_ratio = ratio
+                best_active_cost = active_cost
+                best_idx = i
+
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

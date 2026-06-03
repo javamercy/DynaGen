@@ -1,0 +1,153 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+STRATEGY m3_simplify_generalize: Create a simpler and more robust version of one parent by removing brittle, over-specialized, redundant, or overly complex components. Preserve the essential idea and required behavior while improving generalization and maintainability.
+
+Use the provided parents as the primary source of design changes.
+
+Incorporate, adapt, recombine, repair, or refine the listed parents.
+
+Do not ignore the parents or generate an unrelated policy from scratch.
+
+PARENTS:
+Candidate cand_000084: adaptive_regret_with_far_truck_penalty
+Status: valid; Gap: 32.6881%
+Thought: Modify parent's base_threshold to depend on number of available customers (linear schedule) and make alpha adaptive based on active truck's depot distance relative to median. This provides more aggressive protection for far trucks when active truck is close to depot, and more conservative thresholds when many customers are available, improving load balancing and reducing TTT.
+Mean gap: 32.68806152726792
+Mean TTT: 3.907827991766085
+Gap by instance size: {'50': 32.68806152726792}
+TTT by instance size: {'50': 3.907827991766085}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+
+    n_trucks = len(truck_positions)
+    # find active truck index
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+
+    # compute depot distances of all trucks
+    truck_depot_dists = np.linalg.norm(truck_positions - depot_position, axis=1)
+    median_depot = np.median(truck_depot_dists)
+    active_depot_dist = truck_depot_dists[active_idx]
+
+    # adaptive base threshold: increases with number of available customers
+    n_avail = len(available_customers)
+    base_threshold = 1.1 + 0.1 * min(n_avail / 10, 5)  # range 1.1 to 1.6
+
+    best_index = None
+    best_savings = -np.inf
+    best_active_cost = np.inf
+    fallback_index = None
+    fallback_active_cost = np.inf
+    # track best fallback to break ties by depot distance
+    best_fallback_depot_dist = np.inf
+
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+
+        if n_trucks == 1:
+            if active_cost < best_active_cost or (active_cost == best_active_cost and depot_dists[i] < best_fallback_depot_dist):
+                best_index = i
+                best_active_cost = active_cost
+                best_fallback_depot_dist = depot_dists[i]
+            continue
+
+        # compute min cost among other trucks and find best other truck
+        min_other = np.inf
+        best_other_idx = -1
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            if cost < min_other:
+                min_other = cost
+                best_other_idx = j
+
+        savings = min_other - active_cost
+
+        if savings >= 0:
+            # active is at least as good as any other truck
+            if (savings > best_savings or 
+                (savings == best_savings and active_cost < best_active_cost)):
+                best_savings = savings
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            # active is worse; fallback with modulated threshold
+            best_other_depot = truck_depot_dists[best_other_idx]
+            if median_depot > 0 and active_depot_dist > 0:
+                # alpha larger when active truck is close to depot
+                alpha = 0.1 * (median_depot / (active_depot_dist + 1e-6))
+                factor = (best_other_depot - median_depot) / median_depot
+                modulated_threshold = base_threshold * (1 + alpha * factor)
+            else:
+                modulated_threshold = base_threshold
+            modulated_threshold = max(1.0, min(modulated_threshold, 2.0))
+            if active_cost <= modulated_threshold * min_other:
+                # prefer lower active cost, tie-break by depot distance
+                if (active_cost < fallback_active_cost or 
+                    (active_cost == fallback_active_cost and depot_dists[i] < best_fallback_depot_dist)):
+                    fallback_index = i
+                    fallback_active_cost = active_cost
+                    best_fallback_depot_dist = depot_dists[i]
+
+    if best_index is not None:
+        return best_index
+    elif fallback_index is not None:
+        return fallback_index
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

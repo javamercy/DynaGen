@@ -1,0 +1,74 @@
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    n_trucks = len(truck_positions)
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+    
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    best_index = None
+    best_opportunity = -np.inf
+    best_active_cost = np.inf
+    fallback_index = None
+    fallback_active_cost = np.inf
+    
+    # Adaptive threshold based on number of available customers
+    n_avail = len(available_customers)
+    if n_avail <= 5:
+        fallback_threshold = 1.2  # 20%
+    else:
+        fallback_threshold = 1.1  # 10%
+    
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+        
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            other_costs.append(cost)
+        
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_index = i
+                best_active_cost = active_cost
+            continue
+        
+        min_other = min(other_costs)
+        
+        if active_cost <= min_other:
+            # opportunity ratio: savings divided by active cost
+            opportunity = (min_other - active_cost) / active_cost
+            if opportunity > best_opportunity or (opportunity == best_opportunity and active_cost < best_active_cost):
+                best_opportunity = opportunity
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            # fallback: accept if active cost is within threshold
+            if active_cost <= fallback_threshold * min_other:
+                if active_cost < fallback_active_cost:
+                    fallback_index = i
+                    fallback_active_cost = active_cost
+    
+    if best_index is not None:
+        return best_index
+    elif fallback_index is not None:
+        return fallback_index
+    else:
+        return None

@@ -1,0 +1,93 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000029 LLM reflection:
+- Summary: Adaptive slack (delta=0.1/n_trucks) yields a 0.25% gap improvement over parent but increases mean waits from 6.9 to 10.4.
+- Aim: Reduce last-truck return time by better balancing waiting and depot-return pressure, possibly via tuning gamma or adding spatial clustering to discourage inefficient long trips.
+
+PARENTS:
+Candidate cand_000018: depot_aware_minimax_tiebreak
+Status: valid; Gap: 61.7504%
+Thought: Select customer that minimizes estimated maximum return time across trucks, with tie-breaking by distance to current position. Returns None only if no customers available.
+Mean gap: 61.750381792143045
+Mean TTT: 4.75318088307795
+Gap by instance size: {'50': 61.750381792143045}
+TTT by instance size: {'50': 4.75318088307795}
+History source: yes
+History bucket: dvrp:size:50
+History role: regime specialist
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    # Compute distances
+    cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)
+    dist_to_cust = np.linalg.norm(available_customers - current_position, axis=1)
+    candidate_returns = dist_to_cust + cust_to_depot
+    # Find index of current truck
+    diff = np.linalg.norm(truck_positions - current_position, axis=1)
+    idx_current = int(np.argmin(diff))
+    all_truck_depot_dists = np.linalg.norm(truck_positions - depot_position, axis=1)
+    if len(truck_positions) == 1:
+        candidate_ttt = candidate_returns
+    else:
+        other_max = np.max(np.delete(all_truck_depot_dists, idx_current))
+        candidate_ttt = np.maximum(candidate_returns, other_max)
+    # Modified selection: among customers with TTT within tolerance of min, pick closest
+    min_ttt = np.min(candidate_ttt)
+    tol = 1e-9
+    mask = candidate_ttt <= min_ttt + tol
+    # Among those, pick one with smallest distance to current position
+    distances_eligible = dist_to_cust[mask]
+    best_local_idx = int(np.argmin(distances_eligible))
+    # Find global index
+    global_indices = np.where(mask)[0]
+    best_idx = int(global_indices[best_local_idx])
+    return best_idx
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

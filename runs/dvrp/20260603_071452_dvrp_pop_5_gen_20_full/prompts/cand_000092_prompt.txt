@@ -1,0 +1,156 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000079 LLM reflection:
+- Summary: Regret-based selection with median-modulated fallback worsened gap (28.93% vs best parent 19.51%) for 3-truck instances.
+- Aim: Increase depot-return pressure to reduce last-truck finish time by penalizing assignments that extend remaining return distance.
+
+Parent cand_000065 LLM reflection:
+- Summary: Imbalance penalty and tiered selection increased gap from 30.5% to 32.1%, indicating added complexity hurt performance.
+- Aim: Restore simplified savings selection (active ≤ min_other) and refine fleet balance by incorporating truck proximity to customer without penalty, aiming to reduce gap below 30%.
+
+Parent cand_000076 LLM reflection:
+- Summary: Fixed slack of 0.1 yields gap 32.14% with mean_waits 5.5 and 51.5 decisions; best parent gap 30.50% with dynamic slack.
+- Aim: Reduce last-truck return time by adapting slack to remaining customer count to better balance competition and waiting.
+
+PARENTS:
+Candidate cand_000079: regret_with_far_truck_penalty
+Status: valid; Gap: 28.9321%
+Thought: Improve TTT by a regret-based rule that penalizes assigning customers to trucks far from depot. For each customer, if the active truck is the best (min cost), select the best savings. Otherwise, accept a fallback if the active cost is within a threshold that increases with the distance of the best other truck from depot, protecting far trucks from additional work. Return None if no acceptable customer.
+Mean gap: 28.9320826371496
+Mean TTT: 3.7908532350254283
+Gap by instance size: {'50': 28.9320826371496}
+TTT by instance size: {'50': 3.7908532350254283}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+
+    n_trucks = len(truck_positions)
+    # find active truck index
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+
+    # compute median depot distance of all trucks
+    truck_depot_dists = np.linalg.norm(truck_positions - depot_position, axis=1)
+    median_depot = np.median(truck_depot_dists)
+
+    best_index = None
+    best_savings = -np.inf
+    best_active_cost = np.inf
+    fallback_index = None
+    fallback_active_cost = np.inf
+
+    n_avail = len(available_customers)
+    if n_avail <= 5:
+        base_threshold = 1.2
+    else:
+        base_threshold = 1.1
+
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+
+        # single truck case
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_index = i
+                best_active_cost = active_cost
+            continue
+
+        # compute min cost among other trucks and find best other truck
+        min_other = np.inf
+        best_other_idx = -1
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            if cost < min_other:
+                min_other = cost
+                best_other_idx = j
+
+        savings = min_other - active_cost
+
+        if savings >= 0:
+            # active is at least as good as any other truck
+            if savings > best_savings or (savings == best_savings and active_cost < best_active_cost):
+                best_savings = savings
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            # active is worse than best other truck; consider fallback with modulated threshold
+            # compute modulation factor based on best other truck's depot distance
+            best_other_depot = truck_depot_dists[best_other_idx]
+            if median_depot > 0:
+                factor = (best_other_depot - median_depot) / median_depot
+                alpha = 0.1
+                modulated_threshold = base_threshold * (1 + alpha * factor)
+            else:
+                modulated_threshold = base_threshold
+            # cap threshold to avoid extremely poor assignments
+            modulated_threshold = max(1.0, min(modulated_threshold, 2.0))
+            if active_cost <= modulated_threshold * min_other:
+                if active_cost < fallback_active_cost:
+                    fallback_index = i
+                    fallback_active_cost = active_cost
+
+    if best_index is not None:
+        return best_index
+    elif fallback_index is not None:
+        return fallback_index
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}

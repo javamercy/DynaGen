@@ -1,0 +1,81 @@
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    n_trucks = len(truck_positions)
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+    
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    best_index = None
+    best_savings = -np.inf
+    best_active_cost = np.inf
+    fallback_index = None
+    fallback_active_cost = np.inf
+    
+    # Adaptive base threshold based on number of available customers
+    n_avail = len(available_customers)
+    if n_avail <= 5:
+        base_threshold = 1.2
+    else:
+        base_threshold = 1.1
+    
+    # Modulation based on active truck's distance to depot relative to median
+    dist_active_to_depot = np.linalg.norm(current_position - depot_position)
+    truck_depot_dists = np.linalg.norm(truck_positions - depot_position, axis=1)
+    median_depot_dist = np.median(truck_depot_dists)
+    if dist_active_to_depot > median_depot_dist:
+        base_threshold = max(1.0, base_threshold - 0.05)  # stricter for far truck
+    else:
+        base_threshold += 0.05  # more lenient for close truck
+    
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+        
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            other_costs.append(cost)
+        
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_index = i
+                best_active_cost = active_cost
+            continue
+        
+        min_other = min(other_costs)
+        
+        if active_cost <= min_other:
+            savings = min_other - active_cost
+            if savings > best_savings or (savings == best_savings and active_cost < best_active_cost):
+                best_savings = savings
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            if active_cost <= base_threshold * min_other:
+                if active_cost < fallback_active_cost:
+                    fallback_index = i
+                    fallback_active_cost = active_cost
+    
+    if best_index is not None:
+        return best_index
+    elif fallback_index is not None:
+        return fallback_index
+    else:
+        return None

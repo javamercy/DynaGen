@@ -1,0 +1,47 @@
+{
+  "candidate_id": "cand_000002",
+  "generation": 9,
+  "gradient": {
+    "aim": "Reduce waiting-induced delays by making the idle decision responsive to fleet pressure and expected return time.",
+    "avoid": [
+      "Removing waiting mechanism entirely",
+      "Adding future-knowledge features",
+      "Using global state beyond online dispatch"
+    ],
+    "candidate_id": "cand_000002",
+    "change": [
+      "Dynamically adjust waiting threshold based on truck's current distance from depot or remaining customer count",
+      "Incorporate a waiting penalty that increases with idle steps"
+    ],
+    "delta_vs_best_parent": null,
+    "evidence": {},
+    "generation": 9,
+    "parent_ids": [],
+    "preserve": [
+      "Depot-relative distance signal",
+      "Current position vs. customer distances",
+      "Waiting mechanism (return None)"
+    ],
+    "problem": "dvrp",
+    "score_name": "gap",
+    "score_value": 40.898017603613134,
+    "source": "llm",
+    "summary": "Candidate with static 2\u00d7 average depot-distance threshold achieved 40.9% gap due to excessive waiting.",
+    "version": 1
+  },
+  "model": "deepseek-v4-flash",
+  "problem": "dvrp",
+  "prompt": [
+    {
+      "content": "Produce concise, aim-guided LLM reflections for evolutionary code mutation.",
+      "role": "system"
+    },
+    {
+      "content": "Create one simple, aim-guided LLM reflection before this candidate is reused as a parent. Use measured evaluator evidence, parent comparison, code, thought, and errors. Do not invent unsupported weaknesses.\nOptimization goal: minimize the time until the last truck returns to the depot using only online dispatch state\nDomain focus: customer ranking, waiting behavior, fleet balance, depot-return pressure, spatial clustering, truck competition, per-call cost, and generalization across customer counts\n\nReturn exactly one JSON object with these keys: summary, aim, preserve, change, avoid.\nsummary: one sentence describing the measured outcome.\naim: one concrete objective for the next mutation, directly aligned with the optimization goal.\npreserve: a short list of mechanisms worth keeping.\nchange: a short list of one or two targeted changes to try next.\navoid: a short list of failure modes or distracting edits to avoid.\nKeep every value concise. Do not include Markdown, code, or text outside JSON.\n\nEvidence:\n{\"candidate\":{\"code\":\"import numpy as np\\n\\ndef choose_next_customer(current_position, depot_position, truck_positions, available_customers):\\n    if len(available_customers) == 0:\\n        return None\\n    dist_current_to_cust = np.linalg.norm(available_customers - current_position, axis=1)\\n    dist_cust_to_depot = np.linalg.norm(available_customers - depot_position, axis=1)\\n    avg_dist_cust_to_depot = np.mean(dist_cust_to_depot)\\n    min_idx = np.argmin(dist_current_to_cust)\\n    min_dist = dist_current_to_cust[min_idx]\\n    if min_dist > 2 * avg_dist_cust_to_depot:\\n        return None\\n    else:\\n        return int(min_idx)\",\"error_details\":null,\"generation\":0,\"id\":\"cand_000002\",\"metrics\":{\"best_gap\":18.585391930446914,\"budget\":1,\"gap\":40.898017603613134,\"gap_by_instance_size\":{\"50\":40.898017603613134},\"gap_by_instance_source\":{\"data\\\\dvrp\\\\train\\\\instances.pkl\":40.898017603613134},\"gap_by_truck_count\":{\"3\":40.898017603613134},\"history\":{\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"diversity_score\":1.0,\"history_score\":0.9321603991269706,\"in_history\":true,\"primary_bucket\":\"dvrp:size:50\",\"quality_score\":0.3793740830016906,\"robustness_score\":0.842621053750933},\"history_selection\":{\"bucket_score\":0.3793740830016906,\"buckets\":[\"global\",\"dvrp:size:50\",\"dvrp:trucks:3\",\"dvrp:source:instances.pkl\",\"dvrp:waits:low\",\"dvrp:completion:high\",\"dvrp:runtime:fast\",\"dvrp:mechanism:nearest_available\",\"dvrp:mechanism:wait_control\",\"dvrp:mechanism:return_policy\"],\"history_score\":0.8821603991269705,\"primary_bucket\":\"dvrp:size:50\",\"role\":\"regime specialist\"},\"invalid_count\":0,\"mean_completed_count\":49.0,\"mean_decisions\":51.2,\"mean_gap\":40.898017603613134,\"mean_runtime\":0.00513000999999349,\"mean_ttt\":4.144491136804165,\"mean_waits\":9.1,\"median_gap\":43.70430565945351,\"penalized_mean_gap\":40.898017603613134,\"penalized_mean_ttt\":4.144491136804165,\"pool\":\"search_instances\",\"problem\":\"dvrp\",\"runs\":10,\"runtime_error_count\":0,\"score_by_instance_size\":{\"50\":40.898017603613134},\"score_by_instance_source\":{\"data\\\\dvrp\\\\train\\\\instances.pkl\":40.898017603613134},\"score_by_truck_count\":{\"3\":40.898017603613134},\"score_name\":\"gap\",\"scored_count\":10,\"seeds\":[100],\"timeout_count\":0,\"timeout_fraction\":0.0,\"timeout_gap\":40.898017603613134,\"timeout_penalty\":0.0,\"timeout_seconds\":300.0,\"timeout_ttt\":4.144491136804165,\"ttt_by_instance_size\":{\"50\":4.144491136804165},\"ttt_by_instance_source\":{\"data\\\\dvrp\\\\train\\\\instances.pkl\":4.144491136804165},\"ttt_by_truck_count\":{\"3\":4.144491136804165},\"valid_count\":10,\"worst_gap\":57.29014344338282},\"score_name\":\"gap\",\"score_value\":40.898017603613134,\"status\":\"valid\",\"thought\":\"If the nearest available customer is farther than twice the average distance of customers from the depot, the truck waits at its current position; otherwise, it heads to the nearest customer. This heuristic avoids long deadhead trips when customers are clustered near the depot, anticipating that future customers may appear closer.\"},\"delta_vs_best_parent\":null,\"generation\":9,\"goal\":\"minimize the time until the last truck returns to the depot using only online dispatch state\",\"parents\":[],\"problem\":\"dvrp\"}\n",
+      "role": "user"
+    }
+  ],
+  "response": "{\n  \"summary\": \"Candidate with static 2\u00d7 average depot-distance threshold achieved 40.9% gap due to excessive waiting.\",\n  \"aim\": \"Reduce waiting-induced delays by making the idle decision responsive to fleet pressure and expected return time.\",\n  \"preserve\": [\"Depot-relative distance signal\", \"Current position vs. customer distances\", \"Waiting mechanism (return None)\"],\n  \"change\": [\"Dynamically adjust waiting threshold based on truck's current distance from depot or remaining customer count\", \"Incorporate a waiting penalty that increases with idle steps\"],\n  \"avoid\": [\"Removing waiting mechanism entirely\", \"Adding future-knowledge features\", \"Using global state beyond online dispatch\"]\n}",
+  "status": "ok",
+  "type": "reflection"
+}

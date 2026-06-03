@@ -1,0 +1,132 @@
+[system]
+You generate compact online DVRP dispatch policies that minimize TTT (last-truck return time).
+
+[user]
+Implement exactly this interface:
+
+def choose_next_customer(
+    current_position: np.ndarray,        # (2,) the deciding truck's position
+    depot_position: np.ndarray,          # (2,)
+    truck_positions: np.ndarray,         # (n_trucks, 2) all trucks
+    available_customers: np.ndarray,     # (n_available, 2) revealed unserved customers
+) -> int | None:
+
+Rules:
+- DVRP is an online dispatch problem; the objective is to minimize TTT, defined here as the last-truck return time.
+- Decide which customer the active truck (at current_position) should head to next.
+- Return an index into available_customers, or None to wait at the current position.
+- If available_customers is empty, return None.
+- The function is stateless across calls; treat each call as a one-shot decision with the snapshot given.
+- Do not assume coordinates beyond what is passed; do not hard-code instance sizes, truck counts, or dataset details.
+- Do not read/write files, use network, spawn subprocesses, or call external solvers.
+- No module-level mutable globals; the function may be called many times across instances.
+
+VERBAL GRADIENT MODE: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000044 LLM reflection:
+- Summary: The adaptive fallback threshold improved gap by ~1% but gap remains high at 29.5%, indicating the assignment logic still underperforms in minimizing last-truck return time.
+- Aim: Reduce last-truck return time by introducing a depot-return pressure that biases assignments toward customers that lower the maximum expected completion time across all trucks.
+
+Parent cand_000057 LLM reflection:
+- Summary: Candidate gap 33.97% is worse than best parent (29.51%) by 4.46%, showing no improvement in minimizing last-truck return time.
+- Aim: Refine slack calculation and eligibility criteria to reduce unnecessary waiting improve assignment balance across trucks under varying customer counts.
+
+PARENTS:
+Candidate cand_000044: adaptive_threshold_savings
+Status: valid; Gap: 29.5081%
+Thought: Modify parent's fallback threshold from fixed 10% to adaptive based on number of available customers: 20% if few (<=5), else 10%. This makes the policy more patient when choices are limited, potentially reducing last-truck return time by avoiding unnecessary waits or poor assignments.
+Mean gap: 29.508072489997158
+Mean TTT: 3.8105153769609563
+Gap by instance size: {'50': 29.508072489997158}
+TTT by instance size: {'50': 3.8105153769609563}
+Code:
+```python
+import numpy as np
+
+def choose_next_customer(
+    current_position: np.ndarray,
+    depot_position: np.ndarray,
+    truck_positions: np.ndarray,
+    available_customers: np.ndarray,
+) -> int | None:
+    if len(available_customers) == 0:
+        return None
+    
+    n_trucks = len(truck_positions)
+    active_idx = None
+    for i in range(n_trucks):
+        if np.allclose(truck_positions[i], current_position):
+            active_idx = i
+            break
+    if active_idx is None:
+        raise ValueError("current_position not found in truck_positions")
+    
+    depot_dists = np.linalg.norm(available_customers - depot_position, axis=1)
+    
+    best_index = None
+    best_savings = -np.inf
+    best_active_cost = np.inf
+    fallback_index = None
+    fallback_active_cost = np.inf
+    
+    # Adaptive threshold based on number of available customers
+    n_avail = len(available_customers)
+    if n_avail <= 5:
+        fallback_threshold = 1.2  # 20%
+    else:
+        fallback_threshold = 1.1  # 10%
+    
+    for i in range(n_avail):
+        cust = available_customers[i]
+        active_cost = np.linalg.norm(current_position - cust) + depot_dists[i]
+        
+        other_costs = []
+        for j in range(n_trucks):
+            if j == active_idx:
+                continue
+            cost = np.linalg.norm(truck_positions[j] - cust) + depot_dists[i]
+            other_costs.append(cost)
+        
+        if n_trucks == 1:
+            if active_cost < best_active_cost:
+                best_index = i
+                best_active_cost = active_cost
+            continue
+        
+        min_other = min(other_costs)
+        
+        if active_cost <= min_other:
+            savings = min_other - active_cost
+            if savings > best_savings or (savings == best_savings and active_cost < best_active_cost):
+                best_savings = savings
+                best_index = i
+                best_active_cost = active_cost
+        else:
+            if active_cost <= fallback_threshold * min_other:
+                if active_cost < fallback_active_cost:
+                    fallback_index = i
+                    fallback_active_cost = active_cost
+    
+    if best_index is not None:
+        return best_index
+    elif fallback_index is not None:
+        return fallback_index
+    else:
+        return None
+```
+
+Minimize TTT: the time until the last truck returns to the depot. This is the only optimization goal.
+
+Internal check before final JSON: correct choose_next_customer signature, returns None or a valid
+available_customers index, handles empty available_customers no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+{
+  "name": "snake_case_or_title",
+  "thought": "brief public summary of the dispatch rule, tie-break, and wait condition",
+  "code": "complete Python code as a JSON string"
+}
