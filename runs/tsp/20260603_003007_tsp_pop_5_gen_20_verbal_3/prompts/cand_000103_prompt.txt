@@ -1,0 +1,128 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000033: restart_annealer
+
+Status: valid; distance: 12.9574
+
+Thought: Nearest neighbor construction with simulated annealing using insertion moves and restart from perturbed NN when no improvement for 2000 iterations.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    
+    def nearest_neighbor(start):
+        tour = [start]
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        curr = start
+        while unvisited:
+            next_city = min(unvisited, key=lambda city: distance_matrix[curr, city])
+            tour.append(next_city)
+            unvisited.remove(next_city)
+            curr = next_city
+        return tour
+    
+    def cost(tour):
+        total = 0.0
+        for i in range(n):
+            total += distance_matrix[tour[i], tour[(i+1)%n]]
+        return total
+    
+    # Initial tour
+    current_tour = nearest_neighbor(0)
+    current_cost = cost(current_tour)
+    best_tour = current_tour.copy()
+    best_cost = current_cost
+    report_best_tour(np.array(best_tour))
+    
+    temp = 100.0
+    cooling = 0.995
+    max_iter = 10000
+    restart_threshold = 2000
+    no_improve = 0
+    
+    for _ in range(max_iter):
+        # Insertion move
+        i = random.randint(0, n-1)
+        city = current_tour[i]
+        new_tour = current_tour[:i] + current_tour[i+1:]
+        j = random.randint(0, n-1)
+        new_tour.insert(j, city)
+        new_cost = cost(new_tour)
+        delta = new_cost - current_cost
+        if delta < 0 or random.random() < np.exp(-delta / temp):
+            current_tour = new_tour
+            current_cost = new_cost
+            if new_cost < best_cost:
+                best_cost = new_cost
+                best_tour = current_tour.copy()
+                report_best_tour(np.array(best_tour))
+                no_improve = 0
+            else:
+                no_improve += 1
+        else:
+            no_improve += 1
+        
+        if no_improve >= restart_threshold:
+            # Restart from perturbed NN
+            start = random.randint(0, n-1)
+            current_tour = nearest_neighbor(start)
+            current_cost = cost(current_tour)
+            temp = 100.0  # reset temperature
+            no_improve = 0
+        else:
+            temp *= cooling
+    
+    return np.array(best_tour)
+
+```
+
+STRATEGY: m1_component_replacement
+
+GOAL: Create a modified version of one parent by replacing exactly one major component while preserving the parent algorithm's overall identity. Possible components include initialization, candidate generation, scoring, selection, update, acceptance, refinement, restart logic, or budget allocation.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

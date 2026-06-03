@@ -1,0 +1,154 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000058: aco_random_init
+
+Status: valid; distance: 10.8506
+
+Thought: Replace nearest neighbor initialization with random permutation to explore different initial conditions, maintaining identical ACO parameters and stepwise stagnation restart logic.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    # random initial tour
+    tour = np.random.permutation(n)
+    best_tour = tour.copy()
+    best_dist = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))
+    report_best_tour(best_tour)
+    # pheromone initialization
+    mean_dist = np.mean(distance_matrix[distance_matrix > 0])
+    tau0 = 1.0 / (n * mean_dist)
+    pheromone = np.full((n, n), tau0)
+    np.fill_diagonal(pheromone, 0)
+    # parameters
+    n_ants = max(10, n // 10)
+    n_iterations = 200
+    alpha = 1.0
+    beta = 5.0
+    rho = 0.95
+    Q = 1.0
+    # heuristic
+    eta = 1.0 / (distance_matrix + np.eye(n))
+    np.fill_diagonal(eta, 0)
+    # stepwise stagnation threshold
+    step_points = [0, n_iterations // 3, 2 * n_iterations // 3, n_iterations]
+    step_values = [20, 10, 5]
+    no_improve = 0
+    # main loop
+    for iteration in range(n_iterations):
+        # determine max_no_improve for current iteration
+        for idx in range(len(step_points)-1):
+            if step_points[idx] <= iteration < step_points[idx+1]:
+                max_no_improve = step_values[idx]
+                break
+        tours = []
+        dists = []
+        for _ in range(n_ants):
+            tour = [np.random.randint(n)]
+            visited = set(tour)
+            while len(tour) < n:
+                i = tour[-1]
+                tau = pheromone[i, :]
+                prob = (tau ** alpha) * (eta[i, :] ** beta)
+                prob[list(visited)] = 0
+                prob_sum = prob.sum()
+                if prob_sum == 0:
+                    choices = [c for c in range(n) if c not in visited]
+                    next_city = np.random.choice(choices)
+                else:
+                    prob = prob / prob_sum
+                    next_city = np.random.choice(n, p=prob)
+                tour.append(next_city)
+                visited.add(next_city)
+            # 2-opt local search
+            improved = True
+            tour_arr = np.array(tour)
+            while improved:
+                improved = False
+                for i in range(n-1):
+                    for j in range(i+1, n):
+                        if j - i == 1:
+                            continue
+                        a, b = tour_arr[i], tour_arr[(i+1)%n]
+                        c, d = tour_arr[j], tour_arr[(j+1)%n]
+                        if distance_matrix[a, c] + distance_matrix[b, d] < distance_matrix[a, b] + distance_matrix[c, d]:
+                            tour_arr[i+1:j+1] = tour_arr[i+1:j+1][::-1]
+                            improved = True
+            dist = sum(distance_matrix[tour_arr[k], tour_arr[(k+1)%n]] for k in range(n))
+            tours.append(tour_arr)
+            dists.append(dist)
+            if dist < best_dist:
+                best_dist = dist
+                best_tour = tour_arr.copy()
+                report_best_tour(best_tour)
+                no_improve = 0
+        # evaporation
+        pheromone *= (1 - rho)
+        # deposit pheromone from ants
+        for tour_arr, dist in zip(tours, dists):
+            for k in range(n):
+                i, j = tour_arr[k], tour_arr[(k+1)%n]
+                pheromone[i, j] += Q / dist
+                pheromone[j, i] += Q / dist
+        # elitist reinforcement on best tour
+        for k in range(n):
+            i, j = best_tour[k], best_tour[(k+1)%n]
+            pheromone[i, j] += Q / best_dist
+            pheromone[j, i] += Q / best_dist
+        # stagnation check
+        no_improve += 1
+        if no_improve >= max_no_improve:
+            pheromone = np.full((n, n), tau0)
+            np.fill_diagonal(pheromone, 0)
+            no_improve = 0
+    return best_tour
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000058 LLM reflection:
+- Summary: Replacing nearest neighbor initialization with random permutation slightly improved tour length (10.8506 vs 10.8555) on synthetic 200-city instances while maintaining validity.
+- Aim: Improve solution quality by enhancing construction heuristic diversity without sacrificing initial tour quality.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

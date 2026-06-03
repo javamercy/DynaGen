@@ -1,0 +1,261 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000003: nn2opt_tsp
+
+Status: valid; distance: 11.3997
+
+Thought: Nearest neighbor construction for initial tour, then 2-opt improvement on cyclic path extension. Uses vectorized delta calculation and array reversal.
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    if n == 1:
+        tour = np.array([0], dtype=np.int32)
+        report_best_tour(tour)
+        return tour
+    # Nearest neighbor construction
+    tour = np.empty(n, dtype=np.int32)
+    unvisited = np.ones(n, dtype=bool)
+    tour[0] = 0
+    unvisited[0] = False
+    current = 0
+    for i in range(1, n):
+        dists = np.where(unvisited, distance_matrix[current], np.inf)
+        next_node = np.argmin(dists)
+        tour[i] = next_node
+        unvisited[next_node] = False
+        current = next_node
+    report_best_tour(tour)
+    # 2-opt on extended tour
+    ext = np.empty(n+1, dtype=np.int32)
+    ext[:n] = tour
+    ext[n] = tour[0]
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n):
+            for j in range(i+2, n):
+                delta = (distance_matrix[ext[i], ext[j]] +
+                         distance_matrix[ext[i+1], ext[j+1]] -
+                         distance_matrix[ext[i], ext[i+1]] -
+                         distance_matrix[ext[j], ext[j+1]])
+                if delta < 0:
+                    ext[i+1:j+1] = ext[i+1:j+1][::-1]
+                    improved = True
+                    new_tour = ext[:n].copy()
+                    report_best_tour(new_tour)
+                    break
+            if improved:
+                break
+    return ext[:n]
+
+```
+
+Candidate cand_000004: ant_colony_tsp
+
+Status: valid; distance: 10.9795
+
+Thought: ACO with 2-opt improvement. Initialize with nearest neighbor. Each ant constructs tour using pheromone and heuristic (inverse distance). Apply 2-opt to each ant's tour. Update global best and pheromone matrix.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = distance_matrix.shape[0]
+    # nearest neighbor initial tour
+    start = 0
+    unvisited = set(range(n))
+    unvisited.remove(start)
+    tour = [start]
+    cur = start
+    while unvisited:
+        next_city = min(unvisited, key=lambda x: distance_matrix[cur, x])
+        tour.append(next_city)
+        unvisited.remove(next_city)
+        cur = next_city
+    best_tour = np.array(tour)
+    best_dist = sum(distance_matrix[best_tour[i], best_tour[(i+1)%n]] for i in range(n))
+    report_best_tour(best_tour)
+    # pheromone initialization
+    mean_dist = np.mean(distance_matrix[distance_matrix > 0])
+    tau0 = 1.0 / (n * mean_dist)
+    pheromone = np.full((n, n), tau0)
+    np.fill_diagonal(pheromone, 0)
+    # parameters
+    n_ants = 10
+    n_iterations = 100
+    alpha = 1.0
+    beta = 2.0
+    rho = 0.5
+    Q = 1.0
+    # heuristic
+    eta = 1.0 / (distance_matrix + np.eye(n))  # avoid division by zero
+    np.fill_diagonal(eta, 0)
+    # main loop
+    for _ in range(n_iterations):
+        for _ in range(n_ants):
+            # construct tour
+            tour = [np.random.randint(n)]
+            visited = set(tour)
+            while len(tour) < n:
+                i = tour[-1]
+                # compute probabilities
+                tau = pheromone[i, :]
+                prob = (tau ** alpha) * (eta[i, :] ** beta)
+                prob[list(visited)] = 0
+                prob_sum = prob.sum()
+                if prob_sum == 0:
+                    # fallback to random
+                    choices = [c for c in range(n) if c not in visited]
+                    next_city = np.random.choice(choices)
+                else:
+                    prob = prob / prob_sum
+                    next_city = np.random.choice(n, p=prob)
+                tour.append(next_city)
+                visited.add(next_city)
+            # 2-opt local search
+            improved = True
+            tour = np.array(tour)
+            while improved:
+                improved = False
+                for i in range(n-1):
+                    for j in range(i+1, n):
+                        if j - i == 1:
+                            continue
+                        a, b = tour[i], tour[(i+1)%n]
+                        c, d = tour[j], tour[(j+1)%n]
+                        if distance_matrix[a, c] + distance_matrix[b, d] < distance_matrix[a, b] + distance_matrix[c, d]:
+                            tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                            improved = True
+            # evaluate
+            dist = sum(distance_matrix[tour[k], tour[(k+1)%n]] for k in range(n))
+            if dist < best_dist:
+                best_dist = dist
+                best_tour = tour.copy()
+                report_best_tour(best_tour)
+            # pheromone deposit
+            for k in range(n):
+                i, j = tour[k], tour[(k+1)%n]
+                pheromone[i, j] += Q / dist
+                pheromone[j, i] += Q / dist
+        # evaporation
+        pheromone *= (1 - rho)
+    return best_tour
+
+```
+
+Candidate cand_000001: nn_2opt_tsp
+
+Status: valid; distance: 11.7151
+
+Thought: Greedy nearest neighbor construction from node 0, ties broken by node index, then 2-opt local search with first-improvement strategy. Report each new best tour.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = len(distance_matrix)
+    # Nearest neighbor construction
+    tour = [0]
+    unvisited = set(range(1, n))
+    current = 0
+    while unvisited:
+        next_city = min(unvisited, key=lambda x: (distance_matrix[current][x], x))
+        tour.append(next_city)
+        unvisited.remove(next_city)
+        current = next_city
+    tour = np.array(tour, dtype=int)
+    best_tour = tour.copy()
+    best_cost = total_distance(distance_matrix, tour)
+    report_best_tour(best_tour)
+    # 2-opt improvement
+    improved = True
+    while improved:
+        improved = False
+        for i in range(n - 1):
+            for j in range(i + 2, n):
+                # skip if j is last and i is first (wrap-around not needed since no return to start)
+                if i == 0 and j == n - 1:
+                    continue
+                # new tour after 2-opt swap
+                new_tour = tour.copy()
+                new_tour[i+1:j+1] = tour[j:i:-1]  # reverse segment
+                new_cost = total_distance(distance_matrix, new_tour)
+                if new_cost < best_cost:
+                    best_tour = new_tour.copy()
+                    best_cost = new_cost
+                    tour = best_tour.copy()
+                    improved = True
+                    report_best_tour(best_tour)
+                    break
+            if improved:
+                break
+    return best_tour
+
+def total_distance(dist_matrix, tour):
+    n = len(tour)
+    total = 0
+    for i in range(n - 1):
+        total += dist_matrix[tour[i]][tour[i+1]]
+    return total
+
+```
+
+STRATEGY: e2_backbone_exploration
+
+GOAL: Identify the useful shared backbone among the provided parents, then create a new algorithm that preserves that core principle while changing the surrounding mechanism, structure, or execution strategy. The result should be motivated by the parents but clearly not a direct copy.
+
+Use the provided parent(s) as the primary source of design changes.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.

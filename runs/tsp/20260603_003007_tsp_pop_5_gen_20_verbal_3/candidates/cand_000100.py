@@ -1,0 +1,72 @@
+import numpy as np
+
+def solve_tsp(distance_matrix):
+    n = distance_matrix.shape[0]
+    best_dist = float('inf')
+    best_tour = None
+    num_restarts = 10
+    
+    def two_opt(tour):
+        improved = True
+        while improved:
+            improved = False
+            for i in range(n-2):
+                for j in range(i+2, n):
+                    if j - i == 1:
+                        continue
+                    a, b = tour[i], tour[i+1]
+                    c, d = tour[j], tour[(j+1) % n]
+                    if distance_matrix[a, c] + distance_matrix[b, d] < distance_matrix[a, b] + distance_matrix[c, d]:
+                        tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                        improved = True
+        return tour
+    
+    def tour_distance(tour):
+        return sum(distance_matrix[tour[i], tour[(i+1)%n]] for i in range(n))
+    
+    for _ in range(num_restarts):
+        start = np.random.randint(n)
+        unvisited = set(range(n))
+        unvisited.remove(start)
+        tour = [start]
+        cur = start
+        while unvisited:
+            next_city = min(unvisited, key=lambda x: distance_matrix[cur, x])
+            tour.append(next_city)
+            unvisited.remove(next_city)
+            cur = next_city
+        tour = np.array(tour)
+        tour = two_opt(tour)
+        curr_dist = tour_distance(tour)
+        if curr_dist < best_dist:
+            best_dist = curr_dist
+            best_tour = tour.copy()
+            report_best_tour(best_tour)
+        
+        no_improve = 0
+        for _ in range(n):
+            i, j = np.random.choice(n, 2, replace=False)
+            new_tour = tour.copy()
+            new_tour[i], new_tour[j] = new_tour[j], new_tour[i]
+            new_tour = two_opt(new_tour)
+            new_dist = tour_distance(new_tour)
+            if new_dist < best_dist:
+                best_dist = new_dist
+                best_tour = new_tour.copy()
+                report_best_tour(best_tour)
+                tour = new_tour
+                no_improve = 0
+            elif new_dist < curr_dist:
+                tour = new_tour
+                curr_dist = new_dist
+                no_improve = 0
+            else:
+                no_improve += 1
+                if no_improve > 20:
+                    break
+        final_dist = tour_distance(tour)
+        if final_dist < best_dist:
+            best_dist = final_dist
+            best_tour = tour.copy()
+            report_best_tour(best_tour)
+    return best_tour

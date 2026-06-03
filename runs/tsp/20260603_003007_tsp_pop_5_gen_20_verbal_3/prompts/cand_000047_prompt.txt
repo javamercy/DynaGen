@@ -1,0 +1,115 @@
+[system]
+
+    You generate compact, robust Python TSP metaheuristics.
+    You must follow the requested interface exactly, always preserve tour validity.
+    
+
+[user]
+PARENTS:
+Candidate cand_000018: insertion_annealer
+
+Status: valid; distance: 13.3748
+
+Thought: Nearest neighbor construction then simulated annealing with random node insertion moves and Metropolis acceptance. Exponential cooling, track best tour, report via callback.
+
+History source: yes
+History bucket: tsp:size:200
+History role: regime specialist
+
+Code:
+
+```python
+
+import numpy as np
+import random
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+    n = len(distance_matrix)
+    # Nearest neighbor construction
+    unvisited = set(range(1, n))
+    tour = [0]
+    curr = 0
+    while unvisited:
+        next_city = min(unvisited, key=lambda city: distance_matrix[curr, city])
+        tour.append(next_city)
+        unvisited.remove(next_city)
+        curr = next_city
+    best_tour = tour.copy()
+    best_cost = sum(distance_matrix[tour[i], tour[(i+1)%n]] for i in range(n-1)) + distance_matrix[tour[-1], tour[0]]
+    report_best_tour(np.array(best_tour))
+
+    def cost(t):
+        total = 0.0
+        for i in range(n):
+            total += distance_matrix[t[i], t[(i+1)%n]]
+        return total
+
+    temp = 100.0
+    cooling = 0.995
+    iterations = 10000
+    for _ in range(iterations):
+        # Random node insertion move
+        i = random.randint(0, n-1)
+        city = tour[i]
+        new_tour = tour[:i] + tour[i+1:]
+        j = random.randint(0, n-1)
+        new_tour.insert(j, city)
+        curr_cost = cost(tour)
+        new_cost = cost(new_tour)
+        delta = new_cost - curr_cost
+        if delta < 0 or random.random() < np.exp(-delta / temp):
+            tour = new_tour
+            if new_cost < best_cost:
+                best_cost = new_cost
+                best_tour = tour.copy()
+                report_best_tour(np.array(best_tour))
+        temp *= cooling
+    return np.array(best_tour)
+
+```
+
+VERBAL GRADIENT: follow the reflection below as the primary source of change.
+
+Use the supplied parents as supporting evidence only.
+
+PARENT-SPECIFIC LLM REFLECTIONS:
+
+Parent cand_000018 LLM reflection:
+- Summary: Random insertion move in simulated annealing achieved identical tour quality as the parent's 2-opt but with 61% higher runtime, indicating no benefit and a need for diversification to escape the same local optimum.
+- Aim: Introduce a restart mechanism that reinitializes the tour from a perturbed nearest-neighbor construction after a period of no improvement, to escape local optima and potentially find shorter tours.
+
+Parent cand_000038 LLM reflection:
+- Summary: Increased ant count and iterations improved tour length slightly over parent; ACO with 2-opt and adaptive restart remains effective.
+- Aim: Achieve further tour length reduction by tuning ACO parameters and/or enhancing local search.
+
+Parent cand_000024 LLM reflection:
+- Summary: The candidate cut runtime via single-pass 2-opt and limited restarts, but tour length worsened (11.83 vs parent 11.34), showing insufficient local search depth.
+- Aim: Improve tour length by intensifying local search (allow multiple 2-opt passes) while controlling runtime with early termination or adaptive restart count.
+
+Distance is the search objective for TSP; lower distance is better.
+
+Implement this function only:
+
+def solve_tsp(distance_matrix: np.ndarray) -> np.ndarray:
+
+Requirements:
+- Minimize total TSP tour distance.
+- Return a 1D np.ndarray containing each node exactly once.
+- Do not repeat the start node at the end.
+- Use only distance_matrix; do not assume coordinates.
+- Create a valid tour early.
+- Call report_best_tour(tour) whenever a new best valid tour is found, assume this func already exists.
+- Do not use files, network, subprocesses, or external solvers.
+- Keep the code compact and robust.
+
+correct signature, valid tour on every return path,
+early report_best_tour, allowed imports only, no I/O/network/subprocesses.
+
+Return one JSON object and nothing else:
+
+{
+  "name": "short_snake_case_name",
+  "thought": "high-level summary of the construction, improvement, and tie-break logic",
+  "code": "complete Python code as a JSON string"
+}
+No Markdown, fences, or text outside JSON. The code string must define solve_tsp.
